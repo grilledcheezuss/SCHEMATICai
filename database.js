@@ -7201,7 +7201,7 @@ window.LOCAL_PANEL_DATA = [
 { id: "6929C", hp: "84", volt: "480", mfg: "SULZER SUB", keys: "CITY OF BOSSIER CITIZEN'S BANK VFD 3 3RSS" },
 { id: "6930R1", hp: "FRACTIONAL", volt: "120", mfg: "BOOSTER/CHEM", keys: "TMB26 STANDARD CHLORINE DIOXIDE (CLO2) GENERATOR 4XFG" },
 { id: "6951R1", hp: "15", volt: "277/480", mfg: "HYDRO SUB", keys: "WEST JEFFERSON BUCKET 4XSS" },
-{ id: "6953A", hp: "", volt: "120", mfg: "WELL", keys: "LEWISBURG WELL 1 " },//force update
+{ id: "6953A", hp: "", volt: "120", mfg: "WELL", keys: "LEWISBURG WELL 1 " },
 { id: "6953B", hp: "", volt: "120", mfg: "WELL", keys: "LEWISBURG WELL 2 " },
 { id: "6954A", hp: "", volt: "120", mfg: "WELL", keys: "LEWISBURG BOOSTER PUMP 1 " },
 { id: "6954B", hp: "", volt: "120", mfg: "WELL", keys: "LEWISBURG BOOSTER PUMP 2 " },
