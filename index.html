@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v7.2 - Stable)</title>
+    <title>Cox Research | SCHEMATICai (v7.3 - Refinery Restored)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -129,12 +129,20 @@
 
 <div id="config-modal">
     <div class="config-card">
-        <h3 style="margin-top:0; color:var(--app-primary);">🔌 API Connection</h3>
+        <h3 style="margin-top:0; color:var(--app-primary);">🔌 Connection & Tools</h3>
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Credentials</p>
         <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
         <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;" value="appgc1pbuOgmODRpj" disabled>
         <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name" style="margin-bottom:15px;" value="Control Panel Items" disabled>
-        <button class="submit-feedback-btn" onclick="ConfigService.save()">Save & Connect</button>
+        <div style="display:flex; gap:10px;">
+            <button class="submit-feedback-btn" style="background:var(--app-primary);" onclick="ConfigService.save()">Save</button>
+            <button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button>
+        </div>
+        
+        <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
+        <h4 style="margin:0 0 10px 0;">Data Refinery</h4>
+        <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="HarvestService.start()">📥 Harvest & Clean All Data</button>
+        <div id="harvest-status" style="font-size:11px; margin-top:10px; color:#666;"></div>
     </div>
 </div>
 
@@ -143,7 +151,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v7.2</div>
+    <div class="version-badge">SCHEMATICai v7.3</div>
     <div class="header-controls">
         <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -202,9 +210,9 @@
 </div>
 
 <script>
-// --- SCHEMATICai v7.2 (STABLE) ---
+// --- SCHEMATICai v7.3 (REFINERY & PARSING) ---
 
-// CONSTANTS (Base/Table Hardcoded to prevent user error)
+// CONSTANTS
 const AT_BASE = 'appgc1pbuOgmODRpj';
 const AT_TABLE = 'Control Panel Items';
 
@@ -258,6 +266,7 @@ class SpecExtractor {
         if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø")) specs.phase = "3";
         else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø")) specs.phase = "1";
 
+        console.log(`Parsing: "${text.substring(0,20)}..." ->`, specs);
         return specs;
     }
 }
@@ -268,7 +277,57 @@ const HealingDB = {
     "CP-2801": { mfg: "GORMAN RUPP", phase: "3" } 
 };
 
-// 4. AIRTABLE SERVICE
+// 4. HARVEST SERVICE (RESTORED)
+class HarvestService {
+    static async start() {
+        const config = ConfigService.get();
+        const status = document.getElementById('harvest-status');
+        if(!config.apiKey) return alert("Please save API Keys first.");
+        status.innerText = "⏳ Connecting...";
+        
+        const allRecords = [];
+        let offset = null;
+        try {
+            do {
+                const url = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.tableName)}?pageSize=100${offset ? '&offset='+offset : ''}`;
+                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
+                const data = await resp.json();
+                if(!data.records) break;
+                
+                data.records.forEach(r => {
+                    const f = r.fields;
+                    const desc = f['Items'] || "";
+                    const extracted = SpecExtractor.extract(desc);
+                    
+                    allRecords.push({
+                        "Panel Number": f['Control Panel Name'],
+                        "Manufacturer": extracted.mfg || "",
+                        "HP": extracted.hp || "",
+                        "Voltage": extracted.volt || "",
+                        "Phase": extracted.phase || "",
+                        "Description": desc,
+                        "PDF Link": (f['Control Panel PDF'] && f['Control Panel PDF'][0]) ? f['Control Panel PDF'][0].url : ""
+                    });
+                });
+                offset = data.offset;
+                status.innerText = `⏳ Harvested ${allRecords.length} records...`;
+            } while (offset);
+            
+            if(allRecords.length > 0) {
+                const headers = Object.keys(allRecords[0]);
+                const csv = [headers.join(','), ...allRecords.map(row => headers.map(h => `"${(row[h]||'').toString().replace(/"/g, '""')}"`).join(','))].join('\n');
+                const blob = new Blob([csv], {type: 'text/csv'});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'golden_database.csv';
+                link.click();
+                status.innerText = "✅ Download Started.";
+            }
+        } catch(e) { status.innerText = "❌ Error: " + e.message; }
+    }
+}
+
+// 5. AIRTABLE SERVICE
 class AirtableService {
     static async search(criteria) {
         const config = ConfigService.get();
@@ -301,7 +360,6 @@ class AirtableService {
                 const desc = f['Items'] || "";
                 let extracted = SpecExtractor.extract(desc);
                 const id = f['Control Panel Name'];
-                
                 if(HealingDB[id]) extracted = { ...extracted, ...HealingDB[id] };
 
                 return {
@@ -399,12 +457,12 @@ class SearchEngine {
         let results = await AirtableService.search(criteria);
         
         if (results) {
-            // STRICT LOCAL FILTER
+            // SOFT FILTER: Only remove if extraction exists AND conflicts
             results = results.filter(rec => {
-                if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg !== criteria.mfg) return false;
-                if(criteria.hp && criteria.hp !== "Any" && rec.hp !== criteria.hp) return false;
-                if(criteria.volt && criteria.volt !== "Any" && rec.volt !== criteria.volt) return false;
-                if(criteria.phase && criteria.phase !== "Any" && rec.phase !== criteria.phase) return false;
+                if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg && rec.mfg !== criteria.mfg) return false;
+                if(criteria.hp && criteria.hp !== "Any" && rec.hp && rec.hp !== criteria.hp) return false;
+                // Voltage/Phase usually strict, but if extraction failed (null), let it pass to user can decide
+                if(criteria.phase && criteria.phase !== "Any" && rec.phase && rec.phase !== criteria.phase) return false;
                 return true;
             });
         }
@@ -443,7 +501,7 @@ class UI {
             card.className = 'record-card';
             
             let badges = '';
-            if(criteria.mfg && criteria.mfg !== "Any") badges += `<span class="hud-badge match-exact">${rec.mfg || "Unknown"}</span>`;
+            if(criteria.mfg && criteria.mfg !== "Any") badges += `<span class="hud-badge ${rec.mfg ? 'match-exact' : ''}">${rec.mfg || "Unknown"}</span>`;
             if(criteria.hp && criteria.hp !== "Any") badges += `<span class="hud-badge match-exact">${rec.hp || "HP?"} HP</span>`;
             if(criteria.volt && criteria.volt !== "Any") badges += `<span class="hud-badge match-exact">${rec.volt || "V?"}V</span>`;
             if(criteria.phase && criteria.phase !== "Any") badges += `<span class="hud-badge match-exact">${rec.phase || criteria.phase}PH</span>`;
@@ -486,8 +544,7 @@ class App {
     static init() {
         AuthService.init();
         UI.populateDropdowns();
-        
-        // Load API Key to UI if exists
+        // Load existing key to UI
         const conf = ConfigService.get();
         if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
     }
