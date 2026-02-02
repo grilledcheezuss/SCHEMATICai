@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v5.8 - Strict Fix)</title>
+    <title>Cox Research | SCHEMATICai (v5.9 - Deep Clean)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -135,7 +135,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v5.8</div>
+    <div class="version-badge">SCHEMATICai v5.9</div>
     <div class="header-controls">
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
@@ -193,7 +193,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v5.8 ---
+// --- SCHEMATICai v5.9 ---
 const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
 const CONSTANTS = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
@@ -297,55 +297,61 @@ class SearchEngine {
             let exactCount = 0;
             let totalFilters = 0;
             
-            const checkField = (dbVal, searchVal, patterns) => {
+            // SMART SCRAPER: Returns 'exact', 'varied', or 'fail'
+            const checkField = (dbVal, searchVal, patterns, strictConflict) => {
                 const s = String(searchVal || "").toUpperCase();
                 const d = String(dbVal || "").toUpperCase();
                 const desc = (rec.keys || "").toUpperCase();
                 
+                // 1. Conflict Check (Primary Identity)
+                // If we searched "BARNES" but DB says "GORMAN", kill it.
+                if (strictConflict && d !== "" && !d.includes(s)) return 'conflict';
+
+                // 2. Direct Match
                 if (d === s) return 'exact';
                 if (d.includes(s) && d !== "") return 'varied';
+                
+                // 3. Description Scraper (Only if DB field is EMPTY)
                 if (d === "") {
                     if (patterns.some(p => desc.includes(p.toUpperCase()))) return 'exact';
                 }
                 return 'fail';
             };
 
-            // 1. MFG - Hard Conflict Fix
+            // 1. MFG (Conflict Mode ON)
             if (c.mfg) {
                 totalFilters++;
-                const s = c.mfg.toUpperCase();
-                const d = (rec.mfg || "").toUpperCase();
-                // STRICTER CONFLICT: If Rec has "GORMAN" and Search is "BARNES" -> Fail instantly.
-                // Even if "Barnes" is in the description.
-                if (d !== "" && !d.includes(s)) {
-                    isFail = true;
-                } else {
-                    const res = checkField(rec.mfg, c.mfg, [c.mfg]);
-                    if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
-                    else isFail = true; 
-                }
+                const res = checkField(rec.mfg, c.mfg, [c.mfg], true); 
+                if (res === 'conflict') isFail = true;
+                else if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
+                else isFail = true; 
             }
 
+            // 2. HP (Scraper ON)
             if (c.hp) {
                 totalFilters++;
-                const res = checkField(rec.hp, c.hp, [c.hp+"HP", c.hp+" HP"]);
+                const res = checkField(rec.hp, c.hp, [c.hp+"HP", c.hp+" HP", c.hp+"-HP"], false);
                 if (res !== 'fail') { matchData.hp = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
+
+            // 3. Volt (Scraper ON)
             if (c.volt) {
                 totalFilters++;
-                const res = checkField(rec.volt, c.volt, [c.volt+"V", c.volt+" V"]);
+                const res = checkField(rec.volt, c.volt, [c.volt+"V", c.volt+" V", c.volt+"VOLT"], false);
                 if (res !== 'fail') { matchData.volt = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
+
+            // 4. Phase (Synonym + Scraper ON)
             if (c.phase) {
                 totalFilters++;
                 const s = String(c.phase);
                 let patterns = [s+"PH", s+"-PH", s+" PHASE"];
-                if (s === "1") patterns.push("SINGLE PHASE", "1-PHASE");
-                if (s === "3") patterns.push("THREE PHASE", "3-PHASE");
+                if (s === "1") patterns.push("SINGLE PHASE", "SINGLE-PHASE", "1-PHASE");
+                if (s === "3") patterns.push("THREE PHASE", "THREE-PHASE", "3-PHASE");
 
-                const res = checkField(rec.phase, c.phase, patterns);
+                const res = checkField(rec.phase, c.phase, patterns, false);
                 if (res !== 'fail') { matchData.phase = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
@@ -404,21 +410,18 @@ class UI {
             const displayMfg = UI.cleanMfg(rec.mfg);
             let badges = '';
 
-            // STRICT VISIBILITY FIXED (v5.8)
-            // Only show badge if user Searched it.
-            // Exception: Mfg always shows for context.
-            badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
-
-            if(criteria.hp) {
+            // STRICT VISIBILITY FIXED (v5.9): Check for string 'Any' or empty
+            if(criteria.mfg && criteria.mfg !== "Any") {
+                badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
+            }
+            if(criteria.hp && criteria.hp !== "Any") {
                 badges += `<span class="hud-badge ${meta.hp ? 'match-'+meta.hp : ''}">${rec.hp || "HP?"} HP</span>`;
             }
-            if(criteria.volt) {
+            if(criteria.volt && criteria.volt !== "Any") {
                 badges += `<span class="hud-badge ${meta.volt ? 'match-'+meta.volt : ''}">${rec.volt || "V?"}V</span>`;
             }
-            if(criteria.phase) {
-                // Show Rec phase if exists, otherwise show search criteria with "?" if inferred
-                const pVal = rec.phase || criteria.phase;
-                badges += `<span class="hud-badge ${meta.phase ? 'match-'+meta.phase : ''}">${pVal}PH</span>`;
+            if(criteria.phase && criteria.phase !== "Any") {
+                badges += `<span class="hud-badge ${meta.phase ? 'match-'+meta.phase : ''}">${rec.phase || criteria.phase}PH</span>`;
             }
 
             card.innerHTML = `
