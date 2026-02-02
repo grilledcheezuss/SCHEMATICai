@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.9 - Badge Integrity)</title>
+    <title>Cox Research | SCHEMATICai (v8.11 - Speed & Strict UI)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -152,7 +152,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.9</div>
+    <div class="version-badge">SCHEMATICai v8.11</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -212,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.9 (BADGE INTEGRITY FIX) ---
+// --- SCHEMATICai v8.11 (SPEED & STRICT UI) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -259,7 +259,7 @@ class SpecExtractor {
             }
         }
 
-        const hpMatch = t.match(/\b(\d{1,3}(?:\.\d+)?|\d+\s*\/\s*\d+)\s*HP\b/i);
+        const hpMatch = t.match(/(\d+(?:\.\d+)?)\s*HP\b/i); 
         if(hpMatch) {
             const val = parseFloat(hpMatch[1]);
             if (!isNaN(val) && val < 999) specs.hp = hpMatch[1].replace(/\s/g, '');
@@ -283,13 +283,14 @@ class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn');
         let offset = null;
+        // V8.11: Limit increased to 1000 for speed
         const fields = "&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF";
         
         console.log("📡 Starting Database Sync...");
         
         try {
             do {
-                const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?pageSize=100${fields}${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=desc`;
+                const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?pageSize=1000${fields}${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=desc`;
                 const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` } });
                 const data = await resp.json();
                 
@@ -340,7 +341,7 @@ class DataLoader {
     }
 }
 
-// 5. SEARCH ENGINE (HYBRID)
+// 5. SEARCH ENGINE
 class SearchEngine {
     static perform() {
         if(window.LOCAL_DB.length === 0) return;
@@ -361,19 +362,16 @@ class SearchEngine {
             let pass = true;
             let rejectReason = "";
 
-            // 1. Keyword
             if(kw) {
                 const searchTarget = (rec.id + " " + rec.desc).toUpperCase();
                 if(!searchTarget.includes(kw)) { pass = false; rejectReason = "KW"; }
             }
             
-            // 2. Manufacturer
             if(pass && mfg !== "Any") {
                 if(rec.mfg && rec.mfg !== mfg.toUpperCase()) { pass = false; rejectReason = "MFG_MISMATCH"; }
                 if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) { pass = false; rejectReason = "MFG_MISSING"; }
             }
 
-            // 3. HP
             if(pass && hp !== "Any") {
                 const hpStr = String(hp);
                 const badgeMatch = rec.hp === hpStr;
@@ -381,7 +379,6 @@ class SearchEngine {
                 if(!badgeMatch && !textMatch) { pass = false; rejectReason = "HP"; }
             }
 
-            // 4. Voltage
             if(pass && volt !== "Any") {
                 const vStr = String(volt);
                 const badgeMatch = rec.volt && rec.volt.includes(vStr);
@@ -389,7 +386,6 @@ class SearchEngine {
                 if(!badgeMatch && !textMatch) { pass = false; rejectReason = "VOLT"; }
             }
 
-            // 5. Phase
             if(pass && phase !== "Any") {
                 const pStr = String(phase);
                 const badgeMatch = rec.phase === pStr;
@@ -434,28 +430,28 @@ class UI {
             const state = FeedbackService.history[item.id] || { up: false, downReasons: new Set() };
             
             let badges = '';
-            // USER AUTHORITY BADGES
-            // MFG: Always show. If filter selected, force match color (Green), else Info (Grey) unless match found.
-            const displayMfg = (criteria.mfg && criteria.mfg !== "Any") ? criteria.mfg : (item.mfg || "Unknown");
-            badges += `<span class="hud-badge match-exact">${displayMfg}</span>`;
             
-            // HP: Green ONLY if strictly matches filter. Grey if info.
-            if(item.hp) {
-                let style = 'match-info';
-                if(criteria.hp !== "Any" && item.hp === String(criteria.hp)) style = 'match-exact';
-                badges += `<span class="hud-badge ${style}">${item.hp} HP</span>`;
+            // 1. MFG: V8.11 Strict Mode: Only show if searched OR if unknown
+            if(criteria.mfg !== "Any") {
+               badges += `<span class="hud-badge match-exact">${criteria.mfg}</span>`;
+            } else if (item.mfg) {
+                // Optional: You can choose to hide this if you want 100% strictness
+                // badges += `<span class="hud-badge match-info">${item.mfg}</span>`; 
             }
-            // Volt: Green ONLY if strictly matches filter.
-            if(item.volt) {
-                let style = 'match-info';
-                if(criteria.volt !== "Any" && item.volt.includes(String(criteria.volt))) style = 'match-exact';
-                badges += `<span class="hud-badge ${style}">${item.volt}V</span>`;
+            
+            // 2. HP: Show ONLY if searched (Force Green)
+            if(criteria.hp !== "Any") {
+                badges += `<span class="hud-badge match-exact">${criteria.hp} HP</span>`;
             }
-            // Phase
-            if(item.phase) {
-                let style = 'match-info';
-                if(criteria.phase !== "Any" && item.phase === String(criteria.phase)) style = 'match-exact';
-                badges += `<span class="hud-badge ${style}">${item.phase}PH</span>`;
+            
+            // 3. Volt: Show ONLY if searched
+            if(criteria.volt !== "Any") {
+                badges += `<span class="hud-badge match-exact">${criteria.volt}V</span>`;
+            }
+            
+            // 4. Phase: Show ONLY if searched
+            if(criteria.phase !== "Any") {
+                badges += `<span class="hud-badge match-exact">${criteria.phase}PH</span>`;
             }
 
             card.innerHTML = `
@@ -485,7 +481,8 @@ class UI {
             const items = cat === 'mfg' ? Object.keys(CONSTANTS.MANUFACTURERS) : CONSTANTS.DATA[cat.toUpperCase()];
             items.forEach(i => {
                 const opt = document.createElement('option');
-                // V8.9 FIX: Actually assign value
+                opt.value = cat==='mfg' ? "Any" : "Any"; 
+                if(cat!=='mfg') opt.value = i; 
                 opt.value = i; 
                 opt.innerText = i;
                 sel.appendChild(opt);
