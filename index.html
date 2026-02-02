@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.3 - Feedback State)</title>
+    <title>Cox Research | SCHEMATICai (v8.5 - Admin Lock)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -32,7 +32,7 @@
             --border-color: #c7c7cc; 
             
             --match-exact-bg: #dcfce7; --match-exact-text: #166534; 
-            --badge-default-bg: #f3f4f6; --badge-default-text: #374151; 
+            --badge-info-bg: #f3f4f6; --badge-info-text: #6b7280;
             
             --header-height: 80px; 
             --input-height: 48px;
@@ -47,7 +47,7 @@
             --border-color: #3c4043;
             
             --match-exact-bg: #14532d; --match-exact-text: #86efac; 
-            --badge-default-bg: #374151; --badge-default-text: #e5e7eb;
+            --badge-info-bg: #374151; --badge-info-text: #9ca3af;
             color-scheme: dark;            
         }
         
@@ -64,6 +64,9 @@
         .header-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; z-index: 2; }
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
         .btn-bug { font-size: 14px; }
+        
+        /* Hidden by default, shown by JS for admins */
+        #settings-btn-wrapper { display: none; }
 
         #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
         html.logged-in #app-container { display: flex !important; }
@@ -89,8 +92,9 @@
         .panel-name { font-size: 24px; font-weight: 900; color: var(--app-primary); margin: 0; letter-spacing: -0.5px; }
 
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
-        .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; border: 1px solid transparent; background: var(--badge-default-bg); color: var(--badge-default-text); }
+        .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; border: 1px solid transparent; }
         .hud-badge.match-exact { background: var(--match-exact-bg); color: var(--match-exact-text); border-color: var(--match-exact-border); }
+        .hud-badge.match-info { background: var(--badge-info-bg); color: var(--badge-info-text); border-color: transparent; }
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
@@ -133,22 +137,21 @@
 
 <div id="config-modal">
     <div class="config-card">
-        <h3 style="margin-top:0; color:var(--app-primary);">🔌 Connection & Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Connection Settings</p>
-        <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
-        <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;" value="appgc1pbuOgmODRpj" disabled>
-        <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name" style="margin-bottom:15px;" value="Control Panel Items" disabled>
+        <h3 style="margin-top:0; color:var(--app-primary);">🛠️ Admin Tools</h3>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">
+            Database Connection is <strong>Hardcoded</strong>.<br>
+            Use this menu to harvest data or reset cache.
+        </p>
         
-        <div style="display:flex; gap:10px;">
-            <button class="submit-feedback-btn" style="background:var(--app-primary);" onclick="ConfigService.save()">Save</button>
-            <button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button>
-        </div>
+        <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="HarvestService.start()">📥 Harvest & Clean All Data</button>
+        <div id="harvest-status" style="font-size:11px; margin-top:10px; color:#666;"></div>
         
         <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
-        <h4 style="margin:0 0 10px 0;">Data Refinery</h4>
-        <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="HarvestService.start()">📥 Harvest & Clean All Data</button>
-        <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Reset All Data</button>
-        <div id="harvest-status" style="font-size:11px; margin-top:10px; color:#666;"></div>
+        
+        <div style="display:flex; gap:10px;">
+            <button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button>
+            <button class="submit-feedback-btn" style="background:var(--status-error);" onclick="ConfigService.reset()">🗑️ Clear Cache</button>
+        </div>
     </div>
 </div>
 
@@ -157,9 +160,11 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.3</div>
+    <div class="version-badge">SCHEMATICai v8.5</div>
     <div class="header-controls">
-        <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
+        <div id="settings-btn-wrapper">
+            <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
+        </div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -216,7 +221,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.3 (FEEDBACK STATE) ---
+// --- SCHEMATICai v8.5 (ADMIN LOCK & HARDCODED) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -241,6 +246,9 @@ class PdfController {
     }
 }
 
+// --- HARDCODED CREDENTIALS ---
+// ⚠️ PASTE YOUR KEY BELOW
+const AIRTABLE_PAT = 'patNuv7rNHCIHeq5t.093ee4623c468319b352d024b4c2309fe598d7962dd83d481ec6b23b4cdacf99'; 
 const AT_BASE = 'appgc1pbuOgmODRpj';
 const AT_TABLE = 'Control Panel Items';
 
@@ -251,21 +259,13 @@ const CONSTANTS = {
 
 // 2. CONFIG
 class ConfigService {
-    static get() { return JSON.parse(localStorage.getItem('cox_at_config')) || {}; }
-    static save() {
-        const key = document.getElementById('at-api-key').value.trim();
-        if(!key.startsWith('pat')) { alert("Invalid Key. Must start with 'pat'"); return; }
-        const config = { apiKey: key, baseId: AT_BASE, tableName: AT_TABLE };
-        localStorage.setItem('cox_at_config', JSON.stringify(config));
-        document.getElementById('config-modal').classList.remove('active-modal');
-        alert("Saved.");
-    }
+    static get() { return { apiKey: AIRTABLE_PAT, baseId: AT_BASE, tableName: AT_TABLE }; }
     static reset() {
-        if(confirm("Delete Key?")) { localStorage.removeItem('cox_at_config'); location.reload(); }
+        if(confirm("Clear Session?")) { localStorage.clear(); location.reload(); }
     }
 }
 
-// 3. PARSING ENGINE (V8.2 Logic)
+// 3. PARSING ENGINE
 class SpecExtractor {
     static extract(text) {
         const specs = { mfg: null, hp: null, volt: null, phase: null };
@@ -295,18 +295,21 @@ class SpecExtractor {
     }
 }
 
-// 4. AIRTABLE SERVICE (UNLIMITED)
+// 4. AIRTABLE SERVICE
 class AirtableService {
     static async search(criteria) {
         const config = ConfigService.get();
-        if(!config.apiKey) { alert("Click ⚙️ and enter API Key."); return null; }
+        if(config.apiKey.includes('PASTE')) { alert("Admin: Please update API Key in code."); return null; }
 
-        console.log("🔑 Key:", config.apiKey.substring(0, 7) + "...");
+        console.log("🔑 Authenticating...");
 
         let formulas = [];
         const searchTerms = [];
         if(criteria.mfg && criteria.mfg !== "Any") searchTerms.push(criteria.mfg);
         if(criteria.kw) searchTerms.push(criteria.kw);
+        if(criteria.hp && criteria.hp !== "Any") searchTerms.push(criteria.hp);
+        if(criteria.volt && criteria.volt !== "Any") searchTerms.push(criteria.volt);
+        if(criteria.phase && criteria.phase !== "Any") searchTerms.push(criteria.phase);
         
         if(searchTerms.length > 0) {
             searchTerms.forEach(term => {
@@ -405,15 +408,24 @@ class UI {
             const card = document.createElement('div');
             card.className = 'record-card';
             
-            // Check State
             const state = FeedbackService.history[item.id] || { up: false, downReasons: new Set() };
             
             let badges = '';
             const displayMfg = (criteria.mfg && criteria.mfg !== "Any") ? criteria.mfg : (item.mfg || "Unknown");
             if(displayMfg !== "Unknown") badges += `<span class="hud-badge match-exact">${displayMfg}</span>`;
-            if(item.hp) badges += `<span class="hud-badge match-exact">${item.hp} HP</span>`;
-            if(item.volt) badges += `<span class="hud-badge match-exact">${item.volt}V</span>`;
-            if(item.phase) badges += `<span class="hud-badge match-exact">${item.phase}PH</span>`;
+            
+            if(item.hp) {
+                const style = (criteria.hp !== "Any" && item.hp.includes(criteria.hp)) ? 'match-exact' : 'match-info';
+                badges += `<span class="hud-badge ${style}">${item.hp} HP</span>`;
+            }
+            if(item.volt) {
+                const style = (criteria.volt !== "Any" && item.volt.includes(criteria.volt)) ? 'match-exact' : 'match-info';
+                badges += `<span class="hud-badge ${style}">${item.volt}V</span>`;
+            }
+            if(item.phase) {
+                const style = (criteria.phase !== "Any" && item.phase.includes(criteria.phase)) ? 'match-exact' : 'match-info';
+                badges += `<span class="hud-badge ${style}">${item.phase}PH</span>`;
+            }
 
             card.innerHTML = `
                 <div class="card-header">
@@ -454,7 +466,7 @@ class HarvestService {
     static async start() {
         const config = ConfigService.get();
         const status = document.getElementById('harvest-status');
-        if(!config.apiKey) return alert("Save Key First.");
+        if(config.apiKey.includes('PASTE')) return alert("Admin: API Key not configured in code.");
         status.innerText = "⏳ Connecting...";
         
         const allRecords = [];
@@ -500,11 +512,15 @@ class HarvestService {
     }
 }
 
-// 8. SERVICES (V8.3: State Tracking)
+// 8. SERVICES (Auth & Feedback)
 class AuthService {
     static init() { 
         const session = JSON.parse(localStorage.getItem('cox_auth_session'));
-        if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); return true; } 
+        if (session && session.expiry > Date.now()) { 
+            document.documentElement.classList.add('logged-in'); 
+            this.checkAdmin(session.user);
+            return true; 
+        } 
         document.getElementById('auth-overlay').classList.add('active-modal');
         return false; 
     }
@@ -513,11 +529,18 @@ class AuthService {
         localStorage.setItem('cox_auth_session', JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); 
     }
     static logout() { localStorage.removeItem('cox_auth_session'); location.reload(); }
+    
+    static checkAdmin(user) {
+        const admins = ['admin', 'thomas', 'grilledcheezus'];
+        if(admins.some(a => user.toLowerCase().includes(a))) {
+            document.getElementById('settings-btn-wrapper').style.display = 'block';
+        }
+    }
 }
 
 class FeedbackService {
     static activeId = null;
-    static history = {}; // Stores { 'CP-123': { up: true, downReasons: Set('hp') } }
+    static history = {};
     static selectedReasons = new Set();
 
     static initHistory(id) {
@@ -526,8 +549,7 @@ class FeedbackService {
 
     static up(id) {
         this.initHistory(id);
-        if(this.history[id].up) return; // Prevent double vote
-        
+        if(this.history[id].up) return;
         this.history[id].up = true;
         document.querySelector(`.thumb-btn.up[data-id="${id}"]`).classList.add('voted-up');
         alert(`Liked ${id}`);
@@ -538,12 +560,9 @@ class FeedbackService {
         this.initHistory(id);
         this.selectedReasons.clear();
         
-        // Reset Modal UI
         document.querySelectorAll('.reason-btn').forEach(b => {
             b.classList.remove('selected');
             b.classList.remove('locked');
-            
-            // Lock if already submitted
             if(this.history[id].downReasons.has(b.dataset.reason)) {
                 b.classList.add('locked');
             }
@@ -554,8 +573,7 @@ class FeedbackService {
 
     static toggleReason(el) {
         const reason = el.dataset.reason;
-        if(el.classList.contains('locked')) return; // Ignore locked
-        
+        if(el.classList.contains('locked')) return;
         el.classList.toggle('selected');
         if(this.selectedReasons.has(reason)) this.selectedReasons.delete(reason); else this.selectedReasons.add(reason);
     }
@@ -563,13 +581,8 @@ class FeedbackService {
     static submit() {
         if(!this.activeId) return;
         const id = this.activeId;
-        
-        // Save to History
         this.selectedReasons.forEach(r => this.history[id].downReasons.add(r));
-        
-        // Visual Update
         document.querySelector(`.thumb-btn.down[data-id="${id}"]`).classList.add('voted-down');
-        
         alert(`Feedback Sent.`);
         this.close();
     }
@@ -580,9 +593,7 @@ class App {
     static init() {
         AuthService.init();
         UI.populateDropdowns();
-        console.log("🧠 AI System: Online (Waiting for Data)");
-        const conf = ConfigService.get();
-        if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
+        console.log("🧠 AI System: Online");
     }
 }
 
