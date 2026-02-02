@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v7.0 - Advanced Parsing)</title>
+    <title>Cox Research | SCHEMATICai (v7.1 - Production)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -32,7 +32,6 @@
             --border-color: #c7c7cc; 
             
             --match-exact-bg: #dcfce7; --match-exact-text: #166534; 
-            --match-varied-bg: #ffedd5; --match-varied-text: #c2410c; 
             --badge-default-bg: #f3f4f6; --badge-default-text: #374151; 
             
             --header-height: 80px; 
@@ -48,7 +47,6 @@
             --border-color: #3c4043;
             
             --match-exact-bg: #14532d; --match-exact-text: #86efac; 
-            --match-varied-bg: #7c2d12; --match-varied-text: #fdba74; 
             --badge-default-bg: #374151; --badge-default-text: #e5e7eb;
             color-scheme: dark;            
         }
@@ -93,16 +91,15 @@
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
         .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; border: 1px solid transparent; background: var(--badge-default-bg); color: var(--badge-default-text); }
         .hud-badge.match-exact { background: var(--match-exact-bg); color: var(--match-exact-text); border-color: var(--match-exact-border); }
-        .hud-badge.match-varied { background: var(--match-varied-bg); color: var(--match-varied-text); border-color: var(--match-varied-border); }
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
         .thumb-btn:hover { background: #f5f5f5; }
 
-        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
+        #auth-overlay, #feedback-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
         .active-modal { display: flex !important; }
         
-        .auth-card, .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
+        .auth-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
         .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
         .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
         .modal-content { padding: 20px; }
@@ -130,33 +127,13 @@
     </div>
 </div>
 
-<div id="config-modal">
-    <div class="config-card">
-        <h3 style="margin-top:0; color:var(--app-primary);">🔌 Connection & Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Connection Settings</p>
-        <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
-        <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;">
-        <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name (e.g. Control Panel Items)" style="margin-bottom:15px;">
-        <div style="display:flex; gap:10px;">
-            <button class="submit-feedback-btn" style="background:var(--app-primary);" onclick="ConfigService.save()">Save</button>
-            <button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button>
-        </div>
-        
-        <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
-        <h4 style="margin:0 0 10px 0;">Data Refinery</h4>
-        <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="HarvestService.start()">📥 Harvest & Clean All Data</button>
-        <div id="harvest-status" style="font-size:11px; margin-top:10px; color:#666;"></div>
-    </div>
-</div>
-
 <header>
     <a href="#" class="logo-group">
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v7.0</div>
+    <div class="version-badge">SCHEMATICai v7.1</div>
     <div class="header-controls">
-        <button class="control-btn" title="Airtable Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -213,34 +190,24 @@
 </div>
 
 <script>
-// --- SCHEMATICai v7.0 (THE PARSING POWERHOUSE) ---
+// --- SCHEMATICai v7.1 (PRODUCTION) ---
 
-class ConfigService {
-    static get() { return JSON.parse(localStorage.getItem('cox_at_config')) || {}; }
-    static save() {
-        const config = {
-            apiKey: document.getElementById('at-api-key').value,
-            baseId: document.getElementById('at-base-id').value,
-            tableName: document.getElementById('at-table-name').value
-        };
-        localStorage.setItem('cox_at_config', JSON.stringify(config));
-        document.getElementById('config-modal').classList.remove('active-modal');
-        alert("Configuration Saved.");
-    }
-}
+// ⚠️ PASTE YOUR API KEY HERE ⚠️
+const AIRTABLE_PAT = 'patFKL5FBJqAej8jx'; 
+const BASE_ID = 'appgc1pbuOgmODRpj';
+const TABLE_NAME = 'Control Panel Items';
 
-// 1. ADVANCED SPEC EXTRACTOR (Rules-Based)
+// 1. EXTRACTION ENGINE
 class SpecExtractor {
     static extract(text) {
         const specs = { mfg: null, hp: null, volt: null, phase: null };
         const t = (text || "").toUpperCase();
 
-        // 1. Manufacturer (Synonyms)
-        // Hardcoded Logic for common issues
+        // Manufacturer
         const mfgPatterns = {
-            'GORMAN RUPP': ['GORMAN', 'GR', 'G.R.', 'GORMAN-RUPP', 'RUPP'],
+            'GORMAN RUPP': ['GORMAN', 'GR', 'G.R.', 'RUPP'],
             'BARNES': ['BARNES', 'SITHE', 'CRANE'],
-            'HYDROMATIC': ['HYDROMATIC', 'HYDRO-MATIC', 'HYDRO'],
+            'HYDROMATIC': ['HYDROMATIC', 'HYDRO-MATIC'],
             'FLYGT': ['FLYGT'],
             'MYERS': ['MYERS'],
             'GOULDS': ['GOULDS'],
@@ -251,7 +218,6 @@ class SpecExtractor {
             'ABS': ['ABS'],
             'AURORA': ['AURORA']
         };
-
         for (const [standard, aliases] of Object.entries(mfgPatterns)) {
             if (aliases.some(alias => t.includes(alias))) {
                 specs.mfg = standard;
@@ -259,50 +225,45 @@ class SpecExtractor {
             }
         }
 
-        // 2. HP (Fractions, Decimals, Spacing)
-        // Matches: 1/2HP, 0.5 HP, 5.0HP, 7-1/2 HP
-        const hpRegex = /(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*HP/i;
-        const hpMatch = t.match(hpRegex);
-        if (hpMatch) specs.hp = hpMatch[1].replace(/\s/g, ''); // Clean spacing
+        // HP
+        const hpMatch = t.match(/(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*HP/i);
+        if(hpMatch) specs.hp = hpMatch[1].replace(/\s/g, '');
 
-        // 3. Voltage (Standard Tiers)
-        // Matches: 120V, 208, 230/460, 480VAC
-        const voltRegex = /(115|120|208|230|240|277|460|480|575)\s*V/i;
-        const voltMatch = t.match(voltRegex);
-        if (voltMatch) specs.volt = voltMatch[1];
-        else {
-            // Fallback for just numbers if 'V' is missing but context implies (rare/risky)
-            // Keeping strict 'V' requirement for now to avoid Part Number collision
-        }
+        // Voltage
+        const voltMatch = t.match(/(\d{3})\/(\d{3})|(\d{3})\s*V/i);
+        if(voltMatch) specs.volt = voltMatch[0];
 
-        // 4. Phase
-        if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("THREE PHASE") || t.includes("3Ø")) specs.phase = "3";
-        else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("SINGLE PHASE") || t.includes("1Ø")) specs.phase = "1";
+        // Phase
+        if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø")) specs.phase = "3";
+        else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø")) specs.phase = "1";
 
         return specs;
     }
 }
 
-// 2. HEALING DB (AI Correction Layer)
+// 2. HEALING DB
 const HealingDB = {
     "CP-6950": { mfg: "GORMAN RUPP" }, 
     "CP-2801": { mfg: "GORMAN RUPP", phase: "3" } 
 };
 
+// 3. AIRTABLE SERVICE
 class AirtableService {
     static async search(criteria) {
-        const config = ConfigService.get();
-        if(!config.apiKey) return null;
+        // USE HARDCODED CREDENTIALS
+        const apiKey = AIRTABLE_PAT !== 'PASTE_YOUR_API_KEY_HERE' ? AIRTABLE_PAT : (JSON.parse(localStorage.getItem('cox_at_config'))?.apiKey);
+        
+        if(!apiKey) {
+            alert("API Key Missing. Edit Code Line 205.");
+            return null;
+        }
 
-        // V7.0 STRATEGY: Broad Search -> Local Filter
         let formulas = [];
         const searchTerms = [];
-        
-        // Push all criteria into a "Bag of Words" for broad search
         if(criteria.mfg && criteria.mfg !== "Any") searchTerms.push(criteria.mfg);
         if(criteria.kw) searchTerms.push(criteria.kw);
         
-        // Build Formula: OR(FIND(Term1, {Items}), FIND(Term2, {Items}))
+        // SEARCH 'Items' AND 'Control Panel Name'
         if(searchTerms.length > 0) {
             searchTerms.forEach(term => {
                 formulas.push(`FIND('${term}', {Items})`); 
@@ -311,30 +272,25 @@ class AirtableService {
         }
 
         const formulaStr = formulas.length > 0 ? `OR(${formulas.join(',')})` : "";
-        const url = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.tableName)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=100`;
+        const url = `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=50`;
 
         try {
-            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
-            if (!resp.ok) { return null; }
+            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+            if (!resp.ok) return null;
             const data = await resp.json();
             
-            // MAP & PARSE
             return data.records.map(r => {
                 const f = r.fields;
                 const desc = f['Items'] || "";
-                
-                // 1. EXTRACT
                 let extracted = SpecExtractor.extract(desc);
-                
-                // 2. HEAL (Override if known bad)
                 const id = f['Control Panel Name'];
-                if(HealingDB[id]) {
-                    extracted = { ...extracted, ...HealingDB[id] };
-                }
+                
+                // HEAL
+                if(HealingDB[id]) extracted = { ...extracted, ...HealingDB[id] };
 
                 return {
                     id: id,
-                    mfg: extracted.mfg, // Now clean standard name
+                    mfg: extracted.mfg,
                     hp: extracted.hp,
                     volt: extracted.volt,
                     phase: extracted.phase,
@@ -343,56 +299,6 @@ class AirtableService {
                 };
             });
         } catch(e) { return null; }
-    }
-}
-
-// HARVESTER
-class HarvestService {
-    static async start() {
-        const config = ConfigService.get();
-        const status = document.getElementById('harvest-status');
-        if(!config.apiKey) return alert("Please save API Keys first.");
-        status.innerText = "⏳ Connecting...";
-        
-        const allRecords = [];
-        let offset = null;
-        try {
-            do {
-                const url = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.tableName)}?pageSize=100${offset ? '&offset='+offset : ''}`;
-                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
-                const data = await resp.json();
-                if(!data.records) break;
-                
-                data.records.forEach(r => {
-                    const f = r.fields;
-                    const desc = f['Items'] || "";
-                    const extracted = SpecExtractor.extract(desc);
-                    
-                    allRecords.push({
-                        "Panel Number": f['Control Panel Name'],
-                        "Manufacturer": extracted.mfg || "",
-                        "HP": extracted.hp || "",
-                        "Voltage": extracted.volt || "",
-                        "Phase": extracted.phase || "",
-                        "Description": desc,
-                        "PDF Link": (f['Control Panel PDF'] && f['Control Panel PDF'][0]) ? f['Control Panel PDF'][0].url : ""
-                    });
-                });
-                offset = data.offset;
-                status.innerText = `⏳ Harvested ${allRecords.length} records...`;
-            } while (offset);
-            
-            if(allRecords.length > 0) {
-                const headers = Object.keys(allRecords[0]);
-                const csv = [headers.join(','), ...allRecords.map(row => headers.map(h => `"${(row[h]||'').toString().replace(/"/g, '""')}"`).join(','))].join('\n');
-                const blob = new Blob([csv], {type: 'text/csv'});
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'golden_database.csv';
-                link.click();
-                status.innerText = "✅ Download Started.";
-            }
-        } catch(e) { status.innerText = "❌ Error: " + e.message; }
     }
 }
 
@@ -439,7 +345,7 @@ class PdfController {
 class FeedbackService {
     static activeId = null;
     static selectedReasons = new Set();
-    static up(id) { alert(`Recorded: Thumbs UP for CP-${id}`); }
+    static up(id) { alert(`Recorded: Thumbs UP for ${id}`); }
     static down(id) { 
         this.activeId = id || "General"; 
         this.selectedReasons.clear();
@@ -477,8 +383,7 @@ class SearchEngine {
         let results = await AirtableService.search(criteria);
         
         if (results) {
-            // V7.0: LOCAL FILTER AFTER PARSING
-            // We fetched broad, now we filter strictly based on what we EXTRACTED
+            // STRICT FILTER
             results = results.filter(rec => {
                 if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg !== criteria.mfg) return false;
                 if(criteria.hp && criteria.hp !== "Any" && rec.hp !== criteria.hp) return false;
@@ -486,9 +391,6 @@ class SearchEngine {
                 if(criteria.phase && criteria.phase !== "Any" && rec.phase !== criteria.phase) return false;
                 return true;
             });
-        } else {
-            console.warn("Airtable failed. Using Local.");
-            // Local fallback logic would go here
         }
 
         UI.renderResults(results, criteria);
@@ -525,24 +427,14 @@ class UI {
             card.className = 'record-card';
             
             let badges = '';
-
-            // STRICT VISIBILITY & CLEAN DISPLAY
-            if(criteria.mfg && criteria.mfg !== "Any") {
-                badges += `<span class="hud-badge ${rec.mfg ? 'match-exact' : ''}">${rec.mfg || "Unknown"}</span>`;
-            }
-            if(criteria.hp && criteria.hp !== "Any") {
-                badges += `<span class="hud-badge match-exact">${rec.hp || "HP?"} HP</span>`;
-            }
-            if(criteria.volt && criteria.volt !== "Any") {
-                badges += `<span class="hud-badge match-exact">${rec.volt || "V?"}V</span>`;
-            }
-            if(criteria.phase && criteria.phase !== "Any") {
-                badges += `<span class="hud-badge match-exact">${rec.phase || criteria.phase}PH</span>`;
-            }
+            if(criteria.mfg && criteria.mfg !== "Any") badges += `<span class="hud-badge match-exact">${rec.mfg || "Unknown"}</span>`;
+            if(criteria.hp && criteria.hp !== "Any") badges += `<span class="hud-badge match-exact">${rec.hp || "HP?"} HP</span>`;
+            if(criteria.volt && criteria.volt !== "Any") badges += `<span class="hud-badge match-exact">${rec.volt || "V?"}V</span>`;
+            if(criteria.phase && criteria.phase !== "Any") badges += `<span class="hud-badge match-exact">${rec.phase || criteria.phase}PH</span>`;
 
             card.innerHTML = `
                 <div class="card-header">
-                    <div class="panel-name">CP-${rec.id.replace('.dwg','').replace('CP-','')}</div>
+                    <div class="panel-name">${rec.id.replace('.dwg','').replace('CP-','CP-')}</div>
                 </div>
                 <div class="badge-row">${badges}</div>
                 <div class="card-actions">
@@ -578,13 +470,6 @@ class App {
     static init() {
         AuthService.init();
         UI.populateDropdowns();
-        
-        const conf = ConfigService.get();
-        if(conf.apiKey) {
-            document.getElementById('at-api-key').value = conf.apiKey;
-            document.getElementById('at-base-id').value = conf.baseId;
-            document.getElementById('at-table-name').value = conf.tableName;
-        }
     }
 }
 
