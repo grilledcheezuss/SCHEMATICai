@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v4.4 - Full List)</title>
+    <title>Cox Research | SCHEMATICai (v4.5 - Local Search)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -247,7 +247,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATIC<span class="version-text-ai">ai</span> v4.4</div>
+    <div class="version-badge">SCHEMATIC<span class="version-text-ai">ai</span> v4.5</div>
     <div class="header-controls">
         <button class="control-btn btn-bug" onclick="BugController.open()" title="Report Bug">
             <img src="image_f7315b.jpg" alt="Bug Report" class="bug-icon-img" onerror="this.style.display='none'; this.parentNode.classList.add('image-missing');">
@@ -345,11 +345,10 @@
 </div>
 
 <script>
-// --- SCHEMATICai v4.4 ---
-const STORAGE_KEYS = { SESSION: 'cox_auth_session', ZONES: 'cox_zones_v4_7', MARKOV: 'cox_markov_cache', VOCAB: 'cox_dynamic_vocab_v1' };
-const CONFIG = { FIELDS: { TARGET: 'Items', NAME: 'Control Panel Name', PDF: 'Control Panel PDF' } };
+// --- SCHEMATICai v4.5 (Local Logic Fixed) ---
+const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
 
-// FIXED: Full Manufacturer List Restored
+// Restored Manufacturer Constants
 const CONSTANTS = { 
     MANUFACTURERS: { 
         'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'],
@@ -362,25 +361,18 @@ const CONSTANTS = {
     } 
 };
 
-// --- CLASSES ---
 class BugController {
-    static blob = null;
-    static init() { document.addEventListener('paste', (e) => { /* logic */ }); }
+    static init() {}
     static open() { document.getElementById('bug-modal').classList.add('active'); }
     static close() { document.getElementById('bug-modal').classList.remove('active'); }
     static async send() { alert('Bug report simulation sent.'); this.close(); }
-}
-
-class VocabService {
-    static init() {}
-    static get(cat) { return []; }
 }
 
 class AuthService {
     static init() { 
         const session = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSION)); 
         if (session && session.expiry > Date.now()) { 
-            document.getElementById('app-container').classList.add('visible'); 
+            document.getElementById('app-container').style.display = 'flex'; 
             return true; 
         } 
         document.getElementById('auth-overlay').style.display = 'flex'; 
@@ -389,8 +381,8 @@ class AuthService {
     static toggleRegister() { 
         const loginV = document.getElementById('auth-login-view'); 
         const regV = document.getElementById('auth-register-view'); 
-        if (loginV.style.display === 'none') { loginV.style.display = 'block'; regV.style.display = 'none'; } 
-        else { loginV.style.display = 'none'; regV.style.display = 'block'; } 
+        loginV.style.display = loginV.style.display === 'none' ? 'block' : 'none';
+        regV.style.display = regV.style.display === 'none' ? 'block' : 'none';
     }
     static async login() { 
         const user = document.getElementById('auth-user').value.trim(); 
@@ -399,33 +391,48 @@ class AuthService {
         window.location.reload(); 
     }
     static logout() { localStorage.removeItem(STORAGE_KEYS.SESSION); location.reload(); }
-    static checkUser() { alert('Simulated check'); }
-    static finalizeRegistration() { alert('Simulated Reg'); this.login(); }
+    static checkUser() {}
+    static finalizeRegistration() { this.login(); }
 }
 
 class DatabaseService {
-    static allRecords = []; static masterData = {};
+    static allRecords = []; 
+    static searchResults = [];
+
     static async init() { 
-        if(window.LOCAL_PANEL_DATA) this.processLocalData(window.LOCAL_PANEL_DATA);
+        // 1. Check if window.LOCAL_PANEL_DATA exists (from database.js)
+        if(window.LOCAL_PANEL_DATA) {
+            console.log("Local Data Found:", window.LOCAL_PANEL_DATA.length, "records.");
+            this.allRecords = window.LOCAL_PANEL_DATA;
+        } else {
+            console.error("No Local Data Found. Ensure database.js is loaded.");
+        }
         return true; 
     }
-    static async searchCloud(keywords) {
-        if(window.location.protocol === 'file:') {
-            alert("⚠️ SECURITY WARNING ⚠️\n\nYou are running this file from your Local Disk (file:///).\nThe Proxy Search cannot run securely here.\n\nPlease upload this code to GitHub and Vercel to enable the search function.");
-            return;
+
+    // 2. The LOCAL Search Logic
+    static searchLocal(queryParts) {
+        if (!this.allRecords.length) {
+            alert("Database is empty or loading. Please wait.");
+            return [];
         }
-        
-        try {
-            const resp = await fetch('/api/search?q=' + encodeURIComponent(keywords));
-            const data = await resp.json();
-            if (data.results) {
-                this.allRecords = data.results; 
-                UI.renderResults(false);
-            }
-        } catch (e) { console.error("Proxy Search Failed", e); }
+
+        // Convert query parts to lowercase for case-insensitive matching
+        const terms = queryParts.toLowerCase().split(',').map(t => t.trim()).filter(t => t);
+
+        // Filter the records
+        this.searchResults = this.allRecords.filter(record => {
+            // Combine all searchable fields into one string for easy checking
+            const recordString = (record.keys + " " + (record.mfg||"") + " " + (record.hp||"") + " " + (record.volt||"")).toLowerCase();
+            
+            // The record must contain ALL terms (AND logic)
+            return terms.every(term => recordString.includes(term));
+        });
+
+        return this.searchResults;
     }
+
     static hardReset() { localStorage.clear(); window.location.reload(); }
-    static processLocalData(data) { /* stub */ }
 }
 
 class SearchEngine {
@@ -438,16 +445,16 @@ class SearchEngine {
         const phase = document.getElementById('phaseInput').value;
         const enc = document.getElementById('enclosureInput').value;
         
-        // Build composite search query if keyword box is empty
+        // Build composite search query
         let parts = [];
         if(kw) parts.push(kw);
         if(mfg && mfg !== "Any") parts.push(mfg);
-        if(hp && hp !== "Any") parts.push(hp + "hp"); // Append unit for tighter matching
+        if(hp && hp !== "Any") parts.push(hp + "hp");
         if(volt && volt !== "Any") parts.push(volt);
         if(phase && phase !== "Any") parts.push(phase + "ph");
         if(enc && enc !== "Any") parts.push(enc);
 
-        const finalQuery = parts.join(", "); // Send comma-separated list to proxy
+        const finalQuery = parts.join(", "); 
 
         if(!finalQuery) { 
             alert("Please enter keywords or select filters."); 
@@ -455,13 +462,14 @@ class SearchEngine {
         }
 
         const btn = document.getElementById('searchBtn');
-        btn.disabled = true; 
         btn.innerText = "SEARCHING...";
         
-        DatabaseService.searchCloud(finalQuery).then(() => {
-            btn.disabled = false;
+        // Call the LOCAL search
+        setTimeout(() => { // Small delay to allow UI to update
+            const results = DatabaseService.searchLocal(finalQuery);
+            UI.renderResults(results);
             btn.innerText = "SEARCH";
-        });
+        }, 50);
     }
     static applyFilter() {}
 }
@@ -472,6 +480,7 @@ class UI {
     static toggleTuner() { document.getElementById('tuner-panel').classList.toggle('open'); }
     static closePdf() { document.getElementById('preview-pane').classList.remove('active'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
+    
     static resetSearch() { 
         document.getElementById('keywordInput').value=''; 
         document.querySelectorAll('select').forEach(s => s.value = "");
@@ -479,15 +488,39 @@ class UI {
         document.getElementById('results-area').innerHTML=''; 
     }
     
-    // UPDATED: No more hardcoded "Mock" text
-    static renderResults() { 
+    // 3. The RENDER Logic (Actually builds the HTML cards)
+    static renderResults(records) { 
         const area = document.getElementById('results-area'); 
-        if (DatabaseService.allRecords && DatabaseService.allRecords.length > 0) {
-            // If we have records, we would render them here. 
-            // For now, we leave it clear rather than showing fake text.
-        } else {
-             area.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.7;">No results found or search incomplete.</div>';
+        area.innerHTML = ''; // Clear previous results
+
+        if (!records || records.length === 0) {
+             area.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.7;">No results found.</div>';
+             return;
         }
+
+        // Loop through results and create cards
+        records.forEach(rec => {
+            const card = document.createElement('div');
+            card.className = 'record-card';
+            // Simple visual based on what fields are available
+            let title = rec.keys || "Unknown Panel";
+            let details = `${rec.mfg || ""} ${rec.hp ? rec.hp+"HP" : ""} ${rec.volt ? rec.volt+"V" : ""}`;
+            
+            card.innerHTML = `
+                <div class="panel-name">${title}</div>
+                <div class="panel-label">${details}</div>
+                <div class="panel-label" style="margin-top:4px; color:var(--text-secondary);">ID: ${rec.id}</div>
+            `;
+            
+            // Add click listener (for PDF viewer later)
+            card.onclick = () => {
+                document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view'));
+                card.classList.add('active-view');
+                // PdfController.load(rec.id); // Future feature
+            };
+
+            area.appendChild(card);
+        });
     }
     
     static populateDropdown() {
@@ -527,7 +560,6 @@ class PdfController {
 
 class App {
     static init() {
-        VocabService.init(); 
         BugController.init();
         if (!AuthService.init()) return;
         App.loadData();
