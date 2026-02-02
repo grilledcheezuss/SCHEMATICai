@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.0 - Secure Polish)</title>
+    <title>Cox Research | SCHEMATICai (v10.1 - Weighted Voting)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -115,7 +115,6 @@
         .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
         .modal-content { padding: 20px; }
         
-        /* LOGIN STYLES V10 */
         .login-avatar { width: 80px; height: 80px; background: #e3e5e8; border-radius: 50%; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 2px solid var(--border-color); color: var(--app-primary); }
         .login-input-group { margin-bottom: 15px; text-align: left; }
         .login-input-label { font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; display: block; opacity: 0.7; }
@@ -145,31 +144,17 @@
     <div class="auth-card">
         <div class="login-avatar">👤</div>
         <h2 style="color:var(--app-primary); margin-top:0; margin-bottom:20px;">SCHEMATICai</h2>
-        
-        <div class="login-input-group">
-            <span class="login-input-label">Username</span>
-            <input type="text" id="auth-user" class="cox-input" placeholder="Enter username">
-        </div>
-        
-        <div class="login-input-group">
-            <span class="login-input-label">Password</span>
-            <input type="password" id="auth-pass" class="cox-input" placeholder="Enter password">
-        </div>
-
+        <div class="login-input-group"><span class="login-input-label">Username</span><input type="text" id="auth-user" class="cox-input" placeholder="Enter username"></div>
+        <div class="login-input-group"><span class="login-input-label">Password</span><input type="password" id="auth-pass" class="cox-input" placeholder="Enter password"></div>
         <button class="submit-feedback-btn" onclick="AuthService.login()">Authenticate</button>
-        
-        <div class="video-container">
-            <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?controls=0&autoplay=1&mute=1&loop=1&playlist=jfKfPfyJRdk" allow="autoplay; encrypted-media"></iframe>
-        </div>
+        <div class="video-container"><iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?controls=0&autoplay=1&mute=1&loop=1&playlist=jfKfPfyJRdk" allow="autoplay; encrypted-media"></iframe></div>
     </div>
 </div>
 
 <div id="config-modal">
     <div class="config-card">
         <h3 style="margin-top:0; color:var(--app-primary);">🛠️ Admin Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">
-            Status: <span id="db-status-text">Idle</span>
-        </p>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Status: <span id="db-status-text">Idle</span></p>
         <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="DataLoader.harvestCSV()">📥 Harvest Golden CSV</button>
         <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Clear Cache</button>
         <div style="margin-top:10px;"><button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
@@ -177,15 +162,10 @@
 </div>
 
 <header>
-    <a href="#" class="logo-group">
-        <span class="logo-main">COX</span>
-        <span class="logo-sub">RESEARCH</span>
-    </a>
-    <div class="version-badge">SCHEMATICai v10.0</div>
+    <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
+    <div class="version-badge">SCHEMATICai v10.1</div>
     <div class="header-controls">
-        <div id="settings-btn-wrapper">
-            <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
-        </div>
+        <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -194,10 +174,7 @@
 
 <div id="feedback-modal">
     <div class="modal-card">
-        <div class="modal-header">
-            <span>Report Inaccuracy</span>
-            <button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button>
-        </div>
+        <div class="modal-header"><span>Report Inaccuracy</span><button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button></div>
         <div class="modal-content">
             <p style="font-size:12px; color:#666; margin-top:0;">Select parameter and enter correct value:</p>
             <div class="reason-row"><div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
@@ -238,7 +215,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.0 (SECURE POLISH) ---
+// --- SCHEMATICai v10.1 (WEIGHTED VOTING) ---
 
 class PdfController {
     static load(id, url) {
@@ -419,10 +396,7 @@ class UI {
         results.slice(0, 100).forEach(item => {
             const card = document.createElement('div'); card.className = 'record-card';
             const healed = TheHealer.healedData[item.id];
-            
-            // Check History using FeedbackService
             const history = FeedbackService.getHistory(item.id);
-            
             let badges = '';
             
             if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
@@ -457,20 +431,11 @@ class UI {
 class FeedbackService { 
     static activeId = null; 
     
-    // V10: PERSISTENT HISTORY (Local Storage)
-    static getHistory(id) {
-        const stored = localStorage.getItem('cox_vote_' + id);
-        return stored ? JSON.parse(stored) : { up: false, down: false };
-    }
-    
-    static saveHistory(id, type) {
-        const current = this.getHistory(id);
-        current[type] = true;
-        localStorage.setItem('cox_vote_' + id, JSON.stringify(current));
-    }
+    static getHistory(id) { const stored = localStorage.getItem('cox_vote_' + id); return stored ? JSON.parse(stored) : { up: false, down: false }; }
+    static saveHistory(id, type) { const current = this.getHistory(id); current[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(current)); }
 
     static down(id) { 
-        if(this.getHistory(id).down) return; // Prevent double vote
+        if(this.getHistory(id).down) return;
         this.activeId = id; 
         document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
         document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); 
@@ -480,41 +445,47 @@ class FeedbackService {
     static async submit() { 
         const id = this.activeId; 
         const submissions = []; 
-        document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
-            const reasonCode = btn.dataset.reason; 
-            const input = btn.nextElementSibling; 
-            const value = input && input.classList.contains('correction-input') ? input.value : ""; 
-            if(value) { submissions.push({ id, reasonCode, value }); } 
-        }); 
-        
+        document.querySelectorAll('.reason-btn.selected').forEach(btn => { const reasonCode = btn.dataset.reason; const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }); 
         if(submissions.length === 0) return alert("Select a reason and enter a value."); 
-        
         for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } 
-        
-        this.saveHistory(id, 'down'); // Save Local
+        this.saveHistory(id, 'down');
         alert("Votes Recorded. Thank you."); 
-        
-        // Visual Update
-        const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); 
-        if(cardBtn) cardBtn.classList.add('voted-down'); 
-        
+        const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); 
         this.close(); 
     } 
     
+    // V10.1: WEIGHTED UPVOTING
+    static async up(id) { 
+        if(this.getHistory(id).up) return;
+        this.saveHistory(id, 'up');
+        
+        let votesCast = 0;
+        const criteria = {
+            mfg: document.getElementById('mfgInput').value,
+            hp: document.getElementById('hpInput').value,
+            volt: document.getElementById('voltInput').value,
+            phase: document.getElementById('phaseInput').value
+        };
+
+        for(const [param, val] of Object.entries(criteria)) {
+            if(val !== "Any" && val !== "") {
+                await this.sendToAirtable(id, param, val);
+                votesCast++;
+            }
+        }
+
+        if(votesCast === 0) await this.sendToAirtable(id, "VERIFIED", "General Match"); // Fallback
+
+        alert("Liked!"); 
+        event.target.classList.add('voted-up');
+    } 
+
     static async sendToAirtable(panelId, param, value) { 
         await fetch(`https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${AT_FEEDBACK_TABLE}`, { method: 'POST', headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ "fields": { "Panel ID": panelId, "Parameter": param, "Suggested Value": value } }) }); 
     } 
     
     static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } 
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
-    
-    static up(id) { 
-        if(this.getHistory(id).up) return; // Prevent spam
-        this.saveHistory(id, 'up');
-        this.sendToAirtable(id, "VERIFIED", "User confirmed match");
-        alert("Liked!"); 
-        event.target.classList.add('voted-up');
-    } 
 }
 
 class ConfigService { static reset() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } } }
