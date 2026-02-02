@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v7.4 - Debugger)</title>
+    <title>Cox Research | SCHEMATICai (v7.5 - Reset Protocol)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -134,6 +134,7 @@
         <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
         <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;" value="appgc1pbuOgmODRpj" disabled>
         <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name" style="margin-bottom:15px;" value="Control Panel Items" disabled>
+        
         <div style="display:flex; gap:10px;">
             <button class="submit-feedback-btn" style="background:var(--app-primary);" onclick="ConfigService.save()">Save</button>
             <button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button>
@@ -142,6 +143,7 @@
         <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
         <h4 style="margin:0 0 10px 0;">Data Refinery</h4>
         <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="HarvestService.start()">📥 Harvest & Clean All Data</button>
+        <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Reset All Data</button>
         <div id="harvest-status" style="font-size:11px; margin-top:10px; color:#666;"></div>
     </div>
 </div>
@@ -151,7 +153,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v7.4</div>
+    <div class="version-badge">SCHEMATICai v7.5</div>
     <div class="header-controls">
         <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -210,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v7.4 (DEBUGGER) ---
+// --- SCHEMATICai v7.5 (RESET PROTOCOL) ---
 
 // CONSTANTS (Hardcoded Correct Values)
 const AT_BASE = 'appgc1pbuOgmODRpj';
@@ -226,7 +228,13 @@ class ConfigService {
         const config = { apiKey: key, baseId: AT_BASE, tableName: AT_TABLE };
         localStorage.setItem('cox_at_config', JSON.stringify(config));
         document.getElementById('config-modal').classList.remove('active-modal');
-        alert("Saved.");
+        alert("Saved. Try Searching.");
+    }
+    static reset() {
+        if(confirm("Are you sure? This will delete your API key.")) {
+            localStorage.removeItem('cox_at_config');
+            location.reload();
+        }
     }
 }
 
@@ -352,9 +360,8 @@ class AirtableService {
         try {
             const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey.trim()}` } });
             
-            if (resp.status === 401) { alert("API Key Invalid (401). Check Settings."); return null; }
+            if (resp.status === 401) { alert("API Key Invalid (401). Regenerate it in Airtable."); return null; }
             if (resp.status === 403) { alert("Permissions Error (403). Check Token Scopes."); return null; }
-            if (resp.status === 422) { console.error("Bad Formula:", formulaStr); return null; }
             
             const data = await resp.json();
             return data.records.map(r => {
@@ -462,11 +469,12 @@ class SearchEngine {
         
         let results = await AirtableService.search(criteria);
         
-        // V7.4: SOFT FILTER (Fallback to Broad Match)
         if (results) {
+            // SOFT FILTER
             results = results.filter(rec => {
                 if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg && rec.mfg !== criteria.mfg) return false;
                 if(criteria.hp && criteria.hp !== "Any" && rec.hp && rec.hp !== criteria.hp) return false;
+                // Allow null voltage/phase to pass broad filter if keywords match
                 if(criteria.volt && criteria.volt !== "Any" && rec.volt && rec.volt !== criteria.volt) return false;
                 if(criteria.phase && criteria.phase !== "Any" && rec.phase && rec.phase !== criteria.phase) return false;
                 return true;
@@ -552,7 +560,6 @@ class App {
         UI.populateDropdowns();
         console.log("🧠 AI System: Online (Waiting for Data)");
         
-        // Auto Load Key
         const conf = ConfigService.get();
         if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
     }
