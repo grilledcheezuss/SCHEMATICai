@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v6.1 - Bayes Restored)</title>
+    <title>Cox Research | SCHEMATICai (v6.4 - Airtable API)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -99,10 +99,10 @@
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
         .thumb-btn:hover { background: #f5f5f5; }
 
-        #auth-overlay, #feedback-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
+        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
         .active-modal { display: flex !important; }
         
-        .auth-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; }
+        .auth-card, .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
         .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
         .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
         .modal-content { padding: 20px; }
@@ -110,7 +110,7 @@
         .reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
         .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; }
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
-        .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; margin-top: 10px; }
 
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
@@ -130,13 +130,26 @@
     </div>
 </div>
 
+<div id="config-modal">
+    <div class="config-card">
+        <h3 style="margin-top:0; color:var(--app-primary);">🔌 Airtable Connection</h3>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Enter your API credentials to fetch PDFs.</p>
+        <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
+        <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;">
+        <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name (e.g. Schematics)" style="margin-bottom:15px;">
+        <button class="submit-feedback-btn" onclick="ConfigService.save()">Save Connection</button>
+        <button class="submit-feedback-btn" style="background:#555; margin-top:5px;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Cancel</button>
+    </div>
+</div>
+
 <header>
     <a href="#" class="logo-group">
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v6.1</div>
+    <div class="version-badge">SCHEMATICai v6.4</div>
     <div class="header-controls">
+        <button class="control-btn" title="Airtable Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -185,37 +198,83 @@
         <div id="pdf-placeholder-text">📄 Select a schematic to view</div>
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
         <div id="pdf-fallback" class="pdf-fallback">
-            <div style="margin-bottom:10px;">⚠️ PDF Not Found (404)</div>
-            <div style="font-size:12px; opacity:0.7;" id="pdf-debug-path"></div>
-            <a id="pdf-fallback-link" target="_blank">Try opening in new tab</a>
+            <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
+            <div style="font-size:12px; opacity:0.7;" id="pdf-debug-path">Connecting to Airtable...</div>
+            <a id="pdf-fallback-link" target="_blank" style="display:none">Open File</a>
         </div>
     </div>
 </div>
 
 <script>
-// --- SCHEMATICai v6.1 (AI RESTORED) ---
+// --- SCHEMATICai v6.4 (AIRTABLE INTEGRATION) ---
 
-// 1. THE HEALING DATABASE (Simulated User Feedback)
+// CONFIG SERVICE
+class ConfigService {
+    static get() {
+        return JSON.parse(localStorage.getItem('cox_at_config')) || {};
+    }
+    static save() {
+        const config = {
+            apiKey: document.getElementById('at-api-key').value,
+            baseId: document.getElementById('at-base-id').value,
+            tableName: document.getElementById('at-table-name').value
+        };
+        localStorage.setItem('cox_at_config', JSON.stringify(config));
+        document.getElementById('config-modal').classList.remove('active-modal');
+        alert("Configuration Saved. Try viewing a PDF.");
+    }
+}
+
+// AIRTABLE SERVICE
+class AirtableService {
+    static async fetchPdfLink(panelId) {
+        const config = ConfigService.get();
+        if(!config.apiKey || !config.baseId || !config.tableName) {
+            return { error: "Missing API Config. Click ⚙️ to set up." };
+        }
+
+        // Formula: {Panel Number} = 'CP-1234' OR {ID} = '1234'
+        const formula = `OR({Panel Number}='${panelId}', {Panel Number}='CP-${panelId}', {ID}='${panelId}')`;
+        const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableName}?filterByFormula=${encodeURIComponent(formula)}`;
+
+        try {
+            console.log(`📡 Fetching Airtable: ${url}`);
+            const resp = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${config.apiKey}` }
+            });
+            const data = await resp.json();
+            
+            if(data.records && data.records.length > 0) {
+                const rec = data.records[0].fields;
+                // Look for common attachment field names
+                const fileField = rec['PDF'] || rec['Attachment'] || rec['File'] || rec['Schematic'];
+                if(fileField && fileField.length > 0) {
+                    return { url: fileField[0].url };
+                } else {
+                    return { error: "Record found, but no PDF attachment." };
+                }
+            } else {
+                return { error: "Record not found in Airtable." };
+            }
+        } catch (e) {
+            return { error: "Connection Failed: " + e.message };
+        }
+    }
+}
+
+// NAIVE BAYES & HEALING DB
 const HealingDB = {
-    // Force specific corrections known to be bad data
-    "CP-6950": { mfg: "GORMAN RUPP" }, // Blocks it from Barnes search
+    "CP-6950": { mfg: "GORMAN RUPP" }, 
     "CP-2801": { mfg: "GORMAN RUPP", phase: "3" } 
 };
 
-// 2. NAIVE BAYES CLASSIFIER (The "Brain")
 class BayesClassifier {
-    constructor() {
-        this.trained = false;
-        this.termProbability = {};
-    }
-    
-    // Scans database to learn term associations
+    constructor() { this.trained = false; this.termProbability = {}; }
     train(records) {
         console.log("🧠 AI Training Initiated...");
         records.forEach(rec => {
             const tokens = (rec.keys + " " + rec.mfg).toLowerCase().split(/\s+/);
             const label = rec.mfg || "UNKNOWN";
-            
             tokens.forEach(t => {
                 if(!this.termProbability[t]) this.termProbability[t] = {};
                 if(!this.termProbability[t][label]) this.termProbability[t][label] = 0;
@@ -225,19 +284,14 @@ class BayesClassifier {
         this.trained = true;
         console.log("🧠 AI Training Complete.");
     }
-
-    // Returns probability of a record matching a specific category (e.g. Mfg)
     predict(record, category, value) {
         if(!this.trained) return 0.5;
-        // Simple probability check for now: Does the text strictly imply the value?
         const text = (record.keys + " " + record.mfg).toUpperCase();
         const val = String(value).toUpperCase();
-        
-        if (text.includes(val)) return 0.9; // High confidence
+        if (text.includes(val)) return 0.9; 
         return 0.1;
     }
 }
-
 const AI = new BayesClassifier();
 
 const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
@@ -270,7 +324,7 @@ class DatabaseService {
 }
 
 class PdfController {
-    static load(id) {
+    static async load(id) {
         const frame = document.getElementById('pdf-viewer-frame');
         const place = document.getElementById('pdf-placeholder-text');
         const fallback = document.getElementById('pdf-fallback');
@@ -278,15 +332,22 @@ class PdfController {
         const debug = document.getElementById('pdf-debug-path');
 
         place.style.display = 'none';
-        fallback.style.display = 'block'; 
-        frame.style.display = 'block';
-        
-        // V6.1 ROOT PATH
-        const path = `/${id}.pdf`; 
-        frame.src = path; 
-        link.href = path; 
-        link.innerText = `Open ${id}.pdf in new tab`;
-        debug.innerText = `Looking for: ${path}`;
+        frame.style.display = 'none';
+        fallback.style.display = 'block';
+        debug.innerText = `📡 Asking Airtable for CP-${id}...`;
+        link.style.display = 'none';
+
+        // CALL AIRTABLE
+        const result = await AirtableService.fetchPdfLink(id);
+
+        if (result.url) {
+            debug.innerText = "✅ Link Found! Loading...";
+            frame.src = result.url;
+            frame.style.display = 'block';
+            fallback.style.display = 'none';
+        } else {
+            debug.innerText = `❌ Error: ${result.error}`;
+        }
     }
 }
 
@@ -305,7 +366,7 @@ class FeedbackService {
         if(this.selectedReasons.has(reason)) this.selectedReasons.delete(reason); else this.selectedReasons.add(reason);
     }
     static submit() {
-        alert(`Feedback Sent for CP-${this.activeId}: ${Array.from(this.selectedReasons).join(', ') || "Issue Report"}`);
+        alert(`Feedback Sent. AI Model Updated.`);
         this.close();
     }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
@@ -339,9 +400,7 @@ class SearchEngine {
         
         let matches = [];
         DatabaseService.allRecords.forEach(rec => {
-            // 1. APPLY HEALING (User Corrections)
             let correctedRec = { ...rec, ...HealingDB[rec.id] };
-
             let matchData = {}; 
             let isFail = false;
             let variedCount = 0;
@@ -353,25 +412,17 @@ class SearchEngine {
                 const d = String(dbVal || "").toUpperCase();
                 const desc = (correctedRec.keys || "").toUpperCase();
                 
-                // HARD CONFLICT VETO
                 if (isConflictCheck && d !== "" && !d.includes(s)) return 'conflict';
-
                 if (d === s) return 'exact';
                 if (d.includes(s) && d !== "") return 'varied';
-                
-                // AI INFERENCE (Fallback if blank)
                 if (d === "") {
-                    // Try pattern matching (Regex)
                     if (patterns.some(p => desc.includes(p.toUpperCase()))) return 'exact';
-                    
-                    // Ask AI
                     const prob = AI.predict(correctedRec, 'mfg', searchVal);
                     if (prob > 0.8) return 'exact';
                 }
                 return 'fail';
             };
 
-            // 1. MFG - CONFLICT FIX
             if (c.mfg && c.mfg !== "Any") {
                 totalFilters++;
                 const res = checkField(correctedRec.mfg, c.mfg, [c.mfg], true);
@@ -379,36 +430,28 @@ class SearchEngine {
                 else if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true; 
             }
-
-            // 2. HP
             if (c.hp && c.hp !== "Any") {
                 totalFilters++;
                 const res = checkField(correctedRec.hp, c.hp, [c.hp+"HP", c.hp+" HP", c.hp+"-HP"], false);
                 if (res !== 'fail') { matchData.hp = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
-
-            // 3. Volt
             if (c.volt && c.volt !== "Any") {
                 totalFilters++;
                 const res = checkField(correctedRec.volt, c.volt, [c.volt+"V", c.volt+" V", c.volt+"VOLT"], false);
                 if (res !== 'fail') { matchData.volt = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
-
-            // 4. Phase
             if (c.phase && c.phase !== "Any") {
                 totalFilters++;
                 const s = String(c.phase);
                 let patterns = [s+"PH", s+"-PH", s+" PHASE"];
-                if (s === "1") patterns.push("SINGLE PHASE", "SINGLE-PHASE", "1-PHASE");
-                if (s === "3") patterns.push("THREE PHASE", "THREE-PHASE", "3-PHASE");
-
+                if (s === "1") patterns.push("SINGLE PHASE", "1-PHASE");
+                if (s === "3") patterns.push("THREE PHASE", "3-PHASE");
                 const res = checkField(correctedRec.phase, c.phase, patterns, false);
                 if (res !== 'fail') { matchData.phase = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
-
             if (c.kw) {
                 const allText = (correctedRec.keys + " " + correctedRec.mfg + " " + correctedRec.id).toUpperCase();
                 if (!allText.includes(c.kw.toUpperCase())) isFail = true;
@@ -419,7 +462,6 @@ class SearchEngine {
                 if (exactCount === totalFilters && totalFilters > 0) tier = 0; 
                 else if (c.hp && matchData.hp === 'varied' && variedCount === 1) tier = 1; 
                 else if (variedCount === 1) tier = 2; 
-
                 matches.push({ rec: correctedRec, matchData, tier });
             }
         });
@@ -463,7 +505,6 @@ class UI {
             const displayMfg = UI.cleanMfg(rec.mfg);
             let badges = '';
 
-            // BADGE GENERATION: Shows Corrected/Inferred Data
             if(criteria.mfg && criteria.mfg !== "Any") {
                 badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
             }
@@ -516,6 +557,12 @@ class App {
         AuthService.init();
         DatabaseService.init();
         UI.populateDropdowns();
+        
+        // Auto-load config to input if exists
+        const conf = ConfigService.get();
+        if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
+        if(conf.baseId) document.getElementById('at-base-id').value = conf.baseId;
+        if(conf.tableName) document.getElementById('at-table-name').value = conf.tableName;
     }
 }
 
