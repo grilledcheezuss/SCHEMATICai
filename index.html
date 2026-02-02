@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v7.3 - Refinery Restored)</title>
+    <title>Cox Research | SCHEMATICai (v7.4 - Debugger)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -130,7 +130,7 @@
 <div id="config-modal">
     <div class="config-card">
         <h3 style="margin-top:0; color:var(--app-primary);">🔌 Connection & Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Credentials</p>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Connection Settings</p>
         <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
         <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;" value="appgc1pbuOgmODRpj" disabled>
         <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name" style="margin-bottom:15px;" value="Control Panel Items" disabled>
@@ -151,7 +151,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v7.3</div>
+    <div class="version-badge">SCHEMATICai v7.4</div>
     <div class="header-controls">
         <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -210,9 +210,9 @@
 </div>
 
 <script>
-// --- SCHEMATICai v7.3 (REFINERY & PARSING) ---
+// --- SCHEMATICai v7.4 (DEBUGGER) ---
 
-// CONSTANTS
+// CONSTANTS (Hardcoded Correct Values)
 const AT_BASE = 'appgc1pbuOgmODRpj';
 const AT_TABLE = 'Control Panel Items';
 
@@ -266,7 +266,6 @@ class SpecExtractor {
         if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø")) specs.phase = "3";
         else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø")) specs.phase = "1";
 
-        console.log(`Parsing: "${text.substring(0,20)}..." ->`, specs);
         return specs;
     }
 }
@@ -277,7 +276,7 @@ const HealingDB = {
     "CP-2801": { mfg: "GORMAN RUPP", phase: "3" } 
 };
 
-// 4. HARVEST SERVICE (RESTORED)
+// 4. HARVEST SERVICE
 class HarvestService {
     static async start() {
         const config = ConfigService.get();
@@ -333,6 +332,8 @@ class AirtableService {
         const config = ConfigService.get();
         if(!config.apiKey) { alert("Click ⚙️ and enter API Key."); return null; }
 
+        console.log("🔑 Sending Key:", config.apiKey.substring(0, 7) + "..." + config.apiKey.slice(-4));
+
         let formulas = [];
         const searchTerms = [];
         if(criteria.mfg && criteria.mfg !== "Any") searchTerms.push(criteria.mfg);
@@ -349,10 +350,11 @@ class AirtableService {
         const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=50`;
 
         try {
-            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
-            if (resp.status === 401) { alert("API Key Invalid (401)"); return null; }
-            if (resp.status === 403) { alert("Permissions Error (403). Check Scopes."); return null; }
-            if (!resp.ok) return null;
+            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey.trim()}` } });
+            
+            if (resp.status === 401) { alert("API Key Invalid (401). Check Settings."); return null; }
+            if (resp.status === 403) { alert("Permissions Error (403). Check Token Scopes."); return null; }
+            if (resp.status === 422) { console.error("Bad Formula:", formulaStr); return null; }
             
             const data = await resp.json();
             return data.records.map(r => {
@@ -360,6 +362,7 @@ class AirtableService {
                 const desc = f['Items'] || "";
                 let extracted = SpecExtractor.extract(desc);
                 const id = f['Control Panel Name'];
+                
                 if(HealingDB[id]) extracted = { ...extracted, ...HealingDB[id] };
 
                 return {
@@ -372,7 +375,10 @@ class AirtableService {
                     pdfUrl: (f['Control Panel PDF'] && f['Control Panel PDF'][0]) ? f['Control Panel PDF'][0].url : null
                 };
             });
-        } catch(e) { return null; }
+        } catch(e) { 
+            console.error("Fetch Error:", e);
+            return null; 
+        }
     }
 }
 
@@ -456,12 +462,12 @@ class SearchEngine {
         
         let results = await AirtableService.search(criteria);
         
+        // V7.4: SOFT FILTER (Fallback to Broad Match)
         if (results) {
-            // SOFT FILTER: Only remove if extraction exists AND conflicts
             results = results.filter(rec => {
                 if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg && rec.mfg !== criteria.mfg) return false;
                 if(criteria.hp && criteria.hp !== "Any" && rec.hp && rec.hp !== criteria.hp) return false;
-                // Voltage/Phase usually strict, but if extraction failed (null), let it pass to user can decide
+                if(criteria.volt && criteria.volt !== "Any" && rec.volt && rec.volt !== criteria.volt) return false;
                 if(criteria.phase && criteria.phase !== "Any" && rec.phase && rec.phase !== criteria.phase) return false;
                 return true;
             });
@@ -501,7 +507,7 @@ class UI {
             card.className = 'record-card';
             
             let badges = '';
-            if(criteria.mfg && criteria.mfg !== "Any") badges += `<span class="hud-badge ${rec.mfg ? 'match-exact' : ''}">${rec.mfg || "Unknown"}</span>`;
+            if(criteria.mfg && criteria.mfg !== "Any") badges += `<span class="hud-badge match-exact">${rec.mfg || "Unknown"}</span>`;
             if(criteria.hp && criteria.hp !== "Any") badges += `<span class="hud-badge match-exact">${rec.hp || "HP?"} HP</span>`;
             if(criteria.volt && criteria.volt !== "Any") badges += `<span class="hud-badge match-exact">${rec.volt || "V?"}V</span>`;
             if(criteria.phase && criteria.phase !== "Any") badges += `<span class="hud-badge match-exact">${rec.phase || criteria.phase}PH</span>`;
@@ -544,7 +550,9 @@ class App {
     static init() {
         AuthService.init();
         UI.populateDropdowns();
-        // Load existing key to UI
+        console.log("🧠 AI System: Online (Waiting for Data)");
+        
+        // Auto Load Key
         const conf = ConfigService.get();
         if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
     }
