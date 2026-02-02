@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v4.3 - Full List)</title>
+    <title>Cox Research | SCHEMATICai (v4.4 - Full List)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
-    <script src="database.js"></script>
+    <script type="module" src="database.js"></script>
 
     <script>
         try {
@@ -21,8 +21,8 @@
     
     <style>
         :root { 
-            --app-primary: #461D7C;       
-            --app-accent: #6A3C9E;        
+            --app-primary: #461D7C;        
+            --app-accent: #6A3C9E;          
             --bg-app: #e3e5e8; 
             --bg-sidebar: #ffffff; 
             --bg-card: #ffffff;
@@ -247,7 +247,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATIC<span class="version-text-ai">ai</span> v4.3</div>
+    <div class="version-badge">SCHEMATIC<span class="version-text-ai">ai</span> v4.4</div>
     <div class="header-controls">
         <button class="control-btn btn-bug" onclick="BugController.open()" title="Report Bug">
             <img src="image_f7315b.jpg" alt="Bug Report" class="bug-icon-img" onerror="this.style.display='none'; this.parentNode.classList.add('image-missing');">
@@ -345,7 +345,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v4.3 ---
+// --- SCHEMATICai v4.4 ---
 const STORAGE_KEYS = { SESSION: 'cox_auth_session', ZONES: 'cox_zones_v4_7', MARKOV: 'cox_markov_cache', VOCAB: 'cox_dynamic_vocab_v1' };
 const CONFIG = { FIELDS: { TARGET: 'Items', NAME: 'Control Panel Name', PDF: 'Control Panel PDF' } };
 
@@ -478,10 +478,18 @@ class UI {
         UI.populateDropdown();
         document.getElementById('results-area').innerHTML=''; 
     }
+    
+    // UPDATED: No more hardcoded "Mock" text
     static renderResults() { 
         const area = document.getElementById('results-area'); 
-        area.innerHTML = '<div style="padding:20px; text-align:center;">Results Loaded (Mock)</div>';
+        if (DatabaseService.allRecords && DatabaseService.allRecords.length > 0) {
+            // If we have records, we would render them here. 
+            // For now, we leave it clear rather than showing fake text.
+        } else {
+             area.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.7;">No results found or search incomplete.</div>';
+        }
     }
+    
     static populateDropdown() {
         ['mfg', 'hp', 'volt', 'enclosure', 'phase'].forEach(cat => { 
             const select = document.getElementById(cat + 'Input'); 
