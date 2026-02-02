@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v4.9 - Strict Logic)</title>
+    <title>Cox Research | SCHEMATICai (v5.0 - PDF & Sorting)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -32,8 +32,8 @@
             --border-color: #c7c7cc; 
             
             /* STRICT MATCH COLORS */
-            --match-exact-bg: #dcfce7; --match-exact-text: #166534; --match-exact-border: #166534; /* GREEN */
-            --match-varied-bg: #ffedd5; --match-varied-text: #c2410c; --match-varied-border: #c2410c; /* ORANGE */
+            --match-exact-bg: #dcfce7; --match-exact-text: #166534; --match-exact-border: #166534;
+            --match-varied-bg: #ffedd5; --match-varied-text: #c2410c; --match-varied-border: #c2410c;
             
             --header-height: 80px; 
             --input-height: 48px;
@@ -82,24 +82,19 @@
         #results-scroll-area { flex: 1; overflow-y: auto; padding: 15px; background: var(--bg-app); }
         #results-area { display: flex; flex-direction: column; gap: 8px; padding-bottom: 80px; }
 
-        /* STRICT BADGE CARDS v4.9 */
+        /* CARDS */
         .record-card { background: var(--bg-card); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border-color); border-left: 6px solid var(--app-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 10px; }
         .record-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .record-card.active-view { background: rgba(70, 29, 124, 0.03); border-color: var(--app-primary); }
         
         .card-header { display: flex; justify-content: space-between; align-items: center; }
         .panel-name { font-size: 24px; font-weight: 900; color: var(--app-primary); margin: 0; letter-spacing: -0.5px; }
-        .panel-id { font-size: 12px; font-weight: 700; color: var(--text-secondary); }
 
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
         .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; border: 1px solid transparent; }
-        
-        /* EXACT MATCH (Green) */
         .hud-badge.match-exact { background: var(--match-exact-bg); color: var(--match-exact-text); border-color: var(--match-exact-border); }
-        /* VARIED MATCH (Orange) */
         .hud-badge.match-varied { background: var(--match-varied-bg); color: var(--match-varied-text); border-color: var(--match-varied-border); }
 
-        /* ACTIONS & MODALS */
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
         .thumb-btn:hover { background: #f5f5f5; }
@@ -117,7 +112,9 @@
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
         .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
 
-        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; }
+        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        #pdf-viewer-frame { width: 100%; height: 100%; border: none; }
+        
         @media (max-width: 900px) { #sidebar { width: 100%; } #preview-pane { display: none; } }
     </style>
 </head>
@@ -136,7 +133,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">v4.9</div>
+    <div class="version-badge">v5.0</div>
     <div class="header-controls">
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -182,12 +179,13 @@
         <div id="results-scroll-area"><div id="results-area"></div></div>
     </div>
     <div id="preview-pane">
-        <div>📄 Select a schematic to view</div>
+        <div id="pdf-placeholder-text">📄 Select a schematic to view</div>
+        <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
     </div>
 </div>
 
 <script>
-// --- SCHEMATICai v4.9 ---
+// --- SCHEMATICai v5.0 ---
 const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
 const CONSTANTS = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
@@ -212,6 +210,21 @@ class DatabaseService {
     static allRecords = []; 
     static async init() { 
         if(window.LOCAL_PANEL_DATA) this.allRecords = window.LOCAL_PANEL_DATA; 
+    }
+}
+
+class PdfController {
+    static load(id) {
+        const frame = document.getElementById('pdf-viewer-frame');
+        const place = document.getElementById('pdf-placeholder-text');
+        
+        // Hide placeholder, show iframe
+        place.style.display = 'none';
+        frame.style.display = 'block';
+        
+        // Attempt to load PDF. Assumes file is named "ID.pdf" in the same folder or 'pdfs/' folder.
+        // We will try root first based on user file structure
+        frame.src = `${id}.pdf`; 
     }
 }
 
@@ -265,27 +278,21 @@ class SearchEngine {
         let matches = [];
         DatabaseService.allRecords.forEach(rec => {
             let score = 0;
-            let matchData = {}; // Stores which fields matched and how (EXACT vs VARIED)
+            let matchData = {}; 
             let isFail = false;
 
-            // 1. Manufacturer Check
             if (c.mfg) {
                 if (rec.mfg && rec.mfg.toUpperCase() === c.mfg.toUpperCase()) { matchData.mfg = 'exact'; score += 10; }
                 else if (rec.mfg && rec.mfg.toUpperCase().includes(c.mfg.toUpperCase())) { matchData.mfg = 'varied'; score += 5; }
                 else isFail = true; 
             }
-
-            // 2. HP Check
             if (c.hp) {
-                // Check exact number (e.g. "5" vs "5")
                 const recHP = String(rec.hp).toUpperCase();
                 const searchHP = String(c.hp).toUpperCase();
                 if (recHP === searchHP) { matchData.hp = 'exact'; score += 10; }
                 else if (recHP.includes(searchHP)) { matchData.hp = 'varied'; score += 5; }
                 else isFail = true;
             }
-
-            // 3. Volt Check
             if (c.volt) {
                 const recVolt = String(rec.volt).toUpperCase();
                 const searchVolt = String(c.volt).toUpperCase();
@@ -293,8 +300,6 @@ class SearchEngine {
                 else if (recVolt.includes(searchVolt)) { matchData.volt = 'varied'; score += 5; }
                 else isFail = true;
             }
-
-            // 4. Keyword Check (General)
             if (c.kw) {
                 const allText = (rec.keys + " " + rec.mfg + " " + rec.id).toUpperCase();
                 if (allText.includes(c.kw.toUpperCase())) { score += 1; }
@@ -306,8 +311,9 @@ class SearchEngine {
             }
         });
 
-        // Sort by Score (Exact matches first)
-        return matches.sort((a, b) => b.score - a.score);
+        // V5.0 FIX: SORT BY ID DESCENDING (Newest first)
+        // We ignore the 'score' for sorting now, as requested.
+        return matches.sort((a, b) => parseInt(b.rec.id) - parseInt(a.rec.id));
     }
 }
 
@@ -320,7 +326,6 @@ class UI {
         document.getElementById('results-area').innerHTML=''; 
     }
     
-    // --- V4.9 STRICT BADGE RENDERER ---
     static renderResults(results, criteria) { 
         const area = document.getElementById('results-area'); 
         area.innerHTML = ''; 
@@ -332,30 +337,16 @@ class UI {
             const card = document.createElement('div');
             card.className = 'record-card';
             
-            // LOGIC: Only show badge if (User Searched Filter) AND (It Matched)
             let badges = '';
-            
-            // Mfg Badge
-            if(criteria.mfg && meta.mfg) {
-                badges += `<span class="hud-badge match-${meta.mfg}">${rec.mfg}</span>`;
-            }
-            // HP Badge
-            if(criteria.hp && meta.hp) {
-                badges += `<span class="hud-badge match-${meta.hp}">${rec.hp} HP</span>`;
-            }
-            // Volt Badge
-            if(criteria.volt && meta.volt) {
-                badges += `<span class="hud-badge match-${meta.volt}">${rec.volt}V</span>`;
-            }
-            // Phase Badge (If searched)
-            if(criteria.phase && rec.phase && String(rec.phase).includes(criteria.phase)) {
-                badges += `<span class="hud-badge match-exact">${rec.phase}PH</span>`;
-            }
+            if(criteria.mfg && meta.mfg) badges += `<span class="hud-badge match-${meta.mfg}">${rec.mfg}</span>`;
+            if(criteria.hp && meta.hp) badges += `<span class="hud-badge match-${meta.hp}">${rec.hp} HP</span>`;
+            if(criteria.volt && meta.volt) badges += `<span class="hud-badge match-${meta.volt}">${rec.volt}V</span>`;
+            if(criteria.phase && rec.phase && String(rec.phase).includes(criteria.phase)) badges += `<span class="hud-badge match-exact">${rec.phase}PH</span>`;
 
+            // V5.0 UI FIX: Removed redundant #ID from right side
             card.innerHTML = `
                 <div class="card-header">
                     <div class="panel-name">CP-${rec.id}</div>
-                    <div class="panel-id">#${rec.id}</div>
                 </div>
                 <div class="badge-row">${badges}</div>
                 <div class="card-actions">
@@ -367,6 +358,8 @@ class UI {
             card.onclick = () => {
                 document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view'));
                 card.classList.add('active-view');
+                // V5.0: Trigger PDF Load
+                PdfController.load(rec.id);
             };
             area.appendChild(card);
         });
