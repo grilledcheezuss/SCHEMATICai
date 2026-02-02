@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v7.6 - Deep Search)</title>
+    <title>Cox Research | SCHEMATICai (v7.7 - Unlimited)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -153,7 +153,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v7.6</div>
+    <div class="version-badge">SCHEMATICai v7.7</div>
     <div class="header-controls">
         <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -212,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v7.6 (DEEP SEARCH) ---
+// --- SCHEMATICai v7.7 (UNLIMITED + ARRAY FIX) ---
 
 // CONSTANTS (Hardcoded Correct Values)
 const AT_BASE = 'appgc1pbuOgmODRpj';
@@ -334,63 +334,91 @@ class HarvestService {
     }
 }
 
-// 5. AIRTABLE SERVICE (DEEP SEARCH)
+// 5. AIRTABLE SERVICE (DEEP SEARCH + PAGINATION)
 class AirtableService {
     static async search(criteria) {
         const config = ConfigService.get();
         if(!config.apiKey) { alert("Click ⚙️ and enter API Key."); return null; }
 
-        console.log("🔑 Sending Key:", config.apiKey.substring(0, 7) + "..." + config.apiKey.slice(-4));
+        console.log("🔑 Sending Key:", config.apiKey.substring(0, 7) + "...");
 
         let formulas = [];
         const searchTerms = [];
         if(criteria.mfg && criteria.mfg !== "Any") searchTerms.push(criteria.mfg);
         if(criteria.kw) searchTerms.push(criteria.kw);
         
-        // V7.6 FIX: USE SEARCH() INSTEAD OF FIND() FOR CASE-INSENSITIVITY
+        // V7.7 FIX: Use ARRAYJOIN() to force Text Conversion for Search
         if(searchTerms.length > 0) {
             searchTerms.forEach(term => {
-                formulas.push(`SEARCH('${term}', {Items})`); 
+                formulas.push(`SEARCH('${term}', ARRAYJOIN({Items}, ''))`); 
                 formulas.push(`SEARCH('${term}', {Control Panel Name})`);
             });
         }
 
         const formulaStr = formulas.length > 0 ? `OR(${formulas.join(',')})` : "";
-        const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=50`;
-
-        console.log("📡 Requesting:", url);
+        const allRecords = [];
+        let offset = null;
+        let page = 1;
 
         try {
-            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey.trim()}` } });
-            
-            if (resp.status === 401) { alert("API Key Invalid (401). Regenerate it in Airtable."); return null; }
-            if (resp.status === 403) { alert("Permissions Error (403). Check Token Scopes."); return null; }
-            
-            const data = await resp.json();
-            console.log(`✅ Airtable Responded: ${data.records.length} records found`);
-
-            return data.records.map(r => {
-                const f = r.fields;
-                const desc = f['Items'] || "";
-                let extracted = SpecExtractor.extract(desc);
-                const id = f['Control Panel Name'];
+            // PAGINATION LOOP
+            do {
+                console.log(`📡 Fetching Page ${page}...`);
+                const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?filterByFormula=${encodeURIComponent(formulaStr)}&pageSize=100${offset ? '&offset='+offset : ''}`;
                 
-                if(HealingDB[id]) extracted = { ...extracted, ...HealingDB[id] };
+                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey.trim()}` } });
+                
+                if (resp.status === 401) { alert("API Key Invalid (401)."); return null; }
+                if (!resp.ok) return null;
+                
+                const data = await resp.json();
+                
+                // MAP THIS BATCH
+                const batch = data.records.map(r => {
+                    const f = r.fields;
+                    const desc = f['Items'] || "";
+                    let extracted = SpecExtractor.extract(desc);
+                    const id = f['Control Panel Name'];
+                    if(HealingDB[id]) extracted = { ...extracted, ...HealingDB[id] };
 
-                return {
-                    id: id,
-                    mfg: extracted.mfg,
-                    hp: extracted.hp,
-                    volt: extracted.volt,
-                    phase: extracted.phase,
-                    keys: desc,
-                    pdfUrl: (f['Control Panel PDF'] && f['Control Panel PDF'][0]) ? f['Control Panel PDF'][0].url : null
-                };
-            });
+                    return {
+                        id: id,
+                        mfg: extracted.mfg,
+                        hp: extracted.hp,
+                        volt: extracted.volt,
+                        phase: extracted.phase,
+                        keys: desc,
+                        pdfUrl: (f['Control Panel PDF'] && f['Control Panel PDF'][0]) ? f['Control Panel PDF'][0].url : null
+                    };
+                });
+
+                allRecords.push(...batch);
+                offset = data.offset;
+                page++;
+
+            } while (offset && allRecords.length < 500); // Safety Cap 500 to prevent infinite loops
+
+            console.log(`✅ Total Records: ${allRecords.length}`);
+            return allRecords;
+
         } catch(e) { 
             console.error("Fetch Error:", e);
             return null; 
         }
+    }
+    
+    // DEBUG: Fetch one raw record to see field names
+    static async debugFields() {
+        const config = ConfigService.get();
+        if(!config.apiKey) return;
+        const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?maxRecords=1`;
+        try {
+            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey.trim()}` } });
+            const data = await resp.json();
+            if(data.records && data.records.length > 0) {
+                console.log("🕵️ FIELD INSPECTOR: Available Fields:", Object.keys(data.records[0].fields));
+            }
+        } catch(e) {}
     }
 }
 
@@ -566,6 +594,9 @@ class App {
         
         const conf = ConfigService.get();
         if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
+        
+        // Debug
+        setTimeout(AirtableService.debugFields, 2000);
     }
 }
 
