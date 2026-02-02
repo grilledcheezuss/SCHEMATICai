@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v5.5 - Logic Hardening)</title>
+    <title>Cox Research | SCHEMATICai (v5.6 - Synonym Logic)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -31,8 +31,10 @@
             --text-secondary: #5f6368; 
             --border-color: #c7c7cc; 
             
+            /* MATCH COLORS */
             --match-exact-bg: #dcfce7; --match-exact-text: #166534; --match-exact-border: #166534;
             --match-varied-bg: #ffedd5; --match-varied-text: #c2410c; --match-varied-border: #c2410c;
+            --badge-default-bg: #f3f4f6; --badge-default-text: #374151; /* RESTORED DEFAULT */
             
             --header-height: 80px; 
             --input-height: 48px;
@@ -48,6 +50,7 @@
             
             --match-exact-bg: #14532d; --match-exact-text: #86efac; --match-exact-border: #86efac;
             --match-varied-bg: #7c2d12; --match-varied-text: #fdba74; --match-varied-border: #fdba74;
+            --badge-default-bg: #374151; --badge-default-text: #e5e7eb;
             color-scheme: dark;            
         }
         
@@ -89,7 +92,7 @@
         .panel-name { font-size: 24px; font-weight: 900; color: var(--app-primary); margin: 0; letter-spacing: -0.5px; }
 
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
-        .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; border: 1px solid transparent; }
+        .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; border: 1px solid transparent; background: var(--badge-default-bg); color: var(--badge-default-text); }
         .hud-badge.match-exact { background: var(--match-exact-bg); color: var(--match-exact-text); border-color: var(--match-exact-border); }
         .hud-badge.match-varied { background: var(--match-varied-bg); color: var(--match-varied-text); border-color: var(--match-varied-border); }
 
@@ -112,7 +115,7 @@
 
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
-        .pdf-fallback { display: none; text-align: center; color: white; }
+        .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; }
         .pdf-fallback a { display: inline-block; margin-top: 10px; color: #b39ddb; text-decoration: underline; font-size: 14px; cursor: pointer; }
         
         @media (max-width: 900px) { #sidebar { width: 100%; } #preview-pane { display: none; } }
@@ -133,7 +136,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v5.5</div>
+    <div class="version-badge">SCHEMATICai v5.6</div>
     <div class="header-controls">
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
@@ -184,13 +187,14 @@
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
         <div id="pdf-fallback" class="pdf-fallback">
             <div style="margin-bottom:10px;">⚠️ PDF Not Found (404)</div>
+            <div style="font-size:12px; opacity:0.7;" id="pdf-debug-path"></div>
             <a id="pdf-fallback-link" target="_blank">Try opening in new tab</a>
         </div>
     </div>
 </div>
 
 <script>
-// --- SCHEMATICai v5.5 ---
+// --- SCHEMATICai v5.6 ---
 const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
 const CONSTANTS = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
@@ -224,6 +228,7 @@ class PdfController {
         const place = document.getElementById('pdf-placeholder-text');
         const fallback = document.getElementById('pdf-fallback');
         const link = document.getElementById('pdf-fallback-link');
+        const debug = document.getElementById('pdf-debug-path');
 
         place.style.display = 'none';
         fallback.style.display = 'block'; 
@@ -233,6 +238,7 @@ class PdfController {
         frame.src = path; 
         link.href = path; 
         link.innerText = `Open ${id}.pdf in new tab`;
+        debug.innerText = `Looking for: /${id}.pdf`;
     }
 }
 
@@ -312,12 +318,10 @@ class SearchEngine {
                 const s = c.mfg.toUpperCase();
                 const d = (rec.mfg || "").toUpperCase();
                 
-                // HARD MISMATCH: If rec has mfg and it DOESN'T match search -> FAIL
+                // V5.6 CONFLICT LOGIC: If I search "BARNES" and DB says "GORMAN", Fail.
                 if (d !== "" && !d.includes(s)) {
                     isFail = true;
-                } 
-                else {
-                    // Standard Check or Fallback
+                } else {
                     const res = checkField(rec.mfg, c.mfg, [c.mfg]);
                     if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
                     else isFail = true; 
@@ -337,13 +341,12 @@ class SearchEngine {
             }
             if (c.phase) {
                 totalFilters++;
-                // Aggressive fallback for Phase including text variations
+                // V5.6 SYNONYM ENGINE
                 const s = String(c.phase);
-                const patterns = [
-                    s+"PH", s+" PH", s+"-PH", 
-                    s+"PHASE", s+" PHASE", s+"-PHASE", 
-                    (s==="3" ? "THREE" : "SINGLE")
-                ];
+                let patterns = [s+"PH", s+"-PH", s+" PHASE"];
+                if (s === "1") patterns.push("SINGLE PHASE", "SINGLE-PHASE", "1-PHASE");
+                if (s === "3") patterns.push("THREE PHASE", "THREE-PHASE", "3-PHASE");
+
                 const res = checkField(rec.phase, c.phase, patterns);
                 if (res !== 'fail') { matchData.phase = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
@@ -403,7 +406,7 @@ class UI {
             const displayMfg = UI.cleanMfg(rec.mfg);
             let badges = '';
 
-            // STRICT BADGE LOGIC v5.5: Only show if criteria exists
+            // STRICT VISIBILITY: Badge only shows if Filter is Active OR Match Data exists
             if(criteria.mfg) {
                 badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
             }
