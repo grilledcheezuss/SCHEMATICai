@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.1 - Weighted Voting)</title>
+    <title>Cox Research | SCHEMATICai (v10.2 - Contextual Voting)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -154,7 +154,9 @@
 <div id="config-modal">
     <div class="config-card">
         <h3 style="margin-top:0; color:var(--app-primary);">🛠️ Admin Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Status: <span id="db-status-text">Idle</span></p>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">
+            Status: <span id="db-status-text">Idle</span>
+        </p>
         <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="DataLoader.harvestCSV()">📥 Harvest Golden CSV</button>
         <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Clear Cache</button>
         <div style="margin-top:10px;"><button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
@@ -162,10 +164,15 @@
 </div>
 
 <header>
-    <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v10.1</div>
+    <a href="#" class="logo-group">
+        <span class="logo-main">COX</span>
+        <span class="logo-sub">RESEARCH</span>
+    </a>
+    <div class="version-badge">SCHEMATICai v10.2</div>
     <div class="header-controls">
-        <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
+        <div id="settings-btn-wrapper">
+            <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
+        </div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -174,7 +181,10 @@
 
 <div id="feedback-modal">
     <div class="modal-card">
-        <div class="modal-header"><span>Report Inaccuracy</span><button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button></div>
+        <div class="modal-header">
+            <span>Report Inaccuracy</span>
+            <button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button>
+        </div>
         <div class="modal-content">
             <p style="font-size:12px; color:#666; margin-top:0;">Select parameter and enter correct value:</p>
             <div class="reason-row"><div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
@@ -215,7 +225,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.1 (WEIGHTED VOTING) ---
+// --- SCHEMATICai v10.2 (CONTEXTUAL VOTING) ---
 
 class PdfController {
     static load(id, url) {
@@ -344,6 +354,10 @@ class DataLoader {
 class SearchEngine {
     static perform() {
         if(window.LOCAL_DB.length === 0) return;
+        
+        // V10.2: RESET SESSION VOTES ON SEARCH
+        FeedbackService.resetSession();
+        
         const kw = document.getElementById('keywordInput').value.trim().toUpperCase();
         const mfg = document.getElementById('mfgInput').value;
         const hp = document.getElementById('hpInput').value;
@@ -396,7 +410,11 @@ class UI {
         results.slice(0, 100).forEach(item => {
             const card = document.createElement('div'); card.className = 'record-card';
             const healed = TheHealer.healedData[item.id];
-            const history = FeedbackService.getHistory(item.id);
+            
+            // Check Session Vote
+            const isVoted = FeedbackService.sessionVotes.has(item.id);
+            const history = FeedbackService.getHistory(item.id); // Only downvotes are persistent now
+            
             let badges = '';
             
             if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
@@ -420,7 +438,7 @@ class UI {
                 badges += `<span class="hud-badge ${css}">${healed?.phase || criteria.phase}PH</span>`;
             }
 
-            card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up ${history.up ? 'voted-up' : ''}" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down ${history.down ? 'voted-down' : ''}" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
+            card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up ${isVoted ? 'voted-up' : ''}" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down ${history.down ? 'voted-down' : ''}" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
             card.onclick = () => { document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view')); card.classList.add('active-view'); PdfController.load(item.id, item.pdfUrl); };
             area.appendChild(card);
         });
@@ -430,9 +448,16 @@ class UI {
 
 class FeedbackService { 
     static activeId = null; 
+    static sessionVotes = new Set(); // V10.2: Reset on search
+    
+    static resetSession() { this.sessionVotes.clear(); }
     
     static getHistory(id) { const stored = localStorage.getItem('cox_vote_' + id); return stored ? JSON.parse(stored) : { up: false, down: false }; }
-    static saveHistory(id, type) { const current = this.getHistory(id); current[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(current)); }
+    static saveHistory(id, type) { 
+        const current = this.getHistory(id); 
+        current[type] = true; 
+        localStorage.setItem('cox_vote_' + id, JSON.stringify(current)); 
+    }
 
     static down(id) { 
         if(this.getHistory(id).down) return;
@@ -448,16 +473,17 @@ class FeedbackService {
         document.querySelectorAll('.reason-btn.selected').forEach(btn => { const reasonCode = btn.dataset.reason; const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }); 
         if(submissions.length === 0) return alert("Select a reason and enter a value."); 
         for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } 
-        this.saveHistory(id, 'down');
+        
+        this.saveHistory(id, 'down'); // Persist down
         alert("Votes Recorded. Thank you."); 
         const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); 
         this.close(); 
     } 
     
-    // V10.1: WEIGHTED UPVOTING
+    // V10.2: CONTEXTUAL UPVOTING
     static async up(id) { 
-        if(this.getHistory(id).up) return;
-        this.saveHistory(id, 'up');
+        if(this.sessionVotes.has(id)) return; // Anti-Spam (Current View Only)
+        this.sessionVotes.add(id);
         
         let votesCast = 0;
         const criteria = {
@@ -474,7 +500,7 @@ class FeedbackService {
             }
         }
 
-        if(votesCast === 0) await this.sendToAirtable(id, "VERIFIED", "General Match"); // Fallback
+        if(votesCast === 0) await this.sendToAirtable(id, "VERIFIED", "General Match"); 
 
         alert("Liked!"); 
         event.target.classList.add('voted-up');
