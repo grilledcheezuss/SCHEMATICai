@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.0 - Display Only)</title>
+    <title>Cox Research | SCHEMATICai (v8.2 - Accuracy)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -153,7 +153,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.0</div>
+    <div class="version-badge">SCHEMATICai v8.2</div>
     <div class="header-controls">
         <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -212,9 +212,9 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.0 (DISPLAY-ONLY ARCHITECTURE) ---
+// --- SCHEMATICai v8.2 (ACCURACY) ---
 
-// 1. CORE CLASSES (Must load first)
+// 1. PDF CONTROLLER
 class PdfController {
     static load(id, url) {
         const frame = document.getElementById('pdf-viewer-frame');
@@ -261,14 +261,16 @@ class ConfigService {
     }
 }
 
-// 3. PARSING ENGINE (COSMETIC ONLY)
+// 3. PARSING ENGINE (V8.2: WORD BOUNDARIES)
 class SpecExtractor {
     static extract(text) {
         const specs = { mfg: null, hp: null, volt: null, phase: null };
         const t = (text || "").toUpperCase();
 
         for (const [standard, aliases] of Object.entries(CONSTANTS.MANUFACTURERS)) {
-            if (aliases.some(alias => t.includes(alias.toUpperCase()))) {
+            // V8.2: Use Regex Word Boundaries to avoid "GRINDER" matching "GR"
+            const pattern = new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i');
+            if (pattern.test(t)) {
                 specs.mfg = standard.toUpperCase();
                 break;
             }
@@ -343,7 +345,7 @@ class AirtableService {
                 offset = data.offset;
                 console.log(`Fetched ${allRecords.length} records...`);
                 
-            } while (offset && allRecords.length < 2000); // Safety Cap
+            } while (offset && allRecords.length < 2000); 
 
             return allRecords;
 
@@ -369,7 +371,7 @@ class SearchEngine {
         const btn = document.getElementById('searchBtn');
         btn.innerText = "...";
         
-        // V8.0: TRUST THE API. NO LOCAL FILTER.
+        // TRUST API
         let results = await AirtableService.search(criteria);
         
         UI.renderResults(results, criteria);
@@ -402,10 +404,13 @@ class UI {
             card.className = 'record-card';
             
             let badges = '';
-            // Only show badges if parsed data exists AND is relevant
-            if(item.mfg) badges += `<span class="hud-badge match-exact">${item.mfg}</span>`;
             
-            // Show specs only if user asked for them OR if they exist strongly
+            // V8.2: USER AUTHORITY BADGE LOGIC
+            // If user selected a filter, FORCE that badge. Otherwise use parser.
+            const displayMfg = (criteria.mfg && criteria.mfg !== "Any") ? criteria.mfg : (item.mfg || "Unknown");
+            
+            if(displayMfg !== "Unknown") badges += `<span class="hud-badge match-exact">${displayMfg}</span>`;
+            
             if(item.hp) badges += `<span class="hud-badge match-exact">${item.hp} HP</span>`;
             if(item.volt) badges += `<span class="hud-badge match-exact">${item.volt}V</span>`;
             if(item.phase) badges += `<span class="hud-badge match-exact">${item.phase}PH</span>`;
@@ -535,6 +540,7 @@ class App {
     static init() {
         AuthService.init();
         UI.populateDropdowns();
+        console.log("🧠 AI System: Online (Waiting for Data)");
         const conf = ConfigService.get();
         if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
     }
