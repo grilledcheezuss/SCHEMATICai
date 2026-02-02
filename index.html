@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.7 - Hardcoded Prod)</title>
+    <title>Cox Research | SCHEMATICai (v8.8 - Hybrid Core)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -152,7 +152,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.7</div>
+    <div class="version-badge">SCHEMATICai v8.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -212,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.7 (HARDCODED PROD) ---
+// --- SCHEMATICai v8.8 (HYBRID CORE + XRAY) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -235,7 +235,7 @@ class PdfController {
     }
 }
 
-// ⚠️ CREDENTIALS (INSERTED)
+// CREDENTIALS
 const AIRTABLE_PAT = 'patNuv7rNHCIHeq5t.093ee4623c468319b352d024b4c2309fe598d7962dd83d481ec6b23b4cdacf99'; 
 const AT_BASE = 'appgc1pbuOgmODRpj';
 const AT_TABLE = 'Control Panel Items';
@@ -278,7 +278,7 @@ class SpecExtractor {
 // 3. GLOBAL STORE
 window.LOCAL_DB = [];
 
-// 4. DATA LOADER (Background Fetcher)
+// 4. DATA LOADER
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn');
@@ -317,7 +317,6 @@ class DataLoader {
             btn.innerText = "SEARCH DATABASE";
             btn.disabled = false;
             btn.style.backgroundColor = "#461D7C";
-            console.log("🧠 Training AI Model...");
             
         } catch(e) {
             console.error("Sync Failed", e);
@@ -341,7 +340,7 @@ class DataLoader {
     }
 }
 
-// 5. LOCAL SEARCH ENGINE
+// 5. SEARCH ENGINE (HYBRID)
 class SearchEngine {
     static perform() {
         if(window.LOCAL_DB.length === 0) return;
@@ -356,30 +355,58 @@ class SearchEngine {
             alert("Enter search criteria."); return;
         }
 
-        const results = window.LOCAL_DB.filter(rec => {
+        console.log("🔎 SEARCH STARTED:", {kw, mfg, hp, volt, phase});
+
+        const results = window.LOCAL_DB.filter((rec, index) => {
+            let pass = true;
+            let rejectReason = "";
+
+            // 1. Keyword
             if(kw) {
                 const searchTarget = (rec.id + " " + rec.desc).toUpperCase();
-                if(!searchTarget.includes(kw)) return false;
+                if(!searchTarget.includes(kw)) { pass = false; rejectReason = "KW"; }
             }
-            if(mfg !== "Any") {
-                if(rec.mfg && rec.mfg !== mfg.toUpperCase()) return false;
-                if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) return false;
+            
+            // 2. Manufacturer
+            if(pass && mfg !== "Any") {
+                if(rec.mfg && rec.mfg !== mfg.toUpperCase()) { pass = false; rejectReason = "MFG_MISMATCH"; }
+                if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) { pass = false; rejectReason = "MFG_MISSING"; }
             }
-            if(hp !== "Any") {
-                if(!rec.hp) return false;
-                if(rec.hp !== String(hp)) return false;
+
+            // 3. HP (Hybrid: Check Badge OR Text)
+            if(pass && hp !== "Any") {
+                const hpStr = String(hp);
+                const badgeMatch = rec.hp === hpStr;
+                const textMatch = rec.desc.includes(hpStr + "HP") || rec.desc.includes(hpStr + " HP");
+                
+                if(!badgeMatch && !textMatch) { pass = false; rejectReason = "HP"; }
             }
-            if(volt !== "Any") {
-                if(!rec.volt) return false;
-                if(!rec.volt.includes(String(volt))) return false;
+
+            // 4. Voltage (Hybrid)
+            if(pass && volt !== "Any") {
+                const vStr = String(volt);
+                const badgeMatch = rec.volt && rec.volt.includes(vStr);
+                const textMatch = rec.desc.includes(vStr);
+                
+                if(!badgeMatch && !textMatch) { pass = false; rejectReason = "VOLT"; }
             }
-            if(phase !== "Any") {
-                if(!rec.phase) return false;
-                if(rec.phase !== String(phase)) return false;
+
+            // 5. Phase (Hybrid)
+            if(pass && phase !== "Any") {
+                const pStr = String(phase);
+                const badgeMatch = rec.phase === pStr;
+                const textMatch = rec.desc.includes(pStr + "PH") || rec.desc.includes(pStr + " PH");
+                
+                if(!badgeMatch && !textMatch) { pass = false; rejectReason = "PHASE"; }
             }
-            return true;
+
+            // TRACE LOG (First 5 Rejections)
+            if(!pass && index < 5) console.log(`❌ Skipped ${rec.id}: ${rejectReason}`);
+            
+            return pass;
         });
 
+        console.log(`✅ Found ${results.length} matches.`);
         UI.renderResults(results, { mfg, hp, volt, phase });
     }
 }
@@ -412,8 +439,11 @@ class UI {
             const state = FeedbackService.history[item.id] || { up: false, downReasons: new Set() };
             
             let badges = '';
-            if(item.mfg) badges += `<span class="hud-badge match-exact">${item.mfg}</span>`;
+            // Always show MFG if known
+            const displayMfg = (criteria.mfg && criteria.mfg !== "Any") ? criteria.mfg : (item.mfg || "Unknown");
+            if(displayMfg !== "Unknown") badges += `<span class="hud-badge match-exact">${displayMfg}</span>`;
             
+            // Smart Badges (Green vs Grey)
             if(item.hp) {
                 const style = (criteria.hp !== "Any") ? 'match-exact' : 'match-info';
                 badges += `<span class="hud-badge ${style}">${item.hp} HP</span>`;
@@ -499,8 +529,6 @@ class FeedbackService {
         if(this.history[id].up) return;
         this.history[id].up = true;
         alert("Liked!");
-        // Force Re-render to show updated state (lazy method: just update this card)
-        // Better: SearchEngine.perform() or simple DOM manipulation
         event.target.classList.add('voted-up');
     }
     static down(id) {
