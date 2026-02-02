@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v5.2 - Fixes)</title>
+    <title>Cox Research | SCHEMATICai (v5.3 - Smart Search)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -54,7 +54,7 @@
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 15px; }
 
-        /* HEADER FIXED v5.2 */
+        /* HEADER */
         header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
         .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; }
         .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
@@ -65,7 +65,7 @@
 
         .header-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; z-index: 2; }
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
-        .btn-bug { font-size: 14px; } 
+        .btn-bug { font-size: 14px; }
 
         #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
         html.logged-in #app-container { display: flex !important; }
@@ -114,8 +114,8 @@
 
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
-        .pdf-fallback { display: none; text-align: center; }
-        .pdf-fallback a { display: inline-block; margin-top: 10px; color: #fff; text-decoration: underline; font-size: 14px; cursor: pointer; }
+        .pdf-fallback { display: none; text-align: center; color: white; }
+        .pdf-fallback a { display: inline-block; margin-top: 10px; color: #b39ddb; text-decoration: underline; font-size: 14px; cursor: pointer; }
         
         @media (max-width: 900px) { #sidebar { width: 100%; } #preview-pane { display: none; } }
     </style>
@@ -135,7 +135,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v5.2</div>
+    <div class="version-badge">SCHEMATICai v5.3</div>
     <div class="header-controls">
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
@@ -192,7 +192,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v5.2 ---
+// --- SCHEMATICai v5.3 ---
 const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
 const CONSTANTS = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
@@ -228,12 +228,12 @@ class PdfController {
         const link = document.getElementById('pdf-fallback-link');
 
         place.style.display = 'none';
-        fallback.style.display = 'block'; // Show fallback controls
+        fallback.style.display = 'block'; 
         frame.style.display = 'block';
         
         const path = `${id}.pdf`;
         frame.src = path; 
-        link.href = path; // Allow user to try direct link
+        link.href = path; 
         link.innerText = `Open ${id}.pdf in new tab`;
     }
 }
@@ -292,38 +292,62 @@ class SearchEngine {
             let variedCount = 0;
             let exactCount = 0;
             let totalFilters = 0;
+            
+            // Helper: Checks strict field, then description if strict is missing
+            const checkField = (dbVal, searchVal, suffix) => {
+                const s = String(searchVal || "").toUpperCase();
+                const d = String(dbVal || "").toUpperCase();
+                const desc = (rec.keys || "").toUpperCase();
+                
+                if (d === s) return 'exact';
+                if (d.includes(s) && d !== "") return 'varied';
+                
+                // FALLBACK: If DB field is empty, check description
+                if (d === "") {
+                    // Look for "3PH" or "3 PHASE"
+                    const patterns = [
+                        s + (suffix || ""), 
+                        s + " " + (suffix || "")
+                    ];
+                    if (patterns.some(p => desc.includes(p))) return 'exact'; // Inferred exact
+                }
+                return 'fail';
+            };
 
             if (c.mfg) {
                 totalFilters++;
-                if (rec.mfg && rec.mfg.toUpperCase() === c.mfg.toUpperCase()) { matchData.mfg = 'exact'; exactCount++; }
-                else if (rec.mfg && rec.mfg.toUpperCase().includes(c.mfg.toUpperCase())) { matchData.mfg = 'varied'; variedCount++; }
+                const res = checkField(rec.mfg, c.mfg);
+                if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true; 
             }
             if (c.hp) {
                 totalFilters++;
-                const recHP = String(rec.hp).toUpperCase();
-                const searchHP = String(c.hp).toUpperCase();
-                if (recHP === searchHP) { matchData.hp = 'exact'; exactCount++; }
-                else if (recHP.includes(searchHP)) { matchData.hp = 'varied'; variedCount++; }
+                const res = checkField(rec.hp, c.hp, "HP");
+                if (res !== 'fail') { matchData.hp = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
             if (c.volt) {
                 totalFilters++;
-                const recVolt = String(rec.volt).toUpperCase();
-                const searchVolt = String(c.volt).toUpperCase();
-                if (recVolt === searchVolt) { matchData.volt = 'exact'; exactCount++; }
-                else if (recVolt.includes(searchVolt)) { matchData.volt = 'varied'; variedCount++; }
+                const res = checkField(rec.volt, c.volt, "V");
+                if (res !== 'fail') { matchData.volt = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
-            
-            // Phase Logic (Strict)
             if (c.phase) {
                 totalFilters++;
-                // FIX: Ensure both are strings for comparison
-                const recPhase = String(rec.phase || "");
-                const searchPhase = String(c.phase);
-                if (recPhase === searchPhase) { matchData.phase = 'exact'; exactCount++; }
-                else if (recPhase.includes(searchPhase)) { matchData.phase = 'varied'; variedCount++; }
+                // Strict check for phase 1 vs 3
+                const s = String(c.phase);
+                const d = String(rec.phase || "");
+                const desc = (rec.keys || "").toUpperCase();
+                
+                let pRes = 'fail';
+                if (d === s) pRes = 'exact';
+                else if (d.includes(s) && d !== "") pRes = 'varied';
+                else if (d === "") {
+                    // Fallback to description text for Phase
+                    if (desc.includes(s + "PH") || desc.includes(s + " PH") || desc.includes(s + "-PH")) pRes = 'exact';
+                }
+
+                if (pRes !== 'fail') { matchData.phase = pRes; if(pRes==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
 
@@ -333,7 +357,6 @@ class SearchEngine {
             }
 
             if (!isFail) {
-                // Tier Logic
                 let tier = 3; 
                 if (exactCount === totalFilters && totalFilters > 0) tier = 0; 
                 else if (c.hp && matchData.hp === 'varied' && variedCount === 1) tier = 1; 
@@ -344,8 +367,8 @@ class SearchEngine {
         });
 
         return matches.sort((a, b) => {
-            if (a.tier !== b.tier) return a.tier - b.tier; // Priority 1: Match Quality
-            return parseInt(b.rec.id) - parseInt(a.rec.id); // Priority 2: Newest First
+            if (a.tier !== b.tier) return a.tier - b.tier; 
+            return parseInt(b.rec.id) - parseInt(a.rec.id); 
         });
     }
 }
@@ -382,11 +405,12 @@ class UI {
             const displayMfg = UI.cleanMfg(rec.mfg);
             let badges = '';
 
-            // FIXED LOGIC: Always show badge if data exists. Color it if it matches.
-            if(rec.mfg) badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg}</span>`;
-            if(rec.hp) badges += `<span class="hud-badge ${meta.hp ? 'match-'+meta.hp : ''}">${rec.hp} HP</span>`;
-            if(rec.volt) badges += `<span class="hud-badge ${meta.volt ? 'match-'+meta.volt : ''}">${rec.volt}V</span>`;
-            if(rec.phase) badges += `<span class="hud-badge ${meta.phase ? 'match-'+meta.phase : ''}">${rec.phase}PH</span>`;
+            // Render badges based on match data or existence
+            if(rec.mfg || meta.mfg) badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
+            if(rec.hp || meta.hp) badges += `<span class="hud-badge ${meta.hp ? 'match-'+meta.hp : ''}">${rec.hp || "HP?"} HP</span>`;
+            if(rec.volt || meta.volt) badges += `<span class="hud-badge ${meta.volt ? 'match-'+meta.volt : ''}">${rec.volt || "V?"}V</span>`;
+            // Force phase badge if searched or exists
+            if(rec.phase || meta.phase) badges += `<span class="hud-badge ${meta.phase ? 'match-'+meta.phase : ''}">${rec.phase || criteria.phase}PH</span>`;
 
             card.innerHTML = `
                 <div class="card-header">
