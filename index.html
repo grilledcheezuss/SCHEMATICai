@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v5.9 - Logic Fix)</title>
+    <title>Cox Research | SCHEMATICai (v5.9 - Logic Hardening)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -234,7 +234,7 @@ class PdfController {
         fallback.style.display = 'block'; 
         frame.style.display = 'block';
         
-        const path = `/${id}.pdf`; // FORCE ROOT PATH
+        const path = `/${id}.pdf`; 
         frame.src = path; 
         link.href = path; 
         link.innerText = `Open ${id}.pdf in new tab`;
@@ -298,11 +298,14 @@ class SearchEngine {
             let totalFilters = 0;
             
             // SMART CHECKER
-            const checkField = (dbVal, searchVal, patterns) => {
+            const checkField = (dbVal, searchVal, patterns, isConflictCheck) => {
                 const s = String(searchVal || "").toUpperCase();
                 const d = String(dbVal || "").toUpperCase();
                 const desc = (rec.keys || "").toUpperCase();
                 
+                // CONFLICT RULE: If this is Manufacturer check, and DB has value that != search
+                if (isConflictCheck && d !== "" && !d.includes(s)) return 'conflict';
+
                 if (d === s) return 'exact';
                 if (d.includes(s) && d !== "") return 'varied';
                 if (d === "") {
@@ -315,22 +318,16 @@ class SearchEngine {
             // 1. MFG - CONFLICT FIX
             if (c.mfg && c.mfg !== "Any") {
                 totalFilters++;
-                const s = c.mfg.toUpperCase();
-                const d = (rec.mfg || "").toUpperCase();
-                // HARD FAIL: DB has data AND data != search
-                if (d !== "" && !d.includes(s)) {
-                    isFail = true; 
-                } else {
-                    const res = checkField(rec.mfg, c.mfg, [c.mfg]);
-                    if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
-                    else isFail = true; 
-                }
+                const res = checkField(rec.mfg, c.mfg, [c.mfg], true);
+                if (res === 'conflict') { isFail = true; } 
+                else if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
+                else isFail = true; 
             }
 
             // 2. HP
             if (c.hp && c.hp !== "Any") {
                 totalFilters++;
-                const res = checkField(rec.hp, c.hp, [c.hp+"HP", c.hp+" HP", c.hp+"-HP"]);
+                const res = checkField(rec.hp, c.hp, [c.hp+"HP", c.hp+" HP", c.hp+"-HP"], false);
                 if (res !== 'fail') { matchData.hp = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
@@ -338,7 +335,7 @@ class SearchEngine {
             // 3. Volt
             if (c.volt && c.volt !== "Any") {
                 totalFilters++;
-                const res = checkField(rec.volt, c.volt, [c.volt+"V", c.volt+" V", c.volt+"VOLT"]);
+                const res = checkField(rec.volt, c.volt, [c.volt+"V", c.volt+" V", c.volt+"VOLT"], false);
                 if (res !== 'fail') { matchData.volt = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
@@ -351,7 +348,7 @@ class SearchEngine {
                 if (s === "1") patterns.push("SINGLE PHASE", "SINGLE-PHASE", "1-PHASE");
                 if (s === "3") patterns.push("THREE PHASE", "THREE-PHASE", "3-PHASE");
 
-                const res = checkField(rec.phase, c.phase, patterns);
+                const res = checkField(rec.phase, c.phase, patterns, false);
                 if (res !== 'fail') { matchData.phase = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
@@ -411,7 +408,7 @@ class UI {
             const displayMfg = UI.cleanMfg(rec.mfg);
             let badges = '';
 
-            // BADGE GENERATION: Only show if criteria is NOT 'Any'
+            // BADGE GENERATION: Only show if criteria is NOT 'Any' (Strict Visibility)
             if(criteria.mfg && criteria.mfg !== "Any") {
                 badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
             }
