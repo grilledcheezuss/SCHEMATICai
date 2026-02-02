@@ -555,7 +555,377 @@ class UI {
 class PdfController {
     static async load(url) {}
     static updateRedactions() {}
-    static addZone() {}
+    static addZone() {}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cox Research | SCHEMATICai (v4.6 - Badges & Feedback)</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    
+    <script type="module" src="database.js"></script>
+
+    <script>
+        try {
+            const session = JSON.parse(localStorage.getItem('cox_auth_session'));
+            if (session && session.expiry > Date.now()) {
+                document.documentElement.classList.add('logged-in');
+            }
+        } catch(e) {}
+    </script>
+    
+    <style>
+        :root { 
+            --app-primary: #461D7C;        
+            --app-accent: #6A3C9E;          
+            --bg-app: #e3e5e8; 
+            --bg-sidebar: #ffffff; 
+            --bg-card: #ffffff;
+            --bg-controls: rgba(255,255,255,0.98); 
+            --bg-viewer: #323639; 
+            --bg-input: #ffffff;
+            --bg-modal: rgba(248, 245, 255, 0.98); 
+            --text-primary: #121212; 
+            --text-secondary: #5f6368; 
+            --text-panel-header: #461D7C; 
+            --border-color: #c7c7cc; 
+            --status-success: #1b5e20; 
+            --status-warning: #f57f17; 
+            --status-error: #b71c1c; 
+            --badge-mfg-bg: #e3f2fd; --badge-mfg-text: #1565c0;
+            --badge-hp-bg: #fff3e0; --badge-hp-text: #ef6c00;
+            --badge-volt-bg: #f3e5f5; --badge-volt-text: #7b1fa2;
+            --header-height: 80px; 
+            --input-height: 48px;
+            --z-header: 100; --z-sidebar: 20; --z-modal: 10000;
+            color-scheme: light; 
+        }
+
+        body.dark-mode {
+            --bg-app: #121212; --bg-sidebar: #1e1e1e; --bg-card: #2d2d2d; 
+            --bg-controls: rgba(30, 30, 30, 0.98); --bg-viewer: #1a1a1a; 
+            --bg-input: #383838; --bg-modal: rgba(30, 30, 30, 0.98); 
+            --text-panel-header: #d1c4e9; --text-primary: #e8eaed; --text-secondary: #9aa0a6; 
+            --border-color: #3c4043;
+            --badge-mfg-bg: #1565c0; --badge-mfg-text: #e3f2fd;
+            --badge-hp-bg: #ef6c00; --badge-hp-text: #fff3e0;
+            --badge-volt-bg: #7b1fa2; --badge-volt-text: #f3e5f5;
+            color-scheme: dark;            
+        }
+        
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 15px; }
+
+        /* HEADER */
+        header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: var(--z-header); flex-shrink: 0; }
+        .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; }
+        .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
+        .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.75rem; color: #b39ddb; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
+        .version-badge { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 8px 20px; border-radius: 20px; font-weight: 800; font-size: 14px; letter-spacing: 1px; pointer-events: none; }
+        .header-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
+        .control-btn:hover { background: rgba(255,255,255,0.3); }
+
+        /* AUTH & MODALS */
+        #auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-app); z-index: 20000; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 50px 0; }
+        html.logged-in #auth-overlay { display: none !important; }
+        .auth-card { background: var(--bg-card); padding: 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); width: 100%; max-width: 1000px; text-align: center; border: 1px solid var(--border-color); margin: auto; }
+        .auth-avatar-container { width: 100px; height: 100px; margin: 0 auto 20px auto; border-radius: 50%; overflow: hidden; border: 3px solid var(--app-primary); }
+        .auth-avatar { width: 100%; height: 100%; object-fit: cover; }
+        .cox-input { width: 100%; height: var(--input-height); padding: 0 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; background: var(--bg-input); color: var(--text-primary); outline: none; margin-bottom: 10px; }
+        .auth-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; font-size: 16px; cursor: pointer; }
+        
+        #feedback-modal, #bug-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
+        #feedback-modal.active, #bug-modal.active { display: flex !important; }
+        .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
+        .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; }
+        .modal-content { padding: 20px; }
+        
+        /* FEEDBACK BUTTONS */
+        .reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+        .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; }
+        .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
+        .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
+
+        /* APP LAYOUT */
+        #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
+        html.logged-in #app-container { display: flex !important; }
+        
+        #sidebar { width: 420px; min-width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: var(--z-sidebar); }
+        .sidebar-controls { padding: 15px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px; }
+        
+        /* SEARCH UI */
+        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .input-group { display: flex; flex-direction: column; gap: 2px; }
+        .input-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
+        .search-btn { flex: 1; height: 40px; background-color: #461D7C !important; color: white !important; border: none; border-radius: 6px; font-weight: 800; cursor: pointer; }
+        .reset-btn { height: 40px; width: 40px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
+
+        #results-scroll-area { flex: 1; overflow-y: auto; padding: 15px; background: var(--bg-app); }
+        #results-area { display: flex; flex-direction: column; gap: 8px; padding-bottom: 80px; }
+
+        /* CARD STYLES - BADGES ONLY v4.6 */
+        .record-card { background: var(--bg-card); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border-color); border-left: 6px solid var(--app-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 8px; }
+        .record-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .record-card.active-view { background: rgba(70, 29, 124, 0.03); border-color: var(--app-primary); }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: center; }
+        .panel-name { font-size: 24px; font-weight: 900; color: var(--app-primary); margin: 0; letter-spacing: -0.5px; }
+        
+        .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 8px; border-radius: 4px; border: 1px solid transparent; letter-spacing: 0.5px; }
+        .hud-badge.mfg { background: var(--badge-mfg-bg); color: var(--badge-mfg-text); }
+        .hud-badge.hp { background: var(--badge-hp-bg); color: var(--badge-hp-text); }
+        .hud-badge.volt { background: var(--badge-volt-bg); color: var(--badge-volt-text); }
+        .hud-badge.neutral { background: #eee; color: #555; border-color: #ddd; }
+
+        /* THUMBS ACTIONS */
+        .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
+        .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
+        .thumb-btn:hover { background: #f5f5f5; }
+        .thumb-btn.up:hover { background: #e8f5e9; border-color: var(--status-success); }
+        .thumb-btn.down:hover { background: #ffebee; border-color: var(--status-error); }
+
+        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; }
+        
+        @media (max-width: 900px) { 
+            #sidebar { width: 100%; }
+            #preview-pane { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="auth-overlay">
+    <div class="auth-card">
+        <div class="auth-avatar-container"><img src="image_f7315b.jpg" class="auth-avatar"></div>
+        <h2 style="color:var(--app-primary)">SCHEMATICai</h2>
+        <div id="auth-login-view">
+            <input type="text" id="auth-user" class="cox-input" placeholder="Username">
+            <input type="password" id="auth-pin" class="cox-input" placeholder="PIN">
+            <button class="auth-btn" onclick="AuthService.login()">Authenticate</button>
+        </div>
+    </div>
+</div>
+
+<header>
+    <a href="#" class="logo-group">
+        <span class="logo-main">COX</span>
+        <span class="logo-sub">RESEARCH</span>
+    </a>
+    <div class="version-badge">SCHEMATIC<span style="font-style:italic;color:#d1c4e9">ai</span> v4.6</div>
+    <div class="header-controls">
+        <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
+        <button class="control-btn" onclick="AuthService.logout()">⏻</button>
+    </div>
+</header>
+
+<div id="feedback-modal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <span style="font-weight:800">Improve AI Accuracy</span>
+            <button class="control-btn" style="width:24px;height:24px;font-size:12px;" onclick="FeedbackService.close()">X</button>
+        </div>
+        <div class="modal-content">
+            <p style="margin-top:0; font-size:13px; color:var(--text-secondary);">What is incorrect about this panel?</p>
+            <div class="reason-grid">
+                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'mfg')">Wrong Manufacturer</div>
+                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'hp')">Wrong HP</div>
+                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'volt')">Wrong Voltage</div>
+                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'phase')">Wrong Phase</div>
+                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'enc')">Wrong Enclosure</div>
+                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'dup')">Duplicate Record</div>
+            </div>
+            <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT FEEDBACK</button>
+        </div>
+    </div>
+</div>
+
+<div id="app-container">
+    <div id="sidebar">
+        <div class="sidebar-controls">
+            <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" class="cox-input" placeholder="e.g. Duplex, 1PH, CP-7920" onkeypress="UI.handleEnter(event)"></div>
+            <div class="filter-grid">
+                <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" class="cox-input"><option value="">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="">Any</option></select></div>
+                <div class="input-group"><span class="input-label">HP</span><select id="hpInput" class="cox-input"><option value="">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" class="cox-input"><option value="">Any</option></select></div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:5px;">
+                <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
+                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()">SEARCH</button>
+            </div>
+        </div>
+        <div id="results-scroll-area"><div id="results-area"></div></div>
+    </div>
+    <div id="preview-pane">
+        <div>📄 Select a schematic to view</div>
+    </div>
+</div>
+
+<script>
+// --- SCHEMATICai v4.6 ---
+const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
+const CONSTANTS = { 
+    MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
+    DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 6.2, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
+};
+
+class AuthService {
+    static init() { 
+        const session = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSION)); 
+        if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); return true; } 
+        return false; 
+    }
+    static login() { 
+        const user = document.getElementById('auth-user').value; if(!user) return;
+        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); 
+    }
+    static logout() { localStorage.removeItem(STORAGE_KEYS.SESSION); location.reload(); }
+}
+
+class DatabaseService {
+    static allRecords = []; 
+    static async init() { 
+        if(window.LOCAL_PANEL_DATA) this.allRecords = window.LOCAL_PANEL_DATA; 
+    }
+    static searchLocal(query) {
+        if (!this.allRecords.length) return [];
+        const terms = query.toLowerCase().split(',').map(t => t.trim()).filter(t => t);
+        return this.allRecords.filter(rec => {
+            const str = (rec.keys + " " + (rec.mfg||"") + " " + (rec.hp||"") + " " + (rec.volt||"")).toLowerCase();
+            return terms.every(t => str.includes(t));
+        });
+    }
+}
+
+class FeedbackService {
+    static activeId = null;
+    static selectedReasons = new Set();
+
+    static up(id) { alert(`Feedback recorded: Thumbs UP for CP-${id}`); }
+    
+    static down(id) { 
+        this.activeId = id; 
+        this.selectedReasons.clear();
+        document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected'));
+        document.getElementById('feedback-modal').classList.add('active');
+    }
+    
+    static toggleReason(el, reason) {
+        el.classList.toggle('selected');
+        if(this.selectedReasons.has(reason)) this.selectedReasons.delete(reason);
+        else this.selectedReasons.add(reason);
+    }
+    
+    static submit() {
+        const reasons = Array.from(this.selectedReasons).join(', ');
+        alert(`Feedback Sent for CP-${this.activeId}:\nIssues: ${reasons || "General Mismatch"}`);
+        this.close();
+    }
+    
+    static close() { document.getElementById('feedback-modal').classList.remove('active'); }
+}
+
+class SearchEngine {
+    static perform() { 
+        const kw = document.getElementById('keywordInput').value.trim(); 
+        const mfg = document.getElementById('mfgInput').value;
+        const hp = document.getElementById('hpInput').value;
+        const volt = document.getElementById('voltInput').value;
+        
+        let parts = [];
+        if(kw) parts.push(kw);
+        if(mfg) parts.push(mfg);
+        if(hp) parts.push(hp + "hp");
+        if(volt) parts.push(volt);
+
+        if(!parts.length) { alert("Enter keywords or select filters."); return; }
+
+        const btn = document.getElementById('searchBtn');
+        btn.innerText = "...";
+        setTimeout(() => { 
+            const results = DatabaseService.searchLocal(parts.join(", "));
+            UI.renderResults(results);
+            btn.innerText = "SEARCH";
+        }, 50);
+    }
+}
+
+class UI {
+    static toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
+    static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
+    static resetSearch() { 
+        document.getElementById('keywordInput').value=''; 
+        document.querySelectorAll('select').forEach(s => s.value = "");
+        document.getElementById('results-area').innerHTML=''; 
+    }
+    
+    // --- V4.6 RENDERER: BADGES & FEEDBACK ---
+    static renderResults(records) { 
+        const area = document.getElementById('results-area'); 
+        area.innerHTML = ''; 
+        if (!records || !records.length) { area.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.5;">No results found.</div>'; return; }
+
+        records.forEach(rec => {
+            const card = document.createElement('div');
+            card.className = 'record-card';
+            
+            // BADGES GENERATION
+            let badges = '';
+            if(rec.mfg) badges += `<span class="hud-badge mfg">${rec.mfg}</span>`;
+            if(rec.hp) badges += `<span class="hud-badge hp">${rec.hp} HP</span>`;
+            if(rec.volt) badges += `<span class="hud-badge volt">${rec.volt}V</span>`;
+            if(rec.phase) badges += `<span class="hud-badge neutral">${rec.phase}PH</span>`;
+            if(rec.enclosure) badges += `<span class="hud-badge neutral">${rec.enclosure}</span>`;
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="panel-name">CP-${rec.id}</div>
+                </div>
+                <div class="badge-row">${badges}</div>
+                <div class="card-actions">
+                    <button class="thumb-btn up" onclick="event.stopPropagation(); FeedbackService.up('${rec.id}')">👍</button>
+                    <button class="thumb-btn down" onclick="event.stopPropagation(); FeedbackService.down('${rec.id}')">👎</button>
+                </div>
+            `;
+            
+            card.onclick = () => {
+                document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view'));
+                card.classList.add('active-view');
+            };
+            area.appendChild(card);
+        });
+    }
+
+    static populateDropdowns() {
+        ['mfg', 'hp', 'volt'].forEach(cat => {
+            const sel = document.getElementById(cat+'Input');
+            if(!sel) return;
+            const items = cat === 'mfg' ? Object.keys(CONSTANTS.MANUFACTURERS) : CONSTANTS.DATA[cat.toUpperCase()];
+            items.forEach(i => {
+                const opt = document.createElement('option');
+                opt.value = String(i).toUpperCase(); opt.innerText = String(i).toUpperCase();
+                sel.appendChild(opt);
+            });
+        });
+    }
+}
+
+class App {
+    static init() {
+        AuthService.init();
+        DatabaseService.init();
+        UI.populateDropdowns();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', App.init);
+</script>
+</body>
+</html>
 }
 
 class App {
