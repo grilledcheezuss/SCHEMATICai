@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v6.4 - Airtable API)</title>
+    <title>Cox Research | SCHEMATICai (v6.6 - The Refinery)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -132,13 +132,20 @@
 
 <div id="config-modal">
     <div class="config-card">
-        <h3 style="margin-top:0; color:var(--app-primary);">🔌 Airtable Connection</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Enter your API credentials to fetch PDFs.</p>
+        <h3 style="margin-top:0; color:var(--app-primary);">🔌 Connection & Tools</h3>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Connection Settings</p>
         <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
         <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;">
         <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name (e.g. Schematics)" style="margin-bottom:15px;">
-        <button class="submit-feedback-btn" onclick="ConfigService.save()">Save Connection</button>
-        <button class="submit-feedback-btn" style="background:#555; margin-top:5px;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Cancel</button>
+        <div style="display:flex; gap:10px;">
+            <button class="submit-feedback-btn" style="background:var(--app-primary);" onclick="ConfigService.save()">Save</button>
+            <button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button>
+        </div>
+        
+        <hr style="border:0; border-top:1px solid #ddd; margin:20px 0;">
+        <h4 style="margin:0 0 10px 0;">Data Refinery</h4>
+        <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="HarvestService.start()">📥 Harvest & Clean All Data</button>
+        <div id="harvest-status" style="font-size:11px; margin-top:10px; color:#666;"></div>
     </div>
 </div>
 
@@ -147,7 +154,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v6.4</div>
+    <div class="version-badge">SCHEMATICai v6.6</div>
     <div class="header-controls">
         <button class="control-btn" title="Airtable Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -199,20 +206,17 @@
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
         <div id="pdf-fallback" class="pdf-fallback">
             <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
-            <div style="font-size:12px; opacity:0.7;" id="pdf-debug-path">Connecting to Airtable...</div>
+            <div style="font-size:12px; opacity:0.7;" id="pdf-debug-path">Fetching from Airtable...</div>
             <a id="pdf-fallback-link" target="_blank" style="display:none">Open File</a>
         </div>
     </div>
 </div>
 
 <script>
-// --- SCHEMATICai v6.4 (AIRTABLE INTEGRATION) ---
+// --- SCHEMATICai v6.6 (THE REFINERY) ---
 
-// CONFIG SERVICE
 class ConfigService {
-    static get() {
-        return JSON.parse(localStorage.getItem('cox_at_config')) || {};
-    }
+    static get() { return JSON.parse(localStorage.getItem('cox_at_config')) || {}; }
     static save() {
         const config = {
             apiKey: document.getElementById('at-api-key').value,
@@ -221,57 +225,90 @@ class ConfigService {
         };
         localStorage.setItem('cox_at_config', JSON.stringify(config));
         document.getElementById('config-modal').classList.remove('active-modal');
-        alert("Configuration Saved. Try viewing a PDF.");
+        alert("Saved.");
     }
 }
 
-// AIRTABLE SERVICE
-class AirtableService {
-    static async fetchPdfLink(panelId) {
+// THE HARVESTER (ETL PIPELINE)
+class HarvestService {
+    static async start() {
         const config = ConfigService.get();
-        if(!config.apiKey || !config.baseId || !config.tableName) {
-            return { error: "Missing API Config. Click ⚙️ to set up." };
-        }
-
-        // Formula: {Panel Number} = 'CP-1234' OR {ID} = '1234'
-        const formula = `OR({Panel Number}='${panelId}', {Panel Number}='CP-${panelId}', {ID}='${panelId}')`;
-        const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableName}?filterByFormula=${encodeURIComponent(formula)}`;
+        if(!config.apiKey) return alert("Please save API Keys first.");
+        
+        const status = document.getElementById('harvest-status');
+        status.innerText = "⏳ Initializing harvest...";
+        
+        const allRecords = [];
+        let offset = null;
+        let page = 1;
 
         try {
-            console.log(`📡 Fetching Airtable: ${url}`);
-            const resp = await fetch(url, {
-                headers: { 'Authorization': `Bearer ${config.apiKey}` }
-            });
-            const data = await resp.json();
+            do {
+                status.innerText = `⏳ Fetching Page ${page}... (${allRecords.length} records)`;
+                const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableName}?pageSize=100${offset ? '&offset='+offset : ''}`;
+                
+                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
+                const data = await resp.json();
+                
+                if(!data.records) break;
+                
+                data.records.forEach(r => {
+                    const f = r.fields;
+                    // CLEAN & STANDARDIZE
+                    const cleanRec = {
+                        "Panel Number": f['Panel Number'] || f['ID'] || "",
+                        "Manufacturer": (f['Manufacturer'] || "").toUpperCase().trim(),
+                        "HP": (f['HP'] || "").replace(/[^0-9.]/g, '') + " HP",
+                        "Voltage": (f['Voltage'] || "").replace(/[^0-9/]/g, '') + "V",
+                        "Phase": (f['Phase'] || "").replace(/[^0-9]/g, '') + "PH",
+                        "Description": (f['Description'] || "").replace(/(\r\n|\n|\r)/gm, " "),
+                        "PDF Link": (f['PDF'] && f['PDF'][0]) ? f['PDF'][0].url : ""
+                    };
+                    allRecords.push(cleanRec);
+                });
+                
+                offset = data.offset;
+                page++;
+                
+            } while (offset);
+
+            status.innerText = `✅ Harvest Complete! ${allRecords.length} records. Generating CSV...`;
+            this.downloadCSV(allRecords);
             
-            if(data.records && data.records.length > 0) {
-                const rec = data.records[0].fields;
-                // Look for common attachment field names
-                const fileField = rec['PDF'] || rec['Attachment'] || rec['File'] || rec['Schematic'];
-                if(fileField && fileField.length > 0) {
-                    return { url: fileField[0].url };
-                } else {
-                    return { error: "Record found, but no PDF attachment." };
-                }
-            } else {
-                return { error: "Record not found in Airtable." };
-            }
-        } catch (e) {
-            return { error: "Connection Failed: " + e.message };
+        } catch(e) {
+            status.innerText = "❌ Error: " + e.message;
         }
+    }
+
+    static downloadCSV(data) {
+        if (!data.length) return;
+        const headers = Object.keys(data[0]);
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => headers.map(fieldName => `"${String(row[fieldName]).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "golden_database.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 }
 
-// NAIVE BAYES & HEALING DB
+// HEALING DB
 const HealingDB = {
     "CP-6950": { mfg: "GORMAN RUPP" }, 
     "CP-2801": { mfg: "GORMAN RUPP", phase: "3" } 
 };
 
 class BayesClassifier {
-    constructor() { this.trained = false; this.termProbability = {}; }
+    constructor() { this.termProbability = {}; }
     train(records) {
-        console.log("🧠 AI Training Initiated...");
+        this.termProbability = {};
         records.forEach(rec => {
             const tokens = (rec.keys + " " + rec.mfg).toLowerCase().split(/\s+/);
             const label = rec.mfg || "UNKNOWN";
@@ -281,20 +318,46 @@ class BayesClassifier {
                 this.termProbability[t][label]++;
             });
         });
-        this.trained = true;
-        console.log("🧠 AI Training Complete.");
     }
-    predict(record, category, value) {
-        if(!this.trained) return 0.5;
+    predict(record, value) {
         const text = (record.keys + " " + record.mfg).toUpperCase();
-        const val = String(value).toUpperCase();
-        if (text.includes(val)) return 0.9; 
+        if (text.includes(String(value).toUpperCase())) return 0.9;
         return 0.1;
     }
 }
 const AI = new BayesClassifier();
 
-const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
+class AirtableService {
+    static async search(criteria) {
+        const config = ConfigService.get();
+        if(!config.apiKey) return null;
+
+        let formulas = [];
+        if(criteria.mfg && criteria.mfg !== "Any") formulas.push(`{Manufacturer}='${criteria.mfg}'`);
+        if(criteria.phase && criteria.phase !== "Any") formulas.push(`FIND('${criteria.phase}', {Phase})`);
+        if(criteria.hp && criteria.hp !== "Any") formulas.push(`FIND('${criteria.hp}', {HP})`);
+        if(criteria.volt && criteria.volt !== "Any") formulas.push(`FIND('${criteria.volt}', {Voltage})`);
+        if(criteria.kw) formulas.push(`OR(FIND('${criteria.kw}', {Description}), FIND('${criteria.kw}', {Panel Number}))`);
+
+        const formulaStr = formulas.length > 0 ? `AND(${formulas.join(',')})` : "";
+        const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableName}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=100&sort%5B0%5D%5Bfield%5D=Panel%20Number&sort%5B0%5D%5Bdirection%5D=desc`;
+
+        try {
+            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
+            const data = await resp.json();
+            return data.records.map(r => ({
+                id: r.fields['Panel Number'] || r.fields['ID'],
+                mfg: r.fields['Manufacturer'],
+                hp: r.fields['HP'],
+                volt: r.fields['Voltage'],
+                phase: r.fields['Phase'],
+                keys: r.fields['Description'] || "",
+                pdfUrl: (r.fields['PDF'] && r.fields['PDF'][0]) ? r.fields['PDF'][0].url : null
+            }));
+        } catch(e) { return null; }
+    }
+}
+
 const CONSTANTS = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 6.2, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
@@ -302,29 +365,20 @@ const CONSTANTS = {
 
 class AuthService {
     static init() { 
-        const session = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSION)); 
+        const session = JSON.parse(localStorage.getItem('cox_auth_session'));
         if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); return true; } 
         document.getElementById('auth-overlay').classList.add('active-modal');
         return false; 
     }
     static login() { 
         const user = document.getElementById('auth-user').value; if(!user) return;
-        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); 
+        localStorage.setItem('cox_auth_session', JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); 
     }
-    static logout() { localStorage.removeItem(STORAGE_KEYS.SESSION); location.reload(); }
-}
-
-class DatabaseService {
-    static allRecords = []; 
-    static async init() { 
-        if(window.LOCAL_PANEL_DATA) this.allRecords = window.LOCAL_PANEL_DATA; 
-        console.log("DB Loaded:", this.allRecords.length);
-        AI.train(this.allRecords);
-    }
+    static logout() { localStorage.removeItem('cox_auth_session'); location.reload(); }
 }
 
 class PdfController {
-    static async load(id) {
+    static load(id, url) {
         const frame = document.getElementById('pdf-viewer-frame');
         const place = document.getElementById('pdf-placeholder-text');
         const fallback = document.getElementById('pdf-fallback');
@@ -334,19 +388,12 @@ class PdfController {
         place.style.display = 'none';
         frame.style.display = 'none';
         fallback.style.display = 'block';
-        debug.innerText = `📡 Asking Airtable for CP-${id}...`;
-        link.style.display = 'none';
+        debug.innerText = url ? "✅ PDF Found" : "❌ No PDF in Record";
 
-        // CALL AIRTABLE
-        const result = await AirtableService.fetchPdfLink(id);
-
-        if (result.url) {
-            debug.innerText = "✅ Link Found! Loading...";
-            frame.src = result.url;
+        if (url) {
+            frame.src = url;
             frame.style.display = 'block';
             fallback.style.display = 'none';
-        } else {
-            debug.innerText = `❌ Error: ${result.error}`;
         }
     }
 }
@@ -373,7 +420,7 @@ class FeedbackService {
 }
 
 class SearchEngine {
-    static perform() { 
+    static async perform() { 
         const criteria = {
             kw: document.getElementById('keywordInput').value.trim(),
             mfg: document.getElementById('mfgInput').value,
@@ -388,88 +435,34 @@ class SearchEngine {
 
         const btn = document.getElementById('searchBtn');
         btn.innerText = "...";
-        setTimeout(() => { 
-            const results = this.runQuery(criteria);
-            UI.renderResults(results, criteria);
-            btn.innerText = "SEARCH";
-        }, 50);
+        
+        let results = await AirtableService.search(criteria);
+        
+        if (!results) {
+            console.warn("Airtable failed. Using Local.");
+            results = this.runLocalQuery(criteria);
+        }
+
+        AI.train(results);
+        UI.renderResults(results, criteria);
+        btn.innerText = "SEARCH";
     }
 
-    static runQuery(c) {
-        if (!DatabaseService.allRecords.length) return [];
-        
+    static runLocalQuery(c) {
+        if (!window.LOCAL_PANEL_DATA) return [];
         let matches = [];
-        DatabaseService.allRecords.forEach(rec => {
+        window.LOCAL_PANEL_DATA.forEach(rec => {
             let correctedRec = { ...rec, ...HealingDB[rec.id] };
-            let matchData = {}; 
             let isFail = false;
-            let variedCount = 0;
-            let exactCount = 0;
-            let totalFilters = 0;
             
-            const checkField = (dbVal, searchVal, patterns, isConflictCheck) => {
-                const s = String(searchVal || "").toUpperCase();
-                const d = String(dbVal || "").toUpperCase();
-                const desc = (correctedRec.keys || "").toUpperCase();
-                
-                if (isConflictCheck && d !== "" && !d.includes(s)) return 'conflict';
-                if (d === s) return 'exact';
-                if (d.includes(s) && d !== "") return 'varied';
-                if (d === "") {
-                    if (patterns.some(p => desc.includes(p.toUpperCase()))) return 'exact';
-                    const prob = AI.predict(correctedRec, 'mfg', searchVal);
-                    if (prob > 0.8) return 'exact';
-                }
-                return 'fail';
-            };
-
-            if (c.mfg && c.mfg !== "Any") {
-                totalFilters++;
-                const res = checkField(correctedRec.mfg, c.mfg, [c.mfg], true);
-                if (res === 'conflict') { isFail = true; } 
-                else if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
-                else isFail = true; 
-            }
-            if (c.hp && c.hp !== "Any") {
-                totalFilters++;
-                const res = checkField(correctedRec.hp, c.hp, [c.hp+"HP", c.hp+" HP", c.hp+"-HP"], false);
-                if (res !== 'fail') { matchData.hp = res; if(res==='exact') exactCount++; else variedCount++; }
-                else isFail = true;
-            }
-            if (c.volt && c.volt !== "Any") {
-                totalFilters++;
-                const res = checkField(correctedRec.volt, c.volt, [c.volt+"V", c.volt+" V", c.volt+"VOLT"], false);
-                if (res !== 'fail') { matchData.volt = res; if(res==='exact') exactCount++; else variedCount++; }
-                else isFail = true;
-            }
-            if (c.phase && c.phase !== "Any") {
-                totalFilters++;
-                const s = String(c.phase);
-                let patterns = [s+"PH", s+"-PH", s+" PHASE"];
-                if (s === "1") patterns.push("SINGLE PHASE", "1-PHASE");
-                if (s === "3") patterns.push("THREE PHASE", "3-PHASE");
-                const res = checkField(correctedRec.phase, c.phase, patterns, false);
-                if (res !== 'fail') { matchData.phase = res; if(res==='exact') exactCount++; else variedCount++; }
-                else isFail = true;
-            }
-            if (c.kw) {
-                const allText = (correctedRec.keys + " " + correctedRec.mfg + " " + correctedRec.id).toUpperCase();
-                if (!allText.includes(c.kw.toUpperCase())) isFail = true;
-            }
-
-            if (!isFail) {
-                let tier = 3; 
-                if (exactCount === totalFilters && totalFilters > 0) tier = 0; 
-                else if (c.hp && matchData.hp === 'varied' && variedCount === 1) tier = 1; 
-                else if (variedCount === 1) tier = 2; 
-                matches.push({ rec: correctedRec, matchData, tier });
-            }
+            // CONFLICT LOGIC (LOCAL FALLBACK)
+            const dMfg = (correctedRec.mfg || "").toUpperCase();
+            if (c.mfg && c.mfg !== "Any" && dMfg !== "" && !dMfg.includes(c.mfg.toUpperCase())) isFail = true;
+            if (c.phase && c.phase !== "Any" && correctedRec.phase != c.phase) isFail = true;
+            
+            if (!isFail) matches.push({rec: correctedRec, matchData:{}});
         });
-
-        return matches.sort((a, b) => {
-            if (a.tier !== b.tier) return a.tier - b.tier; 
-            return parseInt(b.rec.id) - parseInt(a.rec.id); 
-        });
+        return matches;
     }
 }
 
@@ -497,8 +490,7 @@ class UI {
         if (!results || !results.length) { area.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.5;">No results found.</div>'; return; }
 
         results.forEach(item => {
-            const rec = item.rec;
-            const meta = item.matchData;
+            const rec = item.rec || item; 
             const card = document.createElement('div');
             card.className = 'record-card';
             
@@ -506,16 +498,16 @@ class UI {
             let badges = '';
 
             if(criteria.mfg && criteria.mfg !== "Any") {
-                badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
+                badges += `<span class="hud-badge ${rec.mfg ? 'match-exact' : ''}">${displayMfg || "Unknown"}</span>`;
             }
             if(criteria.hp && criteria.hp !== "Any") {
-                badges += `<span class="hud-badge ${meta.hp ? 'match-'+meta.hp : ''}">${rec.hp || "HP?"} HP</span>`;
+                badges += `<span class="hud-badge match-exact">${rec.hp || "HP?"} HP</span>`;
             }
             if(criteria.volt && criteria.volt !== "Any") {
-                badges += `<span class="hud-badge ${meta.volt ? 'match-'+meta.volt : ''}">${rec.volt || "V?"}V</span>`;
+                badges += `<span class="hud-badge match-exact">${rec.volt || "V?"}V</span>`;
             }
             if(criteria.phase && criteria.phase !== "Any") {
-                badges += `<span class="hud-badge ${meta.phase ? 'match-'+meta.phase : ''}">${rec.phase || criteria.phase}PH</span>`;
+                badges += `<span class="hud-badge match-exact">${rec.phase || criteria.phase}PH</span>`;
             }
 
             card.innerHTML = `
@@ -532,7 +524,7 @@ class UI {
             card.onclick = () => {
                 document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view'));
                 card.classList.add('active-view');
-                PdfController.load(rec.id);
+                PdfController.load(rec.id, rec.pdfUrl);
             };
             area.appendChild(card);
         });
@@ -555,14 +547,14 @@ class UI {
 class App {
     static init() {
         AuthService.init();
-        DatabaseService.init();
         UI.populateDropdowns();
         
-        // Auto-load config to input if exists
         const conf = ConfigService.get();
-        if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
-        if(conf.baseId) document.getElementById('at-base-id').value = conf.baseId;
-        if(conf.tableName) document.getElementById('at-table-name').value = conf.tableName;
+        if(conf.apiKey) {
+            document.getElementById('at-api-key').value = conf.apiKey;
+            document.getElementById('at-base-id').value = conf.baseId;
+            document.getElementById('at-table-name').value = conf.tableName;
+        }
     }
 }
 
