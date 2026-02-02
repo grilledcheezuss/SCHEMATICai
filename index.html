@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.11 - Speed & Strict UI)</title>
+    <title>Cox Research | SCHEMATICai (v8.13 - Twin Turbo)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -152,7 +152,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.11</div>
+    <div class="version-badge">SCHEMATICai v8.13</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -212,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.11 (SPEED & STRICT UI) ---
+// --- SCHEMATICai v8.13 (TWIN TURBO) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -275,54 +275,74 @@ class SpecExtractor {
     }
 }
 
-// 3. GLOBAL STORE
+// 3. GLOBAL STORE & UTILS
 window.LOCAL_DB = [];
+window.DB_IDS = new Set(); // To prevent duplicates
 
-// 4. DATA LOADER
+// 4. DATA LOADER (TWIN TURBO)
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn');
-        let offset = null;
-        // V8.11: Limit increased to 1000 for speed
-        const fields = "&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF";
+        btn.innerText = "STARTING TWIN TURBO...";
         
-        console.log("📡 Starting Database Sync...");
+        // Spawn Two Threads
+        const t1 = this.syncThread('desc'); // Top Down
+        const t2 = this.syncThread('asc');  // Bottom Up
+        
+        await Promise.all([t1, t2]);
+        
+        console.log(`✅ Twin-Turbo Complete: ${window.LOCAL_DB.length} records.`);
+        btn.innerText = "SEARCH DATABASE";
+        btn.disabled = false;
+        btn.style.backgroundColor = "#461D7C";
+    }
+
+    static async syncThread(direction) {
+        let offset = null;
+        const fields = "&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF";
         
         try {
             do {
-                const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?pageSize=1000${fields}${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=desc`;
+                // Check if we have enough records (Circuit Breaker)
+                if (window.LOCAL_DB.length >= 7500) break;
+
+                const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?pageSize=100${fields}${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
+                
                 const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` } });
                 const data = await resp.json();
                 
-                if(!data.records) break;
+                if(!data.records || data.records.length === 0) break;
                 
-                const batch = data.records.map(r => {
-                    const desc = r.fields['Items'] || "";
-                    const extracted = SpecExtractor.extract(desc);
-                    return {
-                        id: r.fields['Control Panel Name'],
-                        desc: desc.toUpperCase(),
-                        rawDesc: desc,
-                        pdfUrl: (r.fields['Control Panel PDF'] && r.fields['Control Panel PDF'][0]) ? r.fields['Control Panel PDF'][0].url : null,
-                        ...extracted
-                    };
+                let newCount = 0;
+                
+                data.records.forEach(r => {
+                    const id = r.fields['Control Panel Name'];
+                    if (!window.DB_IDS.has(id)) {
+                        window.DB_IDS.add(id);
+                        newCount++;
+                        
+                        const desc = r.fields['Items'] || "";
+                        const extracted = SpecExtractor.extract(desc);
+                        window.LOCAL_DB.push({
+                            id: id,
+                            desc: desc.toUpperCase(),
+                            rawDesc: desc,
+                            pdfUrl: (r.fields['Control Panel PDF'] && r.fields['Control Panel PDF'][0]) ? r.fields['Control Panel PDF'][0].url : null,
+                            ...extracted
+                        });
+                    }
                 });
                 
-                window.LOCAL_DB.push(...batch);
                 offset = data.offset;
-                btn.innerText = `LOADING DB... (${window.LOCAL_DB.length})`;
+                
+                // UI Update (Shared)
+                document.getElementById('searchBtn').innerText = `LOADING... (${window.LOCAL_DB.length})`;
+                
+                // If thread found nothing new (collision), stop
+                if (newCount === 0) break; 
                 
             } while (offset);
-            
-            console.log(`✅ Sync Complete: ${window.LOCAL_DB.length} records.`);
-            btn.innerText = "SEARCH DATABASE";
-            btn.disabled = false;
-            btn.style.backgroundColor = "#461D7C";
-            
-        } catch(e) {
-            console.error("Sync Failed", e);
-            btn.innerText = "SYNC FAILED";
-        }
+        } catch(e) { console.error("Thread Error", e); }
     }
 
     static harvestCSV() {
@@ -356,48 +376,46 @@ class SearchEngine {
             alert("Enter search criteria."); return;
         }
 
-        console.log(`🔎 SEARCH STARTED: {kw: '${kw}', mfg: '${mfg}', hp: '${hp}', volt: '${volt}', phase: '${phase}'}`);
+        // Sort results by ID Descending (Newest first) before filtering
+        const sortedDB = window.LOCAL_DB.sort((a, b) => (a.id < b.id) ? 1 : -1);
 
-        const results = window.LOCAL_DB.filter((rec, index) => {
+        const results = sortedDB.filter((rec) => {
             let pass = true;
-            let rejectReason = "";
 
             if(kw) {
                 const searchTarget = (rec.id + " " + rec.desc).toUpperCase();
-                if(!searchTarget.includes(kw)) { pass = false; rejectReason = "KW"; }
+                if(!searchTarget.includes(kw)) { pass = false; }
             }
             
             if(pass && mfg !== "Any") {
-                if(rec.mfg && rec.mfg !== mfg.toUpperCase()) { pass = false; rejectReason = "MFG_MISMATCH"; }
-                if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) { pass = false; rejectReason = "MFG_MISSING"; }
+                if(rec.mfg && rec.mfg !== mfg.toUpperCase()) { pass = false; }
+                if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) { pass = false; }
             }
 
             if(pass && hp !== "Any") {
                 const hpStr = String(hp);
                 const badgeMatch = rec.hp === hpStr;
                 const textMatch = rec.desc.includes(hpStr + "HP") || rec.desc.includes(hpStr + " HP");
-                if(!badgeMatch && !textMatch) { pass = false; rejectReason = "HP"; }
+                if(!badgeMatch && !textMatch) { pass = false; }
             }
 
             if(pass && volt !== "Any") {
                 const vStr = String(volt);
                 const badgeMatch = rec.volt && rec.volt.includes(vStr);
                 const textMatch = rec.desc.includes(vStr);
-                if(!badgeMatch && !textMatch) { pass = false; rejectReason = "VOLT"; }
+                if(!badgeMatch && !textMatch) { pass = false; }
             }
 
             if(pass && phase !== "Any") {
                 const pStr = String(phase);
                 const badgeMatch = rec.phase === pStr;
                 const textMatch = rec.desc.includes(pStr + "PH") || rec.desc.includes(pStr + " PH");
-                if(!badgeMatch && !textMatch) { pass = false; rejectReason = "PHASE"; }
+                if(!badgeMatch && !textMatch) { pass = false; }
             }
 
-            if(!pass && index < 5) console.log(`❌ Skipped ${rec.id}: ${rejectReason}`);
             return pass;
         });
 
-        console.log(`✅ Found ${results.length} matches.`);
         UI.renderResults(results, { mfg, hp, volt, phase });
     }
 }
@@ -431,25 +449,22 @@ class UI {
             
             let badges = '';
             
-            // 1. MFG: V8.11 Strict Mode: Only show if searched OR if unknown
+            // 1. MFG: Strict Visibility (Only if searched)
             if(criteria.mfg !== "Any") {
                badges += `<span class="hud-badge match-exact">${criteria.mfg}</span>`;
-            } else if (item.mfg) {
-                // Optional: You can choose to hide this if you want 100% strictness
-                // badges += `<span class="hud-badge match-info">${item.mfg}</span>`; 
-            }
+            } 
             
-            // 2. HP: Show ONLY if searched (Force Green)
+            // 2. HP: Strict Visibility
             if(criteria.hp !== "Any") {
                 badges += `<span class="hud-badge match-exact">${criteria.hp} HP</span>`;
             }
             
-            // 3. Volt: Show ONLY if searched
+            // 3. Volt: Strict Visibility
             if(criteria.volt !== "Any") {
                 badges += `<span class="hud-badge match-exact">${criteria.volt}V</span>`;
             }
             
-            // 4. Phase: Show ONLY if searched
+            // 4. Phase: Strict Visibility
             if(criteria.phase !== "Any") {
                 badges += `<span class="hud-badge match-exact">${criteria.phase}PH</span>`;
             }
