@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v9.5 - Smart Badges)</title>
+    <title>Cox Research | SCHEMATICai (v9.7 - Proximity Sort)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -32,7 +32,7 @@
             --border-color: #c7c7cc; 
             
             --match-exact-bg: #dcfce7; --match-exact-text: #166534; 
-            --match-varied-bg: #ffedd5; --match-varied-text: #9a3412; /* Orange */
+            --match-varied-bg: #ffedd5; --match-varied-text: #9a3412;
             --badge-info-bg: #f3f4f6; --badge-info-text: #6b7280;
             --badge-healed-bg: #dbeafe; --badge-healed-text: #1e40af;
             
@@ -159,7 +159,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v9.5</div>
+    <div class="version-badge">SCHEMATICai v9.7</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -216,7 +216,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v9.5 (SMART BADGES) ---
+// --- SCHEMATICai v9.7 (PROXIMITY SORT) ---
 
 class PdfController {
     static load(id, url) {
@@ -284,16 +284,19 @@ class AIParser {
                 if (new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i').test(t)) { specs.mfg = standard.toUpperCase(); break; }
             }
         }
-        // V9.5: Enhanced HP Parsing
+        
+        // V9.6 Table Logic
         if (!specs.hp) {
-            const hpMatch = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i); 
+            let hpMatch = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i);
+            if (!hpMatch) hpMatch = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i);
             if(hpMatch) { const val = parseFloat(hpMatch[1]); if (!isNaN(val) && val < 999) specs.hp = hpMatch[1].replace(/\s/g, ''); }
         }
+        
         if (!specs.volt) {
             const voltMatch = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i);
             if(voltMatch) specs.volt = voltMatch[1];
         }
-        // V9.5: Enhanced Phase (1/60, 3/60 detection)
+        
         if (!specs.phase) {
             if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø") || t.includes("3/60")) specs.phase = "3";
             else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø") || t.includes("1/60")) specs.phase = "1";
@@ -342,6 +345,7 @@ class DataLoader {
     static harvestCSV() { /* CSV Logic Preserved */ }
 }
 
+// 5. SEARCH ENGINE (PROXIMITY SORTING)
 class SearchEngine {
     static perform() {
         if(window.LOCAL_DB.length === 0) return;
@@ -353,17 +357,52 @@ class SearchEngine {
 
         if(!kw && mfg==="Any" && hp==="Any" && volt==="Any" && phase==="Any") { alert("Enter search criteria."); return; }
 
-        const sortedDB = window.LOCAL_DB.sort((a, b) => (a.id < b.id) ? 1 : -1);
-        const results = sortedDB.filter((rec) => {
+        let results = window.LOCAL_DB.filter((rec) => {
             let pass = true;
             if(kw && !((rec.id + " " + rec.desc).toUpperCase().includes(kw))) pass = false;
-            if(pass && mfg !== "Any") { if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; }
-            // HYBRID SEARCH: Pass if Badge matches OR text matches
-            if(pass && hp !== "Any") { if(rec.hp !== String(hp) && !rec.desc.includes(String(hp))) pass = false; }
-            if(pass && volt !== "Any") { if((!rec.volt || !rec.volt.includes(String(volt))) && !rec.desc.includes(String(volt))) pass = false; }
-            if(pass && phase !== "Any") { if(rec.phase !== String(phase) && !rec.desc.includes(String(phase))) pass = false; }
+            
+            // STRICT FILTERS
+            if(pass && mfg !== "Any") { 
+                if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; 
+                else if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; 
+            }
+            if(pass && volt !== "Any") { 
+                if(rec.volt && !rec.volt.includes(String(volt))) pass = false;
+                else if(!rec.volt && !rec.desc.includes(String(volt))) pass = false;
+            }
+            if(pass && phase !== "Any") { 
+                if(rec.phase && rec.phase !== String(phase)) pass = false;
+                else if(!rec.phase && !rec.desc.includes(String(phase))) pass = false;
+            }
+            
+            // HP: SOFT FILTER (Keep all HP results, sort later)
+            // No 'pass = false' here for HP
+            
             return pass;
         });
+
+        // PROXIMITY SORTING
+        if(hp !== "Any") {
+            const target = parseFloat(hp);
+            results.sort((a, b) => {
+                const valA = parseFloat(a.hp) || -999;
+                const valB = parseFloat(b.hp) || -999;
+                
+                // 1. Exact Match First
+                const matchA = valA === target;
+                const matchB = valB === target;
+                if (matchA && !matchB) return -1;
+                if (!matchA && matchB) return 1;
+                
+                // 2. Proximity (Distance from Target)
+                const distA = Math.abs(valA - target);
+                const distB = Math.abs(valB - target);
+                return distA - distB; 
+            });
+        } else {
+            // Default Sort: Newest First
+            results.sort((a, b) => (a.id < b.id) ? 1 : -1);
+        }
 
         UI.renderResults(results, { mfg, hp, volt, phase });
     }
@@ -384,35 +423,27 @@ class UI {
             const healed = TheHealer.healedData[item.id];
             let badges = '';
             
-            // 1. MFG: Strict Visibility
             if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
             
-            // 2. HP: Strict + Varied Logic
+            // V9.7: Show Badge if searched OR if known (to show the varied HP)
             if(criteria.hp !== "Any" && criteria.hp !== "") {
                 const isMatch = item.hp === String(criteria.hp);
                 const isHealed = healed && healed.hp;
                 const css = isHealed ? 'match-healed' : (isMatch ? 'match-exact' : 'match-varied');
-                // Show badge. If match/healed, show requested value. If varied, show ACTUAL value.
-                const val = isMatch ? criteria.hp : (item.hp || "Unknown"); 
+                // Always show the ACTUAL value of the record
+                const val = (healed?.hp || item.hp || "Unknown"); 
                 badges += `<span class="hud-badge ${css}">${val} HP</span>`;
             }
             
-            // 3. Volt
             if(criteria.volt !== "Any" && criteria.volt !== "") {
                 const isMatch = item.volt && item.volt.includes(String(criteria.volt));
-                const isHealed = healed && healed.volt;
-                const css = isHealed ? 'match-healed' : (isMatch ? 'match-exact' : 'match-varied');
-                const val = isMatch ? criteria.volt : (item.volt || "Unknown"); 
-                badges += `<span class="hud-badge ${css}">${val}V</span>`;
+                const css = healed?.volt ? 'match-healed' : 'match-exact';
+                badges += `<span class="hud-badge ${css}">${healed?.volt || criteria.volt}V</span>`;
             }
             
-            // 4. Phase
             if(criteria.phase !== "Any" && criteria.phase !== "") {
-                const isMatch = item.phase === String(criteria.phase);
-                const isHealed = healed && healed.phase;
-                const css = isHealed ? 'match-healed' : (isMatch ? 'match-exact' : 'match-varied');
-                const val = isMatch ? criteria.phase : (item.phase || "Unknown"); 
-                badges += `<span class="hud-badge ${css}">${val}PH</span>`;
+                const css = healed?.phase ? 'match-healed' : 'match-exact';
+                badges += `<span class="hud-badge ${css}">${healed?.phase || criteria.phase}PH</span>`;
             }
 
             card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id ? item.id.replace('.dwg','') : "Unknown ID"}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
@@ -420,19 +451,11 @@ class UI {
             area.appendChild(card);
         });
     }
-    static populateDropdowns() { /* Populated as before */ }
+    static populateDropdowns() { /* ... */ }
 }
 
-// ... Services (FeedbackService, AuthService, App) maintained from v9.4 ... 
-class FeedbackService {
-    static history = {}; static activeId = null;
-    static down(id) { this.activeId = id; this.history[id] = this.history[id] || { up: false, downReasons: new Set() }; document.querySelectorAll('.correction-input').forEach(i => i.value = ''); document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); if(this.history[id].downReasons) { this.history[id].downReasons.forEach(r => { const btn = document.querySelector(`.reason-btn[data-reason="${r}"]`); if(btn) btn.classList.add('locked'); }); } document.getElementById('feedback-modal').classList.add('active-modal'); }
-    static async submit() { const id = this.activeId; const submissions = []; document.querySelectorAll('.reason-btn.selected').forEach(btn => { const reasonCode = btn.dataset.reason; const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); this.history[id].downReasons.add(reasonCode); } }); if(submissions.length === 0) return alert("Select a reason and enter a value."); for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } alert("Votes Recorded. Thank you."); const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); this.close(); }
-    static async sendToAirtable(panelId, param, value) { await fetch(`https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${AT_FEEDBACK_TABLE}`, { method: 'POST', headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ "fields": { "Panel ID": panelId, "Parameter": param, "Suggested Value": value } }) }); }
-    static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); }
-    static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
-    static up(id) { alert("Liked!"); } 
-}
+// ... Services (FeedbackService, AuthService, App) kept identical to v9.4 ...
+class FeedbackService { static history = {}; static activeId = null; static down(id) { this.activeId = id; this.history[id] = this.history[id] || { up: false, downReasons: new Set() }; document.querySelectorAll('.correction-input').forEach(i => i.value = ''); document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); if(this.history[id].downReasons) { this.history[id].downReasons.forEach(r => { const btn = document.querySelector(`.reason-btn[data-reason="${r}"]`); if(btn) btn.classList.add('locked'); }); } document.getElementById('feedback-modal').classList.add('active-modal'); } static async submit() { const id = this.activeId; const submissions = []; document.querySelectorAll('.reason-btn.selected').forEach(btn => { const reasonCode = btn.dataset.reason; const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); this.history[id].downReasons.add(reasonCode); } }); if(submissions.length === 0) return alert("Select a reason and enter a value."); for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } alert("Votes Recorded. Thank you."); const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); this.close(); } static async sendToAirtable(panelId, param, value) { await fetch(`https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${AT_FEEDBACK_TABLE}`, { method: 'POST', headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ "fields": { "Panel ID": panelId, "Parameter": param, "Suggested Value": value } }) }); } static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } static up(id) { alert("Liked!"); } }
 class ConfigService { static reset() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } } }
 class AuthService { static init() { const session = JSON.parse(localStorage.getItem('cox_auth_session')); if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); this.checkAdmin(session.user); return true; } document.getElementById('auth-overlay').classList.add('active-modal'); return false; } static login() { const user = document.getElementById('auth-user').value; if(!user) return; localStorage.setItem('cox_auth_session', JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); } static logout() { localStorage.removeItem('cox_auth_session'); location.reload(); } static checkAdmin(user) { if(['admin', 'thomas', 'grilledcheezus'].some(a => user.toLowerCase().includes(a))) document.getElementById('settings-btn-wrapper').style.display = 'block'; } }
 class App { static init() { AuthService.init(); UI.populateDropdowns = function() { ['mfg', 'hp', 'volt', 'phase'].forEach(cat => { const sel = document.getElementById(cat+'Input'); if(!sel) return; const items = cat === 'mfg' ? Object.keys(AI_TRAINING_DATA.MANUFACTURERS) : AI_TRAINING_DATA.DATA[cat.toUpperCase()]; items.forEach(i => { const opt = document.createElement('option'); opt.value = i; opt.innerText = i; sel.appendChild(opt); }); }); }; UI.populateDropdowns(); DataLoader.preload(); } }
