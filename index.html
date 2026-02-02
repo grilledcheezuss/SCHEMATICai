@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.13 - Twin Turbo)</title>
+    <title>Cox Research | SCHEMATICai (v8.14 - Badge Perfection)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -152,7 +152,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.13</div>
+    <div class="version-badge">SCHEMATICai v8.14</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -188,10 +188,10 @@
         <div class="sidebar-controls">
             <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" class="cox-input" placeholder="e.g. Duplex, 1PH, CP-7920" onkeypress="UI.handleEnter(event)"></div>
             <div class="filter-grid">
-                <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" class="cox-input"><option value="">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="">Any</option></select></div>
-                <div class="input-group"><span class="input-label">HP</span><select id="hpInput" class="cox-input"><option value="">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" class="cox-input"><option value="">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">HP</span><select id="hpInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" class="cox-input"><option value="Any">Any</option></select></div>
             </div>
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
@@ -212,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.13 (TWIN TURBO) ---
+// --- SCHEMATICai v8.14 (BADGE PERFECTION) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -277,7 +277,7 @@ class SpecExtractor {
 
 // 3. GLOBAL STORE & UTILS
 window.LOCAL_DB = [];
-window.DB_IDS = new Set(); // To prevent duplicates
+window.DB_IDS = new Set();
 
 // 4. DATA LOADER (TWIN TURBO)
 class DataLoader {
@@ -285,9 +285,8 @@ class DataLoader {
         const btn = document.getElementById('searchBtn');
         btn.innerText = "STARTING TWIN TURBO...";
         
-        // Spawn Two Threads
-        const t1 = this.syncThread('desc'); // Top Down
-        const t2 = this.syncThread('asc');  // Bottom Up
+        const t1 = this.syncThread('desc'); 
+        const t2 = this.syncThread('asc');  
         
         await Promise.all([t1, t2]);
         
@@ -303,11 +302,9 @@ class DataLoader {
         
         try {
             do {
-                // Check if we have enough records (Circuit Breaker)
                 if (window.LOCAL_DB.length >= 7500) break;
 
                 const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?pageSize=100${fields}${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
-                
                 const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` } });
                 const data = await resp.json();
                 
@@ -320,7 +317,6 @@ class DataLoader {
                     if (!window.DB_IDS.has(id)) {
                         window.DB_IDS.add(id);
                         newCount++;
-                        
                         const desc = r.fields['Items'] || "";
                         const extracted = SpecExtractor.extract(desc);
                         window.LOCAL_DB.push({
@@ -334,11 +330,7 @@ class DataLoader {
                 });
                 
                 offset = data.offset;
-                
-                // UI Update (Shared)
                 document.getElementById('searchBtn').innerText = `LOADING... (${window.LOCAL_DB.length})`;
-                
-                // If thread found nothing new (collision), stop
                 if (newCount === 0) break; 
                 
             } while (offset);
@@ -376,7 +368,6 @@ class SearchEngine {
             alert("Enter search criteria."); return;
         }
 
-        // Sort results by ID Descending (Newest first) before filtering
         const sortedDB = window.LOCAL_DB.sort((a, b) => (a.id < b.id) ? 1 : -1);
 
         const results = sortedDB.filter((rec) => {
@@ -386,33 +377,28 @@ class SearchEngine {
                 const searchTarget = (rec.id + " " + rec.desc).toUpperCase();
                 if(!searchTarget.includes(kw)) { pass = false; }
             }
-            
             if(pass && mfg !== "Any") {
                 if(rec.mfg && rec.mfg !== mfg.toUpperCase()) { pass = false; }
                 if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) { pass = false; }
             }
-
             if(pass && hp !== "Any") {
                 const hpStr = String(hp);
                 const badgeMatch = rec.hp === hpStr;
                 const textMatch = rec.desc.includes(hpStr + "HP") || rec.desc.includes(hpStr + " HP");
                 if(!badgeMatch && !textMatch) { pass = false; }
             }
-
             if(pass && volt !== "Any") {
                 const vStr = String(volt);
                 const badgeMatch = rec.volt && rec.volt.includes(vStr);
                 const textMatch = rec.desc.includes(vStr);
                 if(!badgeMatch && !textMatch) { pass = false; }
             }
-
             if(pass && phase !== "Any") {
                 const pStr = String(phase);
                 const badgeMatch = rec.phase === pStr;
                 const textMatch = rec.desc.includes(pStr + "PH") || rec.desc.includes(pStr + " PH");
                 if(!badgeMatch && !textMatch) { pass = false; }
             }
-
             return pass;
         });
 
@@ -496,8 +482,6 @@ class UI {
             const items = cat === 'mfg' ? Object.keys(CONSTANTS.MANUFACTURERS) : CONSTANTS.DATA[cat.toUpperCase()];
             items.forEach(i => {
                 const opt = document.createElement('option');
-                opt.value = cat==='mfg' ? "Any" : "Any"; 
-                if(cat!=='mfg') opt.value = i; 
                 opt.value = i; 
                 opt.innerText = i;
                 sel.appendChild(opt);
