@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.2 - Accuracy)</title>
+    <title>Cox Research | SCHEMATICai (v8.3 - Feedback State)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -95,6 +95,8 @@
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
         .thumb-btn:hover { background: #f5f5f5; }
+        .thumb-btn.voted-up { background: #dcfce7; border-color: #166534; color: #166534; pointer-events: none; }
+        .thumb-btn.voted-down { background: #fee2e2; border-color: #991b1b; color: #991b1b; }
 
         #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
         .active-modal { display: flex !important; }
@@ -107,6 +109,8 @@
         .reason-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
         .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; }
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
+        .reason-btn.locked { background: #eee; color: #aaa; border-color: #ddd; pointer-events: none; text-decoration: line-through; }
+        
         .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; margin-top: 10px; }
 
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
@@ -153,7 +157,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.2</div>
+    <div class="version-badge">SCHEMATICai v8.3</div>
     <div class="header-controls">
         <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -171,12 +175,12 @@
         <div class="modal-content">
             <p style="margin-top:0; font-size:13px; color:var(--text-secondary);">Select all that apply:</p>
             <div class="reason-grid">
-                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'mfg')">Wrong Manufacturer</div>
-                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'hp')">Wrong HP</div>
-                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'volt')">Wrong Voltage</div>
-                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'phase')">Wrong Phase</div>
-                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'enc')">Wrong Enclosure</div>
-                <div class="reason-btn" onclick="FeedbackService.toggleReason(this, 'dup')">Duplicate Record</div>
+                <div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div>
+                <div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div>
+                <div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div>
+                <div class="reason-btn" data-reason="phase" onclick="FeedbackService.toggleReason(this)">Wrong Phase</div>
+                <div class="reason-btn" data-reason="enc" onclick="FeedbackService.toggleReason(this)">Wrong Enclosure</div>
+                <div class="reason-btn" data-reason="kw" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch</div>
             </div>
             <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT FEEDBACK</button>
         </div>
@@ -212,7 +216,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.2 (ACCURACY) ---
+// --- SCHEMATICai v8.3 (FEEDBACK STATE) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -261,14 +265,13 @@ class ConfigService {
     }
 }
 
-// 3. PARSING ENGINE (V8.2: WORD BOUNDARIES)
+// 3. PARSING ENGINE (V8.2 Logic)
 class SpecExtractor {
     static extract(text) {
         const specs = { mfg: null, hp: null, volt: null, phase: null };
         const t = (text || "").toUpperCase();
 
         for (const [standard, aliases] of Object.entries(CONSTANTS.MANUFACTURERS)) {
-            // V8.2: Use Regex Word Boundaries to avoid "GRINDER" matching "GR"
             const pattern = new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i');
             if (pattern.test(t)) {
                 specs.mfg = standard.toUpperCase();
@@ -353,7 +356,7 @@ class AirtableService {
     }
 }
 
-// 5. SEARCH ENGINE (NO FILTERING)
+// 5. SEARCH ENGINE
 class SearchEngine {
     static async perform() { 
         const criteria = {
@@ -371,7 +374,6 @@ class SearchEngine {
         const btn = document.getElementById('searchBtn');
         btn.innerText = "...";
         
-        // TRUST API
         let results = await AirtableService.search(criteria);
         
         UI.renderResults(results, criteria);
@@ -403,14 +405,12 @@ class UI {
             const card = document.createElement('div');
             card.className = 'record-card';
             
+            // Check State
+            const state = FeedbackService.history[item.id] || { up: false, downReasons: new Set() };
+            
             let badges = '';
-            
-            // V8.2: USER AUTHORITY BADGE LOGIC
-            // If user selected a filter, FORCE that badge. Otherwise use parser.
             const displayMfg = (criteria.mfg && criteria.mfg !== "Any") ? criteria.mfg : (item.mfg || "Unknown");
-            
             if(displayMfg !== "Unknown") badges += `<span class="hud-badge match-exact">${displayMfg}</span>`;
-            
             if(item.hp) badges += `<span class="hud-badge match-exact">${item.hp} HP</span>`;
             if(item.volt) badges += `<span class="hud-badge match-exact">${item.volt}V</span>`;
             if(item.phase) badges += `<span class="hud-badge match-exact">${item.phase}PH</span>`;
@@ -421,8 +421,8 @@ class UI {
                 </div>
                 <div class="badge-row">${badges}</div>
                 <div class="card-actions">
-                    <button class="thumb-btn up" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button>
-                    <button class="thumb-btn down" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button>
+                    <button class="thumb-btn up ${state.up ? 'voted-up' : ''}" data-id="${item.id}" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button>
+                    <button class="thumb-btn down ${state.downReasons.size > 0 ? 'voted-down' : ''}" data-id="${item.id}" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button>
                 </div>
             `;
             
@@ -500,7 +500,7 @@ class HarvestService {
     }
 }
 
-// 8. SERVICES (Auth & Feedback)
+// 8. SERVICES (V8.3: State Tracking)
 class AuthService {
     static init() { 
         const session = JSON.parse(localStorage.getItem('cox_auth_session'));
@@ -517,19 +517,59 @@ class AuthService {
 
 class FeedbackService {
     static activeId = null;
+    static history = {}; // Stores { 'CP-123': { up: true, downReasons: Set('hp') } }
     static selectedReasons = new Set();
-    static up(id) { alert(`Recorded: Thumbs UP for ${id}`); }
+
+    static initHistory(id) {
+        if (!this.history[id]) this.history[id] = { up: false, downReasons: new Set() };
+    }
+
+    static up(id) {
+        this.initHistory(id);
+        if(this.history[id].up) return; // Prevent double vote
+        
+        this.history[id].up = true;
+        document.querySelector(`.thumb-btn.up[data-id="${id}"]`).classList.add('voted-up');
+        alert(`Liked ${id}`);
+    }
+
     static down(id) { 
-        this.activeId = id || "General"; 
+        this.activeId = id; 
+        this.initHistory(id);
         this.selectedReasons.clear();
-        document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected'));
+        
+        // Reset Modal UI
+        document.querySelectorAll('.reason-btn').forEach(b => {
+            b.classList.remove('selected');
+            b.classList.remove('locked');
+            
+            // Lock if already submitted
+            if(this.history[id].downReasons.has(b.dataset.reason)) {
+                b.classList.add('locked');
+            }
+        });
+        
         document.getElementById('feedback-modal').classList.add('active-modal');
     }
-    static toggleReason(el, reason) {
+
+    static toggleReason(el) {
+        const reason = el.dataset.reason;
+        if(el.classList.contains('locked')) return; // Ignore locked
+        
         el.classList.toggle('selected');
         if(this.selectedReasons.has(reason)) this.selectedReasons.delete(reason); else this.selectedReasons.add(reason);
     }
+
     static submit() {
+        if(!this.activeId) return;
+        const id = this.activeId;
+        
+        // Save to History
+        this.selectedReasons.forEach(r => this.history[id].downReasons.add(r));
+        
+        // Visual Update
+        document.querySelector(`.thumb-btn.down[data-id="${id}"]`).classList.add('voted-down');
+        
         alert(`Feedback Sent.`);
         this.close();
     }
