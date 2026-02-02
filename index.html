@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v7.5 - Reset Protocol)</title>
+    <title>Cox Research | SCHEMATICai (v7.6 - Deep Search)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -153,7 +153,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v7.5</div>
+    <div class="version-badge">SCHEMATICai v7.6</div>
     <div class="header-controls">
         <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -212,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v7.5 (RESET PROTOCOL) ---
+// --- SCHEMATICai v7.6 (DEEP SEARCH) ---
 
 // CONSTANTS (Hardcoded Correct Values)
 const AT_BASE = 'appgc1pbuOgmODRpj';
@@ -228,7 +228,7 @@ class ConfigService {
         const config = { apiKey: key, baseId: AT_BASE, tableName: AT_TABLE };
         localStorage.setItem('cox_at_config', JSON.stringify(config));
         document.getElementById('config-modal').classList.remove('active-modal');
-        alert("Saved. Try Searching.");
+        alert("Saved.");
     }
     static reset() {
         if(confirm("Are you sure? This will delete your API key.")) {
@@ -334,7 +334,7 @@ class HarvestService {
     }
 }
 
-// 5. AIRTABLE SERVICE
+// 5. AIRTABLE SERVICE (DEEP SEARCH)
 class AirtableService {
     static async search(criteria) {
         const config = ConfigService.get();
@@ -347,15 +347,18 @@ class AirtableService {
         if(criteria.mfg && criteria.mfg !== "Any") searchTerms.push(criteria.mfg);
         if(criteria.kw) searchTerms.push(criteria.kw);
         
+        // V7.6 FIX: USE SEARCH() INSTEAD OF FIND() FOR CASE-INSENSITIVITY
         if(searchTerms.length > 0) {
             searchTerms.forEach(term => {
-                formulas.push(`FIND('${term}', {Items})`); 
-                formulas.push(`FIND('${term}', {Control Panel Name})`);
+                formulas.push(`SEARCH('${term}', {Items})`); 
+                formulas.push(`SEARCH('${term}', {Control Panel Name})`);
             });
         }
 
         const formulaStr = formulas.length > 0 ? `OR(${formulas.join(',')})` : "";
         const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=50`;
+
+        console.log("📡 Requesting:", url);
 
         try {
             const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey.trim()}` } });
@@ -364,6 +367,8 @@ class AirtableService {
             if (resp.status === 403) { alert("Permissions Error (403). Check Token Scopes."); return null; }
             
             const data = await resp.json();
+            console.log(`✅ Airtable Responded: ${data.records.length} records found`);
+
             return data.records.map(r => {
                 const f = r.fields;
                 const desc = f['Items'] || "";
@@ -469,12 +474,11 @@ class SearchEngine {
         
         let results = await AirtableService.search(criteria);
         
+        // SOFT FILTER
         if (results) {
-            // SOFT FILTER
             results = results.filter(rec => {
                 if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg && rec.mfg !== criteria.mfg) return false;
                 if(criteria.hp && criteria.hp !== "Any" && rec.hp && rec.hp !== criteria.hp) return false;
-                // Allow null voltage/phase to pass broad filter if keywords match
                 if(criteria.volt && criteria.volt !== "Any" && rec.volt && rec.volt !== criteria.volt) return false;
                 if(criteria.phase && criteria.phase !== "Any" && rec.phase && rec.phase !== criteria.phase) return false;
                 return true;
