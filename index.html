@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v8.8 - Hybrid Core)</title>
+    <title>Cox Research | SCHEMATICai (v8.9 - Badge Integrity)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -152,7 +152,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v8.8</div>
+    <div class="version-badge">SCHEMATICai v8.9</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -212,7 +212,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v8.8 (HYBRID CORE + XRAY) ---
+// --- SCHEMATICai v8.9 (BADGE INTEGRITY FIX) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -355,7 +355,7 @@ class SearchEngine {
             alert("Enter search criteria."); return;
         }
 
-        console.log("🔎 SEARCH STARTED:", {kw, mfg, hp, volt, phase});
+        console.log(`🔎 SEARCH STARTED: {kw: '${kw}', mfg: '${mfg}', hp: '${hp}', volt: '${volt}', phase: '${phase}'}`);
 
         const results = window.LOCAL_DB.filter((rec, index) => {
             let pass = true;
@@ -373,36 +373,31 @@ class SearchEngine {
                 if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) { pass = false; rejectReason = "MFG_MISSING"; }
             }
 
-            // 3. HP (Hybrid: Check Badge OR Text)
+            // 3. HP
             if(pass && hp !== "Any") {
                 const hpStr = String(hp);
                 const badgeMatch = rec.hp === hpStr;
                 const textMatch = rec.desc.includes(hpStr + "HP") || rec.desc.includes(hpStr + " HP");
-                
                 if(!badgeMatch && !textMatch) { pass = false; rejectReason = "HP"; }
             }
 
-            // 4. Voltage (Hybrid)
+            // 4. Voltage
             if(pass && volt !== "Any") {
                 const vStr = String(volt);
                 const badgeMatch = rec.volt && rec.volt.includes(vStr);
                 const textMatch = rec.desc.includes(vStr);
-                
                 if(!badgeMatch && !textMatch) { pass = false; rejectReason = "VOLT"; }
             }
 
-            // 5. Phase (Hybrid)
+            // 5. Phase
             if(pass && phase !== "Any") {
                 const pStr = String(phase);
                 const badgeMatch = rec.phase === pStr;
                 const textMatch = rec.desc.includes(pStr + "PH") || rec.desc.includes(pStr + " PH");
-                
                 if(!badgeMatch && !textMatch) { pass = false; rejectReason = "PHASE"; }
             }
 
-            // TRACE LOG (First 5 Rejections)
             if(!pass && index < 5) console.log(`❌ Skipped ${rec.id}: ${rejectReason}`);
-            
             return pass;
         });
 
@@ -439,21 +434,27 @@ class UI {
             const state = FeedbackService.history[item.id] || { up: false, downReasons: new Set() };
             
             let badges = '';
-            // Always show MFG if known
+            // USER AUTHORITY BADGES
+            // MFG: Always show. If filter selected, force match color (Green), else Info (Grey) unless match found.
             const displayMfg = (criteria.mfg && criteria.mfg !== "Any") ? criteria.mfg : (item.mfg || "Unknown");
-            if(displayMfg !== "Unknown") badges += `<span class="hud-badge match-exact">${displayMfg}</span>`;
+            badges += `<span class="hud-badge match-exact">${displayMfg}</span>`;
             
-            // Smart Badges (Green vs Grey)
+            // HP: Green ONLY if strictly matches filter. Grey if info.
             if(item.hp) {
-                const style = (criteria.hp !== "Any") ? 'match-exact' : 'match-info';
+                let style = 'match-info';
+                if(criteria.hp !== "Any" && item.hp === String(criteria.hp)) style = 'match-exact';
                 badges += `<span class="hud-badge ${style}">${item.hp} HP</span>`;
             }
+            // Volt: Green ONLY if strictly matches filter.
             if(item.volt) {
-                const style = (criteria.volt !== "Any") ? 'match-exact' : 'match-info';
+                let style = 'match-info';
+                if(criteria.volt !== "Any" && item.volt.includes(String(criteria.volt))) style = 'match-exact';
                 badges += `<span class="hud-badge ${style}">${item.volt}V</span>`;
             }
+            // Phase
             if(item.phase) {
-                const style = (criteria.phase !== "Any") ? 'match-exact' : 'match-info';
+                let style = 'match-info';
+                if(criteria.phase !== "Any" && item.phase === String(criteria.phase)) style = 'match-exact';
                 badges += `<span class="hud-badge ${style}">${item.phase}PH</span>`;
             }
 
@@ -484,8 +485,8 @@ class UI {
             const items = cat === 'mfg' ? Object.keys(CONSTANTS.MANUFACTURERS) : CONSTANTS.DATA[cat.toUpperCase()];
             items.forEach(i => {
                 const opt = document.createElement('option');
-                opt.value = cat==='mfg' ? "Any" : "Any"; 
-                if(cat!=='mfg') opt.value = i; 
+                // V8.9 FIX: Actually assign value
+                opt.value = i; 
                 opt.innerText = i;
                 sel.appendChild(opt);
             });
