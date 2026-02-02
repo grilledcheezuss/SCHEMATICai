@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v9.7 - Proximity Sort)</title>
+    <title>Cox Research | SCHEMATICai (v9.8 - Clean & Ordered)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -159,7 +159,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v9.7</div>
+    <div class="version-badge">SCHEMATICai v9.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -216,7 +216,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v9.7 (PROXIMITY SORT) ---
+// --- SCHEMATICai v9.8 (CLEAN & ORDERED) ---
 
 class PdfController {
     static load(id, url) {
@@ -285,9 +285,11 @@ class AIParser {
             }
         }
         
-        // V9.6 Table Logic
+        // V9.8: Enhanced Dot/Leader Support for Tables
         if (!specs.hp) {
-            let hpMatch = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i);
+            // "HP ..... 2"
+            let hpMatch = t.match(/\bHP\s*[._-]+\s*(\d+(\.\d+)?)\b/i);
+            // "2HP" (standard)
             if (!hpMatch) hpMatch = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i);
             if(hpMatch) { const val = parseFloat(hpMatch[1]); if (!isNaN(val) && val < 999) specs.hp = hpMatch[1].replace(/\s/g, ''); }
         }
@@ -328,7 +330,10 @@ class DataLoader {
                 if(!data.records || data.records.length === 0) break;
                 let newCount = 0;
                 data.records.forEach(r => {
-                    const id = r.fields['Control Panel Name'];
+                    const rawId = r.fields['Control Panel Name'] || "";
+                    // V9.8: Clean ID (Remove ! ? and trailing space)
+                    const id = rawId.replace(/[!?]/g, '').trim();
+                    
                     if (!window.DB_IDS.has(id)) {
                         window.DB_IDS.add(id);
                         newCount++;
@@ -345,7 +350,6 @@ class DataLoader {
     static harvestCSV() { /* CSV Logic Preserved */ }
 }
 
-// 5. SEARCH ENGINE (PROXIMITY SORTING)
 class SearchEngine {
     static perform() {
         if(window.LOCAL_DB.length === 0) return;
@@ -360,48 +364,37 @@ class SearchEngine {
         let results = window.LOCAL_DB.filter((rec) => {
             let pass = true;
             if(kw && !((rec.id + " " + rec.desc).toUpperCase().includes(kw))) pass = false;
-            
-            // STRICT FILTERS
-            if(pass && mfg !== "Any") { 
-                if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; 
-                else if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; 
-            }
-            if(pass && volt !== "Any") { 
-                if(rec.volt && !rec.volt.includes(String(volt))) pass = false;
-                else if(!rec.volt && !rec.desc.includes(String(volt))) pass = false;
-            }
-            if(pass && phase !== "Any") { 
-                if(rec.phase && rec.phase !== String(phase)) pass = false;
-                else if(!rec.phase && !rec.desc.includes(String(phase))) pass = false;
-            }
-            
-            // HP: SOFT FILTER (Keep all HP results, sort later)
-            // No 'pass = false' here for HP
-            
+            if(pass && mfg !== "Any") { if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; else if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; }
+            if(pass && volt !== "Any") { if(rec.volt && !rec.volt.includes(String(volt))) pass = false; else if(!rec.volt && !rec.desc.includes(String(volt))) pass = false; }
+            if(pass && phase !== "Any") { if(rec.phase && rec.phase !== String(phase)) pass = false; else if(!rec.phase && !rec.desc.includes(String(phase))) pass = false; }
+            // HP: SOFT FILTER (No reject, just sort)
             return pass;
         });
 
-        // PROXIMITY SORTING
+        // V9.8: TIERED SORTING (Score + ID)
         if(hp !== "Any") {
             const target = parseFloat(hp);
             results.sort((a, b) => {
                 const valA = parseFloat(a.hp) || -999;
                 const valB = parseFloat(b.hp) || -999;
                 
-                // 1. Exact Match First
+                // 1. Exact vs Varied
                 const matchA = valA === target;
                 const matchB = valB === target;
                 if (matchA && !matchB) return -1;
                 if (!matchA && matchB) return 1;
                 
-                // 2. Proximity (Distance from Target)
-                const distA = Math.abs(valA - target);
-                const distB = Math.abs(valB - target);
-                return distA - distB; 
+                // 2. Proximity (If both varied)
+                const distA = (valA === -999) ? Infinity : Math.abs(valA - target);
+                const distB = (valB === -999) ? Infinity : Math.abs(valB - target);
+                if (distA !== distB) return distA - distB;
+                
+                // 3. Newest First (Tie-Breaker)
+                return b.id.localeCompare(a.id);
             });
         } else {
-            // Default Sort: Newest First
-            results.sort((a, b) => (a.id < b.id) ? 1 : -1);
+            // Default: Newest First
+            results.sort((a, b) => b.id.localeCompare(a.id));
         }
 
         UI.renderResults(results, { mfg, hp, volt, phase });
@@ -425,12 +418,10 @@ class UI {
             
             if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
             
-            // V9.7: Show Badge if searched OR if known (to show the varied HP)
             if(criteria.hp !== "Any" && criteria.hp !== "") {
                 const isMatch = item.hp === String(criteria.hp);
                 const isHealed = healed && healed.hp;
                 const css = isHealed ? 'match-healed' : (isMatch ? 'match-exact' : 'match-varied');
-                // Always show the ACTUAL value of the record
                 const val = (healed?.hp || item.hp || "Unknown"); 
                 badges += `<span class="hud-badge ${css}">${val} HP</span>`;
             }
@@ -446,7 +437,7 @@ class UI {
                 badges += `<span class="hud-badge ${css}">${healed?.phase || criteria.phase}PH</span>`;
             }
 
-            card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id ? item.id.replace('.dwg','') : "Unknown ID"}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
+            card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
             card.onclick = () => { document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view')); card.classList.add('active-view'); PdfController.load(item.id, item.pdfUrl); };
             area.appendChild(card);
         });
@@ -454,7 +445,7 @@ class UI {
     static populateDropdowns() { /* ... */ }
 }
 
-// ... Services (FeedbackService, AuthService, App) kept identical to v9.4 ...
+// ... Services (FeedbackService, AuthService, App) kept identical ...
 class FeedbackService { static history = {}; static activeId = null; static down(id) { this.activeId = id; this.history[id] = this.history[id] || { up: false, downReasons: new Set() }; document.querySelectorAll('.correction-input').forEach(i => i.value = ''); document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); if(this.history[id].downReasons) { this.history[id].downReasons.forEach(r => { const btn = document.querySelector(`.reason-btn[data-reason="${r}"]`); if(btn) btn.classList.add('locked'); }); } document.getElementById('feedback-modal').classList.add('active-modal'); } static async submit() { const id = this.activeId; const submissions = []; document.querySelectorAll('.reason-btn.selected').forEach(btn => { const reasonCode = btn.dataset.reason; const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); this.history[id].downReasons.add(reasonCode); } }); if(submissions.length === 0) return alert("Select a reason and enter a value."); for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } alert("Votes Recorded. Thank you."); const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); this.close(); } static async sendToAirtable(panelId, param, value) { await fetch(`https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${AT_FEEDBACK_TABLE}`, { method: 'POST', headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ "fields": { "Panel ID": panelId, "Parameter": param, "Suggested Value": value } }) }); } static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } static up(id) { alert("Liked!"); } }
 class ConfigService { static reset() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } } }
 class AuthService { static init() { const session = JSON.parse(localStorage.getItem('cox_auth_session')); if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); this.checkAdmin(session.user); return true; } document.getElementById('auth-overlay').classList.add('active-modal'); return false; } static login() { const user = document.getElementById('auth-user').value; if(!user) return; localStorage.setItem('cox_auth_session', JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); } static logout() { localStorage.removeItem('cox_auth_session'); location.reload(); } static checkAdmin(user) { if(['admin', 'thomas', 'grilledcheezus'].some(a => user.toLowerCase().includes(a))) document.getElementById('settings-btn-wrapper').style.display = 'block'; } }
