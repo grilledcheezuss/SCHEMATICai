@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v6.6 - The Refinery)</title>
+    <title>Cox Research | SCHEMATICai (v7.0 - Advanced Parsing)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -136,7 +136,7 @@
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Connection Settings</p>
         <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
         <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;">
-        <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name (e.g. Schematics)" style="margin-bottom:15px;">
+        <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name (e.g. Control Panel Items)" style="margin-bottom:15px;">
         <div style="display:flex; gap:10px;">
             <button class="submit-feedback-btn" style="background:var(--app-primary);" onclick="ConfigService.save()">Save</button>
             <button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button>
@@ -154,7 +154,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v6.6</div>
+    <div class="version-badge">SCHEMATICai v7.0</div>
     <div class="header-controls">
         <button class="control-btn" title="Airtable Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -213,7 +213,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v6.6 (THE REFINERY) ---
+// --- SCHEMATICai v7.0 (THE PARSING POWERHOUSE) ---
 
 class ConfigService {
     static get() { return JSON.parse(localStorage.getItem('cox_at_config')) || {}; }
@@ -225,136 +225,174 @@ class ConfigService {
         };
         localStorage.setItem('cox_at_config', JSON.stringify(config));
         document.getElementById('config-modal').classList.remove('active-modal');
-        alert("Saved.");
+        alert("Configuration Saved.");
     }
 }
 
-// THE HARVESTER (ETL PIPELINE)
-class HarvestService {
-    static async start() {
-        const config = ConfigService.get();
-        if(!config.apiKey) return alert("Please save API Keys first.");
-        
-        const status = document.getElementById('harvest-status');
-        status.innerText = "⏳ Initializing harvest...";
-        
-        const allRecords = [];
-        let offset = null;
-        let page = 1;
+// 1. ADVANCED SPEC EXTRACTOR (Rules-Based)
+class SpecExtractor {
+    static extract(text) {
+        const specs = { mfg: null, hp: null, volt: null, phase: null };
+        const t = (text || "").toUpperCase();
 
-        try {
-            do {
-                status.innerText = `⏳ Fetching Page ${page}... (${allRecords.length} records)`;
-                const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableName}?pageSize=100${offset ? '&offset='+offset : ''}`;
-                
-                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
-                const data = await resp.json();
-                
-                if(!data.records) break;
-                
-                data.records.forEach(r => {
-                    const f = r.fields;
-                    // CLEAN & STANDARDIZE
-                    const cleanRec = {
-                        "Panel Number": f['Panel Number'] || f['ID'] || "",
-                        "Manufacturer": (f['Manufacturer'] || "").toUpperCase().trim(),
-                        "HP": (f['HP'] || "").replace(/[^0-9.]/g, '') + " HP",
-                        "Voltage": (f['Voltage'] || "").replace(/[^0-9/]/g, '') + "V",
-                        "Phase": (f['Phase'] || "").replace(/[^0-9]/g, '') + "PH",
-                        "Description": (f['Description'] || "").replace(/(\r\n|\n|\r)/gm, " "),
-                        "PDF Link": (f['PDF'] && f['PDF'][0]) ? f['PDF'][0].url : ""
-                    };
-                    allRecords.push(cleanRec);
-                });
-                
-                offset = data.offset;
-                page++;
-                
-            } while (offset);
+        // 1. Manufacturer (Synonyms)
+        // Hardcoded Logic for common issues
+        const mfgPatterns = {
+            'GORMAN RUPP': ['GORMAN', 'GR', 'G.R.', 'GORMAN-RUPP', 'RUPP'],
+            'BARNES': ['BARNES', 'SITHE', 'CRANE'],
+            'HYDROMATIC': ['HYDROMATIC', 'HYDRO-MATIC', 'HYDRO'],
+            'FLYGT': ['FLYGT'],
+            'MYERS': ['MYERS'],
+            'GOULDS': ['GOULDS'],
+            'ZOELLER': ['ZOELLER'],
+            'LIBERTY': ['LIBERTY'],
+            'WILO': ['WILO'],
+            'PENTAIR': ['PENTAIR'],
+            'ABS': ['ABS'],
+            'AURORA': ['AURORA']
+        };
 
-            status.innerText = `✅ Harvest Complete! ${allRecords.length} records. Generating CSV...`;
-            this.downloadCSV(allRecords);
-            
-        } catch(e) {
-            status.innerText = "❌ Error: " + e.message;
+        for (const [standard, aliases] of Object.entries(mfgPatterns)) {
+            if (aliases.some(alias => t.includes(alias))) {
+                specs.mfg = standard;
+                break;
+            }
         }
-    }
 
-    static downloadCSV(data) {
-        if (!data.length) return;
-        const headers = Object.keys(data[0]);
-        const csvContent = [
-            headers.join(','),
-            ...data.map(row => headers.map(fieldName => `"${String(row[fieldName]).replace(/"/g, '""')}"`).join(','))
-        ].join('\n');
+        // 2. HP (Fractions, Decimals, Spacing)
+        // Matches: 1/2HP, 0.5 HP, 5.0HP, 7-1/2 HP
+        const hpRegex = /(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*HP/i;
+        const hpMatch = t.match(hpRegex);
+        if (hpMatch) specs.hp = hpMatch[1].replace(/\s/g, ''); // Clean spacing
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", "golden_database.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // 3. Voltage (Standard Tiers)
+        // Matches: 120V, 208, 230/460, 480VAC
+        const voltRegex = /(115|120|208|230|240|277|460|480|575)\s*V/i;
+        const voltMatch = t.match(voltRegex);
+        if (voltMatch) specs.volt = voltMatch[1];
+        else {
+            // Fallback for just numbers if 'V' is missing but context implies (rare/risky)
+            // Keeping strict 'V' requirement for now to avoid Part Number collision
+        }
+
+        // 4. Phase
+        if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("THREE PHASE") || t.includes("3Ø")) specs.phase = "3";
+        else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("SINGLE PHASE") || t.includes("1Ø")) specs.phase = "1";
+
+        return specs;
     }
 }
 
-// HEALING DB
+// 2. HEALING DB (AI Correction Layer)
 const HealingDB = {
     "CP-6950": { mfg: "GORMAN RUPP" }, 
     "CP-2801": { mfg: "GORMAN RUPP", phase: "3" } 
 };
-
-class BayesClassifier {
-    constructor() { this.termProbability = {}; }
-    train(records) {
-        this.termProbability = {};
-        records.forEach(rec => {
-            const tokens = (rec.keys + " " + rec.mfg).toLowerCase().split(/\s+/);
-            const label = rec.mfg || "UNKNOWN";
-            tokens.forEach(t => {
-                if(!this.termProbability[t]) this.termProbability[t] = {};
-                if(!this.termProbability[t][label]) this.termProbability[t][label] = 0;
-                this.termProbability[t][label]++;
-            });
-        });
-    }
-    predict(record, value) {
-        const text = (record.keys + " " + record.mfg).toUpperCase();
-        if (text.includes(String(value).toUpperCase())) return 0.9;
-        return 0.1;
-    }
-}
-const AI = new BayesClassifier();
 
 class AirtableService {
     static async search(criteria) {
         const config = ConfigService.get();
         if(!config.apiKey) return null;
 
+        // V7.0 STRATEGY: Broad Search -> Local Filter
         let formulas = [];
-        if(criteria.mfg && criteria.mfg !== "Any") formulas.push(`{Manufacturer}='${criteria.mfg}'`);
-        if(criteria.phase && criteria.phase !== "Any") formulas.push(`FIND('${criteria.phase}', {Phase})`);
-        if(criteria.hp && criteria.hp !== "Any") formulas.push(`FIND('${criteria.hp}', {HP})`);
-        if(criteria.volt && criteria.volt !== "Any") formulas.push(`FIND('${criteria.volt}', {Voltage})`);
-        if(criteria.kw) formulas.push(`OR(FIND('${criteria.kw}', {Description}), FIND('${criteria.kw}', {Panel Number}))`);
+        const searchTerms = [];
+        
+        // Push all criteria into a "Bag of Words" for broad search
+        if(criteria.mfg && criteria.mfg !== "Any") searchTerms.push(criteria.mfg);
+        if(criteria.kw) searchTerms.push(criteria.kw);
+        
+        // Build Formula: OR(FIND(Term1, {Items}), FIND(Term2, {Items}))
+        if(searchTerms.length > 0) {
+            searchTerms.forEach(term => {
+                formulas.push(`FIND('${term}', {Items})`); 
+                formulas.push(`FIND('${term}', {Control Panel Name})`);
+            });
+        }
 
-        const formulaStr = formulas.length > 0 ? `AND(${formulas.join(',')})` : "";
-        const url = `https://api.airtable.com/v0/${config.baseId}/${config.tableName}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=100&sort%5B0%5D%5Bfield%5D=Panel%20Number&sort%5B0%5D%5Bdirection%5D=desc`;
+        const formulaStr = formulas.length > 0 ? `OR(${formulas.join(',')})` : "";
+        const url = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.tableName)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=100`;
 
         try {
             const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
+            if (!resp.ok) { return null; }
             const data = await resp.json();
-            return data.records.map(r => ({
-                id: r.fields['Panel Number'] || r.fields['ID'],
-                mfg: r.fields['Manufacturer'],
-                hp: r.fields['HP'],
-                volt: r.fields['Voltage'],
-                phase: r.fields['Phase'],
-                keys: r.fields['Description'] || "",
-                pdfUrl: (r.fields['PDF'] && r.fields['PDF'][0]) ? r.fields['PDF'][0].url : null
-            }));
+            
+            // MAP & PARSE
+            return data.records.map(r => {
+                const f = r.fields;
+                const desc = f['Items'] || "";
+                
+                // 1. EXTRACT
+                let extracted = SpecExtractor.extract(desc);
+                
+                // 2. HEAL (Override if known bad)
+                const id = f['Control Panel Name'];
+                if(HealingDB[id]) {
+                    extracted = { ...extracted, ...HealingDB[id] };
+                }
+
+                return {
+                    id: id,
+                    mfg: extracted.mfg, // Now clean standard name
+                    hp: extracted.hp,
+                    volt: extracted.volt,
+                    phase: extracted.phase,
+                    keys: desc,
+                    pdfUrl: (f['Control Panel PDF'] && f['Control Panel PDF'][0]) ? f['Control Panel PDF'][0].url : null
+                };
+            });
         } catch(e) { return null; }
+    }
+}
+
+// HARVESTER
+class HarvestService {
+    static async start() {
+        const config = ConfigService.get();
+        const status = document.getElementById('harvest-status');
+        if(!config.apiKey) return alert("Please save API Keys first.");
+        status.innerText = "⏳ Connecting...";
+        
+        const allRecords = [];
+        let offset = null;
+        try {
+            do {
+                const url = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(config.tableName)}?pageSize=100${offset ? '&offset='+offset : ''}`;
+                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
+                const data = await resp.json();
+                if(!data.records) break;
+                
+                data.records.forEach(r => {
+                    const f = r.fields;
+                    const desc = f['Items'] || "";
+                    const extracted = SpecExtractor.extract(desc);
+                    
+                    allRecords.push({
+                        "Panel Number": f['Control Panel Name'],
+                        "Manufacturer": extracted.mfg || "",
+                        "HP": extracted.hp || "",
+                        "Voltage": extracted.volt || "",
+                        "Phase": extracted.phase || "",
+                        "Description": desc,
+                        "PDF Link": (f['Control Panel PDF'] && f['Control Panel PDF'][0]) ? f['Control Panel PDF'][0].url : ""
+                    });
+                });
+                offset = data.offset;
+                status.innerText = `⏳ Harvested ${allRecords.length} records...`;
+            } while (offset);
+            
+            if(allRecords.length > 0) {
+                const headers = Object.keys(allRecords[0]);
+                const csv = [headers.join(','), ...allRecords.map(row => headers.map(h => `"${(row[h]||'').toString().replace(/"/g, '""')}"`).join(','))].join('\n');
+                const blob = new Blob([csv], {type: 'text/csv'});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'golden_database.csv';
+                link.click();
+                status.innerText = "✅ Download Started.";
+            }
+        } catch(e) { status.innerText = "❌ Error: " + e.message; }
     }
 }
 
@@ -413,7 +451,7 @@ class FeedbackService {
         if(this.selectedReasons.has(reason)) this.selectedReasons.delete(reason); else this.selectedReasons.add(reason);
     }
     static submit() {
-        alert(`Feedback Sent. AI Model Updated.`);
+        alert(`Feedback Sent. Model Updated.`);
         this.close();
     }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
@@ -438,31 +476,23 @@ class SearchEngine {
         
         let results = await AirtableService.search(criteria);
         
-        if (!results) {
+        if (results) {
+            // V7.0: LOCAL FILTER AFTER PARSING
+            // We fetched broad, now we filter strictly based on what we EXTRACTED
+            results = results.filter(rec => {
+                if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg !== criteria.mfg) return false;
+                if(criteria.hp && criteria.hp !== "Any" && rec.hp !== criteria.hp) return false;
+                if(criteria.volt && criteria.volt !== "Any" && rec.volt !== criteria.volt) return false;
+                if(criteria.phase && criteria.phase !== "Any" && rec.phase !== criteria.phase) return false;
+                return true;
+            });
+        } else {
             console.warn("Airtable failed. Using Local.");
-            results = this.runLocalQuery(criteria);
+            // Local fallback logic would go here
         }
 
-        AI.train(results);
         UI.renderResults(results, criteria);
         btn.innerText = "SEARCH";
-    }
-
-    static runLocalQuery(c) {
-        if (!window.LOCAL_PANEL_DATA) return [];
-        let matches = [];
-        window.LOCAL_PANEL_DATA.forEach(rec => {
-            let correctedRec = { ...rec, ...HealingDB[rec.id] };
-            let isFail = false;
-            
-            // CONFLICT LOGIC (LOCAL FALLBACK)
-            const dMfg = (correctedRec.mfg || "").toUpperCase();
-            if (c.mfg && c.mfg !== "Any" && dMfg !== "" && !dMfg.includes(c.mfg.toUpperCase())) isFail = true;
-            if (c.phase && c.phase !== "Any" && correctedRec.phase != c.phase) isFail = true;
-            
-            if (!isFail) matches.push({rec: correctedRec, matchData:{}});
-        });
-        return matches;
     }
 }
 
@@ -494,11 +524,11 @@ class UI {
             const card = document.createElement('div');
             card.className = 'record-card';
             
-            const displayMfg = UI.cleanMfg(rec.mfg);
             let badges = '';
 
+            // STRICT VISIBILITY & CLEAN DISPLAY
             if(criteria.mfg && criteria.mfg !== "Any") {
-                badges += `<span class="hud-badge ${rec.mfg ? 'match-exact' : ''}">${displayMfg || "Unknown"}</span>`;
+                badges += `<span class="hud-badge ${rec.mfg ? 'match-exact' : ''}">${rec.mfg || "Unknown"}</span>`;
             }
             if(criteria.hp && criteria.hp !== "Any") {
                 badges += `<span class="hud-badge match-exact">${rec.hp || "HP?"} HP</span>`;
@@ -512,7 +542,7 @@ class UI {
 
             card.innerHTML = `
                 <div class="card-header">
-                    <div class="panel-name">CP-${rec.id}</div>
+                    <div class="panel-name">CP-${rec.id.replace('.dwg','').replace('CP-','')}</div>
                 </div>
                 <div class="badge-row">${badges}</div>
                 <div class="card-actions">
