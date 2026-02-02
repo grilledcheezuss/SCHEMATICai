@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v9.3 - The AI Pipeline)</title>
+    <title>Cox Research | SCHEMATICai (v9.4 - Dual Base Architecture)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -157,7 +157,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v9.3</div>
+    <div class="version-badge">SCHEMATICai v9.4</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -231,7 +231,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v9.3 (THE AI PIPELINE) ---
+// --- SCHEMATICai v9.4 (DUAL BASE ARCHITECTURE) ---
 
 // 1. PDF CONTROLLER
 class PdfController {
@@ -254,33 +254,39 @@ class PdfController {
     }
 }
 
-// ⚠️ CREDENTIALS
-const AIRTABLE_PAT = 'patNuv7rNHCIHeq5t.093ee4623c468319b352d024b4c2309fe598d7962dd83d481ec6b23b4cdacf99'; 
-const AT_BASE = 'appgc1pbuOgmODRpj';
-const AT_TABLE = 'Control Panel Items';
-const AT_FEEDBACK = 'Feedback';
+// ⚠️ DUAL API CREDENTIALS
+// KEY 1: READ-ONLY SOURCE (Main Panel Data)
+const AIRTABLE_READ_KEY = 'patNuv7rNHCIHeq5t.093ee4623c468319b352d024b4c2309fe598d7962dd83d481ec6b23b4cdacf99'; 
+const AT_MAIN_BASE = 'appgc1pbuOgmODRpj';
+const AT_MAIN_TABLE = 'Control Panel Items';
+
+// KEY 2: WRITE-ONLY DESTINATION (Feedback/Healing)
+const AIRTABLE_WRITE_KEY = 'patIoqeaCzTpnX2ir.99286797dc9921be318e30c12e8743eae1041258665d174faf6c98355b90875f';
+const AT_FEEDBACK_BASE = 'app88zF2k4FgjU8hK';
+const AT_FEEDBACK_TABLE = 'Feedback';
 
 const VOTE_THRESHOLD = 3;
 
-// 2. TRAINING DATA (From database.js)
+// 2. TRAINING DATA
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 6.2, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
-// 3. THE HEALER (Manages Votes & Overrides)
+// 3. THE HEALER (USES WRITE KEY TO READ FEEDBACK)
 class TheHealer {
-    static healedData = {}; // Stores confirmed corrections
+    static healedData = {}; 
 
     static async fetchAndTally() {
-        console.log("🚑 Healer: Analyzing Feedback...");
+        console.log("🚑 Healer: Analyzing Feedback from Base 2...");
         const tallies = {}; 
 
         try {
             let offset = null;
             do {
-                const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_FEEDBACK}?pageSize=100${offset ? '&offset='+offset : ''}`;
-                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` } });
+                const url = `https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${encodeURIComponent(AT_FEEDBACK_TABLE)}?pageSize=100${offset ? '&offset='+offset : ''}`;
+                // USE WRITE KEY HERE (Because it has access to the Feedback Base)
+                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}` } });
                 const data = await resp.json();
                 
                 if(!data.records) break;
@@ -298,7 +304,6 @@ class TheHealer {
                 offset = data.offset;
             } while (offset);
 
-            // Apply Corrections if threshold met
             for (const [key, count] of Object.entries(tallies)) {
                 if (count >= VOTE_THRESHOLD) {
                     const [id, param, value] = key.split('|');
@@ -313,13 +318,11 @@ class TheHealer {
     }
 }
 
-// 4. AI PARSER (Engine)
+// 4. AI PARSER
 class AIParser {
     static parse(text, panelId) {
-        // Step 1: Check if Healer has a fix
         const healed = TheHealer.healedData[panelId];
         
-        // Start with Healed values if they exist, otherwise null
         const specs = { 
             mfg: healed?.mfg || null, 
             hp: healed?.hp || null, 
@@ -329,7 +332,6 @@ class AIParser {
         
         const t = (text || "").toUpperCase();
 
-        // Step 2: Use Training Data for anything NOT healed
         if (!specs.mfg) {
             for (const [standard, aliases] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) {
                 const pattern = new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i');
@@ -363,16 +365,16 @@ class AIParser {
 window.LOCAL_DB = [];
 window.DB_IDS = new Set();
 
-// 6. DATA LOADER (PIPELINE COORDINATOR)
+// 6. DATA LOADER (USES READ KEY)
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn');
         btn.innerText = "INITIALIZING AI...";
         
-        // 1. Run Healing Service
+        // 1. Run Healing Service (Uses Write Key)
         await TheHealer.fetchAndTally();
 
-        // 2. Fetch Main Data (Twin Turbo)
+        // 2. Fetch Main Data (Uses Read Key)
         btn.innerText = "DOWNLOADING DB...";
         const t1 = this.syncThread('desc'); 
         const t2 = this.syncThread('asc');  
@@ -393,8 +395,9 @@ class DataLoader {
             do {
                 if (window.LOCAL_DB.length >= 7500) break;
 
-                const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?pageSize=100${fields}${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
-                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}` } });
+                const url = `https://api.airtable.com/v0/${AT_MAIN_BASE}/${encodeURIComponent(AT_MAIN_TABLE)}?pageSize=100${fields}${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
+                // USE READ KEY HERE
+                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_READ_KEY}` } });
                 const data = await resp.json();
                 
                 if(!data.records || data.records.length === 0) break;
@@ -407,9 +410,6 @@ class DataLoader {
                         window.DB_IDS.add(id);
                         newCount++;
                         const desc = r.fields['Items'] || "";
-                        
-                        // --- THE PIPELINE ---
-                        // Raw -> AI Parser (With Healer Check) -> Result
                         const extracted = AIParser.parse(desc, id); 
                         
                         window.LOCAL_DB.push({
@@ -588,7 +588,7 @@ class UI {
     }
 }
 
-// 9. FEEDBACK SERVICE
+// 9. FEEDBACK SERVICE (USES WRITE KEY)
 class FeedbackService {
     static history = {};
     static activeId = null;
@@ -639,7 +639,7 @@ class FeedbackService {
     }
     
     static async sendToAirtable(panelId, param, value) {
-        const url = `https://api.airtable.com/v0/${AT_BASE}/${AT_FEEDBACK}`;
+        const url = `https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${encodeURIComponent(AT_FEEDBACK_TABLE)}`;
         const data = {
             "fields": {
                 "Panel ID": panelId,
@@ -647,9 +647,10 @@ class FeedbackService {
                 "Suggested Value": value
             }
         };
+        // USE WRITE KEY HERE
         await fetch(url, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${AIRTABLE_PAT}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
     }
