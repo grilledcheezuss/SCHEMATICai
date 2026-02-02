@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v9.8 - Clean & Ordered)</title>
+    <title>Cox Research | SCHEMATICai (v9.9 - Final Polish)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -159,7 +159,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v9.8</div>
+    <div class="version-badge">SCHEMATICai v9.9</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -216,7 +216,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v9.8 (CLEAN & ORDERED) ---
+// --- SCHEMATICai v9.9 (FINAL POLISH - CLEAN IDs) ---
 
 class PdfController {
     static load(id, url) {
@@ -285,11 +285,8 @@ class AIParser {
             }
         }
         
-        // V9.8: Enhanced Dot/Leader Support for Tables
         if (!specs.hp) {
-            // "HP ..... 2"
-            let hpMatch = t.match(/\bHP\s*[._-]+\s*(\d+(\.\d+)?)\b/i);
-            // "2HP" (standard)
+            let hpMatch = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i);
             if (!hpMatch) hpMatch = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i);
             if(hpMatch) { const val = parseFloat(hpMatch[1]); if (!isNaN(val) && val < 999) specs.hp = hpMatch[1].replace(/\s/g, ''); }
         }
@@ -331,8 +328,8 @@ class DataLoader {
                 let newCount = 0;
                 data.records.forEach(r => {
                     const rawId = r.fields['Control Panel Name'] || "";
-                    // V9.8: Clean ID (Remove ! ? and trailing space)
-                    const id = rawId.replace(/[!?]/g, '').trim();
+                    // V9.9: REMOVE EXTENSION + PUNCTUATION
+                    const id = rawId.replace(/[!?]/g, '').replace(/\.dwg$/i, '').trim();
                     
                     if (!window.DB_IDS.has(id)) {
                         window.DB_IDS.add(id);
@@ -367,33 +364,24 @@ class SearchEngine {
             if(pass && mfg !== "Any") { if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; else if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; }
             if(pass && volt !== "Any") { if(rec.volt && !rec.volt.includes(String(volt))) pass = false; else if(!rec.volt && !rec.desc.includes(String(volt))) pass = false; }
             if(pass && phase !== "Any") { if(rec.phase && rec.phase !== String(phase)) pass = false; else if(!rec.phase && !rec.desc.includes(String(phase))) pass = false; }
-            // HP: SOFT FILTER (No reject, just sort)
             return pass;
         });
 
-        // V9.8: TIERED SORTING (Score + ID)
         if(hp !== "Any") {
             const target = parseFloat(hp);
             results.sort((a, b) => {
                 const valA = parseFloat(a.hp) || -999;
                 const valB = parseFloat(b.hp) || -999;
-                
-                // 1. Exact vs Varied
                 const matchA = valA === target;
                 const matchB = valB === target;
                 if (matchA && !matchB) return -1;
                 if (!matchA && matchB) return 1;
-                
-                // 2. Proximity (If both varied)
                 const distA = (valA === -999) ? Infinity : Math.abs(valA - target);
                 const distB = (valB === -999) ? Infinity : Math.abs(valB - target);
                 if (distA !== distB) return distA - distB;
-                
-                // 3. Newest First (Tie-Breaker)
                 return b.id.localeCompare(a.id);
             });
         } else {
-            // Default: Newest First
             results.sort((a, b) => b.id.localeCompare(a.id));
         }
 
