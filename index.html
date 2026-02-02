@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v7.1 - Production)</title>
+    <title>Cox Research | SCHEMATICai (v7.2 - Stable)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -96,10 +96,10 @@
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
         .thumb-btn:hover { background: #f5f5f5; }
 
-        #auth-overlay, #feedback-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
+        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
         .active-modal { display: flex !important; }
         
-        .auth-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
+        .auth-card, .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
         .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
         .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
         .modal-content { padding: 20px; }
@@ -127,13 +127,25 @@
     </div>
 </div>
 
+<div id="config-modal">
+    <div class="config-card">
+        <h3 style="margin-top:0; color:var(--app-primary);">🔌 API Connection</h3>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:15px;">Airtable Credentials</p>
+        <input type="text" id="at-api-key" class="cox-input" placeholder="API Key / Token (pat_...)" style="margin-bottom:8px;">
+        <input type="text" id="at-base-id" class="cox-input" placeholder="Base ID (app...)" style="margin-bottom:8px;" value="appgc1pbuOgmODRpj" disabled>
+        <input type="text" id="at-table-name" class="cox-input" placeholder="Table Name" style="margin-bottom:15px;" value="Control Panel Items" disabled>
+        <button class="submit-feedback-btn" onclick="ConfigService.save()">Save & Connect</button>
+    </div>
+</div>
+
 <header>
     <a href="#" class="logo-group">
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v7.1</div>
+    <div class="version-badge">SCHEMATICai v7.2</div>
     <div class="header-controls">
+        <button class="control-btn" title="API Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -190,20 +202,32 @@
 </div>
 
 <script>
-// --- SCHEMATICai v7.1 (PRODUCTION) ---
+// --- SCHEMATICai v7.2 (STABLE) ---
 
-// ⚠️ PASTE YOUR API KEY HERE ⚠️
-const AIRTABLE_PAT = 'patFKL5FBJqAej8jx'; 
-const BASE_ID = 'appgc1pbuOgmODRpj';
-const TABLE_NAME = 'Control Panel Items';
+// CONSTANTS (Base/Table Hardcoded to prevent user error)
+const AT_BASE = 'appgc1pbuOgmODRpj';
+const AT_TABLE = 'Control Panel Items';
 
-// 1. EXTRACTION ENGINE
+// 1. CONFIG SERVICE
+class ConfigService {
+    static get() { return JSON.parse(localStorage.getItem('cox_at_config')) || {}; }
+    static save() {
+        const key = document.getElementById('at-api-key').value.trim();
+        if(!key.startsWith('pat')) { alert("Invalid Key. Must start with 'pat'"); return; }
+        
+        const config = { apiKey: key, baseId: AT_BASE, tableName: AT_TABLE };
+        localStorage.setItem('cox_at_config', JSON.stringify(config));
+        document.getElementById('config-modal').classList.remove('active-modal');
+        alert("Saved.");
+    }
+}
+
+// 2. EXTRACTION ENGINE
 class SpecExtractor {
     static extract(text) {
         const specs = { mfg: null, hp: null, volt: null, phase: null };
         const t = (text || "").toUpperCase();
 
-        // Manufacturer
         const mfgPatterns = {
             'GORMAN RUPP': ['GORMAN', 'GR', 'G.R.', 'RUPP'],
             'BARNES': ['BARNES', 'SITHE', 'CRANE'],
@@ -225,15 +249,12 @@ class SpecExtractor {
             }
         }
 
-        // HP
         const hpMatch = t.match(/(\d+(?:\.\d+)?|\d+\s*\/\s*\d+)\s*HP/i);
         if(hpMatch) specs.hp = hpMatch[1].replace(/\s/g, '');
 
-        // Voltage
         const voltMatch = t.match(/(\d{3})\/(\d{3})|(\d{3})\s*V/i);
         if(voltMatch) specs.volt = voltMatch[0];
 
-        // Phase
         if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø")) specs.phase = "3";
         else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø")) specs.phase = "1";
 
@@ -241,29 +262,23 @@ class SpecExtractor {
     }
 }
 
-// 2. HEALING DB
+// 3. HEALING DB
 const HealingDB = {
     "CP-6950": { mfg: "GORMAN RUPP" }, 
     "CP-2801": { mfg: "GORMAN RUPP", phase: "3" } 
 };
 
-// 3. AIRTABLE SERVICE
+// 4. AIRTABLE SERVICE
 class AirtableService {
     static async search(criteria) {
-        // USE HARDCODED CREDENTIALS
-        const apiKey = AIRTABLE_PAT !== 'PASTE_YOUR_API_KEY_HERE' ? AIRTABLE_PAT : (JSON.parse(localStorage.getItem('cox_at_config'))?.apiKey);
-        
-        if(!apiKey) {
-            alert("API Key Missing. Edit Code Line 205.");
-            return null;
-        }
+        const config = ConfigService.get();
+        if(!config.apiKey) { alert("Click ⚙️ and enter API Key."); return null; }
 
         let formulas = [];
         const searchTerms = [];
         if(criteria.mfg && criteria.mfg !== "Any") searchTerms.push(criteria.mfg);
         if(criteria.kw) searchTerms.push(criteria.kw);
         
-        // SEARCH 'Items' AND 'Control Panel Name'
         if(searchTerms.length > 0) {
             searchTerms.forEach(term => {
                 formulas.push(`FIND('${term}', {Items})`); 
@@ -272,20 +287,21 @@ class AirtableService {
         }
 
         const formulaStr = formulas.length > 0 ? `OR(${formulas.join(',')})` : "";
-        const url = `https://api.airtable.com/v0/${BASE_ID}/${encodeURIComponent(TABLE_NAME)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=50`;
+        const url = `https://api.airtable.com/v0/${AT_BASE}/${encodeURIComponent(AT_TABLE)}?filterByFormula=${encodeURIComponent(formulaStr)}&maxRecords=50`;
 
         try {
-            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+            const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${config.apiKey}` } });
+            if (resp.status === 401) { alert("API Key Invalid (401)"); return null; }
+            if (resp.status === 403) { alert("Permissions Error (403). Check Scopes."); return null; }
             if (!resp.ok) return null;
-            const data = await resp.json();
             
+            const data = await resp.json();
             return data.records.map(r => {
                 const f = r.fields;
                 const desc = f['Items'] || "";
                 let extracted = SpecExtractor.extract(desc);
                 const id = f['Control Panel Name'];
                 
-                // HEAL
                 if(HealingDB[id]) extracted = { ...extracted, ...HealingDB[id] };
 
                 return {
@@ -383,7 +399,7 @@ class SearchEngine {
         let results = await AirtableService.search(criteria);
         
         if (results) {
-            // STRICT FILTER
+            // STRICT LOCAL FILTER
             results = results.filter(rec => {
                 if(criteria.mfg && criteria.mfg !== "Any" && rec.mfg !== criteria.mfg) return false;
                 if(criteria.hp && criteria.hp !== "Any" && rec.hp !== criteria.hp) return false;
@@ -470,6 +486,10 @@ class App {
     static init() {
         AuthService.init();
         UI.populateDropdowns();
+        
+        // Load API Key to UI if exists
+        const conf = ConfigService.get();
+        if(conf.apiKey) document.getElementById('at-api-key').value = conf.apiKey;
     }
 }
 
