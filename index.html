@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v9.9 - Final Polish)</title>
+    <title>Cox Research | SCHEMATICai (v10.0 - Secure Polish)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -107,14 +107,21 @@
         .thumb-btn.voted-up { background: #dcfce7; border-color: #166534; color: #166534; pointer-events: none; }
         .thumb-btn.voted-down { background: #fee2e2; border-color: #991b1b; color: #991b1b; }
 
-        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
+        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
         .active-modal { display: flex !important; }
         
-        .auth-card, .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
+        .auth-card, .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 480px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
         .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
         .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
         .modal-content { padding: 20px; }
         
+        /* LOGIN STYLES V10 */
+        .login-avatar { width: 80px; height: 80px; background: #e3e5e8; border-radius: 50%; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 2px solid var(--border-color); color: var(--app-primary); }
+        .login-input-group { margin-bottom: 15px; text-align: left; }
+        .login-input-label { font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; display: block; opacity: 0.7; }
+        .video-container { margin-top: 30px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); background: #000; }
+        .video-container iframe { width: 100%; aspect-ratio: 16/9; border: none; }
+
         .reason-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
         .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; width: 100%; }
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
@@ -136,9 +143,24 @@
 
 <div id="auth-overlay">
     <div class="auth-card">
-        <h2 style="color:var(--app-primary); margin-top:0;">SCHEMATICai</h2>
-        <input type="text" id="auth-user" class="cox-input" placeholder="Username" style="margin-bottom:10px;">
+        <div class="login-avatar">👤</div>
+        <h2 style="color:var(--app-primary); margin-top:0; margin-bottom:20px;">SCHEMATICai</h2>
+        
+        <div class="login-input-group">
+            <span class="login-input-label">Username</span>
+            <input type="text" id="auth-user" class="cox-input" placeholder="Enter username">
+        </div>
+        
+        <div class="login-input-group">
+            <span class="login-input-label">Password</span>
+            <input type="password" id="auth-pass" class="cox-input" placeholder="Enter password">
+        </div>
+
         <button class="submit-feedback-btn" onclick="AuthService.login()">Authenticate</button>
+        
+        <div class="video-container">
+            <iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?controls=0&autoplay=1&mute=1&loop=1&playlist=jfKfPfyJRdk" allow="autoplay; encrypted-media"></iframe>
+        </div>
     </div>
 </div>
 
@@ -159,7 +181,7 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">SCHEMATICai v9.9</div>
+    <div class="version-badge">SCHEMATICai v10.0</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper">
             <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -216,7 +238,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v9.9 (FINAL POLISH - CLEAN IDs) ---
+// --- SCHEMATICai v10.0 (SECURE POLISH) ---
 
 class PdfController {
     static load(id, url) {
@@ -284,18 +306,15 @@ class AIParser {
                 if (new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i').test(t)) { specs.mfg = standard.toUpperCase(); break; }
             }
         }
-        
         if (!specs.hp) {
             let hpMatch = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i);
             if (!hpMatch) hpMatch = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i);
             if(hpMatch) { const val = parseFloat(hpMatch[1]); if (!isNaN(val) && val < 999) specs.hp = hpMatch[1].replace(/\s/g, ''); }
         }
-        
         if (!specs.volt) {
             const voltMatch = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i);
             if(voltMatch) specs.volt = voltMatch[1];
         }
-        
         if (!specs.phase) {
             if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø") || t.includes("3/60")) specs.phase = "3";
             else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø") || t.includes("1/60")) specs.phase = "1";
@@ -328,9 +347,7 @@ class DataLoader {
                 let newCount = 0;
                 data.records.forEach(r => {
                     const rawId = r.fields['Control Panel Name'] || "";
-                    // V9.9: REMOVE EXTENSION + PUNCTUATION
                     const id = rawId.replace(/[!?]/g, '').replace(/\.dwg$/i, '').trim();
-                    
                     if (!window.DB_IDS.has(id)) {
                         window.DB_IDS.add(id);
                         newCount++;
@@ -402,6 +419,10 @@ class UI {
         results.slice(0, 100).forEach(item => {
             const card = document.createElement('div'); card.className = 'record-card';
             const healed = TheHealer.healedData[item.id];
+            
+            // Check History using FeedbackService
+            const history = FeedbackService.getHistory(item.id);
+            
             let badges = '';
             
             if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
@@ -425,7 +446,7 @@ class UI {
                 badges += `<span class="hud-badge ${css}">${healed?.phase || criteria.phase}PH</span>`;
             }
 
-            card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
+            card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up ${history.up ? 'voted-up' : ''}" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down ${history.down ? 'voted-down' : ''}" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
             card.onclick = () => { document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view')); card.classList.add('active-view'); PdfController.load(item.id, item.pdfUrl); };
             area.appendChild(card);
         });
@@ -433,8 +454,69 @@ class UI {
     static populateDropdowns() { /* ... */ }
 }
 
-// ... Services (FeedbackService, AuthService, App) kept identical ...
-class FeedbackService { static history = {}; static activeId = null; static down(id) { this.activeId = id; this.history[id] = this.history[id] || { up: false, downReasons: new Set() }; document.querySelectorAll('.correction-input').forEach(i => i.value = ''); document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); if(this.history[id].downReasons) { this.history[id].downReasons.forEach(r => { const btn = document.querySelector(`.reason-btn[data-reason="${r}"]`); if(btn) btn.classList.add('locked'); }); } document.getElementById('feedback-modal').classList.add('active-modal'); } static async submit() { const id = this.activeId; const submissions = []; document.querySelectorAll('.reason-btn.selected').forEach(btn => { const reasonCode = btn.dataset.reason; const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); this.history[id].downReasons.add(reasonCode); } }); if(submissions.length === 0) return alert("Select a reason and enter a value."); for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } alert("Votes Recorded. Thank you."); const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); this.close(); } static async sendToAirtable(panelId, param, value) { await fetch(`https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${AT_FEEDBACK_TABLE}`, { method: 'POST', headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ "fields": { "Panel ID": panelId, "Parameter": param, "Suggested Value": value } }) }); } static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } static up(id) { alert("Liked!"); } }
+class FeedbackService { 
+    static activeId = null; 
+    
+    // V10: PERSISTENT HISTORY (Local Storage)
+    static getHistory(id) {
+        const stored = localStorage.getItem('cox_vote_' + id);
+        return stored ? JSON.parse(stored) : { up: false, down: false };
+    }
+    
+    static saveHistory(id, type) {
+        const current = this.getHistory(id);
+        current[type] = true;
+        localStorage.setItem('cox_vote_' + id, JSON.stringify(current));
+    }
+
+    static down(id) { 
+        if(this.getHistory(id).down) return; // Prevent double vote
+        this.activeId = id; 
+        document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
+        document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); 
+        document.getElementById('feedback-modal').classList.add('active-modal'); 
+    } 
+    
+    static async submit() { 
+        const id = this.activeId; 
+        const submissions = []; 
+        document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
+            const reasonCode = btn.dataset.reason; 
+            const input = btn.nextElementSibling; 
+            const value = input && input.classList.contains('correction-input') ? input.value : ""; 
+            if(value) { submissions.push({ id, reasonCode, value }); } 
+        }); 
+        
+        if(submissions.length === 0) return alert("Select a reason and enter a value."); 
+        
+        for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } 
+        
+        this.saveHistory(id, 'down'); // Save Local
+        alert("Votes Recorded. Thank you."); 
+        
+        // Visual Update
+        const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); 
+        if(cardBtn) cardBtn.classList.add('voted-down'); 
+        
+        this.close(); 
+    } 
+    
+    static async sendToAirtable(panelId, param, value) { 
+        await fetch(`https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${AT_FEEDBACK_TABLE}`, { method: 'POST', headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ "fields": { "Panel ID": panelId, "Parameter": param, "Suggested Value": value } }) }); 
+    } 
+    
+    static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } 
+    static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
+    
+    static up(id) { 
+        if(this.getHistory(id).up) return; // Prevent spam
+        this.saveHistory(id, 'up');
+        this.sendToAirtable(id, "VERIFIED", "User confirmed match");
+        alert("Liked!"); 
+        event.target.classList.add('voted-up');
+    } 
+}
+
 class ConfigService { static reset() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } } }
 class AuthService { static init() { const session = JSON.parse(localStorage.getItem('cox_auth_session')); if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); this.checkAdmin(session.user); return true; } document.getElementById('auth-overlay').classList.add('active-modal'); return false; } static login() { const user = document.getElementById('auth-user').value; if(!user) return; localStorage.setItem('cox_auth_session', JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); } static logout() { localStorage.removeItem('cox_auth_session'); location.reload(); } static checkAdmin(user) { if(['admin', 'thomas', 'grilledcheezus'].some(a => user.toLowerCase().includes(a))) document.getElementById('settings-btn-wrapper').style.display = 'block'; } }
 class App { static init() { AuthService.init(); UI.populateDropdowns = function() { ['mfg', 'hp', 'volt', 'phase'].forEach(cat => { const sel = document.getElementById(cat+'Input'); if(!sel) return; const items = cat === 'mfg' ? Object.keys(AI_TRAINING_DATA.MANUFACTURERS) : AI_TRAINING_DATA.DATA[cat.toUpperCase()]; items.forEach(i => { const opt = document.createElement('option'); opt.value = i; opt.innerText = i; sel.appendChild(opt); }); }); }; UI.populateDropdowns(); DataLoader.preload(); } }
