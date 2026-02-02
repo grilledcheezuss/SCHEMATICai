@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v5.1 - Tiers & Parsing)</title>
+    <title>Cox Research | SCHEMATICai (v5.2 - Fixes)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -54,13 +54,18 @@
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 15px; }
 
+        /* HEADER FIXED v5.2 */
         header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
-        .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; }
+        .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; }
         .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
         .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.75rem; color: #b39ddb; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
-        .version-badge { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 6px 16px; border-radius: 20px; font-weight: 800; font-size: 13px; letter-spacing: 1px; margin-left: 20px; white-space: nowrap; }
-        .header-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+        
+        /* CENTERED VERSION BADGE */
+        .version-badge { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 6px 16px; border-radius: 20px; font-weight: 800; font-size: 13px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
+
+        .header-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; z-index: 2; }
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
+        .btn-bug { font-size: 14px; } 
 
         #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
         html.logged-in #app-container { display: flex !important; }
@@ -107,8 +112,10 @@
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
         .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
 
-        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
-        #pdf-viewer-frame { width: 100%; height: 100%; border: none; }
+        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
+        .pdf-fallback { display: none; text-align: center; }
+        .pdf-fallback a { display: inline-block; margin-top: 10px; color: #fff; text-decoration: underline; font-size: 14px; cursor: pointer; }
         
         @media (max-width: 900px) { #sidebar { width: 100%; } #preview-pane { display: none; } }
     </style>
@@ -128,8 +135,9 @@
         <span class="logo-main">COX</span>
         <span class="logo-sub">RESEARCH</span>
     </a>
-    <div class="version-badge">v5.1</div>
+    <div class="version-badge">SCHEMATICai v5.2</div>
     <div class="header-controls">
+        <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
     </div>
@@ -176,11 +184,15 @@
     <div id="preview-pane">
         <div id="pdf-placeholder-text">📄 Select a schematic to view</div>
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
+        <div id="pdf-fallback" class="pdf-fallback">
+            <div style="margin-bottom:10px;">⚠️ PDF Not Found (404)</div>
+            <a id="pdf-fallback-link" target="_blank">Try opening in new tab</a>
+        </div>
     </div>
 </div>
 
 <script>
-// --- SCHEMATICai v5.1 ---
+// --- SCHEMATICai v5.2 ---
 const STORAGE_KEYS = { SESSION: 'cox_auth_session' };
 const CONSTANTS = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
@@ -212,9 +224,17 @@ class PdfController {
     static load(id) {
         const frame = document.getElementById('pdf-viewer-frame');
         const place = document.getElementById('pdf-placeholder-text');
+        const fallback = document.getElementById('pdf-fallback');
+        const link = document.getElementById('pdf-fallback-link');
+
         place.style.display = 'none';
+        fallback.style.display = 'block'; // Show fallback controls
         frame.style.display = 'block';
-        frame.src = `${id}.pdf`; 
+        
+        const path = `${id}.pdf`;
+        frame.src = path; 
+        link.href = path; // Allow user to try direct link
+        link.innerText = `Open ${id}.pdf in new tab`;
     }
 }
 
@@ -223,7 +243,7 @@ class FeedbackService {
     static selectedReasons = new Set();
     static up(id) { alert(`Recorded: Thumbs UP for CP-${id}`); }
     static down(id) { 
-        this.activeId = id; 
+        this.activeId = id || "General"; 
         this.selectedReasons.clear();
         document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected'));
         document.getElementById('feedback-modal').classList.add('active-modal');
@@ -233,7 +253,7 @@ class FeedbackService {
         if(this.selectedReasons.has(reason)) this.selectedReasons.delete(reason); else this.selectedReasons.add(reason);
     }
     static submit() {
-        alert(`Feedback Sent for CP-${this.activeId}: ${Array.from(this.selectedReasons).join(', ') || "Issue"}`);
+        alert(`Feedback Sent for CP-${this.activeId}: ${Array.from(this.selectedReasons).join(', ') || "Issue Report"}`);
         this.close();
     }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
@@ -295,35 +315,37 @@ class SearchEngine {
                 else if (recVolt.includes(searchVolt)) { matchData.volt = 'varied'; variedCount++; }
                 else isFail = true;
             }
+            
+            // Phase Logic (Strict)
+            if (c.phase) {
+                totalFilters++;
+                // FIX: Ensure both are strings for comparison
+                const recPhase = String(rec.phase || "");
+                const searchPhase = String(c.phase);
+                if (recPhase === searchPhase) { matchData.phase = 'exact'; exactCount++; }
+                else if (recPhase.includes(searchPhase)) { matchData.phase = 'varied'; variedCount++; }
+                else isFail = true;
+            }
+
             if (c.kw) {
-                // KW is a "soft" filter, doesn't count towards tiers as strictly
                 const allText = (rec.keys + " " + rec.mfg + " " + rec.id).toUpperCase();
                 if (!allText.includes(c.kw.toUpperCase())) isFail = true;
             }
 
             if (!isFail) {
-                // CALCULATE TIER PRIORITY (Lower is better)
-                let tier = 3; // Default (Messy match)
-                
-                if (exactCount === totalFilters && totalFilters > 0) {
-                    tier = 0; // TIER 1: Perfect Exact Match
-                } else if (c.hp && matchData.hp === 'varied' && variedCount === 1) {
-                    tier = 1; // TIER 2: Only HP is varied (Special Request)
-                } else if (variedCount === 1) {
-                    tier = 2; // TIER 3: Single varied field
-                } 
-                // else Tier 3 (Multiple varied)
+                // Tier Logic
+                let tier = 3; 
+                if (exactCount === totalFilters && totalFilters > 0) tier = 0; 
+                else if (c.hp && matchData.hp === 'varied' && variedCount === 1) tier = 1; 
+                else if (variedCount === 1) tier = 2; 
 
                 matches.push({ rec, matchData, tier });
             }
         });
 
-        // SORTING LOGIC:
-        // 1. Tier (Ascending) -> 0 is top
-        // 2. ID (Descending) -> Newest first
         return matches.sort((a, b) => {
-            if (a.tier !== b.tier) return a.tier - b.tier;
-            return parseInt(b.rec.id) - parseInt(a.rec.id);
+            if (a.tier !== b.tier) return a.tier - b.tier; // Priority 1: Match Quality
+            return parseInt(b.rec.id) - parseInt(a.rec.id); // Priority 2: Newest First
         });
     }
 }
@@ -337,14 +359,13 @@ class UI {
         document.getElementById('results-area').innerHTML=''; 
     }
     
-    // NEW CLEANER: Parses messy DB strings into clean names
     static cleanMfg(raw) {
         if(!raw) return "";
         const r = raw.toUpperCase();
         for(const [k, v] of Object.entries(CONSTANTS.MANUFACTURERS)) {
             if(r.includes(k.toUpperCase()) || v.some(x => r.includes(x.toUpperCase()))) return k.toUpperCase();
         }
-        return raw; // Fallback
+        return raw;
     }
 
     static renderResults(results, criteria) { 
@@ -358,14 +379,14 @@ class UI {
             const card = document.createElement('div');
             card.className = 'record-card';
             
-            // Clean the manufacturer name for display
             const displayMfg = UI.cleanMfg(rec.mfg);
-
             let badges = '';
-            if(criteria.mfg && meta.mfg) badges += `<span class="hud-badge match-${meta.mfg}">${displayMfg}</span>`;
-            if(criteria.hp && meta.hp) badges += `<span class="hud-badge match-${meta.hp}">${rec.hp} HP</span>`;
-            if(criteria.volt && meta.volt) badges += `<span class="hud-badge match-${meta.volt}">${rec.volt}V</span>`;
-            if(criteria.phase && rec.phase && String(rec.phase).includes(criteria.phase)) badges += `<span class="hud-badge match-exact">${rec.phase}PH</span>`;
+
+            // FIXED LOGIC: Always show badge if data exists. Color it if it matches.
+            if(rec.mfg) badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg}</span>`;
+            if(rec.hp) badges += `<span class="hud-badge ${meta.hp ? 'match-'+meta.hp : ''}">${rec.hp} HP</span>`;
+            if(rec.volt) badges += `<span class="hud-badge ${meta.volt ? 'match-'+meta.volt : ''}">${rec.volt}V</span>`;
+            if(rec.phase) badges += `<span class="hud-badge ${meta.phase ? 'match-'+meta.phase : ''}">${rec.phase}PH</span>`;
 
             card.innerHTML = `
                 <div class="card-header">
