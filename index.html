@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v5.9 - Deep Clean)</title>
+    <title>Cox Research | SCHEMATICai (v5.9 - Logic Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -234,11 +234,11 @@ class PdfController {
         fallback.style.display = 'block'; 
         frame.style.display = 'block';
         
-        const path = `${id}.pdf`;
+        const path = `/${id}.pdf`; // FORCE ROOT PATH
         frame.src = path; 
         link.href = path; 
         link.innerText = `Open ${id}.pdf in new tab`;
-        debug.innerText = `Looking for: /${id}.pdf`;
+        debug.innerText = `Looking for: ${path}`;
     }
 }
 
@@ -297,65 +297,66 @@ class SearchEngine {
             let exactCount = 0;
             let totalFilters = 0;
             
-            // SMART SCRAPER: Returns 'exact', 'varied', or 'fail'
-            const checkField = (dbVal, searchVal, patterns, strictConflict) => {
+            // SMART CHECKER
+            const checkField = (dbVal, searchVal, patterns) => {
                 const s = String(searchVal || "").toUpperCase();
                 const d = String(dbVal || "").toUpperCase();
                 const desc = (rec.keys || "").toUpperCase();
                 
-                // 1. Conflict Check (Primary Identity)
-                // If we searched "BARNES" but DB says "GORMAN", kill it.
-                if (strictConflict && d !== "" && !d.includes(s)) return 'conflict';
-
-                // 2. Direct Match
                 if (d === s) return 'exact';
                 if (d.includes(s) && d !== "") return 'varied';
-                
-                // 3. Description Scraper (Only if DB field is EMPTY)
                 if (d === "") {
+                    // Smart Regex Fallback for Empty Columns
                     if (patterns.some(p => desc.includes(p.toUpperCase()))) return 'exact';
                 }
                 return 'fail';
             };
 
-            // 1. MFG (Conflict Mode ON)
-            if (c.mfg) {
+            // 1. MFG - CONFLICT FIX
+            if (c.mfg && c.mfg !== "Any") {
                 totalFilters++;
-                const res = checkField(rec.mfg, c.mfg, [c.mfg], true); 
-                if (res === 'conflict') isFail = true;
-                else if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
-                else isFail = true; 
+                const s = c.mfg.toUpperCase();
+                const d = (rec.mfg || "").toUpperCase();
+                // HARD FAIL: DB has data AND data != search
+                if (d !== "" && !d.includes(s)) {
+                    isFail = true; 
+                } else {
+                    const res = checkField(rec.mfg, c.mfg, [c.mfg]);
+                    if (res !== 'fail') { matchData.mfg = res; if(res==='exact') exactCount++; else variedCount++; }
+                    else isFail = true; 
+                }
             }
 
-            // 2. HP (Scraper ON)
-            if (c.hp) {
+            // 2. HP
+            if (c.hp && c.hp !== "Any") {
                 totalFilters++;
-                const res = checkField(rec.hp, c.hp, [c.hp+"HP", c.hp+" HP", c.hp+"-HP"], false);
+                const res = checkField(rec.hp, c.hp, [c.hp+"HP", c.hp+" HP", c.hp+"-HP"]);
                 if (res !== 'fail') { matchData.hp = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
 
-            // 3. Volt (Scraper ON)
-            if (c.volt) {
+            // 3. Volt
+            if (c.volt && c.volt !== "Any") {
                 totalFilters++;
-                const res = checkField(rec.volt, c.volt, [c.volt+"V", c.volt+" V", c.volt+"VOLT"], false);
+                const res = checkField(rec.volt, c.volt, [c.volt+"V", c.volt+" V", c.volt+"VOLT"]);
                 if (res !== 'fail') { matchData.volt = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
 
-            // 4. Phase (Synonym + Scraper ON)
-            if (c.phase) {
+            // 4. Phase - SYNONYM FIX
+            if (c.phase && c.phase !== "Any") {
                 totalFilters++;
                 const s = String(c.phase);
                 let patterns = [s+"PH", s+"-PH", s+" PHASE"];
                 if (s === "1") patterns.push("SINGLE PHASE", "SINGLE-PHASE", "1-PHASE");
                 if (s === "3") patterns.push("THREE PHASE", "THREE-PHASE", "3-PHASE");
 
-                const res = checkField(rec.phase, c.phase, patterns, false);
+                const res = checkField(rec.phase, c.phase, patterns);
                 if (res !== 'fail') { matchData.phase = res; if(res==='exact') exactCount++; else variedCount++; }
                 else isFail = true;
             }
 
+            // 5. Keywords
             if (c.kw) {
                 const allText = (rec.keys + " " + rec.mfg + " " + rec.id).toUpperCase();
                 if (!allText.includes(c.kw.toUpperCase())) isFail = true;
@@ -410,7 +411,7 @@ class UI {
             const displayMfg = UI.cleanMfg(rec.mfg);
             let badges = '';
 
-            // STRICT VISIBILITY FIXED (v5.9): Check for string 'Any' or empty
+            // BADGE GENERATION: Only show if criteria is NOT 'Any'
             if(criteria.mfg && criteria.mfg !== "Any") {
                 badges += `<span class="hud-badge ${meta.mfg ? 'match-'+meta.mfg : ''}">${displayMfg || "Unknown Mfg"}</span>`;
             }
