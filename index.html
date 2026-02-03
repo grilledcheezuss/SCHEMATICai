@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.3)</title>
+    <title>Cox Research | SCHEMATICai (v19.4)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -182,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.3</div>
+    <div class="version-badge">SCHEMATICai v19.4</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -243,16 +243,16 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.3 (INDEXEDDB V2 UPGRADE FORCE) ---
+// --- SCHEMATICai v19.4 (FIXED VERSION CONFLICT - DB V7) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- 1. INDEXEDDB HELPER (V2 UPGRADE) ---
+// --- 1. INDEXEDDB HELPER (V7 - HIGHER THAN 6) ---
 class DB {
     static open() {
         return new Promise((resolve, reject) => {
-            // BUMP VERSION TO 2 TO FORCE UPGRADE
-            const req = indexedDB.open("CoxSchematicDB", 2); 
+            // SET TO VERSION 7 TO FORCE UPGRADE FROM 6
+            const req = indexedDB.open("CoxSchematicDB", 7); 
             req.onupgradeneeded = e => {
                 const db = e.target.result;
                 // Wipe if exists to be safe
@@ -260,7 +260,7 @@ class DB {
                 db.createObjectStore("cache");
             };
             req.onsuccess = e => resolve(e.target.result);
-            req.onerror = e => reject(e.target.error); // Log actual error object
+            req.onerror = e => reject(e.target.error); 
         });
     }
     static async put(key, value) {
@@ -284,16 +284,15 @@ class DB {
                 req.onerror = e => reject(e.target.error);
             });
         } catch(e) { 
-            console.warn("IDB Get Failed (DB Missing?)", e); 
+            console.warn("IDB Get Failed", e); 
             return null; 
         }
     }
     static async clear() {
-        // Nuke it from orbit
         return new Promise((resolve) => {
             const req = indexedDB.deleteDatabase("CoxSchematicDB");
             req.onsuccess = () => resolve();
-            req.onerror = () => resolve(); // proceed anyway
+            req.onerror = () => resolve(); 
         });
     }
 }
@@ -581,7 +580,6 @@ class DataLoader {
             savedSelections[id] = document.getElementById(id+'Input').value;
         });
 
-        // 1. TRY CACHE (INSTANT)
         const password = localStorage.getItem('cox_pass');
         const cached = await CacheService.load(password);
         if(cached) {
@@ -599,14 +597,12 @@ class DataLoader {
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
         
-        // 2. SAVE NEW CACHE (ENCRYPTED) - USING IDB NOW
         await CacheService.save({
             data: window.LOCAL_DB,
             ids: Array.from(window.DB_IDS),
             mfgs: Array.from(window.FOUND_MFGS)
         }, password);
         
-        // FLASH SUCCESS
         if(btn) {
             const originalText = "SEARCH";
             btn.innerText = "✅ CACHE SAVED";
