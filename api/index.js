@@ -1,9 +1,12 @@
-// api/[route].js
+// api/index.js
 export default async function handler(req, res) {
-    // 1. Vercel automatically puts the URL path into req.query.route
-    // Example: /api/Feedback -> req.query.route = "Feedback"
-    const { route } = req.query;
-    const table = route; 
+    // 1. Manually parse the URL to get the Table Name
+    // Request URL: /api/TableName?param=value
+    const { url } = req;
+    const urlParts = url.split('?')[0].split('/'); // Split by "/"
+    // urlParts = ["", "api", "Feedback"]
+    const table = decodeURIComponent(urlParts[2]); // Get the 3rd part
+    
     const method = req.method;
 
     // 🔒 SECURITY CONFIGURATION
@@ -32,13 +35,9 @@ export default async function handler(req, res) {
     }
 
     // 3. Construct Airtable URL
-    // We filter out the 'route' parameter so we don't send it to Airtable
-    const queryParams = new URLSearchParams();
-    for (const [key, value] of Object.entries(req.query)) {
-        if (key !== 'route') queryParams.append(key, value);
-    }
-
-    const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryParams.toString()}`;
+    // We grab the query string manually
+    const queryString = url.split('?')[1] || '';
+    const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryString}`;
 
     // 4. Forward Request
     try {
