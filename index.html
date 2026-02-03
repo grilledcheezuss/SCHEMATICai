@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v16.1)</title>
+    <title>Cox Research | SCHEMATICai (v16.2)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
     <style>
-        /* --- 1. COLOR SYSTEM (Smart Dark Mode) --- */
+        /* --- 1. COLOR SYSTEM --- */
         :root { 
-            /* LIGHT MODE */
             --app-primary: #461D7C;
             --app-accent: #461D7C;
             --bg-app: #e3e5e8; 
@@ -36,7 +35,6 @@
         }
 
         body.dark-mode {
-            /* DARK MODE (Neon Lavender) */
             --app-primary: #A78BFA;
             --app-accent: #8B5CF6;
             --bg-app: #0F0F0F;
@@ -68,13 +66,18 @@
         .header-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; z-index: 2; }
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
 
-        /* --- LAYOUT --- */
+        /* --- MAIN LAYOUT (RESTORED) --- */
         #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); position: relative; }
         html.logged-in #app-container { display: flex !important; }
         
+        /* SIDEBAR (Left) */
         #sidebar { width: 420px; min-width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
         .sidebar-controls { padding: 15px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px; }
         
+        /* PREVIEW (Right) */
+        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        
+        /* FILTERS */
         .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .input-group { display: flex; flex-direction: column; gap: 2px; }
         .input-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
@@ -102,30 +105,42 @@
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
-        /* LOCKED STATE (Voted Up) */
+        /* LOCKED STATE */
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
-        /* LOCKED STATE (Voted Down) */
         .thumb-btn.voted-down { background: #fee2e2 !important; border-color: #991b1b !important; color: #991b1b !important; opacity: 1 !important; pointer-events: none; }
 
-        /* PREVIEW & MOBILE */
-        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        /* PDF VIEWER */
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
         .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; }
         
         #mobile-back-btn { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--app-accent); color: white; padding: 12px 24px; border-radius: 30px; border: none; font-weight: 800; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; cursor: pointer; }
 
-        /* RESPONSIVE */
+        /* RESPONSIVE LOGIC */
+        /* TABLET */
         @media (min-width: 768px) and (max-width: 1024px) {
             #sidebar { width: 300px; min-width: 300px; } 
             .logo-main { font-size: 1.8rem; }
         }
+        
+        /* MOBILE */
         @media (max-width: 767px) {
             .version-badge { display: none; } 
             .header-controls { gap: 6px; }
-            #sidebar { width: 100%; position: absolute; height: 100%; z-index: 20; transform: translateX(0); }
-            #preview-pane { position: absolute; width: 100%; height: 100%; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-            body.viewing-pdf #sidebar { transform: translateX(-100%); }
-            body.viewing-pdf #preview-pane { z-index: 30; opacity: 1; pointer-events: auto; }
+            
+            /* Sidebar is base layer */
+            #sidebar { width: 100%; height: 100%; border-right: none; }
+            
+            /* Preview floats on top, hidden by default */
+            #preview-pane { 
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+                z-index: 100; opacity: 0; pointer-events: none; 
+                transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            }
+            
+            /* ACTIVE STATE (Slide In) */
+            body.viewing-pdf #preview-pane { 
+                opacity: 1; pointer-events: auto; transform: translateX(0); 
+            }
             body.viewing-pdf #mobile-back-btn { display: block; }
         }
 
@@ -146,16 +161,6 @@
     </style>
 </head>
 <body>
-
-<div id="preview-pane">
-    <div id="pdf-placeholder-text">📄 Select a schematic</div>
-    <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
-    <div id="pdf-fallback" class="pdf-fallback">
-        <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
-        <a id="pdf-fallback-link" target="_blank">Open File</a>
-    </div>
-    <button id="mobile-back-btn" onclick="UI.closeMobilePreview()">← BACK TO RESULTS</button>
-</div>
 
 <div id="auth-overlay" class="active-modal">
     <div class="auth-card">
@@ -184,7 +189,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v16.1</div>
+    <div class="version-badge">SCHEMATICai v16.2</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -223,10 +228,20 @@
         </div>
         <div id="results-scroll-area"><div id="results-area"></div></div>
     </div>
+    
+    <div id="preview-pane">
+        <div id="pdf-placeholder-text">📄 Select a schematic</div>
+        <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
+        <div id="pdf-fallback" class="pdf-fallback">
+            <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
+            <a id="pdf-fallback-link" target="_blank">Open File</a>
+        </div>
+        <button id="mobile-back-btn" onclick="UI.closeMobilePreview()">← BACK TO RESULTS</button>
+    </div>
 </div>
 
 <script>
-// --- SCHEMATICai v16.1 (FIXED VOTING LOCKOUT) ---
+// --- SCHEMATICai v16.2 (UI LAYOUT FIX) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -286,17 +301,14 @@ class FeedbackService {
         }); 
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
         this.saveHistory(id, 'down'); 
-        this.sessionVotes.add(id + '_down'); // Lock session
+        this.sessionVotes.add(id + '_down'); 
         alert("Votes Recorded."); this.close(); 
     } 
     
     static async up(id, btnElement) { 
-        if(this.sessionVotes.has(id)) return; // Logic Lock
-        this.sessionVotes.add(id); // Lock Session
-        
-        // Visual Lock (Immediate)
+        if(this.sessionVotes.has(id)) return; 
+        this.sessionVotes.add(id); 
         if(btnElement) btnElement.classList.add('voted-up');
-
         await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
         alert("Liked!"); 
     } 
@@ -418,7 +430,7 @@ class UI {
         results.slice(0, 50).forEach(item => {
             const healed = TheHealer.healedData[item.id];
             
-            // CHECK VOTING STATUS FOR UI
+            // UI VOTING STATUS
             const isVotedUp = FeedbackService.sessionVotes.has(item.id);
             const isVotedDown = FeedbackService.sessionVotes.has(item.id + '_down');
             
