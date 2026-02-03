@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.2 - Contextual Voting)</title>
+    <title>Cox Research | SCHEMATICai (v10.3 - Keyword Tagging)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -33,6 +33,7 @@
             
             --match-exact-bg: #dcfce7; --match-exact-text: #166534; 
             --match-varied-bg: #ffedd5; --match-varied-text: #9a3412;
+            --match-keyword-bg: #f3e8ff; --match-keyword-text: #6b21a8; /* Purple for Keywords */
             --badge-info-bg: #f3f4f6; --badge-info-text: #6b7280;
             --badge-healed-bg: #dbeafe; --badge-healed-text: #1e40af;
             
@@ -50,6 +51,7 @@
             
             --match-exact-bg: #14532d; --match-exact-text: #86efac; 
             --match-varied-bg: #7c2d12; --match-varied-text: #fdba74;
+            --match-keyword-bg: #581c87; --match-keyword-text: #d8b4fe;
             --badge-info-bg: #374151; --badge-info-text: #9ca3af;
             --badge-healed-bg: #1e3a8a; --badge-healed-text: #93c5fd;
             color-scheme: dark;            
@@ -100,6 +102,7 @@
         .hud-badge.match-exact { background: var(--match-exact-bg); color: var(--match-exact-text); border-color: var(--match-exact-border); }
         .hud-badge.match-varied { background: var(--match-varied-bg); color: var(--match-varied-text); border-color: transparent; }
         .hud-badge.match-healed { background: var(--badge-healed-bg); color: var(--badge-healed-text); border-color: transparent; }
+        .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); border-color: transparent; }
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
@@ -154,9 +157,7 @@
 <div id="config-modal">
     <div class="config-card">
         <h3 style="margin-top:0; color:var(--app-primary);">🛠️ Admin Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">
-            Status: <span id="db-status-text">Idle</span>
-        </p>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Status: <span id="db-status-text">Idle</span></p>
         <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="DataLoader.harvestCSV()">📥 Harvest Golden CSV</button>
         <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Clear Cache</button>
         <div style="margin-top:10px;"><button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
@@ -164,15 +165,10 @@
 </div>
 
 <header>
-    <a href="#" class="logo-group">
-        <span class="logo-main">COX</span>
-        <span class="logo-sub">RESEARCH</span>
-    </a>
-    <div class="version-badge">SCHEMATICai v10.2</div>
+    <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
+    <div class="version-badge">SCHEMATICai v10.3</div>
     <div class="header-controls">
-        <div id="settings-btn-wrapper">
-            <button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
-        </div>
+        <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
         <button class="control-btn" onclick="AuthService.logout()">⏻</button>
@@ -181,16 +177,16 @@
 
 <div id="feedback-modal">
     <div class="modal-card">
-        <div class="modal-header">
-            <span>Report Inaccuracy</span>
-            <button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button>
-        </div>
+        <div class="modal-header"><span>Report Inaccuracy</span><button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button></div>
         <div class="modal-content">
             <p style="font-size:12px; color:#666; margin-top:0;">Select parameter and enter correct value:</p>
             <div class="reason-row"><div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
             <div class="reason-row"><div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
             <div class="reason-row"><div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
             <div class="reason-row"><div class="reason-btn" data-reason="phase" onclick="FeedbackService.toggleReason(this)">Wrong Phase</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
+            
+            <div id="dynamic-feedback-container"></div>
+
             <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
         </div>
     </div>
@@ -225,7 +221,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.2 (CONTEXTUAL VOTING) ---
+// --- SCHEMATICai v10.3 (KEYWORD TAGGING) ---
 
 class PdfController {
     static load(id, url) {
@@ -352,23 +348,33 @@ class DataLoader {
 }
 
 class SearchEngine {
+    static currentPhrases = []; // V10.3
+
     static perform() {
         if(window.LOCAL_DB.length === 0) return;
-        
-        // V10.2: RESET SESSION VOTES ON SEARCH
         FeedbackService.resetSession();
         
-        const kw = document.getElementById('keywordInput').value.trim().toUpperCase();
+        const kwInput = document.getElementById('keywordInput').value;
         const mfg = document.getElementById('mfgInput').value;
         const hp = document.getElementById('hpInput').value;
         const volt = document.getElementById('voltInput').value;
         const phase = document.getElementById('phaseInput').value;
 
-        if(!kw && mfg==="Any" && hp==="Any" && volt==="Any" && phase==="Any") { alert("Enter search criteria."); return; }
+        // V10.3: Comma separated phrases logic
+        this.currentPhrases = kwInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+        if(this.currentPhrases.length === 0 && mfg==="Any" && hp==="Any" && volt==="Any" && phase==="Any") { alert("Enter search criteria."); return; }
 
         let results = window.LOCAL_DB.filter((rec) => {
             let pass = true;
-            if(kw && !((rec.id + " " + rec.desc).toUpperCase().includes(kw))) pass = false;
+            
+            // Check ALL phrases
+            if(this.currentPhrases.length > 0) {
+                const combinedText = (rec.id + " " + rec.desc).toUpperCase();
+                const allPhrasesMatch = this.currentPhrases.every(p => combinedText.includes(p.toUpperCase()));
+                if(!allPhrasesMatch) pass = false;
+            }
+            
             if(pass && mfg !== "Any") { if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; else if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; }
             if(pass && volt !== "Any") { if(rec.volt && !rec.volt.includes(String(volt))) pass = false; else if(!rec.volt && !rec.desc.includes(String(volt))) pass = false; }
             if(pass && phase !== "Any") { if(rec.phase && rec.phase !== String(phase)) pass = false; else if(!rec.phase && !rec.desc.includes(String(phase))) pass = false; }
@@ -393,7 +399,7 @@ class SearchEngine {
             results.sort((a, b) => b.id.localeCompare(a.id));
         }
 
-        UI.renderResults(results, { mfg, hp, volt, phase });
+        UI.renderResults(results, { mfg, hp, volt, phase }, this.currentPhrases);
     }
 }
 
@@ -402,7 +408,7 @@ class UI {
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.getElementById('keywordInput').value=''; document.querySelectorAll('select').forEach(s => s.value = "Any"); document.getElementById('results-area').innerHTML=''; }
     
-    static renderResults(results, criteria) { 
+    static renderResults(results, criteria, phrases) { 
         const area = document.getElementById('results-area'); area.innerHTML = ''; 
         area.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;padding:0 5px;">Found ${results.length} records</div>`;
         if (results.length === 0) { area.innerHTML += '<div style="padding:20px;text-align:center;opacity:0.5;">No results found.</div>'; return; }
@@ -410,12 +416,15 @@ class UI {
         results.slice(0, 100).forEach(item => {
             const card = document.createElement('div'); card.className = 'record-card';
             const healed = TheHealer.healedData[item.id];
-            
-            // Check Session Vote
             const isVoted = FeedbackService.sessionVotes.has(item.id);
-            const history = FeedbackService.getHistory(item.id); // Only downvotes are persistent now
+            const history = FeedbackService.getHistory(item.id);
             
             let badges = '';
+            
+            // V10.3: Render Keyword Badges
+            phrases.forEach(p => {
+                badges += `<span class="hud-badge match-keyword">KW: ${p.toUpperCase()}</span>`;
+            });
             
             if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
             
@@ -448,41 +457,56 @@ class UI {
 
 class FeedbackService { 
     static activeId = null; 
-    static sessionVotes = new Set(); // V10.2: Reset on search
-    
+    static sessionVotes = new Set();
     static resetSession() { this.sessionVotes.clear(); }
-    
     static getHistory(id) { const stored = localStorage.getItem('cox_vote_' + id); return stored ? JSON.parse(stored) : { up: false, down: false }; }
-    static saveHistory(id, type) { 
-        const current = this.getHistory(id); 
-        current[type] = true; 
-        localStorage.setItem('cox_vote_' + id, JSON.stringify(current)); 
-    }
+    static saveHistory(id, type) { const current = this.getHistory(id); current[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(current)); }
 
     static down(id) { 
         if(this.getHistory(id).down) return;
         this.activeId = id; 
         document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
         document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); 
+        
+        // V10.3: Dynamically Add Keyword Reasons
+        const container = document.getElementById('dynamic-feedback-container');
+        container.innerHTML = '';
+        SearchEngine.currentPhrases.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'reason-row';
+            div.innerHTML = `<div class="reason-btn" data-reason="kw_reject" data-kw="${p}" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch: "${p}"</div>`;
+            container.appendChild(div);
+        });
+
         document.getElementById('feedback-modal').classList.add('active-modal'); 
     } 
     
     static async submit() { 
         const id = this.activeId; 
         const submissions = []; 
-        document.querySelectorAll('.reason-btn.selected').forEach(btn => { const reasonCode = btn.dataset.reason; const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }); 
+        document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
+            const reasonCode = btn.dataset.reason; 
+            
+            // Check for keyword reject
+            if(reasonCode === 'kw_reject') {
+                submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw });
+            } else {
+                const input = btn.nextElementSibling; 
+                const value = input && input.classList.contains('correction-input') ? input.value : ""; 
+                if(value) { submissions.push({ id, reasonCode, value }); } 
+            }
+        }); 
+        
         if(submissions.length === 0) return alert("Select a reason and enter a value."); 
         for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } 
-        
-        this.saveHistory(id, 'down'); // Persist down
+        this.saveHistory(id, 'down');
         alert("Votes Recorded. Thank you."); 
         const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); 
         this.close(); 
     } 
     
-    // V10.2: CONTEXTUAL UPVOTING
     static async up(id) { 
-        if(this.sessionVotes.has(id)) return; // Anti-Spam (Current View Only)
+        if(this.sessionVotes.has(id)) return;
         this.sessionVotes.add(id);
         
         let votesCast = 0;
@@ -494,11 +518,14 @@ class FeedbackService {
         };
 
         for(const [param, val] of Object.entries(criteria)) {
-            if(val !== "Any" && val !== "") {
-                await this.sendToAirtable(id, param, val);
-                votesCast++;
-            }
+            if(val !== "Any" && val !== "") { await this.sendToAirtable(id, param, val); votesCast++; }
         }
+        
+        // V10.3: Vote for Keywords too!
+        SearchEngine.currentPhrases.forEach(p => {
+             this.sendToAirtable(id, 'kw_confirm', p);
+             votesCast++;
+        });
 
         if(votesCast === 0) await this.sendToAirtable(id, "VERIFIED", "General Match"); 
 
