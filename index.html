@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v18.7)</title>
+    <title>Cox Research | SCHEMATICai (v18.8)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -182,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v18.7</div>
+    <div class="version-badge">SCHEMATICai v18.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -243,7 +243,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v18.7 (FIXED DROPDOWNS & FORGIVENESS RANKING) ---
+// --- SCHEMATICai v18.8 (FIXED DROPDOWNS & SEEDED LIST) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -254,7 +254,7 @@ class AuthService {
         if (user && pass) {
             document.documentElement.classList.add('logged-in');
             document.getElementById('auth-overlay').classList.remove('active-modal');
-            UI.populateStaticDropdowns(); // FIX: POPULATE IMMEDIATELY
+            UI.populateAllDropdowns(); // IMMEDIATE POPULATION
             return true;
         }
         return false;
@@ -411,7 +411,6 @@ class AIParser {
         };
         const t = (text || "").toUpperCase();
         
-        // CONTEXT MFG
         const mfgMatch = t.match(/(?:Pump|Motor)\s*(?:Mfg|Manufacturer)[:\s._-]*([A-Z0-9]+)/i);
         if(mfgMatch) {
             const foundName = mfgMatch[1].replace(/_/g, '').trim();
@@ -454,7 +453,7 @@ class DataLoader {
         const btn = document.getElementById('searchBtn'); btn.innerText = "LOADING..."; btn.disabled = true;
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc');
-        UI.populateMfgDropdown(); 
+        UI.populateAllDropdowns(); // UPDATE DYNAMIC
         btn.innerText = "SEARCH"; btn.disabled = false;
     }
     static async fetchPartition(dir) {
@@ -678,23 +677,35 @@ class UI {
         });
     }
     
-    // FIX: STATIC POPULATION
-    static populateStaticDropdowns() {
-        const types = { enc: AI_TRAINING_DATA.ENCLOSURES };
+    // FIX: UNIFIED POPULATOR
+    static populateAllDropdowns() {
+        const encs = AI_TRAINING_DATA.ENCLOSURES;
+        
+        // MFG: Seed Static + Add Dynamic
+        const mfgSelect = document.getElementById('mfgInput');
+        // Get Static Keys
+        let allMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS).map(k => k.toUpperCase());
+        // Merge with Found Dynamic
+        window.FOUND_MFGS.forEach(m => {
+            if(!allMfgs.includes(m)) allMfgs.push(m);
+        });
+        allMfgs.sort();
+        
+        mfgSelect.innerHTML = '<option value="Any">Any</option>';
+        allMfgs.forEach(m => { 
+            const o = document.createElement('option'); o.value=m; o.innerText=m; mfgSelect.appendChild(o); 
+        });
+
+        // OTHER STATIC DROPDOWNS
         ['hp','volt','phase','enc'].forEach(c => {
             const s = document.getElementById(c+'Input');
             if(!s) return;
-            const data = (c==='enc') ? Object.keys(types.enc) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
-            s.innerHTML = '<option value="Any">Any</option>';
-            if(data) data.forEach(i => { const o = document.createElement('option'); o.value=i; o.innerText=i; s.appendChild(o); });
+            if(c !== 'mfg') {
+                const data = (c==='enc') ? Object.keys(encs) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
+                s.innerHTML = '<option value="Any">Any</option>';
+                data.forEach(i => { const o = document.createElement('option'); o.value=i; o.innerText=i; s.appendChild(o); });
+            }
         });
-    }
-    
-    static populateMfgDropdown() {
-        const mfgSelect = document.getElementById('mfgInput');
-        mfgSelect.innerHTML = '<option value="Any">Any</option>';
-        const sortedMfgs = Array.from(window.FOUND_MFGS).sort();
-        sortedMfgs.forEach(m => { const o = document.createElement('option'); o.value=m; o.innerText=m; mfgSelect.appendChild(o); });
     }
 }
 
