@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v16.4)</title>
+    <title>Cox Research | SCHEMATICai (v16.6)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -28,6 +28,7 @@
             --match-varied-bg: #ffedd5; --match-varied-text: #9a3412;
             --match-keyword-bg: #f3e8ff; --match-keyword-text: #6b21a8;
             --badge-healed-bg: #dbeafe; --badge-healed-text: #1e40af;
+            --badge-gray-bg: #f3f4f6; --badge-gray-text: #4b5563;
             
             --header-height: 80px; 
             --input-height: 48px;
@@ -51,6 +52,7 @@
             --match-varied-bg: #7C2D12; --match-varied-text: #FDBA74;
             --match-keyword-bg: #4C1D95; --match-keyword-text: #C4B5FD;
             --badge-healed-bg: #1E3A8A; --badge-healed-text: #93C5FD;
+            --badge-gray-bg: #27272a; --badge-gray-text: #9ca3af;
             color-scheme: dark;            
         }
         
@@ -75,7 +77,10 @@
         
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         
+        /* FILTERS */
         .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .input-group.full-width { grid-column: span 2; }
+        
         .input-group { display: flex; flex-direction: column; gap: 2px; }
         .input-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
         .cox-input { width: 100%; height: var(--input-height); padding: 0 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; background: var(--bg-input); color: var(--text-primary); outline: none; }
@@ -98,10 +103,10 @@
         .hud-badge.match-varied { background: var(--match-varied-bg); color: var(--match-varied-text); }
         .hud-badge.match-healed { background: var(--badge-healed-bg); color: var(--badge-healed-text); }
         .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); }
+        .hud-badge.match-gray { background: var(--badge-gray-bg); color: var(--badge-gray-text); border: 1px solid var(--border-color); }
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
-        /* LOCKED STATE (Positive only) */
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
         
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
@@ -166,7 +171,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v16.4</div>
+    <div class="version-badge">SCHEMATICai v16.6</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -181,8 +186,8 @@
              <div class="reason-row"><div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
              <div class="reason-row"><div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
              <div class="reason-row"><div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
+             <div class="reason-row"><div class="reason-btn" data-reason="enc" onclick="FeedbackService.toggleReason(this)">Wrong Enclosure</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
              <div id="dynamic-feedback-container"></div>
-             
              <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
              <button class="submit-feedback-btn" style="background:#555;margin-top:5px;" onclick="FeedbackService.close()">CANCEL</button>
         </div>
@@ -198,6 +203,7 @@
                 <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="Any">Any</option></select></div>
                 <div class="input-group"><span class="input-label">HP</span><select id="hpInput" class="cox-input"><option value="Any">Any</option></select></div>
                 <div class="input-group"><span class="input-label">Volt</span><select id="voltInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group full-width"><span class="input-label">Enclosure</span><select id="encInput" class="cox-input"><option value="Any">Any</option></select></div>
             </div>
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
@@ -219,7 +225,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v16.4 (KEYWORDS RESTORED & FEEDBACK UNLOCKED) ---
+// --- SCHEMATICai v16.6 (SMART ENCLOSURE MAPPING) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -263,19 +269,15 @@ class FeedbackService {
     static saveHistory(id, type) { const c = this.getHistory(id); c[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(c)); }
     
     static down(id) { 
-        // Note: Removed lockout check here to allow multiple reports per item
         this.activeId = id; 
         document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
         document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected')); 
-        
-        // Dynamic Keywords
         const container = document.getElementById('dynamic-feedback-container'); container.innerHTML = '';
         SearchEngine.currentPhrases.forEach(p => { 
             const div = document.createElement('div'); div.className = 'reason-row'; 
             div.innerHTML = `<div class="reason-btn" data-reason="kw_reject" data-kw="${p}" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch: "${p}"</div>`; 
             container.appendChild(div); 
         });
-
         document.getElementById('feedback-modal').classList.add('active-modal'); 
     } 
     
@@ -286,12 +288,8 @@ class FeedbackService {
             if(reasonCode === 'kw_reject') { submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw }); } 
             else { const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }
         }); 
-        
         if(submissions.length === 0) return alert("Select a reason.");
-
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
-        
-        // Note: Removed 'down' history save to prevent button lockout
         alert("Feedback Recorded."); this.close(); 
     } 
     
@@ -313,20 +311,29 @@ class PdfController {
         const place = document.getElementById('pdf-placeholder-text');
         const fallback = document.getElementById('pdf-fallback');
         const link = document.getElementById('pdf-fallback-link');
-        
         place.style.display = 'none'; frame.style.display = 'none'; fallback.style.display = 'block';
         if (url) { frame.src = url; frame.style.display = 'block'; fallback.style.display = 'none'; }
         if(link) link.href = url || "#";
-        
-        if(window.innerWidth < 768) {
-            document.body.classList.add('viewing-pdf');
-        }
+        if(window.innerWidth < 768) document.body.classList.add('viewing-pdf');
     }
 }
 
+// SMART ENCLOSURE DATA
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
-    DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
+    ENCLOSURES: { 
+        '4XSS': ['4XSS', 'STAINLESS', 'SS', '304', '316'], 
+        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC'], 
+        'POLY': ['POLY', 'POLYCARBONATE', 'PLASTIC'],
+        'NEMA 12': ['NEMA 12', 'NEMA12', 'DUST'],
+        'NEMA 4': ['NEMA 4', 'NEMA4', 'PAINTED'],
+        'NEMA 1': ['NEMA 1', 'NEMA1']
+    },
+    DATA: { 
+        HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], 
+        VOLT: [120, 208, 240, 480, 575], 
+        PHASE: [1, 3]
+    } 
 };
 
 class TheHealer {
@@ -357,26 +364,27 @@ class TheHealer {
 class AIParser {
     static parse(text, panelId) {
         const healed = TheHealer.healedData[panelId];
-        const specs = { mfg: healed?.mfg || null, hp: healed?.hp || null, volt: healed?.volt || null, phase: healed?.phase || null };
+        const specs = { mfg: healed?.mfg || null, hp: healed?.hp || null, volt: healed?.volt || null, phase: healed?.phase || null, enc: healed?.enc || null };
         const t = (text || "").toUpperCase();
         
         // MFG
         if (!specs.mfg) for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) specs.mfg = k.toUpperCase();
         
-        // HP (Robust)
+        // ENCLOSURE (Smart Map)
+        if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) specs.enc = k;
+
+        // HP
         if (!specs.hp) { 
             let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
             if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i); 
             if(m) specs.hp = m[1].replace(/\s/g, ''); 
         }
-        
-        // VOLT (Robust)
+        // VOLT
         if (!specs.volt) { 
             const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); 
             if(m) specs.volt = m[1]; 
         }
-        
-        // PHASE (Robust)
+        // PHASE
         if (!specs.phase) { 
             if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø") || t.includes("3/60")) specs.phase = "3";
             else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø") || t.includes("1/60")) specs.phase = "1";
@@ -402,7 +410,9 @@ class DataLoader {
             const data = await resp.json();
             if(!data.records) break;
             data.records.forEach(r => {
-                const id = (r.fields['Control Panel Name']||"").replace(/[!?]/g,'').trim();
+                const rawName = r.fields['Control Panel Name'] || "";
+                const id = rawName.replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                
                 if(!window.DB_IDS.has(id)) {
                     window.DB_IDS.add(id);
                     window.LOCAL_DB.push({ id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, ...AIParser.parse(r.fields['Items']||"", id) });
@@ -419,12 +429,20 @@ class SearchEngine {
         const kwInput = document.getElementById('keywordInput').value;
         this.currentPhrases = kwInput.split(',').map(s=>s.trim()).filter(s=>s.length > 0);
         
-        const criteria = { kw: this.currentPhrases, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value };
+        const criteria = { 
+            kw: this.currentPhrases, 
+            mfg: document.getElementById('mfgInput').value, 
+            hp: document.getElementById('hpInput').value, 
+            volt: document.getElementById('voltInput').value,
+            enc: document.getElementById('encInput').value 
+        };
+        
         const results = window.LOCAL_DB.filter(r => {
             if(criteria.kw.length && !criteria.kw.every(k => (r.id+r.desc).includes(k.toUpperCase()))) return false;
             if(criteria.mfg!=="Any" && r.mfg!==criteria.mfg.toUpperCase()) return false;
             if(criteria.hp!=="Any" && r.hp!==criteria.hp) return false;
             if(criteria.volt!=="Any" && (!r.volt || !r.volt.includes(criteria.volt))) return false;
+            if(criteria.enc!=="Any" && r.enc!==criteria.enc) return false;
             return true;
         });
         UI.renderResults(results, criteria, this.currentPhrases);
@@ -444,13 +462,12 @@ class UI {
             const isVotedUp = FeedbackService.sessionVotes.has(item.id);
             
             let badges = '';
-            // KEYWORDS BADGES (Restored)
             if(phrases) phrases.forEach(p => { badges += `<span class="hud-badge match-keyword">KW: ${p.toUpperCase()}</span>`; });
-            
             if(criteria.mfg!=="Any") badges += `<span class="hud-badge ${healed?.mfg?'match-healed':'match-exact'}">${criteria.mfg}</span>`;
             if(item.hp) badges += `<span class="hud-badge ${healed?.hp?'match-healed':'match-exact'}">${healed?.hp||item.hp} HP</span>`;
             if(item.volt) badges += `<span class="hud-badge ${healed?.volt?'match-healed':'match-exact'}">${healed?.volt||item.volt}V</span>`;
             if(item.phase) badges += `<span class="hud-badge ${healed?.phase?'match-healed':'match-exact'}">${healed?.phase||item.phase}PH</span>`;
+            if(item.enc) badges += `<span class="hud-badge match-gray">${healed?.enc||item.enc}</span>`;
             
             const card = document.createElement('div'); card.className = 'record-card';
             card.innerHTML = `<div class="panel-name">${item.id}</div><div class="badge-row">${badges}</div>
@@ -466,10 +483,11 @@ class UI {
         });
     }
     static populateDropdowns() { 
-        ['mfg','hp','volt','phase'].forEach(c => {
+        const types = { mfg: AI_TRAINING_DATA.MANUFACTURERS, enc: AI_TRAINING_DATA.ENCLOSURES };
+        ['mfg','hp','volt','phase','enc'].forEach(c => {
             const s = document.getElementById(c+'Input');
             if(!s) return;
-            const data = c==='mfg' ? Object.keys(AI_TRAINING_DATA.MANUFACTURERS) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
+            const data = (types[c]) ? Object.keys(types[c]) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
             data.forEach(i => { const o = document.createElement('option'); o.value=i; o.innerText=i; s.appendChild(o); });
         });
     }
