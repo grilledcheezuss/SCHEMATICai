@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v13.0 - Cloudflare Secure)</title>
+    <title>Cox Research | SCHEMATICai (v13.3 - Enterprise)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -108,6 +108,7 @@
         .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; width: 100%; }
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
         
+        /* Updated with 'name' and 'autocomplete' to fix browser warnings */
         .correction-input { display: none; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-top: 4px; }
         .reason-btn.selected + .correction-input { display: block; }
         
@@ -125,7 +126,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v13.0</div>
+    <div class="version-badge">SCHEMATICai v13.3</div>
     <div class="header-controls">
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
@@ -137,10 +138,27 @@
         <div class="modal-header"><span>Report Inaccuracy</span><button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button></div>
         <div class="modal-content">
             <p style="font-size:12px; color:#666; margin-top:0;">Select parameter and enter correct value:</p>
-            <div class="reason-row"><div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
-            <div class="reason-row"><div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
-            <div class="reason-row"><div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
-            <div class="reason-row"><div class="reason-btn" data-reason="phase" onclick="FeedbackService.toggleReason(this)">Wrong Phase</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
+            
+            <div class="reason-row">
+                <div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div>
+                <input type="text" name="fix_mfg" class="correction-input" placeholder="Correct Value" autocomplete="off">
+            </div>
+            
+            <div class="reason-row">
+                <div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div>
+                <input type="text" name="fix_hp" class="correction-input" placeholder="Correct Value" autocomplete="off">
+            </div>
+            
+            <div class="reason-row">
+                <div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div>
+                <input type="text" name="fix_volt" class="correction-input" placeholder="Correct Value" autocomplete="off">
+            </div>
+            
+            <div class="reason-row">
+                <div class="reason-btn" data-reason="phase" onclick="FeedbackService.toggleReason(this)">Wrong Phase</div>
+                <input type="text" name="fix_phase" class="correction-input" placeholder="Correct Value" autocomplete="off">
+            </div>
+            
             <div id="dynamic-feedback-container"></div>
             <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
         </div>
@@ -150,12 +168,12 @@
 <div id="app-container">
     <div id="sidebar">
         <div class="sidebar-controls">
-            <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" class="cox-input" placeholder="e.g. Duplex, 1PH, CP-7920" onkeypress="UI.handleEnter(event)"></div>
+            <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" name="search_keywords" class="cox-input" placeholder="e.g. Duplex, 1PH, CP-7920" onkeypress="UI.handleEnter(event)" autocomplete="off"></div>
             <div class="filter-grid">
-                <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">HP</span><select id="hpInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" name="filter_mfg" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" name="filter_phase" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">HP</span><select id="hpInput" name="filter_hp" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" name="filter_volt" class="cox-input"><option value="Any">Any</option></select></div>
             </div>
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
@@ -176,25 +194,26 @@
 </div>
 
 <script>
-// --- SCHEMATICai v13.0 (CLOUDFLARE WORKER PROXY) ---
+// --- SCHEMATICai v13.3 (FULLY ABSTRACTED + POLISHED) ---
 
 // ⚠️ PASTE YOUR CLOUDFLARE WORKER URL HERE
-const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev/"; 
+const WORKER_URL = "https://REPLACE_WITH_YOUR_WORKER_URL"; 
 
+// NO REAL NAMES - ONLY GENERIC TARGETS
 const CONFIG = {
-    mainTable: 'Control Panel Items',
-    feedbackTable: 'Feedback',
+    mainTable: 'MAIN',
+    feedbackTable: 'FEEDBACK',
     voteThreshold: 3
 };
 
 class NetworkService {
-    static async fetch(tableName, params = '') {
-        const url = `${WORKER_URL}?table=${encodeURIComponent(tableName)}${params.replace('?', '&')}`;
+    static async fetch(target, params = '') {
+        const url = `${WORKER_URL}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`;
         return fetch(url);
     }
 
-    static async post(tableName, data) {
-        const url = `${WORKER_URL}?table=${encodeURIComponent(tableName)}`;
+    static async post(target, data) {
+        const url = `${WORKER_URL}?target=${encodeURIComponent(target)}`;
         return fetch(url, { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
