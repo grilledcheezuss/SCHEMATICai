@@ -3,19 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v11.5 - Edge)</title>
+    <title>Cox Research | SCHEMATICai (v12.0 - Direct Connect)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-    
-    <script>
-        try {
-            const session = JSON.parse(localStorage.getItem('cox_auth_session'));
-            if (session && session.expiry > Date.now()) {
-                document.documentElement.classList.add('logged-in');
-            }
-        } catch(e) {}
-    </script>
     
     <style>
         :root { 
@@ -68,10 +59,9 @@
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
         .btn-bug { font-size: 14px; }
         
-        #settings-btn-wrapper { display: none; }
+        #settings-btn-wrapper { display: flex; } /* Always visible now */
 
-        #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
-        html.logged-in #app-container { display: flex !important; }
+        #app-container { display: flex; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
         
         #sidebar { width: 420px; min-width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; }
         .sidebar-controls { padding: 15px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px; }
@@ -107,20 +97,14 @@
         .thumb-btn.voted-up { background: #dcfce7; border-color: #166534; color: #166534; pointer-events: none; }
         .thumb-btn.voted-down { background: #fee2e2; border-color: #991b1b; color: #991b1b; }
 
-        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
+        #config-modal, #feedback-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
         .active-modal { display: flex !important; }
         
-        .auth-card, .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 480px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 480px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
         .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
         .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
         .modal-content { padding: 20px; }
         
-        .login-avatar { width: 80px; height: 80px; background: #e3e5e8; border-radius: 50%; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 2px solid var(--border-color); color: var(--app-primary); }
-        .login-input-group { margin-bottom: 15px; text-align: left; }
-        .login-input-label { font-size: 12px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; display: block; opacity: 0.7; }
-        .video-container { margin-top: 30px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.2); background: #000; }
-        .video-container iframe { width: 100%; aspect-ratio: 16/9; border: none; }
-
         .reason-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
         .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; width: 100%; }
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
@@ -140,39 +124,33 @@
 </head>
 <body>
 
-<div id="auth-overlay">
-    <div class="auth-card">
-        <div class="login-avatar">👤</div>
-        <h2 style="color:var(--app-primary); margin-top:0; margin-bottom:20px;">SCHEMATICai</h2>
-        <div class="login-input-group"><span class="login-input-label">Username</span><input type="text" id="auth-user" class="cox-input" placeholder="Enter username"></div>
-        <div class="login-input-group"><span class="login-input-label">Password</span><input type="password" id="auth-pass" class="cox-input" placeholder="Enter password"></div>
-        <button class="submit-feedback-btn" onclick="AuthService.login()">Authenticate</button>
-        <div class="video-container"><iframe src="https://www.youtube.com/embed/jfKfPfyJRdk?controls=0&autoplay=1&mute=1&loop=1&playlist=jfKfPfyJRdk" allow="autoplay; encrypted-media"></iframe></div>
-    </div>
-</div>
-
-<div id="config-modal">
+<div id="config-modal" class="active-modal">
     <div class="config-card">
-        <h3 style="margin-top:0; color:var(--app-primary);">🛠️ Admin Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Status: <span id="db-status-text">Idle</span></p>
-        <div style="margin-bottom:15px; padding:10px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:12px;">
-            <strong>Diagnostics:</strong>
-            <button class="reason-btn" onclick="window.open('/api/search?health=true', '_blank')">🏥 Check Server Health</button>
+        <h3 style="margin-top:0; color:var(--app-primary);">⚙️ Setup Connection</h3>
+        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Enter your Airtable API Keys to connect securely.</p>
+        
+        <div style="text-align:left; margin-bottom:10px;">
+            <label style="font-size:10px; font-weight:bold;">READ KEY (Required for Search)</label>
+            <input type="password" id="api-key-read" class="cox-input" placeholder="pat.xxxxxxxx..." style="margin-top:5px;">
         </div>
-        <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="DataLoader.harvestCSV()">📥 Harvest Golden CSV</button>
-        <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Clear Cache</button>
-        <div style="margin-top:10px;"><button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
+        
+        <div style="text-align:left; margin-bottom:10px;">
+            <label style="font-size:10px; font-weight:bold;">WRITE KEY (Optional for Feedback)</label>
+            <input type="password" id="api-key-write" class="cox-input" placeholder="pat.xxxxxxxx..." style="margin-top:5px;">
+        </div>
+
+        <button class="submit-feedback-btn" onclick="ConfigService.saveKeys()">💾 Save & Connect</button>
+        <button class="submit-feedback-btn" style="background:#555; margin-top:8px;" onclick="ConfigService.close()">Cancel</button>
     </div>
 </div>
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v11.5</div>
+    <div class="version-badge">SCHEMATICai v12.0</div>
     <div class="header-controls">
-        <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
+        <button class="control-btn" title="Settings" onclick="ConfigService.open()">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
-        <button class="control-btn" onclick="AuthService.logout()">⏻</button>
     </div>
 </header>
 
@@ -203,7 +181,7 @@
             </div>
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
-                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()" disabled>LOADING DB...</button>
+                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()" disabled>LOADING...</button>
             </div>
         </div>
         <div id="results-scroll-area"><div id="results-area"></div></div>
@@ -220,13 +198,9 @@
 </div>
 
 <script>
-// --- SCHEMATICai v11.5 (EDGE MODULES) ---
+// --- SCHEMATICai v12.0 (DIRECT CONNECT RESTORE) ---
 
 const CONFIG = {
-    useProxy: true,       
-    proxyUrl: '/api/search', // Explicitly maps to api/search.js
-    
-    // TABLE IDs
     mainBase: 'appgc1pbuOgmODRpj',
     mainTable: 'Control Panel Items',
     feedbackBase: 'app88zF2k4FgjU8hK',
@@ -234,33 +208,36 @@ const CONFIG = {
     voteThreshold: 3
 };
 
-// 1. NETWORK SERVICE
+// KEY MANAGEMENT SERVICE
+class KeyChain {
+    static getRead() { return localStorage.getItem('cox_key_read'); }
+    static getWrite() { return localStorage.getItem('cox_key_write'); }
+    static setKeys(read, write) {
+        if(read) localStorage.setItem('cox_key_read', read);
+        if(write) localStorage.setItem('cox_key_write', write);
+    }
+    static hasKeys() { return !!this.getRead(); }
+}
+
 class NetworkService {
     static async fetch(baseId, tableName, params = '', isWrite = false) {
-        let url, headers = {};
-        
-        if (CONFIG.useProxy) {
-            const prefix = params.includes('?') ? '&' : '?';
-            url = `${CONFIG.proxyUrl}${params}${prefix}table=${encodeURIComponent(tableName)}`;
-            headers = { 'Content-Type': 'application/json' };
-        } else {
-            console.error("❌ PROXY ERROR: useProxy=false but keys are missing.");
-        }
+        const key = isWrite ? KeyChain.getWrite() : KeyChain.getRead();
+        if (!key) throw new Error("Missing API Key");
 
-        return fetch(url, { headers });
+        const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}${params}`;
+        return fetch(url, { headers: { 'Authorization': `Bearer ${key}` } });
     }
 
     static async post(baseId, tableName, data) {
-        let url, headers = {};
-        
-        if (CONFIG.useProxy) {
-            url = `${CONFIG.proxyUrl}?table=${encodeURIComponent(tableName)}`;
-            headers = { 'Content-Type': 'application/json' };
-        } else {
-             console.error("❌ PROXY ERROR: useProxy=false but keys are missing.");
-        }
+        const key = KeyChain.getWrite();
+        if (!key) return alert("Write Key missing. Cannot vote.");
 
-        return fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
+        const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
+        return fetch(url, { 
+            method: 'POST', 
+            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
     }
 }
 
@@ -276,7 +253,6 @@ class PdfController {
     }
 }
 
-// ⚠️ TRAINING DATA
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 6.2, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
@@ -313,7 +289,6 @@ class TheHealer {
     }
 }
 
-// REGEX CONSTANTS
 const REGEX_HP_A = /\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i;
 const REGEX_HP_B = /(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i;
 const REGEX_VOLT = /\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i;
@@ -350,6 +325,10 @@ window.LOCAL_DB = []; window.DB_IDS = new Set();
 
 class DataLoader {
     static async preload() {
+        if (!KeyChain.hasKeys()) {
+            ConfigService.open();
+            return; 
+        }
         const btn = document.getElementById('searchBtn');
         btn.innerText = "INITIALIZING AI...";
         await TheHealer.fetchAndTally();
@@ -385,7 +364,6 @@ class DataLoader {
             } while (offset);
         } catch(e) { console.error("Partition Error", e); }
     }
-    static harvestCSV() { /* CSV Logic Preserved */ }
 }
 
 class SearchEngine {
@@ -533,9 +511,24 @@ class FeedbackService {
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
 }
 
-class ConfigService { static reset() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } } }
-class AuthService { static init() { const session = JSON.parse(localStorage.getItem('cox_auth_session')); if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); this.checkAdmin(session.user); return true; } document.getElementById('auth-overlay').classList.add('active-modal'); return false; } static login() { const user = document.getElementById('auth-user').value; if(!user) return; localStorage.setItem('cox_auth_session', JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); } static logout() { localStorage.removeItem('cox_auth_session'); location.reload(); } static checkAdmin(user) { if(['admin', 'thomas', 'grilledcheezus'].some(a => user.toLowerCase().includes(a))) document.getElementById('settings-btn-wrapper').style.display = 'block'; } }
-class App { static init() { AuthService.init(); UI.populateDropdowns(); DataLoader.preload(); } }
+class ConfigService { 
+    static open() { 
+        document.getElementById('config-modal').classList.add('active-modal'); 
+        document.getElementById('api-key-read').value = KeyChain.getRead() || "";
+        document.getElementById('api-key-write').value = KeyChain.getWrite() || "";
+    }
+    static close() { document.getElementById('config-modal').classList.remove('active-modal'); }
+    static saveKeys() {
+        const r = document.getElementById('api-key-read').value.trim();
+        const w = document.getElementById('api-key-write').value.trim();
+        if(!r) return alert("Read Key is required.");
+        KeyChain.setKeys(r, w);
+        this.close();
+        DataLoader.preload();
+    }
+}
+
+class App { static init() { UI.populateDropdowns(); DataLoader.preload(); } }
 document.addEventListener('DOMContentLoaded', App.init);
 </script>
 </body>
