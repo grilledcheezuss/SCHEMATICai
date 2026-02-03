@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v11.3 - Diagnostic)</title>
+    <title>Cox Research | SCHEMATICai (v11.4 - Proxy Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -157,7 +157,7 @@
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Status: <span id="db-status-text">Idle</span></p>
         <div style="margin-bottom:15px; padding:10px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:12px;">
             <strong>Diagnostics:</strong>
-            <button class="reason-btn" onclick="window.open('/api/?health=true', '_blank')">🏥 Check Server Health</button>
+            <button class="reason-btn" onclick="window.open('/api/proxy?health=true', '_blank')">🏥 Check Server Health</button>
         </div>
         <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="DataLoader.harvestCSV()">📥 Harvest Golden CSV</button>
         <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Clear Cache</button>
@@ -167,7 +167,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v11.3</div>
+    <div class="version-badge">SCHEMATICai v11.4</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -220,11 +220,11 @@
 </div>
 
 <script>
-// --- SCHEMATICai v11.3 (DIAGNOSTIC MODE) ---
+// --- SCHEMATICai v11.4 (EXPLICIT PROXY FIX) ---
 
 const CONFIG = {
     useProxy: true,       
-    proxyUrl: '/api/', // DIRECT PATH to api/index.js (automatically mapped by Vercel)
+    proxyUrl: '/api/proxy', // Maps to api/proxy.js
     
     // TABLE IDs
     mainBase: 'appgc1pbuOgmODRpj',
@@ -277,7 +277,7 @@ class PdfController {
     }
 }
 
-// ⚠️ YOUR TRAINING DATA IS HERE ⚠️
+// ⚠️ TRAINING DATA
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 6.2, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
