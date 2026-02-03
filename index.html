@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.0)</title>
+    <title>Cox Research | SCHEMATICai (v19.1)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -182,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.0</div>
+    <div class="version-badge">SCHEMATICai v19.1</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -243,9 +243,67 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.0 (STRICT SCORING + TARGETED FEEDBACK) ---
+// --- SCHEMATICai v19.1 (ENCRYPTED OFFLINE CACHE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
+
+// --- SECURE CACHE SERVICE ---
+class CacheService {
+    static async save(data, password) {
+        if(!password) return;
+        try {
+            const json = JSON.stringify(data);
+            const enc = await this.encrypt(json, password);
+            localStorage.setItem('cox_db_cache', enc);
+            localStorage.setItem('cox_db_ts', Date.now());
+        } catch(e) { console.warn("Cache Save Failed", e); }
+    }
+
+    static async load(password) {
+        if(!password) return null;
+        try {
+            const enc = localStorage.getItem('cox_db_cache');
+            if(!enc) return null;
+            const json = await this.decrypt(enc, password);
+            if(!json) return null;
+            return JSON.parse(json);
+        } catch(e) { 
+            console.warn("Cache Load Failed (Bad Pass?)", e); 
+            return null; // Invalid pass or data
+        }
+    }
+
+    // NATIVE BROWSER ENCRYPTION (AES-GCM)
+    static async getKey(password) {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+        return crypto.subtle.deriveKey(
+            { name: "PBKDF2", salt: enc.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" },
+            keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
+        );
+    }
+
+    static async encrypt(text, password) {
+        const key = await this.getKey(password);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encoded = new TextEncoder().encode(text);
+        const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, encoded);
+        const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
+        const dataHex = Array.from(new Uint8Array(encrypted)).map(b => b.toString(16).padStart(2, '0')).join('');
+        return ivHex + ":" + dataHex;
+    }
+
+    static async decrypt(text, password) {
+        const [ivHex, dataHex] = text.split(':');
+        const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        const data = new Uint8Array(dataHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        const key = await this.getKey(password);
+        try {
+            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, data);
+            return new TextDecoder().decode(decrypted);
+        } catch(e) { return null; }
+    }
+}
 
 class AuthService {
     static init() {
@@ -254,7 +312,7 @@ class AuthService {
         if (user && pass) {
             document.documentElement.classList.add('logged-in');
             document.getElementById('auth-overlay').classList.remove('active-modal');
-            UI.populateAllDropdowns(); // STATIC SEED
+            UI.populateAllDropdowns();
             return true;
         }
         return false;
@@ -263,9 +321,20 @@ class AuthService {
         const user = document.getElementById('auth-user').value.trim();
         const pass = document.getElementById('auth-pass').value.trim();
         if (!user || !pass) return alert("Missing Credentials");
-        localStorage.setItem('cox_user', user); localStorage.setItem('cox_pass', pass); location.reload(); 
+        
+        // Attempt immediate cache unlock to verify pass
+        CacheService.load(pass).then(data => {
+            // Even if null (no cache), we accept for now. 
+            // Real auth check happens at network fetch usually.
+            localStorage.setItem('cox_user', user); 
+            localStorage.setItem('cox_pass', pass); 
+            location.reload(); 
+        });
     }
-    static logout() { localStorage.clear(); location.reload(); }
+    static logout() { 
+        localStorage.clear(); // CLEARS ENCRYPTED DATA TOO
+        location.reload(); 
+    }
     static getHeaders() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 
@@ -330,11 +399,7 @@ class FeedbackService {
         const enc = document.getElementById('encInput').value;
         
         const submissions = [];
-        
-        // 1. Always send general match
         submissions.push({ "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
-        
-        // 2. Send specific criteria confirmations
         if(mfg !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "mfg", "Suggested Value": mfg } });
         if(hp !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "hp", "Suggested Value": hp } });
         if(volt !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "volt", "Suggested Value": volt } });
@@ -344,7 +409,6 @@ class FeedbackService {
         for(const sub of submissions) {
             await NetworkService.post(CONFIG.feedbackTable, sub);
         }
-        // Silent Success
     } 
     
     static toggleReason(el) { el.classList.toggle('selected'); } 
@@ -480,15 +544,35 @@ class DataLoader {
             savedSelections[id] = document.getElementById(id+'Input').value;
         });
 
+        // 1. TRY CACHE (INSTANT)
+        const password = localStorage.getItem('cox_pass');
+        const cached = await CacheService.load(password);
+        if(cached) {
+            window.LOCAL_DB = cached.data;
+            window.DB_IDS = new Set(cached.ids);
+            window.FOUND_MFGS = new Set(cached.mfgs);
+            UI.populateAllDropdowns();
+            // Restore selection if cache had them
+            ['mfg','hp','volt','phase','enc'].forEach(id => {
+                const s = document.getElementById(id+'Input');
+                if(savedSelections[id] && s.querySelector(`option[value="${savedSelections[id]}"]`)) s.value = savedSelections[id];
+            });
+            btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
+        }
+
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
         
-        UI.populateAllDropdowns(); 
+        // 2. SAVE NEW CACHE (ENCRYPTED)
+        await CacheService.save({
+            data: window.LOCAL_DB,
+            ids: Array.from(window.DB_IDS),
+            mfgs: Array.from(window.FOUND_MFGS)
+        }, password);
         
-        // RESTORE PARAMETERS
+        UI.populateAllDropdowns(); 
         ['mfg','hp','volt','phase','enc'].forEach(id => {
             const saved = savedSelections[id];
-            // Only restore if valid option exists now
             const sel = document.getElementById(id+'Input');
             if(saved && saved !== "Any" && [...sel.options].some(o => o.value === saved)) {
                 sel.value = saved;
@@ -502,7 +586,6 @@ class DataLoader {
         do {
             if(window.LOCAL_DB.length >= 7500) break;
             
-            // PERCENTAGE ESTIMATE
             if(btn) {
                 const pct = Math.min(100, Math.round((window.LOCAL_DB.length / CONFIG.estTotal) * 100));
                 btn.innerText = `LOADING ${pct}%...`;
@@ -576,15 +659,15 @@ class SearchEngine {
                 sortWeight += 1000; 
             }
             
-            // MFG (STRICT WEIGHTING)
+            // MFG
             if(criteria.mfg!=="Any") {
                 if(r.mfg === criteria.mfg.toUpperCase()) {
-                    sortWeight += 500000; // HUGE BONUS FOR EXACT MATCH
+                    sortWeight += 500000; 
                 } else if (!r.mfg) {
-                    sortWeight -= 100000; // HUGE PENALTY FOR UNKNOWN (Push to bottom)
+                    sortWeight -= 100000; 
                     isPerfect = false;
                 } else {
-                    return; // STRICT EXCLUSION
+                    return; 
                 }
             }
 
@@ -598,7 +681,7 @@ class SearchEngine {
                             sortWeight += 5000; 
                         } else {
                             const diff = Math.abs(searchVal - recordVal);
-                            if(diff <= 2.5) sortWeight += 1000; // Close
+                            if(diff <= 2.5) sortWeight += 1000; 
                             else sortWeight += 200; 
                             isPerfect = false;
                         }
@@ -633,17 +716,15 @@ class SearchEngine {
                 }
             }
             
-            if(isPerfect) sortWeight += 1000000; // PERFECT TIER
+            if(isPerfect) sortWeight += 1000000; 
             
             r.sortWeight = sortWeight;
             r.isPerfect = isPerfect;
             results.push(r);
         });
         
-        // SORT BY WEIGHT DESCENDING
         results.sort((a, b) => {
             if (a.sortWeight !== b.sortWeight) return b.sortWeight - a.sortWeight;
-            // TIEBREAKER: NEWEST ID FIRST
             return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' });
         });
         
@@ -684,14 +765,12 @@ class UI {
             
             let badges = '';
             
-            // MFG
             if(criteria.mfg!=="Any") {
                 const isExact = (item.mfg === criteria.mfg.toUpperCase());
                 const badgeClass = (isExact) ? 'match-green' : 'match-orange';
                 badges += `<span class="hud-badge ${badgeClass}">${healed?.mfg||item.mfg||'Unknown'}</span>`;
             }
             
-            // HP
             if(criteria.hp!=="Any" && item.hp) {
                 const isExactHp = (parseFloat(item.hp) === parseFloat(criteria.hp));
                 const badgeClass = (isExactHp) ? 'match-green' : 'match-orange';
@@ -738,7 +817,6 @@ class UI {
         const encs = AI_TRAINING_DATA.ENCLOSURES;
         
         const mfgSelect = document.getElementById('mfgInput');
-        // PRESERVE SELECTION IF DYNAMIC UPDATE HAPPENS
         const currentVal = mfgSelect.value;
         
         let allMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS).map(k => k.toUpperCase());
