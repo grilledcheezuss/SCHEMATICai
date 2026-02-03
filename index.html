@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v17.7)</title>
+    <title>Cox Research | SCHEMATICai (v17.8)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -172,7 +172,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v17.7</div>
+    <div class="version-badge">SCHEMATICai v17.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -228,7 +228,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v17.7 (BALDOR ADDED TO MANUFACTURERS) ---
+// --- SCHEMATICai v17.8 (ROBUST HP & DEEP SCAN) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -340,7 +340,7 @@ const AI_TRAINING_DATA = {
         'pentair':['pentair'], 
         'abs':['abs'], 
         'aurora':['aurora'],
-        'baldor':['baldor'] // ADDED BALDOR HERE
+        'baldor':['baldor']
     }, 
     ENCLOSURES: { 
         '4XSS': ['4XSS', 'STAINLESS', 'SS', '304', '316'], 
@@ -397,9 +397,10 @@ class AIParser {
         if (!specs.mfg) for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) specs.mfg = k.toUpperCase();
         if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { specs.enc = k; break; }
 
+        // ROBUST HP: Allow space or dash (e.g. 5-HP)
         if (!specs.hp) { 
             let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
-            if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i); 
+            if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*[-]?\s*HP\b/i); 
             if(m) specs.hp = parseFloat(m[1].replace(/\s/g, '')).toString(); 
         }
 
@@ -439,7 +440,14 @@ class DataLoader {
                 
                 if(!window.DB_IDS.has(id)) {
                     window.DB_IDS.add(id);
-                    window.LOCAL_DB.push({ id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, ...AIParser.parse(r.fields['Items']||"", id) });
+                    // DEEP SCAN: PARSE ID + DESC
+                    const fullText = (id + " " + (r.fields['Items']||"")).toUpperCase();
+                    window.LOCAL_DB.push({ 
+                        id, 
+                        desc: (r.fields['Items']||"").toUpperCase(), 
+                        pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, 
+                        ...AIParser.parse(fullText, id) 
+                    });
                 }
             });
             offset = data.offset;
@@ -463,7 +471,6 @@ class SearchEngine {
         };
         
         const results = window.LOCAL_DB.filter(r => {
-            // INTELLIGENT PART# MATCHING
             if(criteria.kw.length) {
                 const combinedText = (r.id + " " + r.desc).toUpperCase();
                 const cleanText = combinedText.replace(/[\W_]+/g, "");
