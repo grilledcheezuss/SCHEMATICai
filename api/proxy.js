@@ -1,13 +1,22 @@
-// api/index.js
+// api/proxy.js
 export default async function handler(req, res) {
-    // 1. Manually parse the URL to get the Table Name
-    // Request URL: /api/TableName?param=value
+    // 1. Get the URL path (e.g., "/api/Feedback")
     const { url } = req;
-    const urlParts = url.split('?')[0].split('/'); // Split by "/"
-    // urlParts = ["", "api", "Feedback"]
-    const table = decodeURIComponent(urlParts[2]); // Get the 3rd part
     
-    const method = req.method;
+    // 2. Parse the Table Name
+    // We expect the URL to look like "/api/TableName?param=value"
+    // We split by "/" and grab the part after "api"
+    const parts = url.split('/');
+    const apiIndex = parts.indexOf('api');
+    
+    // Safety check: if "api" isn't found or there's nothing after it
+    if (apiIndex === -1 || !parts[apiIndex + 1]) {
+        return res.status(400).json({ error: "Invalid API URL structure." });
+    }
+
+    // "Feedback" or "Control%20Panel%20Items" (Remove query string ?...)
+    const tableRaw = parts[apiIndex + 1].split('?')[0]; 
+    const table = decodeURIComponent(tableRaw);
 
     // 🔒 SECURITY CONFIGURATION
     const TABLE_CONFIG = {
@@ -25,37 +34,35 @@ export default async function handler(req, res) {
 
     const config = TABLE_CONFIG[table];
 
-    // 2. Validate Access
+    // 3. Access Control
     if (!config) {
-        return res.status(404).json({ error: `Table '${table}' not found or access denied.` });
+        return res.status(404).json({ error: `Table '${table}' not recognized.` });
+    }
+    
+    if (!config.allowMethods.includes(req.method)) {
+        return res.status(405).json({ error: `Method ${req.method} not allowed.` });
     }
 
-    if (!config.allowMethods.includes(method)) {
-        return res.status(405).json({ error: `Method ${method} not allowed.` });
-    }
-
-    // 3. Construct Airtable URL
-    // We grab the query string manually
+    // 4. Forward to Airtable
     const queryString = url.split('?')[1] || '';
     const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryString}`;
 
-    // 4. Forward Request
     try {
         const options = {
-            method,
+            method: req.method,
             headers: {
                 'Authorization': `Bearer ${config.apiKey}`,
                 'Content-Type': 'application/json'
             }
         };
 
-        if (method === 'POST') {
+        if (req.method === 'POST') {
             options.body = JSON.stringify(req.body);
         }
 
         const response = await fetch(airtableUrl, options);
         const data = await response.json();
-
+        
         res.status(response.status).json(data);
 
     } catch (error) {

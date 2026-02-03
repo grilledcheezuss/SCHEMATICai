@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.6 - Robust API Routing)</title>
+    <title>Cox Research | SCHEMATICai (v10.7 - Explicit Proxy)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -166,7 +166,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v10.6</div>
+    <div class="version-badge">SCHEMATICai v10.7</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -219,13 +219,13 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.6 (ROBUST API ROUTING) ---
+// --- SCHEMATICai v10.7 (EXPLICIT PROXY) ---
 
-// ⚠️ V10.6: CONFIGURATION
-// Security Note: Keys are handled by the backend (api/index.js)
+// ⚠️ V10.7: CONFIGURATION
+// Security Note: Keys are handled by the backend (api/proxy.js)
 const CONFIG = {
     useProxy: true,       // ENABLED: App will call relative path /api
-    proxyUrl: '/api',     // RELATIVE PATH: Works on Cloudflare/Vercel (Points to api/index.js)
+    proxyUrl: '/api',     // RELATIVE PATH: Mapped to api/proxy.js via vercel.json
     
     // TABLE IDs
     mainBase: 'appgc1pbuOgmODRpj',
@@ -242,7 +242,8 @@ class NetworkService {
         
         if (CONFIG.useProxy) {
             // PROXY MODE: Call local endpoint
-            // Backend routes request based on tableName/baseId mapping
+            // URL will look like: /api/Feedback?pageSize=100...
+            // Vercel routes this to api/proxy.js
             url = `${CONFIG.proxyUrl}/${encodeURIComponent(tableName)}${params}`;
             headers = { 'Content-Type': 'application/json' };
         } else {
