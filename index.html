@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v17.5)</title>
+    <title>Cox Research | SCHEMATICai (v17.7)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -107,6 +107,7 @@
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
+        /* LOCKED STATE */
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
         
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
@@ -171,7 +172,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v17.5</div>
+    <div class="version-badge">SCHEMATICai v17.7</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -227,7 +228,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v17.5 (REVERTED POWER & FIXED HP/ENC PARSING) ---
+// --- SCHEMATICai v17.7 (BALDOR ADDED TO MANUFACTURERS) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -326,7 +327,21 @@ class PdfController {
 }
 
 const AI_TRAINING_DATA = { 
-    MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
+    MANUFACTURERS: { 
+        'gorman rupp':['gorman','gr'], 
+        'barnes':['barnes','sithe'], 
+        'hydromatic':['hydromatic','hydro-matic'], 
+        'flygt':['flygt'], 
+        'myers':['myers'], 
+        'goulds':['goulds'], 
+        'zoeller':['zoeller'], 
+        'liberty':['liberty'], 
+        'wilo':['wilo'], 
+        'pentair':['pentair'], 
+        'abs':['abs'], 
+        'aurora':['aurora'],
+        'baldor':['baldor'] // ADDED BALDOR HERE
+    }, 
     ENCLOSURES: { 
         '4XSS': ['4XSS', 'STAINLESS', 'SS', '304', '316'], 
         '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC'], 
@@ -380,25 +395,14 @@ class AIParser {
         const t = (text || "").toUpperCase();
         
         if (!specs.mfg) for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) specs.mfg = k.toUpperCase();
-        
-        // LOOSER ENCLOSURE PARSING
-        if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) {
-            // Check ANY value in the list
-            if (v.some(val => t.includes(val))) { specs.enc = k; break; }
-        }
+        if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { specs.enc = k; break; }
 
-        // IMPROVED HP PARSING (Handle decimals)
         if (!specs.hp) { 
             let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
             if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i); 
-            if(m) {
-                const rawHp = m[1].replace(/\s/g, '');
-                // NORMALIZE: 5.0 -> 5
-                specs.hp = parseFloat(rawHp).toString();
-            }
+            if(m) specs.hp = parseFloat(m[1].replace(/\s/g, '')).toString(); 
         }
 
-        // RESTORED ROBUST VOLTAGE PARSING
         if (!specs.volt) { 
             const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); 
             if(m) specs.volt = m[1]; 
@@ -459,13 +463,21 @@ class SearchEngine {
         };
         
         const results = window.LOCAL_DB.filter(r => {
-            if(criteria.kw.length && !criteria.kw.every(k => (r.id+" "+r.desc).includes(k.toUpperCase()))) return false;
+            // INTELLIGENT PART# MATCHING
+            if(criteria.kw.length) {
+                const combinedText = (r.id + " " + r.desc).toUpperCase();
+                const cleanText = combinedText.replace(/[\W_]+/g, "");
+                
+                const allKwMatch = criteria.kw.every(k => {
+                    const kUp = k.toUpperCase();
+                    const kClean = kUp.replace(/[\W_]+/g, "");
+                    return combinedText.includes(kUp) || cleanText.includes(kClean);
+                });
+                if(!allKwMatch) return false;
+            }
             
             if(criteria.mfg!=="Any" && r.mfg!==criteria.mfg.toUpperCase()) return false;
-            
-            // STRICT HP CHECK
             if(criteria.hp!=="Any" && r.hp!==criteria.hp) return false;
-            
             if(criteria.volt!=="Any" && (!r.volt || !r.volt.includes(criteria.volt))) return false;
             if(criteria.phase!=="Any" && r.phase!==criteria.phase) return false;
             if(criteria.enc!=="Any" && r.enc!==criteria.enc) return false;
