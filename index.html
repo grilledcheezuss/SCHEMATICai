@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v14.1)</title>
+    <title>Cox Research | SCHEMATICai (v15.0 - Secure Login)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -130,10 +130,15 @@
 
 <div id="auth-overlay" class="active-modal">
     <div class="auth-card">
-        <div class="login-avatar">🔒</div>
+        <div class="login-avatar">👤</div>
         <h2 style="color:var(--app-primary); margin-top:0; margin-bottom:20px;">SCHEMATICai</h2>
-        <div style="margin-bottom:20px;">
-            <input type="password" id="auth-pass" class="cox-input" placeholder="Enter Access Code" onkeypress="if(event.key==='Enter') AuthService.login()">
+        <div style="margin-bottom:15px; text-align:left;">
+            <label style="font-size:10px; font-weight:bold; color:var(--text-secondary);">USERNAME</label>
+            <input type="text" id="auth-user" class="cox-input" style="margin-top:5px;" placeholder="Username" autocomplete="username">
+        </div>
+        <div style="margin-bottom:20px; text-align:left;">
+            <label style="font-size:10px; font-weight:bold; color:var(--text-secondary);">PASSCODE</label>
+            <input type="password" id="auth-pass" class="cox-input" style="margin-top:5px;" placeholder="Enter Passcode" autocomplete="current-password" onkeypress="if(event.key==='Enter') AuthService.login()">
         </div>
         <button class="submit-feedback-btn" onclick="AuthService.login()">Authenticate</button>
     </div>
@@ -151,7 +156,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v14.1</div>
+    <div class="version-badge">SCHEMATICai v15.0</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -221,7 +226,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v14.0 (GATEKEEPER SECURITY) ---
+// --- SCHEMATICai v15.0 (SECURE USER LOGIN) ---
 
 // 🚀 CLOUDFLARE WORKER URL
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
@@ -232,11 +237,13 @@ const CONFIG = {
     voteThreshold: 3
 };
 
-// AUTHENTICATION SERVICE (Restored & Secured)
+// AUTHENTICATION SERVICE
 class AuthService {
     static init() {
-        const token = localStorage.getItem('cox_access_token');
-        if (token) {
+        const user = localStorage.getItem('cox_user');
+        const pass = localStorage.getItem('cox_pass');
+        
+        if (user && pass) {
             document.documentElement.classList.add('logged-in');
             document.getElementById('auth-overlay').classList.remove('active-modal');
             return true;
@@ -245,21 +252,28 @@ class AuthService {
     }
 
     static login() {
+        const user = document.getElementById('auth-user').value.trim();
         const pass = document.getElementById('auth-pass').value.trim();
-        if (!pass) return alert("Please enter access code.");
         
-        // Save token and reload
-        localStorage.setItem('cox_access_token', pass);
-        location.reload();
+        if (!user || !pass) return alert("Please enter Username and Passcode.");
+        
+        // Save creds locally
+        localStorage.setItem('cox_user', user);
+        localStorage.setItem('cox_pass', pass);
+        location.reload(); // Refresh to trigger init() and load data
     }
 
     static logout() {
-        localStorage.removeItem('cox_access_token');
+        localStorage.removeItem('cox_user');
+        localStorage.removeItem('cox_pass');
         location.reload();
     }
 
-    static getToken() {
-        return localStorage.getItem('cox_access_token');
+    static getHeaders() {
+        return {
+            'X-Cox-User': localStorage.getItem('cox_user'),
+            'X-Cox-Pass': localStorage.getItem('cox_pass')
+        };
     }
 }
 
@@ -271,11 +285,9 @@ class NetworkService {
         
         const url = `${baseUrl}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`;
         
-        // PASS THE TOKEN IN HEADER
+        // PASS AUTH HEADERS
         return fetch(url, {
-            headers: {
-                'X-Access-Token': AuthService.getToken()
-            }
+            headers: AuthService.getHeaders()
         });
     }
 
@@ -289,7 +301,7 @@ class NetworkService {
             method: 'POST', 
             headers: { 
                 'Content-Type': 'application/json',
-                'X-Access-Token': AuthService.getToken()
+                ...AuthService.getHeaders()
             },
             body: JSON.stringify(data)
         });
@@ -324,9 +336,10 @@ class TheHealer {
                 const params = `?pageSize=100${offset ? '&offset='+offset : ''}`;
                 const resp = await NetworkService.fetch(CONFIG.feedbackTable, params);
                 
-                // AUTH CHECK: If backend rejected password
-                if(resp.status === 401) {
-                    AuthService.logout(); // Force re-login
+                // AUTH CHECK: If backend rejected credentials
+                if(resp.status === 401 || resp.status === 403) {
+                    alert("Authentication Failed. Please check your credentials.");
+                    AuthService.logout(); 
                     return;
                 }
 
@@ -410,7 +423,7 @@ class DataLoader {
                 const params = `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
                 const resp = await NetworkService.fetch(CONFIG.mainTable, params);
                 
-                if(resp.status === 401) { return; } // Auth failed
+                if(resp.status === 401 || resp.status === 403) return; // Stop if auth fails
 
                 const data = await resp.json();
                 
