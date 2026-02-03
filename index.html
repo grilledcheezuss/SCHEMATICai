@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.5)</title>
+    <title>Cox Research | SCHEMATICai (v19.8)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -92,7 +92,7 @@
         .cox-input { width: 100%; height: var(--input-height); padding: 0 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-input); color: var(--text-primary); outline: none; }
         
         .search-btn { flex: 1; height: 38px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 13px; letter-spacing: 0.5px; }
-        .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; } /* DISABLED STATE */
+        .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; }
         .reset-btn { height: 38px; width: 38px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
         .refine-btn { width: 100%; height: 32px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 12px; }
 
@@ -181,7 +181,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.5</div>
+    <div class="version-badge">SCHEMATICai v19.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -242,7 +242,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.5 (VISUAL LOADING STATE & UX FIXES) ---
+// --- SCHEMATICai v19.8 (PENALTY SCORING & BADGE REORG) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -566,7 +566,6 @@ window.LOCAL_DB = []; window.DB_IDS = new Set(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); 
-        // 1. SET STATUS TO LOADING
         btn.disabled = true;
         btn.innerText = "🔒 DECRYPTING...";
         
@@ -600,7 +599,6 @@ class DataLoader {
             mfgs: Array.from(window.FOUND_MFGS)
         }, password);
         
-        // 2. SET FINAL STATE
         btn.innerText = "SEARCH";
         btn.disabled = false;
         
@@ -618,7 +616,6 @@ class DataLoader {
         do {
             if(window.LOCAL_DB.length >= 7500) break;
             
-            // 3. UPDATE PERCENTAGE
             if(btn && btn.disabled) {
                 const pct = Math.min(100, Math.round((window.LOCAL_DB.length / CONFIG.estTotal) * 100));
                 btn.innerText = `⬇️ SYNCING ${pct}%...`;
@@ -670,7 +667,10 @@ class SearchEngine {
         window.LOCAL_DB.forEach(r => {
             let sortWeight = 0; 
             let isPerfect = true; 
+            let isHpOnlyVar = false;
+            let mismatchCount = 0;
             
+            // KEYWORDS (PENALTY SCORING: SMALL BOOST)
             if(criteria.kw.length) {
                 const combinedText = (r.id + " " + r.desc).toUpperCase();
                 const cleanText = combinedText.replace(/[\W_]+/g, "");
@@ -688,70 +688,90 @@ class SearchEngine {
                     return allWordsFound;
                 });
                 if(!allKwMatch) return;
-                sortWeight += 1000; 
+                sortWeight += 10; // TINY BOOST
             }
             
+            // MFG (STRICT)
             if(criteria.mfg!=="Any") {
                 if(r.mfg === criteria.mfg.toUpperCase()) {
-                    sortWeight += 500000; 
+                    sortWeight += 50000; 
                 } else if (!r.mfg) {
-                    sortWeight -= 100000; 
-                    isPerfect = false;
+                    sortWeight -= 10000; 
+                    isPerfect = false; mismatchCount++;
                 } else {
-                    return; 
+                    return; // EXCLUDE WRONG MFG
                 }
             }
 
+            // HP (PROXIMITY)
             if(criteria.hp!=="Any") {
                 if(r.hp) {
                     const searchVal = parseFloat(criteria.hp);
                     const recordVal = parseFloat(r.hp);
                     if(!isNaN(searchVal) && !isNaN(recordVal)) {
                         if(searchVal === recordVal) {
-                            sortWeight += 5000; 
+                            sortWeight += 100;
                         } else {
                             const diff = Math.abs(searchVal - recordVal);
-                            if(diff <= 2.5) sortWeight += 1000; 
-                            else sortWeight += 200; 
-                            isPerfect = false;
+                            if(diff <= 2.5) sortWeight += 50; 
+                            else sortWeight += 10; 
+                            isPerfect = false; mismatchCount++;
                         }
-                    } else { sortWeight += 10; isPerfect = false; }
-                } else { isPerfect = false; }
+                    } else { sortWeight += 5; isPerfect = false; mismatchCount++; }
+                } else { isPerfect = false; mismatchCount++; }
             }
 
+            // VOLT (HEAVY PENALTY)
             if(criteria.volt!=="Any") { 
                 if(!r.volt || !r.volt.includes(criteria.volt)) {
-                    isPerfect = false; 
-                } else {
-                    sortWeight += 2000;
+                    isPerfect = false; mismatchCount++;
+                    sortWeight -= 10000; // ANCHOR
                 }
             }
             
+            // PHASE (HEAVY PENALTY)
             if(criteria.phase!=="Any") { 
                 if(r.phase !== criteria.phase) {
-                    isPerfect = false; 
-                } else {
-                    sortWeight += 2000;
+                    isPerfect = false; mismatchCount++;
+                    sortWeight -= 5000; // ANCHOR
                 }
             }
             
+            // ENC (LIGHT PENALTY)
             if(criteria.enc!=="Any") { 
                 if(r.enc !== criteria.enc) {
-                    isPerfect = false; 
-                } else {
-                    sortWeight += 2000;
+                    isPerfect = false; mismatchCount++;
+                    sortWeight -= 1000;
                 }
             }
             
-            if(isPerfect) sortWeight += 1000000; 
+            // HP ONLY VAR CHECK
+            if(!isPerfect && mismatchCount === 1) {
+                // If only mismatch is HP, flag it for Tier 2
+                if(criteria.hp!=="Any" && r.hp && parseFloat(r.hp) !== parseFloat(criteria.hp)) {
+                    isHpOnlyVar = true;
+                }
+            }
             
             r.sortWeight = sortWeight;
             r.isPerfect = isPerfect;
+            r.isHpOnlyVar = isHpOnlyVar;
             results.push(r);
         });
         
+        // TIERED SORT
         results.sort((a, b) => {
-            if (a.sortWeight !== b.sortWeight) return b.sortWeight - a.sortWeight;
+            // TIER 1: PERFECT
+            if (a.isPerfect && !b.isPerfect) return -1;
+            if (!a.isPerfect && b.isPerfect) return 1;
+            
+            // TIER 2: HP VARIED ONLY
+            if (a.isHpOnlyVar && !b.isHpOnlyVar) return -1;
+            if (!a.isHpOnlyVar && b.isHpOnlyVar) return 1;
+            
+            // TIER 3: SCORE (VOLT MISMATCHES SUNK BY NEGATIVE SCORE)
+            if (b.sortWeight !== a.sortWeight) return b.sortWeight - a.sortWeight;
+            
             return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' });
         });
         
@@ -792,17 +812,7 @@ class UI {
             
             let badges = '';
             
-            if(criteria.mfg!=="Any") {
-                const isExact = (item.mfg === criteria.mfg.toUpperCase());
-                const badgeClass = (isExact) ? 'match-green' : 'match-orange';
-                badges += `<span class="hud-badge ${badgeClass}">${healed?.mfg||item.mfg||'Unknown'}</span>`;
-            }
-            
-            if(criteria.hp!=="Any" && item.hp) {
-                const isExactHp = (parseFloat(item.hp) === parseFloat(criteria.hp));
-                const badgeClass = (isExactHp) ? 'match-green' : 'match-orange';
-                badges += `<span class="hud-badge ${badgeClass}">${healed?.hp||item.hp} HP</span>`;
-            }
+            // BADGE ORDER: VOLT > PHASE > HP > MFG > ENC > KEYWORDS
             
             if(criteria.volt!=="Any" && item.volt) {
                 const isMatch = item.volt.includes(criteria.volt);
@@ -814,6 +824,18 @@ class UI {
                 const isMatch = item.phase === criteria.phase;
                 const badgeClass = isMatch ? 'match-green' : 'match-red';
                 badges += `<span class="hud-badge ${badgeClass}">${healed?.phase||item.phase}PH</span>`;
+            }
+
+            if(criteria.hp!=="Any" && item.hp) {
+                const isExactHp = (parseFloat(item.hp) === parseFloat(criteria.hp));
+                const badgeClass = (isExactHp) ? 'match-green' : 'match-orange';
+                badges += `<span class="hud-badge ${badgeClass}">${healed?.hp||item.hp} HP</span>`;
+            }
+
+            if(criteria.mfg!=="Any") {
+                const isExact = (item.mfg === criteria.mfg.toUpperCase());
+                const badgeClass = (isExact) ? 'match-green' : 'match-orange';
+                badges += `<span class="hud-badge ${badgeClass}">${healed?.mfg||item.mfg||'Unknown'}</span>`;
             }
             
             if(criteria.enc!=="Any" && item.enc) {
@@ -842,18 +864,13 @@ class UI {
     
     static populateAllDropdowns() {
         const encs = AI_TRAINING_DATA.ENCLOSURES;
-        
         const mfgSelect = document.getElementById('mfgInput');
         const currentVal = mfgSelect.value;
-        
         let allMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS).map(k => k.toUpperCase());
         window.FOUND_MFGS.forEach(m => { if(!allMfgs.includes(m)) allMfgs.push(m); });
         allMfgs.sort();
-        
         mfgSelect.innerHTML = '<option value="Any">Any</option>';
-        allMfgs.forEach(m => { 
-            const o = document.createElement('option'); o.value=m; o.innerText=m; mfgSelect.appendChild(o); 
-        });
+        allMfgs.forEach(m => { const o = document.createElement('option'); o.value=m; o.innerText=m; mfgSelect.appendChild(o); });
         if(currentVal && currentVal !== "Any") mfgSelect.value = currentVal;
 
         ['hp','volt','phase','enc'].forEach(c => {
