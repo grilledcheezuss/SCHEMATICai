@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v15.4)</title>
-    
+    <title>Cox Research | SCHEMATICai (v16.1)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     
     <style>
+        /* --- 1. COLOR SYSTEM (Smart Dark Mode) --- */
         :root { 
-            --app-primary: #461D7C;        
+            /* LIGHT MODE */
+            --app-primary: #461D7C;
+            --app-accent: #461D7C;
             --bg-app: #e3e5e8; 
             --bg-sidebar: #ffffff; 
             --bg-card: #ffffff;
@@ -34,39 +36,43 @@
         }
 
         body.dark-mode {
-            --bg-app: #121212; --bg-sidebar: #1e1e1e; --bg-card: #2d2d2d; 
-            --bg-controls: rgba(30, 30, 30, 0.98); --bg-viewer: #1a1a1a; 
-            --bg-input: #383838; 
-            --text-primary: #e8eaed; --text-secondary: #9aa0a6; 
-            --border-color: #3c4043;
+            /* DARK MODE (Neon Lavender) */
+            --app-primary: #A78BFA;
+            --app-accent: #8B5CF6;
+            --bg-app: #0F0F0F;
+            --bg-sidebar: #18181B;
+            --bg-card: #27272A;
+            --bg-controls: rgba(24, 24, 27, 0.98); 
+            --bg-viewer: #000000; 
+            --bg-input: #3F3F46; 
+            --text-primary: #F4F4F5; 
+            --text-secondary: #A1A1AA; 
+            --border-color: #3F3F46;
             
-            --match-exact-bg: #14532d; --match-exact-text: #86efac; 
-            --match-varied-bg: #7c2d12; --match-varied-text: #fdba74;
-            --match-keyword-bg: #581c87; --match-keyword-text: #d8b4fe;
-            --badge-healed-bg: #1e3a8a; --badge-healed-text: #93c5fd;
+            --match-exact-bg: #064E3B; --match-exact-text: #6EE7B7; 
+            --match-varied-bg: #7C2D12; --match-varied-text: #FDBA74;
+            --match-keyword-bg: #4C1D95; --match-keyword-text: #C4B5FD;
+            --badge-healed-bg: #1E3A8A; --badge-healed-text: #93C5FD;
             color-scheme: dark;            
         }
         
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 15px; }
 
+        /* --- HEADER --- */
         header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 25px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
         .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; }
         .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
         .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.75rem; color: #b39ddb; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; margin-top: 4px; }
-        
         .version-badge { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 6px 16px; border-radius: 20px; font-weight: 800; font-size: 13px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
-
         .header-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; z-index: 2; }
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
-        .btn-bug { font-size: 14px; }
-        
-        #settings-btn-wrapper { display: flex; } 
 
-        #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
+        /* --- LAYOUT --- */
+        #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); position: relative; }
         html.logged-in #app-container { display: flex !important; }
         
-        #sidebar { width: 420px; min-width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; }
+        #sidebar { width: 420px; min-width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
         .sidebar-controls { padding: 15px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px; }
         
         .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -74,8 +80,7 @@
         .input-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
         .cox-input { width: 100%; height: var(--input-height); padding: 0 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px; background: var(--bg-input); color: var(--text-primary); outline: none; }
         
-        .search-btn { flex: 1; height: 40px; background-color: #461D7C !important; color: white !important; border: none; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.3s; }
-        .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.8; }
+        .search-btn { flex: 1; height: 40px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.3s; }
         .reset-btn { height: 40px; width: 40px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
 
         #results-scroll-area { flex: 1; overflow-y: auto; padding: 15px; background: var(--bg-app); }
@@ -83,83 +88,95 @@
 
         .record-card { background: var(--bg-card); padding: 12px 15px; border-radius: 8px; border: 1px solid var(--border-color); border-left: 6px solid var(--app-primary); box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 10px; }
         .record-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .record-card.active-view { background: rgba(70, 29, 124, 0.03); border-color: var(--app-primary); }
+        .record-card.active-view { background: rgba(139, 92, 246, 0.1); border-color: var(--app-accent); }
         
-        .card-header { display: flex; justify-content: space-between; align-items: center; }
         .panel-name { font-size: 24px; font-weight: 900; color: var(--app-primary); margin: 0; letter-spacing: -0.5px; }
 
+        /* BADGES & BUTTONS */
         .badge-row { display: flex; gap: 6px; flex-wrap: wrap; }
         .hud-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px; border: 1px solid transparent; }
-        .hud-badge.match-exact { background: var(--match-exact-bg); color: var(--match-exact-text); border-color: var(--match-exact-border); }
-        .hud-badge.match-varied { background: var(--match-varied-bg); color: var(--match-varied-text); border-color: transparent; }
-        .hud-badge.match-healed { background: var(--badge-healed-bg); color: var(--badge-healed-text); border-color: transparent; }
-        .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); border-color: transparent; }
+        .hud-badge.match-exact { background: var(--match-exact-bg); color: var(--match-exact-text); }
+        .hud-badge.match-varied { background: var(--match-varied-bg); color: var(--match-varied-text); }
+        .hud-badge.match-healed { background: var(--badge-healed-bg); color: var(--badge-healed-text); }
+        .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); }
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
-        .thumb-btn:hover { background: #f5f5f5; }
-        .thumb-btn.voted-up { background: #dcfce7; border-color: #166534; color: #166534; pointer-events: none; }
-        .thumb-btn.voted-down { background: #fee2e2; border-color: #991b1b; color: #991b1b; }
+        /* LOCKED STATE (Voted Up) */
+        .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
+        /* LOCKED STATE (Voted Down) */
+        .thumb-btn.voted-down { background: #fee2e2 !important; border-color: #991b1b !important; color: #991b1b !important; opacity: 1 !important; pointer-events: none; }
 
-        /* MODALS & AUTH */
-        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
-        .active-modal { display: flex !important; }
-        
-        .auth-card, .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 480px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
-        .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
-        .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
-        .modal-content { padding: 20px; }
-        
-        .login-avatar { width: 80px; height: 80px; background: #e3e5e8; border-radius: 50%; margin: 0 auto 20px auto; display: flex; align-items: center; justify-content: center; font-size: 32px; border: 2px solid var(--border-color); color: var(--app-primary); }
-        
-        /* CLEAN AUTH CSS (v15.4) */
-        .auth-group { margin-bottom: 20px; text-align: left; }
-        .auth-label { font-size: 10px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px; letter-spacing: 0.5px; }
-        .auth-input { margin-top: 0 !important; } 
-
-        .reason-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
-        .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; width: 100%; }
-        .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
-        
-        .correction-input { display: none; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-top: 4px; }
-        .reason-btn.selected + .correction-input { display: block; }
-        
-        .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-primary); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; margin-top: 15px; }
-
+        /* PREVIEW & MOBILE */
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
         .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; }
-        .pdf-fallback a { display: inline-block; margin-top: 10px; color: #b39ddb; text-decoration: underline; font-size: 14px; cursor: pointer; }
         
-        @media (max-width: 900px) { #sidebar { width: 100%; } #preview-pane { display: none; } }
+        #mobile-back-btn { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--app-accent); color: white; padding: 12px 24px; border-radius: 30px; border: none; font-weight: 800; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; cursor: pointer; }
+
+        /* RESPONSIVE */
+        @media (min-width: 768px) and (max-width: 1024px) {
+            #sidebar { width: 300px; min-width: 300px; } 
+            .logo-main { font-size: 1.8rem; }
+        }
+        @media (max-width: 767px) {
+            .version-badge { display: none; } 
+            .header-controls { gap: 6px; }
+            #sidebar { width: 100%; position: absolute; height: 100%; z-index: 20; transform: translateX(0); }
+            #preview-pane { position: absolute; width: 100%; height: 100%; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+            body.viewing-pdf #sidebar { transform: translateX(-100%); }
+            body.viewing-pdf #preview-pane { z-index: 30; opacity: 1; pointer-events: auto; }
+            body.viewing-pdf #mobile-back-btn { display: block; }
+        }
+
+        /* MODALS */
+        #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
+        .active-modal { display: flex !important; }
+        .auth-card, .config-card, .modal-card { background: var(--bg-card); padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
+        .auth-group { margin-bottom: 20px; text-align: left; }
+        .auth-label { font-size: 10px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px; }
+        
+        .reason-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+        .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; }
+        .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
+        .correction-input { display: none; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; }
+        .reason-btn.selected + .correction-input { display: block; }
+        .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-accent); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; margin-top: 15px; }
+
     </style>
 </head>
 <body>
 
+<div id="preview-pane">
+    <div id="pdf-placeholder-text">📄 Select a schematic</div>
+    <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
+    <div id="pdf-fallback" class="pdf-fallback">
+        <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
+        <a id="pdf-fallback-link" target="_blank">Open File</a>
+    </div>
+    <button id="mobile-back-btn" onclick="UI.closeMobilePreview()">← BACK TO RESULTS</button>
+</div>
+
 <div id="auth-overlay" class="active-modal">
     <div class="auth-card">
-        <div class="login-avatar">👤</div>
-        <h2 style="color:var(--app-primary); margin-top:0; margin-bottom:20px;">SCHEMATICai</h2>
-        
+        <div style="font-size:32px;margin-bottom:20px;">👤</div>
+        <h2 style="color:var(--app-primary); margin-top:0;">SCHEMATICai</h2>
         <div class="auth-group">
             <label for="auth-user" class="auth-label">Username</label>
-            <input type="text" id="auth-user" class="cox-input auth-input" placeholder="Enter Username" autocomplete="username">
+            <input type="text" id="auth-user" class="cox-input" placeholder="Enter Username" autocomplete="username">
         </div>
-        
         <div class="auth-group">
             <label for="auth-pass" class="auth-label">Passcode</label>
-            <input type="password" id="auth-pass" class="cox-input auth-input" placeholder="Enter Passcode" autocomplete="current-password" onkeypress="if(event.key==='Enter') AuthService.login()">
+            <input type="password" id="auth-pass" class="cox-input" placeholder="Enter Passcode" autocomplete="current-password" onkeypress="if(event.key==='Enter') AuthService.login()">
         </div>
-        
         <button class="submit-feedback-btn" onclick="AuthService.login()">Authenticate</button>
     </div>
 </div>
 
 <div id="config-modal">
     <div class="config-card">
-        <h3 style="margin-top:0; color:var(--app-primary);">🛠️ Admin Tools</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Connection: <strong>SECURE (Cloudflare)</strong></p>
-        <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="DataLoader.harvestCSV()">📥 Harvest Golden CSV</button>
+        <h3>🛠️ Admin Tools</h3>
+        <button class="submit-feedback-btn" onclick="DataLoader.harvestCSV()">📥 Harvest CSV</button>
         <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="AuthService.logout()">⏻ Logout</button>
         <div style="margin-top:10px;"><button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
     </div>
@@ -167,43 +184,24 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v15.4</div>
+    <div class="version-badge">SCHEMATICai v16.1</div>
     <div class="header-controls">
-        <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
+        <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
-        <button class="control-btn" onclick="AuthService.logout()">⏻</button>
     </div>
 </header>
 
 <div id="feedback-modal">
     <div class="modal-card">
-        <div class="modal-header"><span>Report Inaccuracy</span><button class="control-btn" style="width:24px;height:24px;font-size:12px;background:rgba(255,255,255,0.2);" onclick="FeedbackService.close()">X</button></div>
-        <div class="modal-content">
-            <p style="font-size:12px; color:#666; margin-top:0;">Select parameter and enter correct value:</p>
-            
-            <div class="reason-row">
-                <div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div>
-                <input type="text" name="fix_mfg" class="correction-input" placeholder="Correct Value" autocomplete="off">
-            </div>
-            
-            <div class="reason-row">
-                <div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div>
-                <input type="text" name="fix_hp" class="correction-input" placeholder="Correct Value" autocomplete="off">
-            </div>
-            
-            <div class="reason-row">
-                <div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div>
-                <input type="text" name="fix_volt" class="correction-input" placeholder="Correct Value" autocomplete="off">
-            </div>
-            
-            <div class="reason-row">
-                <div class="reason-btn" data-reason="phase" onclick="FeedbackService.toggleReason(this)">Wrong Phase</div>
-                <input type="text" name="fix_phase" class="correction-input" placeholder="Correct Value" autocomplete="off">
-            </div>
-            
-            <div id="dynamic-feedback-container"></div>
-            <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
+        <h3>Report Inaccuracy</h3>
+        <div style="padding:15px; text-align:left;">
+             <div class="reason-row"><div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
+             <div class="reason-row"><div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
+             <div class="reason-row"><div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
+             <div id="dynamic-feedback-container"></div>
+             <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
+             <button class="submit-feedback-btn" style="background:#555;margin-top:5px;" onclick="FeedbackService.close()">CANCEL</button>
         </div>
     </div>
 </div>
@@ -211,49 +209,31 @@
 <div id="app-container">
     <div id="sidebar">
         <div class="sidebar-controls">
-            <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" name="search_keywords" class="cox-input" placeholder="e.g. Duplex, 1PH, CP-7920" onkeypress="UI.handleEnter(event)" autocomplete="off"></div>
+            <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" class="cox-input" placeholder="e.g. Duplex, 1PH" onkeypress="UI.handleEnter(event)"></div>
             <div class="filter-grid">
-                <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" name="filter_mfg" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" name="filter_phase" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">HP</span><select id="hpInput" name="filter_hp" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" name="filter_volt" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Mfg</span><select id="mfgInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">HP</span><select id="hpInput" class="cox-input"><option value="Any">Any</option></select></div>
+                <div class="input-group"><span class="input-label">Volt</span><select id="voltInput" class="cox-input"><option value="Any">Any</option></select></div>
             </div>
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
-                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()">SEARCH DATABASE</button>
+                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()">SEARCH</button>
             </div>
         </div>
         <div id="results-scroll-area"><div id="results-area"></div></div>
     </div>
-    <div id="preview-pane">
-        <div id="pdf-placeholder-text">📄 Select a schematic to view</div>
-        <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
-        <div id="pdf-fallback" class="pdf-fallback">
-            <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
-            <div style="font-size:12px; opacity:0.7;" id="pdf-debug-path">Fetching from Airtable...</div>
-            <a id="pdf-fallback-link" target="_blank" style="display:none">Open File</a>
-        </div>
-    </div>
 </div>
 
 <script>
-// --- SCHEMATICai v15.4 (FAVICON + STABILITY) ---
-
-// 🚀 CLOUDFLARE WORKER URL
+// --- SCHEMATICai v16.1 (FIXED VOTING LOCKOUT) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
+const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
-const CONFIG = {
-    mainTable: 'MAIN',
-    feedbackTable: 'FEEDBACK',
-    voteThreshold: 3
-};
-
-// 1. AUTH SERVICE
 class AuthService {
     static init() {
         const user = localStorage.getItem('cox_user');
         const pass = localStorage.getItem('cox_pass');
-        
         if (user && pass) {
             document.documentElement.classList.add('logged-in');
             document.getElementById('auth-overlay').classList.remove('active-modal');
@@ -261,349 +241,215 @@ class AuthService {
         }
         return false;
     }
-
     static login() {
         const user = document.getElementById('auth-user').value.trim();
         const pass = document.getElementById('auth-pass').value.trim();
-        
-        if (!user || !pass) return alert("Please enter Username and Passcode.");
-        
-        localStorage.setItem('cox_user', user);
-        localStorage.setItem('cox_pass', pass);
-        location.reload(); 
+        if (!user || !pass) return alert("Missing Credentials");
+        localStorage.setItem('cox_user', user); localStorage.setItem('cox_pass', pass); location.reload(); 
     }
-
-    static logout() {
-        localStorage.removeItem('cox_user');
-        localStorage.removeItem('cox_pass');
-        location.reload();
-    }
-
-    static getHeaders() {
-        return {
-            'X-Cox-User': localStorage.getItem('cox_user'),
-            'X-Cox-Pass': localStorage.getItem('cox_pass')
-        };
-    }
+    static logout() { localStorage.clear(); location.reload(); }
+    static getHeaders() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 
-// 2. NETWORK SERVICE
 class NetworkService {
     static async fetch(target, params = '') {
-        let baseUrl = WORKER_URL;
-        if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
-        const url = `${baseUrl}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`;
-        return fetch(url, { headers: AuthService.getHeaders() });
+        let baseUrl = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
+        return fetch(`${baseUrl}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`, { headers: AuthService.getHeaders() });
     }
-
     static async post(target, data) {
-        let baseUrl = WORKER_URL;
-        if (!baseUrl.startsWith('http')) baseUrl = `https://${baseUrl}`;
-        const url = `${baseUrl}?target=${encodeURIComponent(target)}`;
-        return fetch(url, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', ...AuthService.getHeaders() },
-            body: JSON.stringify(data)
+        let baseUrl = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
+        return fetch(`${baseUrl}?target=${encodeURIComponent(target)}`, { 
+            method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.getHeaders() }, body: JSON.stringify(data)
         });
     }
 }
 
-// 3. FEEDBACK SERVICE (Moved UP to fix ReferenceError)
 class FeedbackService { 
-    static activeId = null; 
-    static sessionVotes = new Set();
-    static resetSession() { this.sessionVotes.clear(); }
-    static getHistory(id) { const stored = localStorage.getItem('cox_vote_' + id); return stored ? JSON.parse(stored) : { up: false, down: false }; }
-    static saveHistory(id, type) { const current = this.getHistory(id); current[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(current)); }
-
+    static activeId = null; static sessionVotes = new Set();
+    static getHistory(id) { const s = localStorage.getItem('cox_vote_' + id); return s ? JSON.parse(s) : { up: false, down: false }; }
+    static saveHistory(id, type) { const c = this.getHistory(id); c[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(c)); }
+    
     static down(id) { 
-        if(this.getHistory(id).down) return;
+        if(this.getHistory(id).down || this.sessionVotes.has(id + '_down')) return;
         this.activeId = id; 
         document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
-        document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); 
-        const container = document.getElementById('dynamic-feedback-container'); container.innerHTML = '';
-        SearchEngine.currentPhrases.forEach(p => { const div = document.createElement('div'); div.className = 'reason-row'; div.innerHTML = `<div class="reason-btn" data-reason="kw_reject" data-kw="${p}" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch: "${p}"</div>`; container.appendChild(div); });
+        document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected')); 
         document.getElementById('feedback-modal').classList.add('active-modal'); 
     } 
     
     static async submit() { 
         const id = this.activeId; const submissions = []; 
         document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
-            const reasonCode = btn.dataset.reason; 
-            if(reasonCode === 'kw_reject') { submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw }); } 
-            else { const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }
+            const reason = btn.dataset.reason; 
+            const val = btn.nextElementSibling?.value || ""; 
+            submissions.push({ id, reasonCode: reason, value: val }); 
         }); 
-        if(submissions.length === 0) return alert("Select a reason and enter a value."); 
-        for(const sub of submissions) { await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); } 
-        this.saveHistory(id, 'down'); alert("Votes Recorded. Thank you."); 
-        const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); this.close(); 
+        for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
+        this.saveHistory(id, 'down'); 
+        this.sessionVotes.add(id + '_down'); // Lock session
+        alert("Votes Recorded."); this.close(); 
     } 
     
-    static async up(id) { 
-        if(this.sessionVotes.has(id)) return;
-        this.sessionVotes.add(id);
-        let votesCast = 0;
-        const criteria = { mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value };
-        for(const [param, val] of Object.entries(criteria)) { if(val !== "Any" && val !== "") { await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": param, "Suggested Value": val } }); votesCast++; } }
-        SearchEngine.currentPhrases.forEach(p => { NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": 'kw_confirm', "Suggested Value": p } }); votesCast++; });
-        if(votesCast === 0) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
-        alert("Liked!"); event.target.classList.add('voted-up');
+    static async up(id, btnElement) { 
+        if(this.sessionVotes.has(id)) return; // Logic Lock
+        this.sessionVotes.add(id); // Lock Session
+        
+        // Visual Lock (Immediate)
+        if(btnElement) btnElement.classList.add('voted-up');
+
+        await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
+        alert("Liked!"); 
     } 
     
-    static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } 
+    static toggleReason(el) { el.classList.toggle('selected'); } 
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
 }
 
-// 4. PDF CONTROLLER
 class PdfController {
     static load(id, url) {
         const frame = document.getElementById('pdf-viewer-frame');
         const place = document.getElementById('pdf-placeholder-text');
         const fallback = document.getElementById('pdf-fallback');
         const link = document.getElementById('pdf-fallback-link');
+        
         place.style.display = 'none'; frame.style.display = 'none'; fallback.style.display = 'block';
         if (url) { frame.src = url; frame.style.display = 'block'; fallback.style.display = 'none'; }
         if(link) link.href = url || "#";
+        
+        if(window.innerWidth < 768) {
+            document.body.classList.add('viewing-pdf');
+        }
     }
 }
 
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
-    DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 6.2, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
+    DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
 class TheHealer {
     static healedData = {}; 
     static async fetchAndTally() {
-        console.log("🚑 Healer: Analyzing Feedback...");
-        const tallies = {}; 
         try {
-            let offset = null;
-            do {
-                const params = `?pageSize=100${offset ? '&offset='+offset : ''}`;
-                const resp = await NetworkService.fetch(CONFIG.feedbackTable, params);
-                
-                if(resp.status === 401 || resp.status === 403) {
-                    alert("Authentication Failed. Please check your credentials.");
-                    AuthService.logout(); 
-                    return;
-                }
-
-                const data = await resp.json();
-                
-                if(!data.records) break;
+            const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100');
+            if(resp.status === 401) { AuthService.logout(); return; }
+            const data = await resp.json();
+            if(data.records) {
+                const tallies = {};
                 data.records.forEach(r => {
-                    const id = r.fields['Panel ID']; const param = r.fields['Parameter']; const value = r.fields['Suggested Value'];
-                    if(id && param && value) { const key = `${id}|${param}|${value}`; tallies[key] = (tallies[key] || 0) + 1; }
+                    const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`;
+                    tallies[key] = (tallies[key] || 0) + 1;
                 });
-                offset = data.offset;
-            } while (offset);
-            for (const [key, count] of Object.entries(tallies)) {
-                if (count >= CONFIG.voteThreshold) {
-                    const [id, param, value] = key.split('|');
-                    if (!this.healedData[id]) this.healedData[id] = {};
-                    this.healedData[id][param] = value;
-                    console.log(`✨ HEALED: ${id} ${param} = ${value} (${count} votes)`);
+                for (const [key, count] of Object.entries(tallies)) {
+                    if (count >= CONFIG.voteThreshold) {
+                        const [id, param, value] = key.split('|');
+                        if (!this.healedData[id]) this.healedData[id] = {};
+                        this.healedData[id][param] = value;
+                    }
                 }
             }
         } catch(e) { console.error("Healing Failed", e); }
     }
 }
 
-const REGEX_HP_A = /\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i;
-const REGEX_HP_B = /(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i;
-const REGEX_VOLT = /\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i;
-
 class AIParser {
     static parse(text, panelId) {
         const healed = TheHealer.healedData[panelId];
         const specs = { mfg: healed?.mfg || null, hp: healed?.hp || null, volt: healed?.volt || null, phase: healed?.phase || null };
         const t = (text || "").toUpperCase();
-
-        if (!specs.mfg) {
-            for (const [standard, aliases] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) {
-                if (new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i').test(t)) { specs.mfg = standard.toUpperCase(); break; }
-            }
-        }
-        if (!specs.hp) {
-            let hpMatch = t.match(REGEX_HP_A);
-            if (!hpMatch) hpMatch = t.match(REGEX_HP_B);
-            if(hpMatch) { const val = parseFloat(hpMatch[1]); if (!isNaN(val) && val < 999) specs.hp = hpMatch[1].replace(/\s/g, ''); }
-        }
-        if (!specs.volt) {
-            const voltMatch = t.match(REGEX_VOLT);
-            if(voltMatch) specs.volt = voltMatch[1];
-        }
-        if (!specs.phase) {
-            if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø") || t.includes("3/60")) specs.phase = "3";
-            else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø") || t.includes("1/60")) specs.phase = "1";
-        }
+        if (!specs.mfg) for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) specs.mfg = k.toUpperCase();
+        if (!specs.hp) { const m = t.match(/\b(\d+(\.\d+)?)\s*HP\b/); if(m) specs.hp = m[1]; }
+        if (!specs.volt) { const m = t.match(/\b(120|208|230|240|460|480|575)\s*V\b/); if(m) specs.volt = m[1]; }
+        if (!specs.phase) { if(t.includes("3PH") || t.includes("3Ø")) specs.phase = "3"; else if(t.includes("1PH")) specs.phase = "1"; }
         return specs;
     }
 }
 
 window.LOCAL_DB = []; window.DB_IDS = new Set();
-
 class DataLoader {
     static async preload() {
-        const btn = document.getElementById('searchBtn');
-        btn.innerText = "INITIALIZING...";
-        btn.disabled = true; 
-        
+        const btn = document.getElementById('searchBtn'); btn.innerText = "LOADING..."; btn.disabled = true;
         await TheHealer.fetchAndTally();
-        
-        btn.innerText = "DOWNLOADING...";
-        
-        await Promise.all([this.fetchPartition('desc'), this.fetchPartition('asc')]);
-        
-        console.log(`✅ Pipeline Complete: ${window.LOCAL_DB.length} records processed.`);
-        btn.innerText = "SEARCH DATABASE"; 
-        btn.disabled = false;
-        btn.style.backgroundColor = "#461D7C";
+        await this.fetchPartition('desc');
+        btn.innerText = "SEARCH"; btn.disabled = false;
     }
-    static async fetchPartition(direction) {
+    static async fetchPartition(dir) {
         let offset = null;
-        try {
-            do {
-                if (window.LOCAL_DB.length >= 7500) break;
-                const params = `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
-                const resp = await NetworkService.fetch(CONFIG.mainTable, params);
-                
-                if(resp.status === 401 || resp.status === 403) return; // Stop if auth fails
-
-                const data = await resp.json();
-                
-                if(!data.records || data.records.length === 0) break;
-                let newCount = 0;
-                data.records.forEach(r => {
-                    const rawId = r.fields['Control Panel Name'] || "";
-                    const id = rawId.replace(/[!?]/g, '').replace(/\.dwg$/i, '').trim();
-                    if (!window.DB_IDS.has(id)) {
-                        window.DB_IDS.add(id);
-                        newCount++;
-                        const extracted = AIParser.parse(r.fields['Items'] || "", id); 
-                        window.LOCAL_DB.push({ id: id, desc: (r.fields['Items']||"").toUpperCase(), rawDesc: r.fields['Items']||"", pdfUrl: (r.fields['Control Panel PDF'] && r.fields['Control Panel PDF'][0]) ? r.fields['Control Panel PDF'][0].url : null, ...extracted });
-                    }
-                });
-                offset = data.offset;
-                if(document.getElementById('searchBtn')) {
-                    document.getElementById('searchBtn').innerText = `LOADING... (${window.LOCAL_DB.length})`;
+        do {
+            if(window.LOCAL_DB.length >= 7500) break;
+            const resp = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
+            if(resp.status!==200) return;
+            const data = await resp.json();
+            if(!data.records) break;
+            data.records.forEach(r => {
+                const id = (r.fields['Control Panel Name']||"").replace(/[!?]/g,'').trim();
+                if(!window.DB_IDS.has(id)) {
+                    window.DB_IDS.add(id);
+                    window.LOCAL_DB.push({ id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, ...AIParser.parse(r.fields['Items']||"", id) });
                 }
-                if (newCount === 0) break; 
-            } while (offset);
-        } catch(e) { console.error("Partition Error", e); }
+            });
+            offset = data.offset;
+        } while(offset);
     }
-    static harvestCSV() { alert("Harvesting..."); }
 }
 
 class SearchEngine {
-    static currentPhrases = []; 
-
     static perform() {
-        const kwInput = document.getElementById('keywordInput').value;
-        const mfg = document.getElementById('mfgInput').value;
-        const hp = document.getElementById('hpInput').value;
-        const volt = document.getElementById('voltInput').value;
-        const phase = document.getElementById('phaseInput').value;
-
-        this.currentPhrases = kwInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
-
-        if(this.currentPhrases.length === 0 && mfg==="Any" && hp==="Any" && volt==="Any" && phase==="Any") { alert("Enter search criteria."); return; }
-
-        let results = window.LOCAL_DB.filter((rec) => {
-            let pass = true;
-            if(this.currentPhrases.length > 0) {
-                const combinedText = (rec.id + " " + rec.desc).toUpperCase();
-                const allPhrasesMatch = this.currentPhrases.every(p => combinedText.includes(p.toUpperCase()));
-                if(!allPhrasesMatch) pass = false;
-            }
-            if(pass && mfg !== "Any") { if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; else if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; }
-            if(pass && volt !== "Any") { if(rec.volt && !rec.volt.includes(String(volt))) pass = false; else if(!rec.volt && !rec.desc.includes(String(volt))) pass = false; }
-            if(pass && phase !== "Any") { if(rec.phase && rec.phase !== String(phase)) pass = false; else if(!rec.phase && !rec.desc.includes(String(phase))) pass = false; }
-            return pass;
+        const criteria = { kw: document.getElementById('keywordInput').value.split(',').map(s=>s.trim()).filter(s=>s), mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value };
+        const results = window.LOCAL_DB.filter(r => {
+            if(criteria.kw.length && !criteria.kw.every(k => (r.id+r.desc).includes(k.toUpperCase()))) return false;
+            if(criteria.mfg!=="Any" && r.mfg!==criteria.mfg.toUpperCase()) return false;
+            if(criteria.hp!=="Any" && r.hp!==criteria.hp) return false;
+            if(criteria.volt!=="Any" && (!r.volt || !r.volt.includes(criteria.volt))) return false;
+            return true;
         });
-
-        if(hp !== "Any") {
-            const target = parseFloat(hp);
-            results.sort((a, b) => {
-                const valA = parseFloat(a.hp) || -999;
-                const valB = parseFloat(b.hp) || -999;
-                const matchA = valA === target;
-                const matchB = valB === target;
-                if (matchA && !matchB) return -1;
-                if (!matchA && matchB) return 1;
-                const distA = (valA === -999) ? Infinity : Math.abs(valA - target);
-                const distB = (valB === -999) ? Infinity : Math.abs(valB - target);
-                if (distA !== distB) return distA - distB;
-                return b.id.localeCompare(a.id);
-            });
-        } else {
-            results.sort((a, b) => b.id.localeCompare(a.id));
-        }
-
-        UI.renderResults(results, { mfg, hp, volt, phase }, this.currentPhrases);
+        UI.renderResults(results, criteria);
     }
 }
 
 class UI {
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
-    static resetSearch() { document.getElementById('keywordInput').value=''; document.querySelectorAll('select').forEach(s => s.value = "Any"); document.getElementById('results-area').innerHTML=''; }
+    static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; }
+    static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
     
-    static renderResults(results, criteria, phrases) { 
-        const area = document.getElementById('results-area'); area.innerHTML = ''; 
-        area.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;padding:0 5px;">Found ${results.length} records</div>`;
-        if (results.length === 0) { area.innerHTML += '<div style="padding:20px;text-align:center;opacity:0.5;">No results found.</div>'; return; }
-
-        results.slice(0, 100).forEach(item => {
-            const card = document.createElement('div'); card.className = 'record-card';
+    static renderResults(results, criteria) {
+        const area = document.getElementById('results-area'); area.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${results.length} records</div>`;
+        results.slice(0, 50).forEach(item => {
             const healed = TheHealer.healedData[item.id];
-            const isVoted = FeedbackService.sessionVotes.has(item.id);
-            const history = FeedbackService.getHistory(item.id);
+            
+            // CHECK VOTING STATUS FOR UI
+            const isVotedUp = FeedbackService.sessionVotes.has(item.id);
+            const isVotedDown = FeedbackService.sessionVotes.has(item.id + '_down');
             
             let badges = '';
-            phrases.forEach(p => { badges += `<span class="hud-badge match-keyword">KW: ${p.toUpperCase()}</span>`; });
+            if(criteria.mfg!=="Any") badges += `<span class="hud-badge ${healed?.mfg?'match-healed':'match-exact'}">${criteria.mfg}</span>`;
+            if(item.hp) badges += `<span class="hud-badge ${healed?.hp?'match-healed':'match-exact'}">${healed?.hp||item.hp} HP</span>`;
             
-            if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
-            
-            if(criteria.hp !== "Any" && criteria.hp !== "") {
-                const isMatch = item.hp === String(criteria.hp);
-                const isHealed = healed && healed.hp;
-                const css = isHealed ? 'match-healed' : (isMatch ? 'match-exact' : 'match-varied');
-                const val = (healed?.hp || item.hp || "Unknown"); 
-                badges += `<span class="hud-badge ${css}">${val} HP</span>`;
-            }
-            
-            if(criteria.volt !== "Any" && criteria.volt !== "") {
-                const isMatch = item.volt && item.volt.includes(String(criteria.volt));
-                const css = healed?.volt ? 'match-healed' : 'match-exact';
-                badges += `<span class="hud-badge ${css}">${healed?.volt || criteria.volt}V</span>`;
-            }
-            
-            if(criteria.phase !== "Any" && criteria.phase !== "") {
-                const css = healed?.phase ? 'match-healed' : 'match-exact';
-                badges += `<span class="hud-badge ${css}">${healed?.phase || criteria.phase}PH</span>`;
-            }
-
-            card.innerHTML = `<div class="card-header"><div class="panel-name">${item.id}</div></div><div class="badge-row">${badges}</div><div class="card-actions"><button class="thumb-btn up ${isVoted ? 'voted-up' : ''}" onclick="event.stopPropagation(); FeedbackService.up('${item.id}')">👍</button><button class="thumb-btn down ${history.down ? 'voted-down' : ''}" onclick="event.stopPropagation(); FeedbackService.down('${item.id}')">👎</button></div>`;
-            card.onclick = () => { document.querySelectorAll('.record-card').forEach(c => c.classList.remove('active-view')); card.classList.add('active-view'); PdfController.load(item.id, item.pdfUrl); };
+            const card = document.createElement('div'); card.className = 'record-card';
+            card.innerHTML = `<div class="panel-name">${item.id}</div><div class="badge-row">${badges}</div>
+            <div class="card-actions">
+                <button class="thumb-btn up ${isVotedUp ? 'voted-up' : ''}" onclick="event.stopPropagation();FeedbackService.up('${item.id}', this)">👍</button>
+                <button class="thumb-btn down ${isVotedDown ? 'voted-down' : ''}" onclick="event.stopPropagation();FeedbackService.down('${item.id}')">👎</button>
+            </div>`;
+            card.onclick = () => { 
+                document.querySelectorAll('.record-card').forEach(c=>c.classList.remove('active-view')); card.classList.add('active-view'); 
+                PdfController.load(item.id, item.pdfUrl); 
+            };
             area.appendChild(card);
         });
     }
-    static populateDropdowns() { ['mfg', 'hp', 'volt', 'phase'].forEach(cat => { const sel = document.getElementById(cat+'Input'); if(!sel) return; const items = cat === 'mfg' ? Object.keys(AI_TRAINING_DATA.MANUFACTURERS) : AI_TRAINING_DATA.DATA[cat.toUpperCase()]; items.forEach(i => { const opt = document.createElement('option'); opt.value = i; opt.innerText = i; sel.appendChild(opt); }); }); }
+    static populateDropdowns() { 
+        ['mfg','hp','volt','phase'].forEach(c => {
+            const s = document.getElementById(c+'Input');
+            if(!s) return;
+            const data = c==='mfg' ? Object.keys(AI_TRAINING_DATA.MANUFACTURERS) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
+            data.forEach(i => { const o = document.createElement('option'); o.value=i; o.innerText=i; s.appendChild(o); });
+        });
+    }
 }
 
-class ConfigService { static reset() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } } }
-
-class App { 
-    static init() { 
-        if(AuthService.init()) {
-            UI.populateDropdowns(); 
-            DataLoader.preload(); 
-        }
-    } 
-}
-document.addEventListener('DOMContentLoaded', App.init);
+document.addEventListener('DOMContentLoaded', () => { if(AuthService.init()) { UI.populateDropdowns(); DataLoader.preload(); } });
 </script>
 </body>
 </html>
