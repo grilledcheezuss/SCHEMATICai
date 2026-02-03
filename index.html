@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v13.3 - Enterprise)</title>
+    <title>Cox Research | SCHEMATICai (v13.4 - Protocol Fix)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -108,7 +108,6 @@
         .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; width: 100%; }
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
         
-        /* Updated with 'name' and 'autocomplete' to fix browser warnings */
         .correction-input { display: none; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-top: 4px; }
         .reason-btn.selected + .correction-input { display: block; }
         
@@ -126,7 +125,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v13.3</div>
+    <div class="version-badge">SCHEMATICai v13.4</div>
     <div class="header-controls">
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
@@ -194,12 +193,11 @@
 </div>
 
 <script>
-// --- SCHEMATICai v13.3 (FULLY ABSTRACTED + POLISHED) ---
+// --- SCHEMATICai v13.4 (PROTOCOL FIX) ---
 
-// ⚠️ PASTE YOUR CLOUDFLARE WORKER URL HERE
-const WORKER_URL = "cox-proxy.thomas-85a.workers.dev"; 
+// 1. HARDCODED PROXY URL (WITH HTTPS)
+const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 
-// NO REAL NAMES - ONLY GENERIC TARGETS
 const CONFIG = {
     mainTable: 'MAIN',
     feedbackTable: 'FEEDBACK',
@@ -208,12 +206,23 @@ const CONFIG = {
 
 class NetworkService {
     static async fetch(target, params = '') {
-        const url = `${WORKER_URL}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`;
+        // 2. FAILSAFE: Ensure HTTPS is present
+        let baseUrl = WORKER_URL;
+        if (!baseUrl.startsWith('http')) {
+            baseUrl = `https://${baseUrl}`;
+        }
+
+        const url = `${baseUrl}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`;
         return fetch(url);
     }
 
     static async post(target, data) {
-        const url = `${WORKER_URL}?target=${encodeURIComponent(target)}`;
+        let baseUrl = WORKER_URL;
+        if (!baseUrl.startsWith('http')) {
+            baseUrl = `https://${baseUrl}`;
+        }
+
+        const url = `${baseUrl}?target=${encodeURIComponent(target)}`;
         return fetch(url, { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' },
