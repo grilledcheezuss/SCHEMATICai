@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.2)</title>
+    <title>Cox Research | SCHEMATICai (v19.3)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -182,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.2</div>
+    <div class="version-badge">SCHEMATICai v19.3</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -243,70 +243,80 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.2 (INDEXEDDB UPGRADE FOR UNLIMITED CACHE) ---
+// --- SCHEMATICai v19.3 (INDEXEDDB V2 UPGRADE FORCE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- 1. INDEXEDDB HELPER (UNLIMITED STORAGE) ---
+// --- 1. INDEXEDDB HELPER (V2 UPGRADE) ---
 class DB {
     static open() {
         return new Promise((resolve, reject) => {
-            const req = indexedDB.open("CoxSchematicDB", 1);
+            // BUMP VERSION TO 2 TO FORCE UPGRADE
+            const req = indexedDB.open("CoxSchematicDB", 2); 
             req.onupgradeneeded = e => {
                 const db = e.target.result;
-                if(!db.objectStoreNames.contains("cache")) db.createObjectStore("cache");
+                // Wipe if exists to be safe
+                if(db.objectStoreNames.contains("cache")) db.deleteObjectStore("cache");
+                db.createObjectStore("cache");
             };
             req.onsuccess = e => resolve(e.target.result);
-            req.onerror = e => reject(e);
+            req.onerror = e => reject(e.target.error); // Log actual error object
         });
     }
     static async put(key, value) {
-        const db = await this.open();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction("cache", "readwrite");
-            tx.objectStore("cache").put(value, key);
-            tx.oncomplete = () => resolve();
-            tx.onerror = e => reject(e);
-        });
+        try {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction("cache", "readwrite");
+                tx.objectStore("cache").put(value, key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = e => reject(e.target.error);
+            });
+        } catch(e) { console.warn("IDB Put Failed", e); }
     }
     static async get(key) {
-        const db = await this.open();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction("cache", "readonly");
-            const req = tx.objectStore("cache").get(key);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = e => reject(e);
+        try {
+            const db = await this.open();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction("cache", "readonly");
+                const req = tx.objectStore("cache").get(key);
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = e => reject(e.target.error);
+            });
+        } catch(e) { 
+            console.warn("IDB Get Failed (DB Missing?)", e); 
+            return null; 
+        }
+    }
+    static async clear() {
+        // Nuke it from orbit
+        return new Promise((resolve) => {
+            const req = indexedDB.deleteDatabase("CoxSchematicDB");
+            req.onsuccess = () => resolve();
+            req.onerror = () => resolve(); // proceed anyway
         });
     }
 }
 
-// --- SECURE CACHE SERVICE (USES IDB) ---
+// --- SECURE CACHE SERVICE ---
 class CacheService {
     static async save(data, password) {
         if(!password) return;
-        try {
-            const json = JSON.stringify(data);
-            const enc = await this.encrypt(json, password);
-            await DB.put('db_blob', enc); // Save to IndexedDB
-            console.log("Cache Saved Successfully (IDB)");
-        } catch(e) { console.warn("Cache Save Failed", e); }
+        const json = JSON.stringify(data);
+        const enc = await this.encrypt(json, password);
+        await DB.put('db_blob', enc); 
     }
 
     static async load(password) {
         if(!password) return null;
-        try {
-            const enc = await DB.get('db_blob'); // Load from IndexedDB
-            if(!enc) return null;
-            const json = await this.decrypt(enc, password);
-            if(!json) return null;
-            return JSON.parse(json);
-        } catch(e) { 
-            console.warn("Cache Load Failed", e); 
-            return null; 
-        }
+        const enc = await DB.get('db_blob'); 
+        if(!enc) return null;
+        const json = await this.decrypt(enc, password);
+        if(!json) return null;
+        return JSON.parse(json);
     }
 
-    // AES-GCM (NO CHANGES)
+    // AES-GCM
     static async getKey(password) {
         const enc = new TextEncoder();
         const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
@@ -358,7 +368,11 @@ class AuthService {
         localStorage.setItem('cox_pass', pass); 
         location.reload(); 
     }
-    static logout() { localStorage.clear(); location.reload(); }
+    static async logout() { 
+        localStorage.clear(); 
+        await DB.clear(); // NUKE DB
+        location.reload(); 
+    }
     static getHeaders() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 
