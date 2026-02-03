@@ -1,25 +1,30 @@
 // api/index.js
+// Maps to /api/
 const https = require('https');
 
 module.exports = async (req, res) => {
-    // 1. CORS & Preflight Security
+    // 1. CORS Headers (Security)
     res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow access from anywhere (or restrict to your domain)
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Handle standard OPTIONS request (Browser pre-check)
+    // 2. Health Check (Diagnostic)
+    // If browser visits /api/?health=true
+    if (req.query.health === 'true') {
+        return res.status(200).json({ status: "ALIVE", message: "Server is running!" });
+    }
+
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
     }
 
-    // 2. Parse URL Parameters
-    // We expect ?table=Name&param=value
+    // 3. Parameters
     const { table } = req.query;
     const method = req.method;
 
-    // 3. Security Configuration
+    // 4. Config
     const TABLE_CONFIG = {
         'Control Panel Items': {
             baseId: process.env.AIRTABLE_MAIN_BASE,
@@ -35,25 +40,18 @@ module.exports = async (req, res) => {
 
     const config = TABLE_CONFIG[table];
 
-    // 4. Access Control Checks
+    // 5. Validation
     if (!config) {
-        return res.status(404).json({ error: `Table '${table}' not recognized/authorized.` });
+        return res.status(404).json({ error: `Table '${table}' not found. System is online.` });
     }
 
-    if (!config.allowMethods.includes(method)) {
-        return res.status(405).json({ error: `Method ${method} not allowed for this table.` });
-    }
-
-    // 5. Construct Airtable URL
-    // Filter out 'table' from the query params so we don't send it to Airtable
+    // 6. Forward to Airtable
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(req.query)) {
-        if (key !== 'table') queryParams.append(key, value);
+        if (key !== 'table' && key !== 'health') queryParams.append(key, value);
     }
-
     const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryParams.toString()}`;
 
-    // 6. Execute Request
     try {
         const response = await fetch(airtableUrl, {
             method: method,
@@ -68,7 +66,6 @@ module.exports = async (req, res) => {
         res.status(response.status).json(data);
 
     } catch (error) {
-        console.error("Proxy Error:", error);
-        res.status(500).json({ error: 'Internal Proxy Error', details: error.message });
+        res.status(500).json({ error: 'Proxy Error', details: error.message });
     }
 };

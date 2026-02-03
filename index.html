@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v11.2 - Secure & Training Preserved)</title>
+    <title>Cox Research | SCHEMATICai (v11.3 - Diagnostic)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -155,6 +155,10 @@
     <div class="config-card">
         <h3 style="margin-top:0; color:var(--app-primary);">🛠️ Admin Tools</h3>
         <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Status: <span id="db-status-text">Idle</span></p>
+        <div style="margin-bottom:15px; padding:10px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:12px;">
+            <strong>Diagnostics:</strong>
+            <button class="reason-btn" onclick="window.open('/api/?health=true', '_blank')">🏥 Check Server Health</button>
+        </div>
         <button class="submit-feedback-btn" style="background:var(--status-success);" onclick="DataLoader.harvestCSV()">📥 Harvest Golden CSV</button>
         <button class="submit-feedback-btn" style="background:var(--status-error); margin-top:8px;" onclick="ConfigService.reset()">🗑️ Clear Cache</button>
         <div style="margin-top:10px;"><button class="submit-feedback-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
@@ -163,7 +167,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v11.2</div>
+    <div class="version-badge">SCHEMATICai v11.3</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -216,11 +220,11 @@
 </div>
 
 <script>
-// --- SCHEMATICai v11.2 (SECURE PROXY WITH TRAINING DATA) ---
+// --- SCHEMATICai v11.3 (DIAGNOSTIC MODE) ---
 
 const CONFIG = {
     useProxy: true,       
-    proxyUrl: '/api/search', // Maps to api/search.js physically
+    proxyUrl: '/api/', // DIRECT PATH to api/index.js (automatically mapped by Vercel)
     
     // TABLE IDs
     mainBase: 'appgc1pbuOgmODRpj',
@@ -236,6 +240,7 @@ class NetworkService {
         let url, headers = {};
         
         if (CONFIG.useProxy) {
+            // Append table param
             const prefix = params.includes('?') ? '&' : '?';
             url = `${CONFIG.proxyUrl}${params}${prefix}table=${encodeURIComponent(tableName)}`;
             headers = { 'Content-Type': 'application/json' };

@@ -1,9 +1,6 @@
 {
   "name": "schematic-ai",
   "version": "1.0.0",
-  "scripts": {
-    "start": "node api/index.js"
-  },
   "engines": {
     "node": "20.x"
   }
