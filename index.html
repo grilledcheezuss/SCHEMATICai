@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.3 - Keyword Tagging)</title>
+    <title>Cox Research | SCHEMATICai (v10.5 - Secure Relative Proxy)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -33,7 +33,7 @@
             
             --match-exact-bg: #dcfce7; --match-exact-text: #166534; 
             --match-varied-bg: #ffedd5; --match-varied-text: #9a3412;
-            --match-keyword-bg: #f3e8ff; --match-keyword-text: #6b21a8; /* Purple for Keywords */
+            --match-keyword-bg: #f3e8ff; --match-keyword-text: #6b21a8;
             --badge-info-bg: #f3f4f6; --badge-info-text: #6b7280;
             --badge-healed-bg: #dbeafe; --badge-healed-text: #1e40af;
             
@@ -166,7 +166,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v10.3</div>
+    <div class="version-badge">SCHEMATICai v10.5</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -184,9 +184,7 @@
             <div class="reason-row"><div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
             <div class="reason-row"><div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
             <div class="reason-row"><div class="reason-btn" data-reason="phase" onclick="FeedbackService.toggleReason(this)">Wrong Phase</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
-            
             <div id="dynamic-feedback-container"></div>
-
             <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
         </div>
     </div>
@@ -221,7 +219,56 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.3 (KEYWORD TAGGING) ---
+// --- SCHEMATICai v10.5 (SECURE RELATIVE PROXY) ---
+
+// ⚠️ V10.5: CENTRALIZED CONFIG ⚠️
+// Security Note: Keys have been removed from the frontend.
+// The backend listening at /api must now inject the tokens.
+const CONFIG = {
+    useProxy: true,       // ENABLED: App will call relative path /api
+    proxyUrl: '/api',     // RELATIVE PATH: Works on Cloudflare/Vercel
+    
+    // DEV KEYS DELETED (Handled by backend)
+    
+    // TABLE IDs
+    mainBase: 'appgc1pbuOgmODRpj',
+    mainTable: 'Control Panel Items',
+    feedbackBase: 'app88zF2k4FgjU8hK',
+    feedbackTable: 'Feedback',
+    voteThreshold: 3
+};
+
+// 1. NETWORK SERVICE (SMART PROXY HANDLER)
+class NetworkService {
+    static async fetch(baseId, tableName, params = '', isWrite = false) {
+        let url, headers = {};
+        
+        if (CONFIG.useProxy) {
+            // PROXY MODE: Call local endpoint, NO TOKENS sent from client
+            // Backend must route request based on tableName/baseId mapping
+            url = `${CONFIG.proxyUrl}/${encodeURIComponent(tableName)}${params}`;
+            headers = { 'Content-Type': 'application/json' };
+        } else {
+            // FALLBACK (If keys were present, which they aren't)
+            console.error("❌ PROXY ERROR: useProxy=false but keys are missing.");
+        }
+
+        return fetch(url, { headers });
+    }
+
+    static async post(baseId, tableName, data) {
+        let url, headers = {};
+        
+        if (CONFIG.useProxy) {
+            url = `${CONFIG.proxyUrl}/${encodeURIComponent(tableName)}`;
+            headers = { 'Content-Type': 'application/json' };
+        } else {
+             console.error("❌ PROXY ERROR: useProxy=false but keys are missing.");
+        }
+
+        return fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
+    }
+}
 
 class PdfController {
     static load(id, url) {
@@ -234,14 +281,6 @@ class PdfController {
         if(link) link.href = url || "#";
     }
 }
-
-const AIRTABLE_READ_KEY = 'patNuv7rNHCIHeq5t.093ee4623c468319b352d024b4c2309fe598d7962dd83d481ec6b23b4cdacf99'; 
-const AT_MAIN_BASE = 'appgc1pbuOgmODRpj';
-const AT_MAIN_TABLE = 'Control Panel Items';
-const AIRTABLE_WRITE_KEY = 'patIoqeaCzTpnX2ir.99286797dc9921be318e30c12e8743eae1041258665d174faf6c98355b90875f';
-const AT_FEEDBACK_BASE = 'app88zF2k4FgjU8hK';
-const AT_FEEDBACK_TABLE = 'Feedback';
-const VOTE_THRESHOLD = 3;
 
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
@@ -256,9 +295,10 @@ class TheHealer {
         try {
             let offset = null;
             do {
-                const url = `https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${encodeURIComponent(AT_FEEDBACK_TABLE)}?pageSize=100${offset ? '&offset='+offset : ''}`;
-                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}` } });
+                const params = `?pageSize=100${offset ? '&offset='+offset : ''}`;
+                const resp = await NetworkService.fetch(CONFIG.feedbackBase, CONFIG.feedbackTable, params, true);
                 const data = await resp.json();
+                
                 if(!data.records) break;
                 data.records.forEach(r => {
                     const id = r.fields['Panel ID']; const param = r.fields['Parameter']; const value = r.fields['Suggested Value'];
@@ -266,8 +306,9 @@ class TheHealer {
                 });
                 offset = data.offset;
             } while (offset);
+            
             for (const [key, count] of Object.entries(tallies)) {
-                if (count >= VOTE_THRESHOLD) {
+                if (count >= CONFIG.voteThreshold) {
                     const [id, param, value] = key.split('|');
                     if (!this.healedData[id]) this.healedData[id] = {};
                     this.healedData[id][param] = value;
@@ -323,9 +364,11 @@ class DataLoader {
         try {
             do {
                 if (window.LOCAL_DB.length >= 7500) break;
-                const url = `https://api.airtable.com/v0/${AT_MAIN_BASE}/${encodeURIComponent(AT_MAIN_TABLE)}?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
-                const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${AIRTABLE_READ_KEY}` } });
+                // V10.5: NetworkService Call
+                const params = `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
+                const resp = await NetworkService.fetch(CONFIG.mainBase, CONFIG.mainTable, params, false); 
                 const data = await resp.json();
+                
                 if(!data.records || data.records.length === 0) break;
                 let newCount = 0;
                 data.records.forEach(r => {
@@ -348,7 +391,7 @@ class DataLoader {
 }
 
 class SearchEngine {
-    static currentPhrases = []; // V10.3
+    static currentPhrases = []; 
 
     static perform() {
         if(window.LOCAL_DB.length === 0) return;
@@ -360,21 +403,17 @@ class SearchEngine {
         const volt = document.getElementById('voltInput').value;
         const phase = document.getElementById('phaseInput').value;
 
-        // V10.3: Comma separated phrases logic
         this.currentPhrases = kwInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
 
         if(this.currentPhrases.length === 0 && mfg==="Any" && hp==="Any" && volt==="Any" && phase==="Any") { alert("Enter search criteria."); return; }
 
         let results = window.LOCAL_DB.filter((rec) => {
             let pass = true;
-            
-            // Check ALL phrases
             if(this.currentPhrases.length > 0) {
                 const combinedText = (rec.id + " " + rec.desc).toUpperCase();
                 const allPhrasesMatch = this.currentPhrases.every(p => combinedText.includes(p.toUpperCase()));
                 if(!allPhrasesMatch) pass = false;
             }
-            
             if(pass && mfg !== "Any") { if(rec.mfg && rec.mfg !== mfg.toUpperCase()) pass = false; else if(!rec.mfg && !rec.desc.includes(mfg.toUpperCase())) pass = false; }
             if(pass && volt !== "Any") { if(rec.volt && !rec.volt.includes(String(volt))) pass = false; else if(!rec.volt && !rec.desc.includes(String(volt))) pass = false; }
             if(pass && phase !== "Any") { if(rec.phase && rec.phase !== String(phase)) pass = false; else if(!rec.phase && !rec.desc.includes(String(phase))) pass = false; }
@@ -420,11 +459,7 @@ class UI {
             const history = FeedbackService.getHistory(item.id);
             
             let badges = '';
-            
-            // V10.3: Render Keyword Badges
-            phrases.forEach(p => {
-                badges += `<span class="hud-badge match-keyword">KW: ${p.toUpperCase()}</span>`;
-            });
+            phrases.forEach(p => { badges += `<span class="hud-badge match-keyword">KW: ${p.toUpperCase()}</span>`; });
             
             if(criteria.mfg !== "Any") badges += `<span class="hud-badge ${healed?.mfg ? 'match-healed' : 'match-exact'}">${criteria.mfg}</span>`;
             
@@ -452,7 +487,7 @@ class UI {
             area.appendChild(card);
         });
     }
-    static populateDropdowns() { /* ... */ }
+    static populateDropdowns() { ['mfg', 'hp', 'volt', 'phase'].forEach(cat => { const sel = document.getElementById(cat+'Input'); if(!sel) return; const items = cat === 'mfg' ? Object.keys(AI_TRAINING_DATA.MANUFACTURERS) : AI_TRAINING_DATA.DATA[cat.toUpperCase()]; items.forEach(i => { const opt = document.createElement('option'); opt.value = i; opt.innerText = i; sel.appendChild(opt); }); }); }
 }
 
 class FeedbackService { 
@@ -467,74 +502,33 @@ class FeedbackService {
         this.activeId = id; 
         document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
         document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected', 'locked')); 
-        
-        // V10.3: Dynamically Add Keyword Reasons
-        const container = document.getElementById('dynamic-feedback-container');
-        container.innerHTML = '';
-        SearchEngine.currentPhrases.forEach(p => {
-            const div = document.createElement('div');
-            div.className = 'reason-row';
-            div.innerHTML = `<div class="reason-btn" data-reason="kw_reject" data-kw="${p}" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch: "${p}"</div>`;
-            container.appendChild(div);
-        });
-
+        const container = document.getElementById('dynamic-feedback-container'); container.innerHTML = '';
+        SearchEngine.currentPhrases.forEach(p => { const div = document.createElement('div'); div.className = 'reason-row'; div.innerHTML = `<div class="reason-btn" data-reason="kw_reject" data-kw="${p}" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch: "${p}"</div>`; container.appendChild(div); });
         document.getElementById('feedback-modal').classList.add('active-modal'); 
     } 
     
     static async submit() { 
-        const id = this.activeId; 
-        const submissions = []; 
+        const id = this.activeId; const submissions = []; 
         document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
             const reasonCode = btn.dataset.reason; 
-            
-            // Check for keyword reject
-            if(reasonCode === 'kw_reject') {
-                submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw });
-            } else {
-                const input = btn.nextElementSibling; 
-                const value = input && input.classList.contains('correction-input') ? input.value : ""; 
-                if(value) { submissions.push({ id, reasonCode, value }); } 
-            }
+            if(reasonCode === 'kw_reject') { submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw }); } 
+            else { const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }
         }); 
-        
         if(submissions.length === 0) return alert("Select a reason and enter a value."); 
-        for(const sub of submissions) { await this.sendToAirtable(sub.id, sub.reasonCode, sub.value); } 
-        this.saveHistory(id, 'down');
-        alert("Votes Recorded. Thank you."); 
-        const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); 
-        this.close(); 
+        for(const sub of submissions) { await NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); } 
+        this.saveHistory(id, 'down'); alert("Votes Recorded. Thank you."); 
+        const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); this.close(); 
     } 
     
     static async up(id) { 
         if(this.sessionVotes.has(id)) return;
         this.sessionVotes.add(id);
-        
         let votesCast = 0;
-        const criteria = {
-            mfg: document.getElementById('mfgInput').value,
-            hp: document.getElementById('hpInput').value,
-            volt: document.getElementById('voltInput').value,
-            phase: document.getElementById('phaseInput').value
-        };
-
-        for(const [param, val] of Object.entries(criteria)) {
-            if(val !== "Any" && val !== "") { await this.sendToAirtable(id, param, val); votesCast++; }
-        }
-        
-        // V10.3: Vote for Keywords too!
-        SearchEngine.currentPhrases.forEach(p => {
-             this.sendToAirtable(id, 'kw_confirm', p);
-             votesCast++;
-        });
-
-        if(votesCast === 0) await this.sendToAirtable(id, "VERIFIED", "General Match"); 
-
-        alert("Liked!"); 
-        event.target.classList.add('voted-up');
-    } 
-
-    static async sendToAirtable(panelId, param, value) { 
-        await fetch(`https://api.airtable.com/v0/${AT_FEEDBACK_BASE}/${AT_FEEDBACK_TABLE}`, { method: 'POST', headers: { 'Authorization': `Bearer ${AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ "fields": { "Panel ID": panelId, "Parameter": param, "Suggested Value": value } }) }); 
+        const criteria = { mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value };
+        for(const [param, val] of Object.entries(criteria)) { if(val !== "Any" && val !== "") { await NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": param, "Suggested Value": val } }); votesCast++; } }
+        SearchEngine.currentPhrases.forEach(p => { NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": 'kw_confirm', "Suggested Value": p } }); votesCast++; });
+        if(votesCast === 0) await NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
+        alert("Liked!"); event.target.classList.add('voted-up');
     } 
     
     static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } 
@@ -543,7 +537,7 @@ class FeedbackService {
 
 class ConfigService { static reset() { if(confirm("Reset?")) { localStorage.clear(); location.reload(); } } }
 class AuthService { static init() { const session = JSON.parse(localStorage.getItem('cox_auth_session')); if (session && session.expiry > Date.now()) { document.documentElement.classList.add('logged-in'); this.checkAdmin(session.user); return true; } document.getElementById('auth-overlay').classList.add('active-modal'); return false; } static login() { const user = document.getElementById('auth-user').value; if(!user) return; localStorage.setItem('cox_auth_session', JSON.stringify({ user, expiry: Date.now() + 86400000 })); location.reload(); } static logout() { localStorage.removeItem('cox_auth_session'); location.reload(); } static checkAdmin(user) { if(['admin', 'thomas', 'grilledcheezus'].some(a => user.toLowerCase().includes(a))) document.getElementById('settings-btn-wrapper').style.display = 'block'; } }
-class App { static init() { AuthService.init(); UI.populateDropdowns = function() { ['mfg', 'hp', 'volt', 'phase'].forEach(cat => { const sel = document.getElementById(cat+'Input'); if(!sel) return; const items = cat === 'mfg' ? Object.keys(AI_TRAINING_DATA.MANUFACTURERS) : AI_TRAINING_DATA.DATA[cat.toUpperCase()]; items.forEach(i => { const opt = document.createElement('option'); opt.value = i; opt.innerText = i; sel.appendChild(opt); }); }); }; UI.populateDropdowns(); DataLoader.preload(); } }
+class App { static init() { AuthService.init(); UI.populateDropdowns(); DataLoader.preload(); } }
 document.addEventListener('DOMContentLoaded', App.init);
 </script>
 </body>
