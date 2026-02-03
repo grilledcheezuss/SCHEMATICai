@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.8 - Native Routing)</title>
+    <title>Cox Research | SCHEMATICai (v10.9 - Node Engine)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -166,7 +166,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v10.8</div>
+    <div class="version-badge">SCHEMATICai v10.9</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -219,13 +219,14 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.8 (NATIVE ROUTING) ---
+// --- SCHEMATICai v10.9 (NODE ENGINE) ---
 
-// ⚠️ V10.8: CONFIGURATION
+// ⚠️ V10.9: CONFIGURATION
 // Keys handled by backend (api/[table].js)
+// Project now identified as Module via package.json
 const CONFIG = {
     useProxy: true,       
-    proxyUrl: '/api',     // Points to Vercel Native /api/
+    proxyUrl: '/api',     
     
     // TABLE IDs
     mainBase: 'appgc1pbuOgmODRpj',
@@ -242,7 +243,6 @@ class NetworkService {
         
         if (CONFIG.useProxy) {
             // PROXY MODE: /api/TableName
-            // Vercel routes this to [table].js
             url = `${CONFIG.proxyUrl}/${encodeURIComponent(tableName)}${params}`;
             headers = { 'Content-Type': 'application/json' };
         } else {

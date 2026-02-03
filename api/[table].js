@@ -1,9 +1,6 @@
 // api/[table].js
 export default async function handler(req, res) {
-    // Vercel Native Routing:
-    // The filename [table].js automatically captures the URL part after /api/
-    // Example: /api/Feedback -> req.query.table = "Feedback"
-    const { table } = req.query; 
+    const { table } = req.query;
     const method = req.method;
 
     // 🔒 SECURITY CONFIGURATION
@@ -22,16 +19,15 @@ export default async function handler(req, res) {
 
     const config = TABLE_CONFIG[table];
 
-    // Validate Access
     if (!config) {
-        return res.status(404).json({ error: `Table '${table}' not recognized.` });
+        return res.status(404).json({ error: `Table '${table}' not found.` });
     }
 
     if (!config.allowMethods.includes(method)) {
         return res.status(405).json({ error: `Method ${method} not allowed.` });
     }
 
-    // Construct Airtable URL (Keep query params, remove 'table' param)
+    // Clean Query Params
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(req.query)) {
         if (key !== 'table') queryParams.append(key, value);
@@ -54,6 +50,7 @@ export default async function handler(req, res) {
 
         const response = await fetch(airtableUrl, options);
         const data = await response.json();
+        
         res.status(response.status).json(data);
 
     } catch (error) {
