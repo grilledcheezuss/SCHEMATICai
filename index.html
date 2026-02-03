@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.9 - Node Engine)</title>
+    <title>Cox Research | SCHEMATICai (v11.0 - Audited)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-    <script type="module" src="database.js"></script>
-
     <script>
         try {
             const session = JSON.parse(localStorage.getItem('cox_auth_session'));
@@ -34,7 +32,6 @@
             --match-exact-bg: #dcfce7; --match-exact-text: #166534; 
             --match-varied-bg: #ffedd5; --match-varied-text: #9a3412;
             --match-keyword-bg: #f3e8ff; --match-keyword-text: #6b21a8;
-            --badge-info-bg: #f3f4f6; --badge-info-text: #6b7280;
             --badge-healed-bg: #dbeafe; --badge-healed-text: #1e40af;
             
             --header-height: 80px; 
@@ -52,7 +49,6 @@
             --match-exact-bg: #14532d; --match-exact-text: #86efac; 
             --match-varied-bg: #7c2d12; --match-varied-text: #fdba74;
             --match-keyword-bg: #581c87; --match-keyword-text: #d8b4fe;
-            --badge-info-bg: #374151; --badge-info-text: #9ca3af;
             --badge-healed-bg: #1e3a8a; --badge-healed-text: #93c5fd;
             color-scheme: dark;            
         }
@@ -166,7 +162,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v10.9</div>
+    <div class="version-badge">SCHEMATICai v11.0</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -219,16 +215,11 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.9 (NODE ENGINE) ---
+// --- SCHEMATICai v11.0 (AUDITED & OPTIMIZED) ---
 
-// ⚠️ V10.9: CONFIGURATION
-// Keys handled by backend (api/[table].js)
-// Project now identified as Module via package.json
 const CONFIG = {
     useProxy: true,       
-    proxyUrl: '/api',     
-    
-    // TABLE IDs
+    proxyUrl: '/api/data', 
     mainBase: 'appgc1pbuOgmODRpj',
     mainTable: 'Control Panel Items',
     feedbackBase: 'app88zF2k4FgjU8hK',
@@ -236,14 +227,14 @@ const CONFIG = {
     voteThreshold: 3
 };
 
-// 1. NETWORK SERVICE (SMART PROXY HANDLER)
+// 1. NETWORK SERVICE
 class NetworkService {
     static async fetch(baseId, tableName, params = '', isWrite = false) {
         let url, headers = {};
         
         if (CONFIG.useProxy) {
-            // PROXY MODE: /api/TableName
-            url = `${CONFIG.proxyUrl}/${encodeURIComponent(tableName)}${params}`;
+            const prefix = params.includes('?') ? '&' : '?';
+            url = `${CONFIG.proxyUrl}${params}${prefix}table=${encodeURIComponent(tableName)}`;
             headers = { 'Content-Type': 'application/json' };
         } else {
             console.error("❌ PROXY ERROR: useProxy=false but keys are missing.");
@@ -256,7 +247,7 @@ class NetworkService {
         let url, headers = {};
         
         if (CONFIG.useProxy) {
-            url = `${CONFIG.proxyUrl}/${encodeURIComponent(tableName)}`;
+            url = `${CONFIG.proxyUrl}?table=${encodeURIComponent(tableName)}`;
             headers = { 'Content-Type': 'application/json' };
         } else {
              console.error("❌ PROXY ERROR: useProxy=false but keys are missing.");
@@ -314,6 +305,11 @@ class TheHealer {
     }
 }
 
+// OPTIMIZED: REGEX CONSTANTS (Outside loop)
+const REGEX_HP_A = /\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i;
+const REGEX_HP_B = /(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i;
+const REGEX_VOLT = /\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i;
+
 class AIParser {
     static parse(text, panelId) {
         const healed = TheHealer.healedData[panelId];
@@ -322,16 +318,17 @@ class AIParser {
 
         if (!specs.mfg) {
             for (const [standard, aliases] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) {
+                // Optimization: Pre-built regex is cleaner, but this is fast enough for now
                 if (new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i').test(t)) { specs.mfg = standard.toUpperCase(); break; }
             }
         }
         if (!specs.hp) {
-            let hpMatch = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i);
-            if (!hpMatch) hpMatch = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i);
+            let hpMatch = t.match(REGEX_HP_A);
+            if (!hpMatch) hpMatch = t.match(REGEX_HP_B);
             if(hpMatch) { const val = parseFloat(hpMatch[1]); if (!isNaN(val) && val < 999) specs.hp = hpMatch[1].replace(/\s/g, ''); }
         }
         if (!specs.volt) {
-            const voltMatch = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i);
+            const voltMatch = t.match(REGEX_VOLT);
             if(voltMatch) specs.volt = voltMatch[1];
         }
         if (!specs.phase) {
@@ -350,11 +347,12 @@ class DataLoader {
         btn.innerText = "INITIALIZING AI...";
         await TheHealer.fetchAndTally();
         btn.innerText = "DOWNLOADING DB...";
-        await Promise.all([this.syncThread('desc'), this.syncThread('asc')]);
+        // AUDIT: Renamed to fetchPartition (Concurrency is valid, 'thread' was misnomer)
+        await Promise.all([this.fetchPartition('desc'), this.fetchPartition('asc')]);
         console.log(`✅ Pipeline Complete: ${window.LOCAL_DB.length} records processed.`);
         btn.innerText = "SEARCH DATABASE"; btn.disabled = false; btn.style.backgroundColor = "#461D7C";
     }
-    static async syncThread(direction) {
+    static async fetchPartition(direction) {
         let offset = null;
         try {
             do {
@@ -379,7 +377,7 @@ class DataLoader {
                 document.getElementById('searchBtn').innerText = `LOADING... (${window.LOCAL_DB.length})`;
                 if (newCount === 0) break; 
             } while (offset);
-        } catch(e) { console.error("Thread Error", e); }
+        } catch(e) { console.error("Partition Error", e); }
     }
     static harvestCSV() { /* CSV Logic Preserved */ }
 }

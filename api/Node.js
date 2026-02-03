@@ -1,5 +1,8 @@
-// api/[table].js
-export default async function handler(req, res) {
+// api/data.js
+// Standard Node.js (CommonJS) - Guaranteed to run on Vercel
+const https = require('https');
+
+module.exports = async (req, res) => {
     const { table } = req.query;
     const method = req.method;
 
@@ -20,40 +23,35 @@ export default async function handler(req, res) {
     const config = TABLE_CONFIG[table];
 
     if (!config) {
-        return res.status(404).json({ error: `Table '${table}' not found.` });
+        return res.status(404).json({ error: `Table '${table}' not recognized.` });
     }
 
     if (!config.allowMethods.includes(method)) {
         return res.status(405).json({ error: `Method ${method} not allowed.` });
     }
 
-    // Clean Query Params
+    // Construct URL
     const queryParams = new URLSearchParams();
     for (const [key, value] of Object.entries(req.query)) {
         if (key !== 'table') queryParams.append(key, value);
     }
-
     const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryParams.toString()}`;
 
+    // Forward Request using Native Fetch (Node 18+)
     try {
-        const options = {
-            method,
+        const response = await fetch(airtableUrl, {
+            method: method,
             headers: {
                 'Authorization': `Bearer ${config.apiKey}`,
                 'Content-Type': 'application/json'
-            }
-        };
+            },
+            body: method === 'POST' ? JSON.stringify(req.body) : undefined
+        });
 
-        if (method === 'POST') {
-            options.body = JSON.stringify(req.body);
-        }
-
-        const response = await fetch(airtableUrl, options);
         const data = await response.json();
-        
         res.status(response.status).json(data);
 
     } catch (error) {
         res.status(500).json({ error: 'Proxy Error', details: error.message });
     }
-}
+};

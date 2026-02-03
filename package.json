@@ -1,8 +1,7 @@
 {
   "name": "schematic-ai",
   "version": "1.0.0",
-  "description": "Secure Proxy for SchematicAI",
-  "type": "module",
+  "description": "Secure Proxy",
   "engines": {
     "node": "20.x"
   },
