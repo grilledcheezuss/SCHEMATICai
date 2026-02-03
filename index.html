@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v12.0 - Direct Connect)</title>
+    <title>Cox Research | SCHEMATICai (v13.0 - Cloudflare Secure)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -59,7 +59,7 @@
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.2s; overflow: hidden; }
         .btn-bug { font-size: 14px; }
         
-        #settings-btn-wrapper { display: flex; } /* Always visible now */
+        #settings-btn-wrapper { display: none; }
 
         #app-container { display: flex; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); }
         
@@ -97,10 +97,9 @@
         .thumb-btn.voted-up { background: #dcfce7; border-color: #166534; color: #166534; pointer-events: none; }
         .thumb-btn.voted-down { background: #fee2e2; border-color: #991b1b; color: #991b1b; }
 
-        #config-modal, #feedback-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
+        #feedback-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
         .active-modal { display: flex !important; }
         
-        .config-card { background: var(--bg-card); padding: 40px; border-radius: 12px; width: 100%; max-width: 480px; text-align: center; border: 1px solid var(--border-color); box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
         .modal-card { width: 400px; background: var(--bg-card); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
         .modal-header { background: var(--app-primary); padding: 15px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: 700; }
         .modal-content { padding: 20px; }
@@ -124,31 +123,10 @@
 </head>
 <body>
 
-<div id="config-modal" class="active-modal">
-    <div class="config-card">
-        <h3 style="margin-top:0; color:var(--app-primary);">⚙️ Setup Connection</h3>
-        <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Enter your Airtable API Keys to connect securely.</p>
-        
-        <div style="text-align:left; margin-bottom:10px;">
-            <label style="font-size:10px; font-weight:bold;">READ KEY (Required for Search)</label>
-            <input type="password" id="api-key-read" class="cox-input" placeholder="pat.xxxxxxxx..." style="margin-top:5px;">
-        </div>
-        
-        <div style="text-align:left; margin-bottom:10px;">
-            <label style="font-size:10px; font-weight:bold;">WRITE KEY (Optional for Feedback)</label>
-            <input type="password" id="api-key-write" class="cox-input" placeholder="pat.xxxxxxxx..." style="margin-top:5px;">
-        </div>
-
-        <button class="submit-feedback-btn" onclick="ConfigService.saveKeys()">💾 Save & Connect</button>
-        <button class="submit-feedback-btn" style="background:#555; margin-top:8px;" onclick="ConfigService.close()">Cancel</button>
-    </div>
-</div>
-
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v12.0</div>
+    <div class="version-badge">SCHEMATICai v13.0</div>
     <div class="header-controls">
-        <button class="control-btn" title="Settings" onclick="ConfigService.open()">⚙️</button>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
     </div>
@@ -181,7 +159,7 @@
             </div>
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
-                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()" disabled>LOADING...</button>
+                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()" disabled>LOADING DB...</button>
             </div>
         </div>
         <div id="results-scroll-area"><div id="results-area"></div></div>
@@ -198,44 +176,28 @@
 </div>
 
 <script>
-// --- SCHEMATICai v12.0 (DIRECT CONNECT RESTORE) ---
+// --- SCHEMATICai v13.0 (CLOUDFLARE WORKER PROXY) ---
+
+// ⚠️ PASTE YOUR CLOUDFLARE WORKER URL HERE
+const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev/"; 
 
 const CONFIG = {
-    mainBase: 'appgc1pbuOgmODRpj',
     mainTable: 'Control Panel Items',
-    feedbackBase: 'app88zF2k4FgjU8hK',
     feedbackTable: 'Feedback',
     voteThreshold: 3
 };
 
-// KEY MANAGEMENT SERVICE
-class KeyChain {
-    static getRead() { return localStorage.getItem('cox_key_read'); }
-    static getWrite() { return localStorage.getItem('cox_key_write'); }
-    static setKeys(read, write) {
-        if(read) localStorage.setItem('cox_key_read', read);
-        if(write) localStorage.setItem('cox_key_write', write);
-    }
-    static hasKeys() { return !!this.getRead(); }
-}
-
 class NetworkService {
-    static async fetch(baseId, tableName, params = '', isWrite = false) {
-        const key = isWrite ? KeyChain.getWrite() : KeyChain.getRead();
-        if (!key) throw new Error("Missing API Key");
-
-        const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}${params}`;
-        return fetch(url, { headers: { 'Authorization': `Bearer ${key}` } });
+    static async fetch(tableName, params = '') {
+        const url = `${WORKER_URL}?table=${encodeURIComponent(tableName)}${params.replace('?', '&')}`;
+        return fetch(url);
     }
 
-    static async post(baseId, tableName, data) {
-        const key = KeyChain.getWrite();
-        if (!key) return alert("Write Key missing. Cannot vote.");
-
-        const url = `https://api.airtable.com/v0/${baseId}/${encodeURIComponent(tableName)}`;
+    static async post(tableName, data) {
+        const url = `${WORKER_URL}?table=${encodeURIComponent(tableName)}`;
         return fetch(url, { 
             method: 'POST', 
-            headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
     }
@@ -267,7 +229,7 @@ class TheHealer {
             let offset = null;
             do {
                 const params = `?pageSize=100${offset ? '&offset='+offset : ''}`;
-                const resp = await NetworkService.fetch(CONFIG.feedbackBase, CONFIG.feedbackTable, params, true);
+                const resp = await NetworkService.fetch(CONFIG.feedbackTable, params);
                 const data = await resp.json();
                 
                 if(!data.records) break;
@@ -325,10 +287,6 @@ window.LOCAL_DB = []; window.DB_IDS = new Set();
 
 class DataLoader {
     static async preload() {
-        if (!KeyChain.hasKeys()) {
-            ConfigService.open();
-            return; 
-        }
         const btn = document.getElementById('searchBtn');
         btn.innerText = "INITIALIZING AI...";
         await TheHealer.fetchAndTally();
@@ -343,7 +301,7 @@ class DataLoader {
             do {
                 if (window.LOCAL_DB.length >= 7500) break;
                 const params = `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
-                const resp = await NetworkService.fetch(CONFIG.mainBase, CONFIG.mainTable, params, false); 
+                const resp = await NetworkService.fetch(CONFIG.mainTable, params); 
                 const data = await resp.json();
                 
                 if(!data.records || data.records.length === 0) break;
@@ -370,9 +328,6 @@ class SearchEngine {
     static currentPhrases = []; 
 
     static perform() {
-        if(window.LOCAL_DB.length === 0) return;
-        FeedbackService.resetSession();
-        
         const kwInput = document.getElementById('keywordInput').value;
         const mfg = document.getElementById('mfgInput').value;
         const hp = document.getElementById('hpInput').value;
@@ -491,7 +446,7 @@ class FeedbackService {
             else { const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }
         }); 
         if(submissions.length === 0) return alert("Select a reason and enter a value."); 
-        for(const sub of submissions) { await NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); } 
+        for(const sub of submissions) { await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); } 
         this.saveHistory(id, 'down'); alert("Votes Recorded. Thank you."); 
         const cardBtn = document.querySelector(`.thumb-btn.down[onclick*="${id}"]`); if(cardBtn) cardBtn.classList.add('voted-down'); this.close(); 
     } 
@@ -501,31 +456,14 @@ class FeedbackService {
         this.sessionVotes.add(id);
         let votesCast = 0;
         const criteria = { mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value };
-        for(const [param, val] of Object.entries(criteria)) { if(val !== "Any" && val !== "") { await NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": param, "Suggested Value": val } }); votesCast++; } }
-        SearchEngine.currentPhrases.forEach(p => { NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": 'kw_confirm', "Suggested Value": p } }); votesCast++; });
-        if(votesCast === 0) await NetworkService.post(CONFIG.feedbackBase, CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
+        for(const [param, val] of Object.entries(criteria)) { if(val !== "Any" && val !== "") { await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": param, "Suggested Value": val } }); votesCast++; } }
+        SearchEngine.currentPhrases.forEach(p => { NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": 'kw_confirm', "Suggested Value": p } }); votesCast++; });
+        if(votesCast === 0) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
         alert("Liked!"); event.target.classList.add('voted-up');
     } 
     
     static toggleReason(el) { if(!el.classList.contains('locked')) el.classList.toggle('selected'); } 
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
-}
-
-class ConfigService { 
-    static open() { 
-        document.getElementById('config-modal').classList.add('active-modal'); 
-        document.getElementById('api-key-read').value = KeyChain.getRead() || "";
-        document.getElementById('api-key-write').value = KeyChain.getWrite() || "";
-    }
-    static close() { document.getElementById('config-modal').classList.remove('active-modal'); }
-    static saveKeys() {
-        const r = document.getElementById('api-key-read').value.trim();
-        const w = document.getElementById('api-key-write').value.trim();
-        if(!r) return alert("Read Key is required.");
-        KeyChain.setKeys(r, w);
-        this.close();
-        DataLoader.preload();
-    }
 }
 
 class App { static init() { UI.populateDropdowns(); DataLoader.preload(); } }
