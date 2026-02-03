@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.4)</title>
+    <title>Cox Research | SCHEMATICai (v19.5)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -92,6 +92,7 @@
         .cox-input { width: 100%; height: var(--input-height); padding: 0 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-input); color: var(--text-primary); outline: none; }
         
         .search-btn { flex: 1; height: 38px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 13px; letter-spacing: 0.5px; }
+        .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; } /* DISABLED STATE */
         .reset-btn { height: 38px; width: 38px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
         .refine-btn { width: 100%; height: 32px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 12px; }
 
@@ -102,8 +103,6 @@
         .record-card { background: var(--bg-card); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); border-left: 5px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 6px; }
         .record-card:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .record-card.active-view { background: rgba(139, 92, 246, 0.1); border-color: var(--app-accent); }
-        
-        /* VARIED RESULT STYLING */
         .record-card.varied-result { opacity: 0.9; border-left-color: #94a3b8; }
         
         .panel-name { font-size: 18px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.2; }
@@ -182,7 +181,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.4</div>
+    <div class="version-badge">SCHEMATICai v19.5</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -220,7 +219,7 @@
             
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
-                <button class="search-btn" id="searchBtn" onclick="SearchEngine.perform()">SEARCH</button>
+                <button id="searchBtn" class="search-btn" onclick="SearchEngine.perform()" disabled>INITIALIZING...</button>
             </div>
         </div>
         
@@ -243,19 +242,17 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.4 (FIXED VERSION CONFLICT - DB V7) ---
+// --- SCHEMATICai v19.5 (VISUAL LOADING STATE & UX FIXES) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- 1. INDEXEDDB HELPER (V7 - HIGHER THAN 6) ---
+// --- 1. INDEXEDDB HELPER (V7) ---
 class DB {
     static open() {
         return new Promise((resolve, reject) => {
-            // SET TO VERSION 7 TO FORCE UPGRADE FROM 6
             const req = indexedDB.open("CoxSchematicDB", 7); 
             req.onupgradeneeded = e => {
                 const db = e.target.result;
-                // Wipe if exists to be safe
                 if(db.objectStoreNames.contains("cache")) db.deleteObjectStore("cache");
                 db.createObjectStore("cache");
             };
@@ -283,10 +280,7 @@ class DB {
                 req.onsuccess = () => resolve(req.result);
                 req.onerror = e => reject(e.target.error);
             });
-        } catch(e) { 
-            console.warn("IDB Get Failed", e); 
-            return null; 
-        }
+        } catch(e) { return null; }
     }
     static async clear() {
         return new Promise((resolve) => {
@@ -297,7 +291,7 @@ class DB {
     }
 }
 
-// --- SECURE CACHE SERVICE ---
+// --- SECURE CACHE ---
 class CacheService {
     static async save(data, password) {
         if(!password) return;
@@ -315,7 +309,6 @@ class CacheService {
         return JSON.parse(json);
     }
 
-    // AES-GCM
     static async getKey(password) {
         const enc = new TextEncoder();
         const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
@@ -369,7 +362,7 @@ class AuthService {
     }
     static async logout() { 
         localStorage.clear(); 
-        await DB.clear(); // NUKE DB
+        await DB.clear(); 
         location.reload(); 
     }
     static getHeaders() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
@@ -573,7 +566,9 @@ window.LOCAL_DB = []; window.DB_IDS = new Set(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); 
+        // 1. SET STATUS TO LOADING
         btn.disabled = true;
+        btn.innerText = "🔒 DECRYPTING...";
         
         const savedSelections = {};
         ['mfg','hp','volt','phase','enc'].forEach(id => {
@@ -592,6 +587,8 @@ class DataLoader {
                 if(savedSelections[id] && s.querySelector(`option[value="${savedSelections[id]}"]`)) s.value = savedSelections[id];
             });
             btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
+        } else {
+            btn.innerText = "⬇️ SYNCING 0%...";
         }
 
         await TheHealer.fetchAndTally();
@@ -603,11 +600,9 @@ class DataLoader {
             mfgs: Array.from(window.FOUND_MFGS)
         }, password);
         
-        if(btn) {
-            const originalText = "SEARCH";
-            btn.innerText = "✅ CACHE SAVED";
-            setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 2000);
-        }
+        // 2. SET FINAL STATE
+        btn.innerText = "SEARCH";
+        btn.disabled = false;
         
         UI.populateAllDropdowns(); 
         ['mfg','hp','volt','phase','enc'].forEach(id => {
@@ -623,9 +618,10 @@ class DataLoader {
         do {
             if(window.LOCAL_DB.length >= 7500) break;
             
-            if(btn && btn.innerText.includes("LOADING")) {
+            // 3. UPDATE PERCENTAGE
+            if(btn && btn.disabled) {
                 const pct = Math.min(100, Math.round((window.LOCAL_DB.length / CONFIG.estTotal) * 100));
-                btn.innerText = `LOADING ${pct}%...`;
+                btn.innerText = `⬇️ SYNCING ${pct}%...`;
             }
 
             const resp = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
