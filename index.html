@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v16.3)</title>
+    <title>Cox Research | SCHEMATICai (v16.4)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -101,9 +101,9 @@
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
+        /* LOCKED STATE (Positive only) */
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
-        .thumb-btn.voted-down { background: #fee2e2 !important; border-color: #991b1b !important; color: #991b1b !important; opacity: 1 !important; pointer-events: none; }
-
+        
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
         .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; }
         
@@ -166,7 +166,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v16.3</div>
+    <div class="version-badge">SCHEMATICai v16.4</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -182,6 +182,7 @@
              <div class="reason-row"><div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
              <div class="reason-row"><div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
              <div id="dynamic-feedback-container"></div>
+             
              <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
              <button class="submit-feedback-btn" style="background:#555;margin-top:5px;" onclick="FeedbackService.close()">CANCEL</button>
         </div>
@@ -218,7 +219,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v16.3 (RESTORED BADGES & ROBUST PARSER) ---
+// --- SCHEMATICai v16.4 (KEYWORDS RESTORED & FEEDBACK UNLOCKED) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -262,24 +263,36 @@ class FeedbackService {
     static saveHistory(id, type) { const c = this.getHistory(id); c[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(c)); }
     
     static down(id) { 
-        if(this.getHistory(id).down || this.sessionVotes.has(id + '_down')) return;
+        // Note: Removed lockout check here to allow multiple reports per item
         this.activeId = id; 
         document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
         document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected')); 
+        
+        // Dynamic Keywords
+        const container = document.getElementById('dynamic-feedback-container'); container.innerHTML = '';
+        SearchEngine.currentPhrases.forEach(p => { 
+            const div = document.createElement('div'); div.className = 'reason-row'; 
+            div.innerHTML = `<div class="reason-btn" data-reason="kw_reject" data-kw="${p}" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch: "${p}"</div>`; 
+            container.appendChild(div); 
+        });
+
         document.getElementById('feedback-modal').classList.add('active-modal'); 
     } 
     
     static async submit() { 
         const id = this.activeId; const submissions = []; 
         document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
-            const reason = btn.dataset.reason; 
-            const val = btn.nextElementSibling?.value || ""; 
-            submissions.push({ id, reasonCode: reason, value: val }); 
+            const reasonCode = btn.dataset.reason; 
+            if(reasonCode === 'kw_reject') { submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw }); } 
+            else { const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }
         }); 
+        
+        if(submissions.length === 0) return alert("Select a reason.");
+
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
-        this.saveHistory(id, 'down'); 
-        this.sessionVotes.add(id + '_down'); 
-        alert("Votes Recorded."); this.close(); 
+        
+        // Note: Removed 'down' history save to prevent button lockout
+        alert("Feedback Recorded."); this.close(); 
     } 
     
     static async up(id, btnElement) { 
@@ -352,8 +365,8 @@ class AIParser {
         
         // HP (Robust)
         if (!specs.hp) { 
-            let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); // "HP: 5"
-            if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i); // "5 HP"
+            let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
+            if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i); 
             if(m) specs.hp = m[1].replace(/\s/g, ''); 
         }
         
@@ -401,8 +414,12 @@ class DataLoader {
 }
 
 class SearchEngine {
+    static currentPhrases = []; 
     static perform() {
-        const criteria = { kw: document.getElementById('keywordInput').value.split(',').map(s=>s.trim()).filter(s=>s), mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value };
+        const kwInput = document.getElementById('keywordInput').value;
+        this.currentPhrases = kwInput.split(',').map(s=>s.trim()).filter(s=>s.length > 0);
+        
+        const criteria = { kw: this.currentPhrases, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value };
         const results = window.LOCAL_DB.filter(r => {
             if(criteria.kw.length && !criteria.kw.every(k => (r.id+r.desc).includes(k.toUpperCase()))) return false;
             if(criteria.mfg!=="Any" && r.mfg!==criteria.mfg.toUpperCase()) return false;
@@ -410,7 +427,7 @@ class SearchEngine {
             if(criteria.volt!=="Any" && (!r.volt || !r.volt.includes(criteria.volt))) return false;
             return true;
         });
-        UI.renderResults(results, criteria);
+        UI.renderResults(results, criteria, this.currentPhrases);
     }
 }
 
@@ -420,15 +437,16 @@ class UI {
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
     
-    static renderResults(results, criteria) {
+    static renderResults(results, criteria, phrases) {
         const area = document.getElementById('results-area'); area.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${results.length} records</div>`;
         results.slice(0, 50).forEach(item => {
             const healed = TheHealer.healedData[item.id];
             const isVotedUp = FeedbackService.sessionVotes.has(item.id);
-            const isVotedDown = FeedbackService.sessionVotes.has(item.id + '_down');
             
             let badges = '';
-            // RESTORED BADGE LOGIC v16.3
+            // KEYWORDS BADGES (Restored)
+            if(phrases) phrases.forEach(p => { badges += `<span class="hud-badge match-keyword">KW: ${p.toUpperCase()}</span>`; });
+            
             if(criteria.mfg!=="Any") badges += `<span class="hud-badge ${healed?.mfg?'match-healed':'match-exact'}">${criteria.mfg}</span>`;
             if(item.hp) badges += `<span class="hud-badge ${healed?.hp?'match-healed':'match-exact'}">${healed?.hp||item.hp} HP</span>`;
             if(item.volt) badges += `<span class="hud-badge ${healed?.volt?'match-healed':'match-exact'}">${healed?.volt||item.volt}V</span>`;
@@ -438,7 +456,7 @@ class UI {
             card.innerHTML = `<div class="panel-name">${item.id}</div><div class="badge-row">${badges}</div>
             <div class="card-actions">
                 <button class="thumb-btn up ${isVotedUp ? 'voted-up' : ''}" onclick="event.stopPropagation();FeedbackService.up('${item.id}', this)">👍</button>
-                <button class="thumb-btn down ${isVotedDown ? 'voted-down' : ''}" onclick="event.stopPropagation();FeedbackService.down('${item.id}')">👎</button>
+                <button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${item.id}')">👎</button>
             </div>`;
             card.onclick = () => { 
                 document.querySelectorAll('.record-card').forEach(c=>c.classList.remove('active-view')); card.classList.add('active-view'); 
