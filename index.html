@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v16.6)</title>
+    <title>Cox Research | SCHEMATICai (v16.8)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -107,6 +107,7 @@
 
         .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; border-top: 1px solid var(--border-color); padding-top: 8px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
+        /* LOCKED STATE */
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
         
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
@@ -171,7 +172,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v16.6</div>
+    <div class="version-badge">SCHEMATICai v16.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -225,7 +226,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v16.6 (SMART ENCLOSURE MAPPING) ---
+// --- SCHEMATICai v16.8 (STRICT BADGES & DEEP SEARCH) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -285,8 +286,14 @@ class FeedbackService {
         const id = this.activeId; const submissions = []; 
         document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
             const reasonCode = btn.dataset.reason; 
-            if(reasonCode === 'kw_reject') { submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw }); } 
-            else { const input = btn.nextElementSibling; const value = input && input.classList.contains('correction-input') ? input.value : ""; if(value) { submissions.push({ id, reasonCode, value }); } }
+            if(reasonCode === 'kw_reject') { 
+                submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw }); 
+            } else { 
+                const input = btn.nextElementSibling; 
+                // FORCE UPPERCASE
+                const value = (input && input.value) ? input.value.trim().toUpperCase() : ""; 
+                if(value) submissions.push({ id, reasonCode, value }); 
+            }
         }); 
         if(submissions.length === 0) return alert("Select a reason.");
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
@@ -318,7 +325,6 @@ class PdfController {
     }
 }
 
-// SMART ENCLOSURE DATA
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic','hydro-matic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'] }, 
     ENCLOSURES: { 
@@ -367,24 +373,18 @@ class AIParser {
         const specs = { mfg: healed?.mfg || null, hp: healed?.hp || null, volt: healed?.volt || null, phase: healed?.phase || null, enc: healed?.enc || null };
         const t = (text || "").toUpperCase();
         
-        // MFG
         if (!specs.mfg) for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) specs.mfg = k.toUpperCase();
-        
-        // ENCLOSURE (Smart Map)
         if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) specs.enc = k;
 
-        // HP
         if (!specs.hp) { 
             let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
             if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i); 
             if(m) specs.hp = m[1].replace(/\s/g, ''); 
         }
-        // VOLT
         if (!specs.volt) { 
             const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); 
             if(m) specs.volt = m[1]; 
         }
-        // PHASE
         if (!specs.phase) { 
             if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø") || t.includes("3/60")) specs.phase = "3";
             else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø") || t.includes("1/60")) specs.phase = "1";
@@ -438,7 +438,9 @@ class SearchEngine {
         };
         
         const results = window.LOCAL_DB.filter(r => {
+            // FIX: Removed strict word boundary (\b) for partial keyword matches
             if(criteria.kw.length && !criteria.kw.every(k => (r.id+r.desc).includes(k.toUpperCase()))) return false;
+            
             if(criteria.mfg!=="Any" && r.mfg!==criteria.mfg.toUpperCase()) return false;
             if(criteria.hp!=="Any" && r.hp!==criteria.hp) return false;
             if(criteria.volt!=="Any" && (!r.volt || !r.volt.includes(criteria.volt))) return false;
@@ -462,12 +464,13 @@ class UI {
             const isVotedUp = FeedbackService.sessionVotes.has(item.id);
             
             let badges = '';
+            // STRICT BADGE LOGIC (v16.8)
             if(phrases) phrases.forEach(p => { badges += `<span class="hud-badge match-keyword">KW: ${p.toUpperCase()}</span>`; });
             if(criteria.mfg!=="Any") badges += `<span class="hud-badge ${healed?.mfg?'match-healed':'match-exact'}">${criteria.mfg}</span>`;
-            if(item.hp) badges += `<span class="hud-badge ${healed?.hp?'match-healed':'match-exact'}">${healed?.hp||item.hp} HP</span>`;
-            if(item.volt) badges += `<span class="hud-badge ${healed?.volt?'match-healed':'match-exact'}">${healed?.volt||item.volt}V</span>`;
-            if(item.phase) badges += `<span class="hud-badge ${healed?.phase?'match-healed':'match-exact'}">${healed?.phase||item.phase}PH</span>`;
-            if(item.enc) badges += `<span class="hud-badge match-gray">${healed?.enc||item.enc}</span>`;
+            if(criteria.hp!=="Any" && item.hp) badges += `<span class="hud-badge ${healed?.hp?'match-healed':'match-exact'}">${healed?.hp||item.hp} HP</span>`;
+            if(criteria.volt!=="Any" && item.volt) badges += `<span class="hud-badge ${healed?.volt?'match-healed':'match-exact'}">${healed?.volt||item.volt}V</span>`;
+            if(criteria.phase!=="Any" && item.phase) badges += `<span class="hud-badge ${healed?.phase?'match-healed':'match-exact'}">${healed?.phase||item.phase}PH</span>`;
+            if(criteria.enc!=="Any" && item.enc) badges += `<span class="hud-badge match-gray">${healed?.enc||item.enc}</span>`;
             
             const card = document.createElement('div'); card.className = 'record-card';
             card.innerHTML = `<div class="panel-name">${item.id}</div><div class="badge-row">${badges}</div>
