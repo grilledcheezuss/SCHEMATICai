@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v18.6)</title>
+    <title>Cox Research | SCHEMATICai (v18.7)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -27,7 +27,7 @@
             /* BADGE COLORS */
             --match-green-bg: #dcfce7; --match-green-text: #166534; 
             --match-orange-bg: #ffedd5; --match-orange-text: #9a3412; 
-            --match-red-bg: #fee2e2; --match-red-text: #991b1b; /* New Red Badge */
+            --match-red-bg: #fee2e2; --match-red-text: #991b1b; 
             --match-keyword-bg: #dcfce7; --match-keyword-text: #166534;
             
             --header-height: 70px; 
@@ -74,6 +74,7 @@
         
         #sidebar { width: 420px; min-width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
         
+        /* COLLAPSIBLE CONTROLS */
         .sidebar-controls { padding: 12px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
         .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
         
@@ -112,7 +113,7 @@
         
         .hud-badge.match-green { background: var(--match-green-bg); color: var(--match-green-text); }
         .hud-badge.match-orange { background: var(--match-orange-bg); color: var(--match-orange-text); }
-        .hud-badge.match-red { background: var(--match-red-bg); color: var(--match-red-text); } /* New Red */
+        .hud-badge.match-red { background: var(--match-red-bg); color: var(--match-red-text); }
         .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); }
 
         .card-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 2px; border-top: 1px solid var(--border-color); padding-top: 4px; }
@@ -181,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v18.6</div>
+    <div class="version-badge">SCHEMATICai v18.7</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -242,7 +243,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v18.6 (FORGIVENESS SCORING & VISUAL RED BADGES) ---
+// --- SCHEMATICai v18.7 (FIXED DROPDOWNS & FORGIVENESS RANKING) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -253,6 +254,7 @@ class AuthService {
         if (user && pass) {
             document.documentElement.classList.add('logged-in');
             document.getElementById('auth-overlay').classList.remove('active-modal');
+            UI.populateStaticDropdowns(); // FIX: POPULATE IMMEDIATELY
             return true;
         }
         return false;
@@ -452,7 +454,7 @@ class DataLoader {
         const btn = document.getElementById('searchBtn'); btn.innerText = "LOADING..."; btn.disabled = true;
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc');
-        UI.populateDropdowns(); 
+        UI.populateMfgDropdown(); 
         btn.innerText = "SEARCH"; btn.disabled = false;
     }
     static async fetchPartition(dir) {
@@ -504,11 +506,11 @@ class SearchEngine {
         
         window.LOCAL_DB.forEach(r => {
             let mismatchCount = 0;
-            let mismatchPenalty = 0; // Higher = Worse
+            let mismatchPenalty = 0; 
             let hpDiff = 0;
             let hardFail = false;
             
-            // KEYWORDS (Hard Filter)
+            // KEYWORDS
             if(criteria.kw.length) {
                 const combinedText = (r.id + " " + r.desc).toUpperCase();
                 const cleanText = combinedText.replace(/[\W_]+/g, "");
@@ -528,12 +530,12 @@ class SearchEngine {
                 if(!allKwMatch) return; 
             }
             
-            // MFG (Strict Filter: Match or Unknown only)
+            // MFG
             if(criteria.mfg!=="Any") {
-                if(r.mfg && r.mfg !== criteria.mfg.toUpperCase()) return; // HARD EXCLUDE
+                if(r.mfg && r.mfg !== criteria.mfg.toUpperCase()) return; 
             }
 
-            // HP (Most Forgivable)
+            // HP
             if(criteria.hp!=="Any") {
                 if(r.hp) {
                     const searchVal = parseFloat(criteria.hp);
@@ -541,14 +543,14 @@ class SearchEngine {
                     if(!isNaN(searchVal) && !isNaN(recordVal)) {
                         if(searchVal !== recordVal) {
                             mismatchCount++;
-                            mismatchPenalty += 1; // Low Penalty
+                            mismatchPenalty += 1; 
                             hpDiff = Math.abs(searchVal - recordVal);
                         }
                     } else { mismatchCount++; mismatchPenalty += 1; }
                 } else { mismatchCount++; mismatchPenalty += 1; }
             }
 
-            // VOLT (Medium Penalty)
+            // VOLT
             if(criteria.volt!=="Any") { 
                 if(!r.volt || !r.volt.includes(criteria.volt)) {
                     mismatchCount++;
@@ -556,7 +558,7 @@ class SearchEngine {
                 }
             }
             
-            // PHASE (High Penalty)
+            // PHASE
             if(criteria.phase!=="Any") { 
                 if(r.phase !== criteria.phase) {
                     mismatchCount++;
@@ -564,7 +566,7 @@ class SearchEngine {
                 }
             }
             
-            // ENC (Low/Ignored Penalty in rank, just count)
+            // ENC
             if(criteria.enc!=="Any") { 
                 if(r.enc !== criteria.enc) {
                     mismatchCount++;
@@ -580,24 +582,14 @@ class SearchEngine {
             results.push(r);
         });
         
-        // SORTING HIERARCHY
         results.sort((a, b) => {
-            // 1. Perfect Matches First
             if (a.isPerfect && !b.isPerfect) return -1;
             if (!a.isPerfect && b.isPerfect) return 1;
-            
-            // 2. Sort Perfects by ID (Newest First)
             if (a.isPerfect && b.isPerfect) {
                 return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' });
             }
-            
-            // 3. Sort Varied by "Mismatch Count" (Fewer is better)
             if (a.mismatchCount !== b.mismatchCount) return a.mismatchCount - b.mismatchCount;
-            
-            // 4. If Counts equal, check Penalty Score (HP mismatch < Volt < Phase)
             if (a.mismatchPenalty !== b.mismatchPenalty) return a.mismatchPenalty - b.mismatchPenalty;
-            
-            // 5. If both are HP Mismatches only, sort by proximity
             return a.hpDiff - b.hpDiff;
         });
         
@@ -638,36 +630,30 @@ class UI {
             
             let badges = '';
             
-            // MFG
             if(criteria.mfg!=="Any") {
-                // If we are here, it's either Match or Unknown (Strict Exclusion applied)
                 const isExact = (item.mfg === criteria.mfg.toUpperCase());
                 const badgeClass = (isExact) ? 'match-green' : 'match-orange';
                 badges += `<span class="hud-badge ${badgeClass}">${healed?.mfg||item.mfg||'Unknown'}</span>`;
             }
             
-            // HP
             if(criteria.hp!=="Any" && item.hp) {
                 const isExactHp = (parseFloat(item.hp) === parseFloat(criteria.hp));
                 const badgeClass = (isExactHp) ? 'match-green' : 'match-orange';
                 badges += `<span class="hud-badge ${badgeClass}">${healed?.hp||item.hp} HP</span>`;
             }
             
-            // VOLT (Red badge if mismatch)
             if(criteria.volt!=="Any" && item.volt) {
                 const isMatch = item.volt.includes(criteria.volt);
                 const badgeClass = isMatch ? 'match-green' : 'match-red';
                 badges += `<span class="hud-badge ${badgeClass}">${healed?.volt||item.volt}V</span>`;
             }
             
-            // PHASE (Red badge if mismatch)
             if(criteria.phase!=="Any" && item.phase) {
                 const isMatch = item.phase === criteria.phase;
                 const badgeClass = isMatch ? 'match-green' : 'match-red';
                 badges += `<span class="hud-badge ${badgeClass}">${healed?.phase||item.phase}PH</span>`;
             }
             
-            // ENC
             if(criteria.enc!=="Any" && item.enc) {
                 const isMatch = item.enc === criteria.enc;
                 const badgeClass = isMatch ? 'match-green' : 'match-orange';
@@ -691,22 +677,24 @@ class UI {
             area.appendChild(card);
         });
     }
-    static populateDropdowns() { 
-        const encs = AI_TRAINING_DATA.ENCLOSURES;
+    
+    // FIX: STATIC POPULATION
+    static populateStaticDropdowns() {
+        const types = { enc: AI_TRAINING_DATA.ENCLOSURES };
+        ['hp','volt','phase','enc'].forEach(c => {
+            const s = document.getElementById(c+'Input');
+            if(!s) return;
+            const data = (c==='enc') ? Object.keys(types.enc) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
+            s.innerHTML = '<option value="Any">Any</option>';
+            if(data) data.forEach(i => { const o = document.createElement('option'); o.value=i; o.innerText=i; s.appendChild(o); });
+        });
+    }
+    
+    static populateMfgDropdown() {
         const mfgSelect = document.getElementById('mfgInput');
         mfgSelect.innerHTML = '<option value="Any">Any</option>';
         const sortedMfgs = Array.from(window.FOUND_MFGS).sort();
         sortedMfgs.forEach(m => { const o = document.createElement('option'); o.value=m; o.innerText=m; mfgSelect.appendChild(o); });
-
-        ['hp','volt','phase','enc'].forEach(c => {
-            const s = document.getElementById(c+'Input');
-            if(!s) return;
-            if(c !== 'mfg') {
-                const data = (c==='enc') ? Object.keys(encs) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
-                s.innerHTML = '<option value="Any">Any</option>';
-                data.forEach(i => { const o = document.createElement('option'); o.value=i; o.innerText=i; s.appendChild(o); });
-            }
-        });
     }
 }
 
