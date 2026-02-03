@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.1)</title>
+    <title>Cox Research | SCHEMATICai (v19.2)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -182,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.1</div>
+    <div class="version-badge">SCHEMATICai v19.2</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -243,37 +243,70 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.1 (ENCRYPTED OFFLINE CACHE) ---
+// --- SCHEMATICai v19.2 (INDEXEDDB UPGRADE FOR UNLIMITED CACHE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- SECURE CACHE SERVICE ---
+// --- 1. INDEXEDDB HELPER (UNLIMITED STORAGE) ---
+class DB {
+    static open() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open("CoxSchematicDB", 1);
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if(!db.objectStoreNames.contains("cache")) db.createObjectStore("cache");
+            };
+            req.onsuccess = e => resolve(e.target.result);
+            req.onerror = e => reject(e);
+        });
+    }
+    static async put(key, value) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("cache", "readwrite");
+            tx.objectStore("cache").put(value, key);
+            tx.oncomplete = () => resolve();
+            tx.onerror = e => reject(e);
+        });
+    }
+    static async get(key) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("cache", "readonly");
+            const req = tx.objectStore("cache").get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = e => reject(e);
+        });
+    }
+}
+
+// --- SECURE CACHE SERVICE (USES IDB) ---
 class CacheService {
     static async save(data, password) {
         if(!password) return;
         try {
             const json = JSON.stringify(data);
             const enc = await this.encrypt(json, password);
-            localStorage.setItem('cox_db_cache', enc);
-            localStorage.setItem('cox_db_ts', Date.now());
+            await DB.put('db_blob', enc); // Save to IndexedDB
+            console.log("Cache Saved Successfully (IDB)");
         } catch(e) { console.warn("Cache Save Failed", e); }
     }
 
     static async load(password) {
         if(!password) return null;
         try {
-            const enc = localStorage.getItem('cox_db_cache');
+            const enc = await DB.get('db_blob'); // Load from IndexedDB
             if(!enc) return null;
             const json = await this.decrypt(enc, password);
             if(!json) return null;
             return JSON.parse(json);
         } catch(e) { 
-            console.warn("Cache Load Failed (Bad Pass?)", e); 
-            return null; // Invalid pass or data
+            console.warn("Cache Load Failed", e); 
+            return null; 
         }
     }
 
-    // NATIVE BROWSER ENCRYPTION (AES-GCM)
+    // AES-GCM (NO CHANGES)
     static async getKey(password) {
         const enc = new TextEncoder();
         const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
@@ -321,20 +354,11 @@ class AuthService {
         const user = document.getElementById('auth-user').value.trim();
         const pass = document.getElementById('auth-pass').value.trim();
         if (!user || !pass) return alert("Missing Credentials");
-        
-        // Attempt immediate cache unlock to verify pass
-        CacheService.load(pass).then(data => {
-            // Even if null (no cache), we accept for now. 
-            // Real auth check happens at network fetch usually.
-            localStorage.setItem('cox_user', user); 
-            localStorage.setItem('cox_pass', pass); 
-            location.reload(); 
-        });
-    }
-    static logout() { 
-        localStorage.clear(); // CLEARS ENCRYPTED DATA TOO
+        localStorage.setItem('cox_user', user); 
+        localStorage.setItem('cox_pass', pass); 
         location.reload(); 
     }
+    static logout() { localStorage.clear(); location.reload(); }
     static getHeaders() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 
@@ -386,7 +410,6 @@ class FeedbackService {
         this.close(); 
     } 
     
-    // SMART TARGETED FEEDBACK
     static async up(id, btnElement) { 
         if(this.sessionVotes.has(id)) return; 
         this.sessionVotes.add(id); 
@@ -552,7 +575,6 @@ class DataLoader {
             window.DB_IDS = new Set(cached.ids);
             window.FOUND_MFGS = new Set(cached.mfgs);
             UI.populateAllDropdowns();
-            // Restore selection if cache had them
             ['mfg','hp','volt','phase','enc'].forEach(id => {
                 const s = document.getElementById(id+'Input');
                 if(savedSelections[id] && s.querySelector(`option[value="${savedSelections[id]}"]`)) s.value = savedSelections[id];
@@ -563,12 +585,19 @@ class DataLoader {
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
         
-        // 2. SAVE NEW CACHE (ENCRYPTED)
+        // 2. SAVE NEW CACHE (ENCRYPTED) - USING IDB NOW
         await CacheService.save({
             data: window.LOCAL_DB,
             ids: Array.from(window.DB_IDS),
             mfgs: Array.from(window.FOUND_MFGS)
         }, password);
+        
+        // FLASH SUCCESS
+        if(btn) {
+            const originalText = "SEARCH";
+            btn.innerText = "✅ CACHE SAVED";
+            setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 2000);
+        }
         
         UI.populateAllDropdowns(); 
         ['mfg','hp','volt','phase','enc'].forEach(id => {
@@ -578,15 +607,13 @@ class DataLoader {
                 sel.value = saved;
             }
         });
-
-        btn.innerText = "SEARCH"; btn.disabled = false;
     }
     static async fetchPartition(dir, btn) {
         let offset = null;
         do {
             if(window.LOCAL_DB.length >= 7500) break;
             
-            if(btn) {
+            if(btn && btn.innerText.includes("LOADING")) {
                 const pct = Math.min(100, Math.round((window.LOCAL_DB.length / CONFIG.estTotal) * 100));
                 btn.innerText = `LOADING ${pct}%...`;
             }
@@ -638,7 +665,6 @@ class SearchEngine {
             let sortWeight = 0; 
             let isPerfect = true; 
             
-            // KEYWORDS
             if(criteria.kw.length) {
                 const combinedText = (r.id + " " + r.desc).toUpperCase();
                 const cleanText = combinedText.replace(/[\W_]+/g, "");
@@ -659,7 +685,6 @@ class SearchEngine {
                 sortWeight += 1000; 
             }
             
-            // MFG
             if(criteria.mfg!=="Any") {
                 if(r.mfg === criteria.mfg.toUpperCase()) {
                     sortWeight += 500000; 
@@ -671,7 +696,6 @@ class SearchEngine {
                 }
             }
 
-            // HP
             if(criteria.hp!=="Any") {
                 if(r.hp) {
                     const searchVal = parseFloat(criteria.hp);
@@ -689,7 +713,6 @@ class SearchEngine {
                 } else { isPerfect = false; }
             }
 
-            // VOLT
             if(criteria.volt!=="Any") { 
                 if(!r.volt || !r.volt.includes(criteria.volt)) {
                     isPerfect = false; 
@@ -698,7 +721,6 @@ class SearchEngine {
                 }
             }
             
-            // PHASE
             if(criteria.phase!=="Any") { 
                 if(r.phase !== criteria.phase) {
                     isPerfect = false; 
@@ -707,7 +729,6 @@ class SearchEngine {
                 }
             }
             
-            // ENC
             if(criteria.enc!=="Any") { 
                 if(r.enc !== criteria.enc) {
                     isPerfect = false; 
