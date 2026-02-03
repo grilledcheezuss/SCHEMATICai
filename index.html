@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v17.10)</title>
+    <title>Cox Research | SCHEMATICai (v17.11)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -172,7 +172,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v17.9</div>
+    <div class="version-badge">SCHEMATICai v17.11</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -228,7 +228,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v17.9 (SMART EXCLUSION & FLEXIBLE PHRASES) ---
+// --- SCHEMATICai v17.11 (SMART CONTEXT & PLURAL HANDLING) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
 
@@ -469,18 +469,24 @@ class SearchEngine {
         };
         
         const results = window.LOCAL_DB.filter(r => {
-            // SMART EXCLUSION & FLEXIBLE MATCHING
+            // FIX: SMART CONTEXT SEARCH
             if(criteria.kw.length) {
                 const combinedText = (r.id + " " + r.desc).toUpperCase();
+                const cleanText = combinedText.replace(/[\W_]+/g, "");
                 
                 const allKwMatch = criteria.kw.every(k => {
                     const kUp = k.toUpperCase();
-                    // FLEXIBLE WORD ORDER: "Backup Float" matches "Float Backup"
-                    const words = kUp.split(' ');
-                    const allWordsFound = words.every(w => combinedText.includes(w));
                     
-                    // EXCLUSION LOGIC: If searching "FLOAT" (alone), ensure NOT "BACKUP FLOAT"
-                    if(kUp === "FLOAT" && combinedText.includes("BACKUP")) return false;
+                    // 1. PLURAL HANDLING: "Floats" matches "Float"
+                    const kSingular = kUp.replace(/S$/,''); 
+                    
+                    // 2. WORD SOUP: "Backup Float" matches "Float Backup"
+                    const words = kSingular.split(' ');
+                    const allWordsFound = words.every(w => combinedText.includes(w) || cleanText.includes(w));
+                    
+                    // 3. EXCLUSION LOGIC: "Float" search EXCLUDES "Backup"
+                    // (But "Backup Float" search allows it)
+                    if(kSingular === "FLOAT" && combinedText.includes("BACKUP")) return false;
                     
                     return allWordsFound;
                 });
