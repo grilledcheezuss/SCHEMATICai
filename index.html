@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v10.5 - Secure Relative Proxy)</title>
+    <title>Cox Research | SCHEMATICai (v10.6 - Robust API Routing)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -166,7 +166,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v10.5</div>
+    <div class="version-badge">SCHEMATICai v10.6</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -219,16 +219,13 @@
 </div>
 
 <script>
-// --- SCHEMATICai v10.5 (SECURE RELATIVE PROXY) ---
+// --- SCHEMATICai v10.6 (ROBUST API ROUTING) ---
 
-// ⚠️ V10.5: CENTRALIZED CONFIG ⚠️
-// Security Note: Keys have been removed from the frontend.
-// The backend listening at /api must now inject the tokens.
+// ⚠️ V10.6: CONFIGURATION
+// Security Note: Keys are handled by the backend (api/index.js)
 const CONFIG = {
     useProxy: true,       // ENABLED: App will call relative path /api
-    proxyUrl: '/api',     // RELATIVE PATH: Works on Cloudflare/Vercel
-    
-    // DEV KEYS DELETED (Handled by backend)
+    proxyUrl: '/api',     // RELATIVE PATH: Works on Cloudflare/Vercel (Points to api/index.js)
     
     // TABLE IDs
     mainBase: 'appgc1pbuOgmODRpj',
@@ -244,12 +241,11 @@ class NetworkService {
         let url, headers = {};
         
         if (CONFIG.useProxy) {
-            // PROXY MODE: Call local endpoint, NO TOKENS sent from client
-            // Backend must route request based on tableName/baseId mapping
+            // PROXY MODE: Call local endpoint
+            // Backend routes request based on tableName/baseId mapping
             url = `${CONFIG.proxyUrl}/${encodeURIComponent(tableName)}${params}`;
             headers = { 'Content-Type': 'application/json' };
         } else {
-            // FALLBACK (If keys were present, which they aren't)
             console.error("❌ PROXY ERROR: useProxy=false but keys are missing.");
         }
 
@@ -306,7 +302,6 @@ class TheHealer {
                 });
                 offset = data.offset;
             } while (offset);
-            
             for (const [key, count] of Object.entries(tallies)) {
                 if (count >= CONFIG.voteThreshold) {
                     const [id, param, value] = key.split('|');
@@ -364,7 +359,6 @@ class DataLoader {
         try {
             do {
                 if (window.LOCAL_DB.length >= 7500) break;
-                // V10.5: NetworkService Call
                 const params = `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${direction}`;
                 const resp = await NetworkService.fetch(CONFIG.mainBase, CONFIG.mainTable, params, false); 
                 const data = await resp.json();
