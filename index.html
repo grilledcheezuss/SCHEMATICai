@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v18.8)</title>
+    <title>Cox Research | SCHEMATICai (v19.0)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -182,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v18.8</div>
+    <div class="version-badge">SCHEMATICai v19.0</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -243,9 +243,9 @@
 </div>
 
 <script>
-// --- SCHEMATICai v18.8 (FIXED DROPDOWNS & SEEDED LIST) ---
+// --- SCHEMATICai v19.0 (STRICT SCORING + TARGETED FEEDBACK) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
-const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3 };
+const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 class AuthService {
     static init() {
@@ -254,7 +254,7 @@ class AuthService {
         if (user && pass) {
             document.documentElement.classList.add('logged-in');
             document.getElementById('auth-overlay').classList.remove('active-modal');
-            UI.populateAllDropdowns(); // IMMEDIATE POPULATION
+            UI.populateAllDropdowns(); // STATIC SEED
             return true;
         }
         return false;
@@ -314,15 +314,37 @@ class FeedbackService {
         }); 
         if(submissions.length === 0) return alert("Select a reason.");
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
-        alert("Feedback Recorded."); this.close(); 
+        this.close(); 
     } 
     
+    // SMART TARGETED FEEDBACK
     static async up(id, btnElement) { 
         if(this.sessionVotes.has(id)) return; 
         this.sessionVotes.add(id); 
         if(btnElement) btnElement.classList.add('voted-up');
-        await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
-        alert("Liked!"); 
+        
+        const mfg = document.getElementById('mfgInput').value;
+        const hp = document.getElementById('hpInput').value;
+        const volt = document.getElementById('voltInput').value;
+        const phase = document.getElementById('phaseInput').value;
+        const enc = document.getElementById('encInput').value;
+        
+        const submissions = [];
+        
+        // 1. Always send general match
+        submissions.push({ "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
+        
+        // 2. Send specific criteria confirmations
+        if(mfg !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "mfg", "Suggested Value": mfg } });
+        if(hp !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "hp", "Suggested Value": hp } });
+        if(volt !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "volt", "Suggested Value": volt } });
+        if(phase !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "phase", "Suggested Value": phase } });
+        if(enc !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "enc", "Suggested Value": enc } });
+        
+        for(const sub of submissions) {
+            await NetworkService.post(CONFIG.feedbackTable, sub);
+        }
+        // Silent Success
     } 
     
     static toggleReason(el) { el.classList.toggle('selected'); } 
@@ -450,16 +472,42 @@ class AIParser {
 window.LOCAL_DB = []; window.DB_IDS = new Set(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
-        const btn = document.getElementById('searchBtn'); btn.innerText = "LOADING..."; btn.disabled = true;
+        const btn = document.getElementById('searchBtn'); 
+        btn.disabled = true;
+        
+        const savedSelections = {};
+        ['mfg','hp','volt','phase','enc'].forEach(id => {
+            savedSelections[id] = document.getElementById(id+'Input').value;
+        });
+
         await TheHealer.fetchAndTally();
-        await this.fetchPartition('desc');
-        UI.populateAllDropdowns(); // UPDATE DYNAMIC
+        await this.fetchPartition('desc', btn);
+        
+        UI.populateAllDropdowns(); 
+        
+        // RESTORE PARAMETERS
+        ['mfg','hp','volt','phase','enc'].forEach(id => {
+            const saved = savedSelections[id];
+            // Only restore if valid option exists now
+            const sel = document.getElementById(id+'Input');
+            if(saved && saved !== "Any" && [...sel.options].some(o => o.value === saved)) {
+                sel.value = saved;
+            }
+        });
+
         btn.innerText = "SEARCH"; btn.disabled = false;
     }
-    static async fetchPartition(dir) {
+    static async fetchPartition(dir, btn) {
         let offset = null;
         do {
             if(window.LOCAL_DB.length >= 7500) break;
+            
+            // PERCENTAGE ESTIMATE
+            if(btn) {
+                const pct = Math.min(100, Math.round((window.LOCAL_DB.length / CONFIG.estTotal) * 100));
+                btn.innerText = `LOADING ${pct}%...`;
+            }
+
             const resp = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
             if(resp.status!==200) return;
             const data = await resp.json();
@@ -504,10 +552,8 @@ class SearchEngine {
         let results = [];
         
         window.LOCAL_DB.forEach(r => {
-            let mismatchCount = 0;
-            let mismatchPenalty = 0; 
-            let hpDiff = 0;
-            let hardFail = false;
+            let sortWeight = 0; 
+            let isPerfect = true; 
             
             // KEYWORDS
             if(criteria.kw.length) {
@@ -526,12 +572,20 @@ class SearchEngine {
                     if(kSingular === "FLOAT" && combinedText.includes("BACKUP")) return false;
                     return allWordsFound;
                 });
-                if(!allKwMatch) return; 
+                if(!allKwMatch) return;
+                sortWeight += 1000; 
             }
             
-            // MFG
+            // MFG (STRICT WEIGHTING)
             if(criteria.mfg!=="Any") {
-                if(r.mfg && r.mfg !== criteria.mfg.toUpperCase()) return; 
+                if(r.mfg === criteria.mfg.toUpperCase()) {
+                    sortWeight += 500000; // HUGE BONUS FOR EXACT MATCH
+                } else if (!r.mfg) {
+                    sortWeight -= 100000; // HUGE PENALTY FOR UNKNOWN (Push to bottom)
+                    isPerfect = false;
+                } else {
+                    return; // STRICT EXCLUSION
+                }
             }
 
             // HP
@@ -540,56 +594,57 @@ class SearchEngine {
                     const searchVal = parseFloat(criteria.hp);
                     const recordVal = parseFloat(r.hp);
                     if(!isNaN(searchVal) && !isNaN(recordVal)) {
-                        if(searchVal !== recordVal) {
-                            mismatchCount++;
-                            mismatchPenalty += 1; 
-                            hpDiff = Math.abs(searchVal - recordVal);
+                        if(searchVal === recordVal) {
+                            sortWeight += 5000; 
+                        } else {
+                            const diff = Math.abs(searchVal - recordVal);
+                            if(diff <= 2.5) sortWeight += 1000; // Close
+                            else sortWeight += 200; 
+                            isPerfect = false;
                         }
-                    } else { mismatchCount++; mismatchPenalty += 1; }
-                } else { mismatchCount++; mismatchPenalty += 1; }
+                    } else { sortWeight += 10; isPerfect = false; }
+                } else { isPerfect = false; }
             }
 
             // VOLT
             if(criteria.volt!=="Any") { 
                 if(!r.volt || !r.volt.includes(criteria.volt)) {
-                    mismatchCount++;
-                    mismatchPenalty += 10;
+                    isPerfect = false; 
+                } else {
+                    sortWeight += 2000;
                 }
             }
             
             // PHASE
             if(criteria.phase!=="Any") { 
                 if(r.phase !== criteria.phase) {
-                    mismatchCount++;
-                    mismatchPenalty += 20;
+                    isPerfect = false; 
+                } else {
+                    sortWeight += 2000;
                 }
             }
             
             // ENC
             if(criteria.enc!=="Any") { 
                 if(r.enc !== criteria.enc) {
-                    mismatchCount++;
-                    mismatchPenalty += 5;
+                    isPerfect = false; 
+                } else {
+                    sortWeight += 2000;
                 }
             }
             
-            r.isPerfect = (mismatchCount === 0);
-            r.mismatchCount = mismatchCount;
-            r.mismatchPenalty = mismatchPenalty;
-            r.hpDiff = hpDiff;
+            if(isPerfect) sortWeight += 1000000; // PERFECT TIER
             
+            r.sortWeight = sortWeight;
+            r.isPerfect = isPerfect;
             results.push(r);
         });
         
+        // SORT BY WEIGHT DESCENDING
         results.sort((a, b) => {
-            if (a.isPerfect && !b.isPerfect) return -1;
-            if (!a.isPerfect && b.isPerfect) return 1;
-            if (a.isPerfect && b.isPerfect) {
-                return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' });
-            }
-            if (a.mismatchCount !== b.mismatchCount) return a.mismatchCount - b.mismatchCount;
-            if (a.mismatchPenalty !== b.mismatchPenalty) return a.mismatchPenalty - b.mismatchPenalty;
-            return a.hpDiff - b.hpDiff;
+            if (a.sortWeight !== b.sortWeight) return b.sortWeight - a.sortWeight;
+            // TIEBREAKER: NEWEST ID FIRST
+            return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' });
         });
         
         UI.renderResults(results, criteria, this.currentPhrases);
@@ -629,12 +684,14 @@ class UI {
             
             let badges = '';
             
+            // MFG
             if(criteria.mfg!=="Any") {
                 const isExact = (item.mfg === criteria.mfg.toUpperCase());
                 const badgeClass = (isExact) ? 'match-green' : 'match-orange';
                 badges += `<span class="hud-badge ${badgeClass}">${healed?.mfg||item.mfg||'Unknown'}</span>`;
             }
             
+            // HP
             if(criteria.hp!=="Any" && item.hp) {
                 const isExactHp = (parseFloat(item.hp) === parseFloat(criteria.hp));
                 const badgeClass = (isExactHp) ? 'match-green' : 'match-orange';
@@ -677,26 +734,23 @@ class UI {
         });
     }
     
-    // FIX: UNIFIED POPULATOR
     static populateAllDropdowns() {
         const encs = AI_TRAINING_DATA.ENCLOSURES;
         
-        // MFG: Seed Static + Add Dynamic
         const mfgSelect = document.getElementById('mfgInput');
-        // Get Static Keys
+        // PRESERVE SELECTION IF DYNAMIC UPDATE HAPPENS
+        const currentVal = mfgSelect.value;
+        
         let allMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS).map(k => k.toUpperCase());
-        // Merge with Found Dynamic
-        window.FOUND_MFGS.forEach(m => {
-            if(!allMfgs.includes(m)) allMfgs.push(m);
-        });
+        window.FOUND_MFGS.forEach(m => { if(!allMfgs.includes(m)) allMfgs.push(m); });
         allMfgs.sort();
         
         mfgSelect.innerHTML = '<option value="Any">Any</option>';
         allMfgs.forEach(m => { 
             const o = document.createElement('option'); o.value=m; o.innerText=m; mfgSelect.appendChild(o); 
         });
+        if(currentVal && currentVal !== "Any") mfgSelect.value = currentVal;
 
-        // OTHER STATIC DROPDOWNS
         ['hp','volt','phase','enc'].forEach(c => {
             const s = document.getElementById(c+'Input');
             if(!s) return;
