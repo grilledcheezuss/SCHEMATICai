@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.8)</title>
+    <title>Cox Research | SCHEMATICai (v19.9)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -181,7 +181,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.8</div>
+    <div class="version-badge">SCHEMATICai v19.9</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -242,7 +242,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.8 (PENALTY SCORING & BADGE REORG) ---
+// --- SCHEMATICai v19.9 (PARSER UPGRADE & FINAL BADGE ORDER) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -542,10 +542,14 @@ class AIParser {
         
         if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { specs.enc = k; break; }
 
-        if (!specs.hp) { 
-            let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
-            if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*[-]?\s*HP\b/i); 
-            if(m) specs.hp = parseFloat(m[1].replace(/\s/g, '')).toString(); 
+        // --- ENHANCED HP PARSING (v19.9) ---
+        if (!specs.hp) {
+            // Pattern 1: Explicit Label ("HP: 15", "HP-15")
+            let m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i);
+            // Pattern 2: Compact Unit ("15HP", "15-HP", "15 HP")
+            if (!m) m = t.match(/\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i);
+            
+            if(m) specs.hp = parseFloat(m[1]).toString();
         }
 
         if (!specs.volt) { 
@@ -688,7 +692,7 @@ class SearchEngine {
                     return allWordsFound;
                 });
                 if(!allKwMatch) return;
-                sortWeight += 10; // TINY BOOST
+                sortWeight += 10; 
             }
             
             // MFG (STRICT)
@@ -699,7 +703,7 @@ class SearchEngine {
                     sortWeight -= 10000; 
                     isPerfect = false; mismatchCount++;
                 } else {
-                    return; // EXCLUDE WRONG MFG
+                    return; 
                 }
             }
 
@@ -725,7 +729,7 @@ class SearchEngine {
             if(criteria.volt!=="Any") { 
                 if(!r.volt || !r.volt.includes(criteria.volt)) {
                     isPerfect = false; mismatchCount++;
-                    sortWeight -= 10000; // ANCHOR
+                    sortWeight -= 10000; 
                 }
             }
             
@@ -733,7 +737,7 @@ class SearchEngine {
             if(criteria.phase!=="Any") { 
                 if(r.phase !== criteria.phase) {
                     isPerfect = false; mismatchCount++;
-                    sortWeight -= 5000; // ANCHOR
+                    sortWeight -= 5000; 
                 }
             }
             
@@ -745,9 +749,7 @@ class SearchEngine {
                 }
             }
             
-            // HP ONLY VAR CHECK
             if(!isPerfect && mismatchCount === 1) {
-                // If only mismatch is HP, flag it for Tier 2
                 if(criteria.hp!=="Any" && r.hp && parseFloat(r.hp) !== parseFloat(criteria.hp)) {
                     isHpOnlyVar = true;
                 }
@@ -759,19 +761,12 @@ class SearchEngine {
             results.push(r);
         });
         
-        // TIERED SORT
         results.sort((a, b) => {
-            // TIER 1: PERFECT
             if (a.isPerfect && !b.isPerfect) return -1;
             if (!a.isPerfect && b.isPerfect) return 1;
-            
-            // TIER 2: HP VARIED ONLY
             if (a.isHpOnlyVar && !b.isHpOnlyVar) return -1;
             if (!a.isHpOnlyVar && b.isHpOnlyVar) return 1;
-            
-            // TIER 3: SCORE (VOLT MISMATCHES SUNK BY NEGATIVE SCORE)
             if (b.sortWeight !== a.sortWeight) return b.sortWeight - a.sortWeight;
-            
             return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' });
         });
         
@@ -812,7 +807,7 @@ class UI {
             
             let badges = '';
             
-            // BADGE ORDER: VOLT > PHASE > HP > MFG > ENC > KEYWORDS
+            // ORDER: VOLT -> PHASE -> HP -> MFG -> ENC -> KEYWORDS
             
             if(criteria.volt!=="Any" && item.volt) {
                 const isMatch = item.volt.includes(criteria.volt);
