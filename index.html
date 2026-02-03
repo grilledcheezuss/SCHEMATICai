@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v11.0 - Audited)</title>
+    <title>Cox Research | SCHEMATICai (v11.1 - Secure CORS)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script type="module" src="database.js"></script>
+
     <script>
         try {
             const session = JSON.parse(localStorage.getItem('cox_auth_session'));
@@ -162,7 +164,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v11.0</div>
+    <div class="version-badge">SCHEMATICai v11.1</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" title="Admin Settings" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -215,11 +217,13 @@
 </div>
 
 <script>
-// --- SCHEMATICai v11.0 (AUDITED & OPTIMIZED) ---
+// --- SCHEMATICai v11.1 (SECURE & FUNCTIONAL) ---
 
 const CONFIG = {
     useProxy: true,       
-    proxyUrl: '/api/data', 
+    proxyUrl: '/api/search', // Maps to api/index.js via vercel.json
+    
+    // TABLE IDs
     mainBase: 'appgc1pbuOgmODRpj',
     mainTable: 'Control Panel Items',
     feedbackBase: 'app88zF2k4FgjU8hK',
@@ -305,7 +309,7 @@ class TheHealer {
     }
 }
 
-// OPTIMIZED: REGEX CONSTANTS (Outside loop)
+// REGEX CONSTANTS
 const REGEX_HP_A = /\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i;
 const REGEX_HP_B = /(?<!\/)\b(\d+(\.\d+)?)\s*HP\b/i;
 const REGEX_VOLT = /\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i;
@@ -318,7 +322,6 @@ class AIParser {
 
         if (!specs.mfg) {
             for (const [standard, aliases] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) {
-                // Optimization: Pre-built regex is cleaner, but this is fast enough for now
                 if (new RegExp(`\\b(${aliases.join('|').toUpperCase()})\\b`, 'i').test(t)) { specs.mfg = standard.toUpperCase(); break; }
             }
         }
@@ -347,7 +350,6 @@ class DataLoader {
         btn.innerText = "INITIALIZING AI...";
         await TheHealer.fetchAndTally();
         btn.innerText = "DOWNLOADING DB...";
-        // AUDIT: Renamed to fetchPartition (Concurrency is valid, 'thread' was misnomer)
         await Promise.all([this.fetchPartition('desc'), this.fetchPartition('asc')]);
         console.log(`✅ Pipeline Complete: ${window.LOCAL_DB.length} records processed.`);
         btn.innerText = "SEARCH DATABASE"; btn.disabled = false; btn.style.backgroundColor = "#461D7C";
