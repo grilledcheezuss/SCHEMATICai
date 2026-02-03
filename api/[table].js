@@ -1,22 +1,10 @@
-// api/proxy.js
+// api/[table].js
 export default async function handler(req, res) {
-    // 1. Get the URL path (e.g., "/api/Feedback")
-    const { url } = req;
-    
-    // 2. Parse the Table Name
-    // We expect the URL to look like "/api/TableName?param=value"
-    // We split by "/" and grab the part after "api"
-    const parts = url.split('/');
-    const apiIndex = parts.indexOf('api');
-    
-    // Safety check: if "api" isn't found or there's nothing after it
-    if (apiIndex === -1 || !parts[apiIndex + 1]) {
-        return res.status(400).json({ error: "Invalid API URL structure." });
-    }
-
-    // "Feedback" or "Control%20Panel%20Items" (Remove query string ?...)
-    const tableRaw = parts[apiIndex + 1].split('?')[0]; 
-    const table = decodeURIComponent(tableRaw);
+    // Vercel Native Routing:
+    // The filename [table].js automatically captures the URL part after /api/
+    // Example: /api/Feedback -> req.query.table = "Feedback"
+    const { table } = req.query; 
+    const method = req.method;
 
     // 🔒 SECURITY CONFIGURATION
     const TABLE_CONFIG = {
@@ -34,35 +22,38 @@ export default async function handler(req, res) {
 
     const config = TABLE_CONFIG[table];
 
-    // 3. Access Control
+    // Validate Access
     if (!config) {
         return res.status(404).json({ error: `Table '${table}' not recognized.` });
     }
-    
-    if (!config.allowMethods.includes(req.method)) {
-        return res.status(405).json({ error: `Method ${req.method} not allowed.` });
+
+    if (!config.allowMethods.includes(method)) {
+        return res.status(405).json({ error: `Method ${method} not allowed.` });
     }
 
-    // 4. Forward to Airtable
-    const queryString = url.split('?')[1] || '';
-    const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryString}`;
+    // Construct Airtable URL (Keep query params, remove 'table' param)
+    const queryParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(req.query)) {
+        if (key !== 'table') queryParams.append(key, value);
+    }
+
+    const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryParams.toString()}`;
 
     try {
         const options = {
-            method: req.method,
+            method,
             headers: {
                 'Authorization': `Bearer ${config.apiKey}`,
                 'Content-Type': 'application/json'
             }
         };
 
-        if (req.method === 'POST') {
+        if (method === 'POST') {
             options.body = JSON.stringify(req.body);
         }
 
         const response = await fetch(airtableUrl, options);
         const data = await response.json();
-        
         res.status(response.status).json(data);
 
     } catch (error) {
