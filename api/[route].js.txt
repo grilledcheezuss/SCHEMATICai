@@ -1,0 +1,65 @@
+// api/[route].js
+export default async function handler(req, res) {
+    // 1. Vercel automatically puts the URL path into req.query.route
+    // Example: /api/Feedback -> req.query.route = "Feedback"
+    const { route } = req.query;
+    const table = route; 
+    const method = req.method;
+
+    // 🔒 SECURITY CONFIGURATION
+    const TABLE_CONFIG = {
+        'Control Panel Items': {
+            baseId: process.env.AIRTABLE_MAIN_BASE,
+            apiKey: process.env.AIRTABLE_READ_KEY,
+            allowMethods: ['GET']
+        },
+        'Feedback': {
+            baseId: process.env.AIRTABLE_FEEDBACK_BASE,
+            apiKey: process.env.AIRTABLE_WRITE_KEY,
+            allowMethods: ['GET', 'POST']
+        }
+    };
+
+    const config = TABLE_CONFIG[table];
+
+    // 2. Validate Access
+    if (!config) {
+        return res.status(404).json({ error: `Table '${table}' not found or access denied.` });
+    }
+
+    if (!config.allowMethods.includes(method)) {
+        return res.status(405).json({ error: `Method ${method} not allowed.` });
+    }
+
+    // 3. Construct Airtable URL
+    // We filter out the 'route' parameter so we don't send it to Airtable
+    const queryParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(req.query)) {
+        if (key !== 'route') queryParams.append(key, value);
+    }
+
+    const airtableUrl = `https://api.airtable.com/v0/${config.baseId}/${encodeURIComponent(table)}?${queryParams.toString()}`;
+
+    // 4. Forward Request
+    try {
+        const options = {
+            method,
+            headers: {
+                'Authorization': `Bearer ${config.apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        if (method === 'POST') {
+            options.body = JSON.stringify(req.body);
+        }
+
+        const response = await fetch(airtableUrl, options);
+        const data = await response.json();
+
+        res.status(response.status).json(data);
+
+    } catch (error) {
+        res.status(500).json({ error: 'Proxy Error', details: error.message });
+    }
+}
