@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v19.9)</title>
+    <title>Cox Research | SCHEMATICai (v20.1)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -181,7 +181,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v19.9</div>
+    <div class="version-badge">SCHEMATICai v20.1</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -242,7 +242,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v19.9 (PARSER UPGRADE & FINAL BADGE ORDER) ---
+// --- SCHEMATICai v20.1 (SYNC ENGINE FIX: REFRESH URLS) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -542,14 +542,10 @@ class AIParser {
         
         if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { specs.enc = k; break; }
 
-        // --- ENHANCED HP PARSING (v19.9) ---
-        if (!specs.hp) {
-            // Pattern 1: Explicit Label ("HP: 15", "HP-15")
-            let m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i);
-            // Pattern 2: Compact Unit ("15HP", "15-HP", "15 HP")
-            if (!m) m = t.match(/\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i);
-            
-            if(m) specs.hp = parseFloat(m[1]).toString();
+        if (!specs.hp) { 
+            let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
+            if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*[-]?\s*HP\b/i); 
+            if(m) specs.hp = parseFloat(m[1].replace(/\s/g, '')).toString(); 
         }
 
         if (!specs.volt) { 
@@ -566,7 +562,7 @@ class AIParser {
     }
 }
 
-window.LOCAL_DB = []; window.DB_IDS = new Set(); window.FOUND_MFGS = new Set();
+window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); 
@@ -582,8 +578,10 @@ class DataLoader {
         const cached = await CacheService.load(password);
         if(cached) {
             window.LOCAL_DB = cached.data;
-            window.DB_IDS = new Set(cached.ids);
             window.FOUND_MFGS = new Set(cached.mfgs);
+            // Rebuild Map for O(1) Access
+            window.LOCAL_DB.forEach(r => window.ID_MAP.set(r.id, r));
+            
             UI.populateAllDropdowns();
             ['mfg','hp','volt','phase','enc'].forEach(id => {
                 const s = document.getElementById(id+'Input');
@@ -599,12 +597,14 @@ class DataLoader {
         
         await CacheService.save({
             data: window.LOCAL_DB,
-            ids: Array.from(window.DB_IDS),
             mfgs: Array.from(window.FOUND_MFGS)
         }, password);
         
-        btn.innerText = "SEARCH";
-        btn.disabled = false;
+        if(btn.innerText.includes("SYNCING")) {
+            const originalText = "SEARCH";
+            btn.innerText = "✅ CACHE SAVED";
+            setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 2000);
+        }
         
         UI.populateAllDropdowns(); 
         ['mfg','hp','volt','phase','enc'].forEach(id => {
@@ -617,33 +617,51 @@ class DataLoader {
     }
     static async fetchPartition(dir, btn) {
         let offset = null;
+        let loopCount = 0; 
+        const MAX_LOOPS = 100; 
+
         do {
+            loopCount++;
+            if(loopCount > MAX_LOOPS) break;
+
             if(window.LOCAL_DB.length >= 7500) break;
             
             if(btn && btn.disabled) {
                 const pct = Math.min(100, Math.round((window.LOCAL_DB.length / CONFIG.estTotal) * 100));
-                btn.innerText = `⬇️ SYNCING ${pct}%...`;
+                btn.innerText = (window.innerWidth < 500) ? `⬇️ ${pct}%` : `⬇️ SYNCING ${pct}%...`;
             }
+
+            if (loopCount % 5 === 0) await new Promise(r => setTimeout(r, 20));
 
             const resp = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
             if(resp.status!==200) return;
             const data = await resp.json();
             if(!data.records) break;
+            
             data.records.forEach(r => {
                 const rawName = r.fields['Control Panel Name'] || "";
                 const id = rawName.replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                const newUrl = r.fields['Control Panel PDF']?.[0]?.url;
                 
-                if(!window.DB_IDS.has(id)) {
-                    window.DB_IDS.add(id);
+                // CRITICAL FIX: MERGE INSTEAD OF SKIP
+                if(window.ID_MAP.has(id)) {
+                    // Update existing record with fresh URL
+                    const record = window.ID_MAP.get(id);
+                    record.pdfUrl = newUrl;
+                } else {
+                    // Create new
                     const fullText = (id + " " + (r.fields['Items']||"")).toUpperCase();
                     const parsed = AIParser.parse(fullText, id);
                     if(parsed.mfg) window.FOUND_MFGS.add(parsed.mfg);
-                    window.LOCAL_DB.push({ 
+                    
+                    const newRecord = { 
                         id, 
                         desc: (r.fields['Items']||"").toUpperCase(), 
-                        pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, 
+                        pdfUrl: newUrl, 
                         ...parsed 
-                    });
+                    };
+                    window.LOCAL_DB.push(newRecord);
+                    window.ID_MAP.set(id, newRecord);
                 }
             });
             offset = data.offset;
@@ -674,7 +692,6 @@ class SearchEngine {
             let isHpOnlyVar = false;
             let mismatchCount = 0;
             
-            // KEYWORDS (PENALTY SCORING: SMALL BOOST)
             if(criteria.kw.length) {
                 const combinedText = (r.id + " " + r.desc).toUpperCase();
                 const cleanText = combinedText.replace(/[\W_]+/g, "");
@@ -695,7 +712,6 @@ class SearchEngine {
                 sortWeight += 10; 
             }
             
-            // MFG (STRICT)
             if(criteria.mfg!=="Any") {
                 if(r.mfg === criteria.mfg.toUpperCase()) {
                     sortWeight += 50000; 
@@ -707,7 +723,6 @@ class SearchEngine {
                 }
             }
 
-            // HP (PROXIMITY)
             if(criteria.hp!=="Any") {
                 if(r.hp) {
                     const searchVal = parseFloat(criteria.hp);
@@ -725,7 +740,6 @@ class SearchEngine {
                 } else { isPerfect = false; mismatchCount++; }
             }
 
-            // VOLT (HEAVY PENALTY)
             if(criteria.volt!=="Any") { 
                 if(!r.volt || !r.volt.includes(criteria.volt)) {
                     isPerfect = false; mismatchCount++;
@@ -733,7 +747,6 @@ class SearchEngine {
                 }
             }
             
-            // PHASE (HEAVY PENALTY)
             if(criteria.phase!=="Any") { 
                 if(r.phase !== criteria.phase) {
                     isPerfect = false; mismatchCount++;
@@ -741,7 +754,6 @@ class SearchEngine {
                 }
             }
             
-            // ENC (LIGHT PENALTY)
             if(criteria.enc!=="Any") { 
                 if(r.enc !== criteria.enc) {
                     isPerfect = false; mismatchCount++;
