@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v20.1)</title>
+    <title>Cox Research | SCHEMATICai (v20.2)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -181,7 +181,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v20.1</div>
+    <div class="version-badge">SCHEMATICai v20.2</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -242,7 +242,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v20.1 (SYNC ENGINE FIX: REFRESH URLS) ---
+// --- SCHEMATICai v20.2 (HARD PHASE FILTER & GREEDY HP PARSER) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -542,10 +542,16 @@ class AIParser {
         
         if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { specs.enc = k; break; }
 
-        if (!specs.hp) { 
-            let m = t.match(/\bHP\s*[:\s.-]*\s*(\d+(\.\d+)?)\b/i); 
-            if (!m) m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*[-]?\s*HP\b/i); 
-            if(m) specs.hp = parseFloat(m[1].replace(/\s/g, '')).toString(); 
+        // --- GREEDY HP PARSER (FIXED) ---
+        if (!specs.hp) {
+            // 1. Look for "15HP", "15 HP", "15-HP" explicitly (GREEDY)
+            // The negative lookbehind (?<!\/) prevents matching '1/60'
+            let m = t.match(/(?<!\/)\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i);
+            
+            // 2. If not found, check Label style "HP: 15"
+            if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i);
+            
+            if(m) specs.hp = parseFloat(m[1]).toString();
         }
 
         if (!specs.volt) { 
@@ -562,7 +568,7 @@ class AIParser {
     }
 }
 
-window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
+window.LOCAL_DB = []; window.DB_IDS = new Set(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); 
@@ -578,10 +584,8 @@ class DataLoader {
         const cached = await CacheService.load(password);
         if(cached) {
             window.LOCAL_DB = cached.data;
+            window.DB_IDS = new Set(cached.ids);
             window.FOUND_MFGS = new Set(cached.mfgs);
-            // Rebuild Map for O(1) Access
-            window.LOCAL_DB.forEach(r => window.ID_MAP.set(r.id, r));
-            
             UI.populateAllDropdowns();
             ['mfg','hp','volt','phase','enc'].forEach(id => {
                 const s = document.getElementById(id+'Input');
@@ -597,6 +601,7 @@ class DataLoader {
         
         await CacheService.save({
             data: window.LOCAL_DB,
+            ids: Array.from(window.DB_IDS),
             mfgs: Array.from(window.FOUND_MFGS)
         }, password);
         
@@ -643,25 +648,25 @@ class DataLoader {
                 const id = rawName.replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                 const newUrl = r.fields['Control Panel PDF']?.[0]?.url;
                 
-                // CRITICAL FIX: MERGE INSTEAD OF SKIP
-                if(window.ID_MAP.has(id)) {
-                    // Update existing record with fresh URL
+                if(window.ID_MAP && window.ID_MAP.has(id)) {
                     const record = window.ID_MAP.get(id);
                     record.pdfUrl = newUrl;
                 } else {
-                    // Create new
-                    const fullText = (id + " " + (r.fields['Items']||"")).toUpperCase();
-                    const parsed = AIParser.parse(fullText, id);
-                    if(parsed.mfg) window.FOUND_MFGS.add(parsed.mfg);
-                    
-                    const newRecord = { 
-                        id, 
-                        desc: (r.fields['Items']||"").toUpperCase(), 
-                        pdfUrl: newUrl, 
-                        ...parsed 
-                    };
-                    window.LOCAL_DB.push(newRecord);
-                    window.ID_MAP.set(id, newRecord);
+                    if(!window.DB_IDS.has(id)) {
+                        window.DB_IDS.add(id);
+                        const fullText = (id + " " + (r.fields['Items']||"")).toUpperCase();
+                        const parsed = AIParser.parse(fullText, id);
+                        if(parsed.mfg) window.FOUND_MFGS.add(parsed.mfg);
+                        
+                        const newRecord = { 
+                            id, 
+                            desc: (r.fields['Items']||"").toUpperCase(), 
+                            pdfUrl: newUrl, 
+                            ...parsed 
+                        };
+                        window.LOCAL_DB.push(newRecord);
+                        // window.ID_MAP check handled by loader init
+                    }
                 }
             });
             offset = data.offset;
@@ -747,10 +752,10 @@ class SearchEngine {
                 }
             }
             
+            // PHASE (STRICT FILTER)
             if(criteria.phase!=="Any") { 
                 if(r.phase !== criteria.phase) {
-                    isPerfect = false; mismatchCount++;
-                    sortWeight -= 5000; 
+                    return; // HARD EXCLUDE
                 }
             }
             
@@ -818,8 +823,6 @@ class UI {
             const isPerfect = item.isPerfect;
             
             let badges = '';
-            
-            // ORDER: VOLT -> PHASE -> HP -> MFG -> ENC -> KEYWORDS
             
             if(criteria.volt!=="Any" && item.volt) {
                 const isMatch = item.volt.includes(criteria.volt);
