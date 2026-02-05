@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v21.0)</title>
+    <title>Cox Research | SCHEMATICai (v21.1)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -91,7 +91,6 @@
 
         /* CUSTOM VIEWER */
         #custom-pdf-viewer { display: flex; width: 100%; height: 100%; flex-direction: row; }
-        /* INCREASED WIDTH FOR THUMBNAIL SIDEBAR to 240px */
         #pdf-sidebar { width: 240px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
         #pdf-main-view { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 20px; background: var(--bg-viewer); }
         
@@ -197,7 +196,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v21.0</div>
+    <div class="version-badge">SCHEMATICai v21.1</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -272,14 +271,14 @@
 </div>
 
 <script>
-// --- SCHEMATICai v21.0 (BUTTON FIX + WIDE SIDEBAR + 150% DEFAULT) ---
+// --- SCHEMATICai v21.1 (MOBILE FAIL-SAFE SYNC) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 // --- PDF VIEWER ---
 class PdfViewer {
     static doc = null;
-    static currentScale = 1.5; // DEFAULT 150%
+    static currentScale = 1.5;
     static currentPage = 1;
     static url = "";
 
@@ -294,8 +293,8 @@ class PdfViewer {
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
             document.getElementById('pdf-viewer-frame').style.display = 'none';
             this.renderSidebar();
-            this.currentScale = 1.5; // RESET TO 150% ON NEW LOAD
-            this.renderPage(1, false); // FALSE = NO AUTO FIT
+            this.currentScale = 1.5; 
+            this.renderPage(1, false); 
         } catch (e) {
             console.warn("Custom Viewer Failed, Reverting", e);
             this.loadNative(url);
@@ -365,7 +364,6 @@ class PdfViewer {
 
         const dpr = window.devicePixelRatio || 1;
         const outputScale = this.currentScale * dpr;
-        
         const viewport = page.getViewport({ scale: this.currentScale });
         const renderViewport = page.getViewport({ scale: outputScale });
 
@@ -433,6 +431,7 @@ class NetworkService {
     static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
 }
 
+// ... (FeedbackService unchanged) ...
 class FeedbackService { 
     static activeId = null; static sessionVotes = new Set();
     static down(id) { this.activeId = id; document.getElementById('feedback-modal').classList.add('active-modal'); } 
@@ -538,33 +537,40 @@ class DataLoader {
     }
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0;
-        do {
-            loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
-            
-            await new Promise(r => setTimeout(r, 30));
+        try {
+            do {
+                loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
+                await new Promise(r => setTimeout(r, 30));
 
-            if(btn && btn.disabled) btn.innerText = (window.innerWidth < 500) ? "⬇️ SYNCING" : "⬇️ SYNCING...";
+                if(btn && btn.disabled) btn.innerText = (window.innerWidth < 500) ? "⬇️ SYNCING" : "⬇️ SYNCING...";
 
-            const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
-            if(r.status!==200) return; const d = await r.json(); if(!d.records) break;
-            
-            const chunks = [];
-            for (let i = 0; i < d.records.length; i += 10) chunks.push(d.records.slice(i, i + 10));
-            
-            for (const chunk of chunks) {
-                await new Promise(r => setTimeout(r, 5)); 
-                chunk.forEach(r => {
-                    const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                    const url = r.fields['Control Panel PDF']?.[0]?.url;
-                    if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
-                    else {
-                        const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
-                        window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg);
-                    }
-                });
-            }
-            offset = d.offset;
-        } while(offset);
+                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
+                if(r.status!==200) { console.error("Sync Failed", r.status); break; }
+                const d = await r.json(); if(!d.records) break;
+                
+                const chunks = [];
+                for (let i = 0; i < d.records.length; i += 50) chunks.push(d.records.slice(i, i + 50));
+                
+                for (const chunk of chunks) {
+                    await new Promise(r => setTimeout(r, 10)); 
+                    chunk.forEach(r => {
+                        const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                        const url = r.fields['Control Panel PDF']?.[0]?.url;
+                        if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
+                        else {
+                            const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
+                            window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg);
+                        }
+                    });
+                }
+                offset = d.offset;
+            } while(offset);
+        } catch(e) {
+            console.error("Sync Critical Error", e);
+        } finally {
+            // FAIL-SAFE UNLOCK
+            if(btn) { btn.innerText = "SEARCH"; btn.disabled = false; }
+        }
     }
 }
 
