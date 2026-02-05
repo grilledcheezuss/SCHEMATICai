@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v20.7)</title>
+    <title>Cox Research | SCHEMATICai (v20.8)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -81,12 +81,19 @@
         #refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
         #refine-btn-area.visible { display: block; }
         
-        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         
-        /* PDF VIEWER */
-        #custom-pdf-viewer { display: flex; width: 100%; height: 100%; }
+        /* PDF TOOLBAR */
+        #pdf-toolbar { display: none; height: 45px; background: #2a2a2a; border-bottom: 1px solid #444; align-items: center; justify-content: center; gap: 15px; flex-shrink: 0; width: 100%; }
+        .pdf-tool-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: 0.2s; }
+        .pdf-tool-btn:hover { background: rgba(255,255,255,0.2); }
+        #pdf-zoom-level { color: white; font-size: 12px; font-weight: 600; min-width: 40px; text-align: center; }
+
+        /* CUSTOM VIEWER */
+        #custom-pdf-viewer { display: none; flex: 1; width: 100%; overflow: hidden; flex-direction: row; }
         #pdf-sidebar { width: 130px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
         #pdf-main-view { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 20px; background: var(--bg-viewer); }
+        
         .pdf-thumb-wrapper { cursor: pointer; position: relative; border: 2px solid transparent; transition: 0.1s; }
         .pdf-thumb-wrapper.active { border-color: var(--app-accent); }
         .pdf-thumb-canvas { width: 100% !important; height: auto !important; display: block; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
@@ -189,7 +196,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v20.7</div>
+    <div class="version-badge">SCHEMATICai v20.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -239,6 +246,13 @@
     </div>
     
     <div id="preview-pane">
+        <div id="pdf-toolbar">
+            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)">-</button>
+            <span id="pdf-zoom-level">FIT</span>
+            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)">+</button>
+            <button class="pdf-tool-btn" style="margin-left:10px;" onclick="PdfViewer.print()">🖨️</button>
+        </div>
+
         <div id="pdf-placeholder-text">📄 Select a schematic</div>
 
         <div id="custom-pdf-viewer" style="display:none;">
@@ -257,25 +271,29 @@
 </div>
 
 <script>
-// --- SCHEMATICai v20.7 (MOBILE ANTI-LAG: MICRO-BATCHING) ---
+// --- SCHEMATICai v20.8 (TOOLBAR RESTORE & SIMPLIFIED SYNC) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 // --- PDF VIEWER ---
 class PdfViewer {
     static doc = null;
-    static currentScale = 1.2;
+    static currentScale = 1.0;
     static currentPage = 1;
+    static url = "";
 
     static async load(url) {
+        this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none';
+        document.getElementById('pdf-toolbar').style.display = 'flex'; // Show Toolbar
+        
         try {
             const loadingTask = pdfjsLib.getDocument(url);
             this.doc = await loadingTask.promise;
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
             document.getElementById('pdf-viewer-frame').style.display = 'none';
             this.renderSidebar();
-            this.renderPage(1);
+            this.renderPage(1, true); // True = auto fit
         } catch (e) {
             console.warn("Custom Viewer Failed, Reverting", e);
             this.loadNative(url);
@@ -284,6 +302,7 @@ class PdfViewer {
 
     static loadNative(url) {
         document.getElementById('custom-pdf-viewer').style.display = 'none';
+        document.getElementById('pdf-toolbar').style.display = 'none'; // Hide Custom Toolbar
         const frame = document.getElementById('pdf-viewer-frame');
         frame.style.display = 'block';
         frame.src = url + "#view=FitH";
@@ -299,7 +318,7 @@ class PdfViewer {
             wrapper.className = 'pdf-thumb-wrapper';
             if(i === 1) wrapper.classList.add('active');
             wrapper.onclick = () => {
-                this.renderPage(i);
+                this.renderPage(i, false);
                 document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active'));
                 wrapper.classList.add('active');
             };
@@ -318,20 +337,36 @@ class PdfViewer {
         }
     }
 
-    static async renderPage(num) {
+    static async renderPage(num, autoFit) {
         this.currentPage = num;
         const container = document.getElementById('pdf-main-view');
         container.innerHTML = ''; 
         const page = await this.doc.getPage(num);
-        const desiredWidth = container.clientWidth - 40; 
-        const viewportUnscaled = page.getViewport({ scale: 1 });
-        const scale = desiredWidth / viewportUnscaled.width;
-        const viewport = page.getViewport({ scale: scale });
+        
+        if (autoFit) {
+            const desiredWidth = container.clientWidth - 40; 
+            const viewportUnscaled = page.getViewport({ scale: 1 });
+            this.currentScale = desiredWidth / viewportUnscaled.width;
+        }
+        
+        document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
+
+        const viewport = page.getViewport({ scale: this.currentScale });
         const canvas = document.createElement('canvas');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
         container.appendChild(canvas);
+    }
+    
+    static zoom(delta) {
+        this.currentScale += delta;
+        if(this.currentScale < 0.2) this.currentScale = 0.2;
+        this.renderPage(this.currentPage, false);
+    }
+    
+    static print() {
+        if(this.url) window.open(this.url, '_blank');
     }
 }
 
@@ -472,7 +507,7 @@ class DataLoader {
             window.LOCAL_DB = c.data; window.FOUND_MFGS = new Set(c.mfgs);
             window.LOCAL_DB.forEach(r => window.ID_MAP.set(r.id, r));
             UI.pop(); btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
-        } else btn.innerText = "⬇️ SYNCING 0%...";
+        } else btn.innerText = "⬇️ SYNCING...";
         
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
@@ -485,26 +520,19 @@ class DataLoader {
         let offset = null, loop = 0;
         do {
             loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
-            
-            // AGGRESSIVE YIELD: SLEEP EVERY LOOP TO UNBLOCK UI
             await new Promise(r => setTimeout(r, 30));
 
-            if(btn) {
-                const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
-                const prefix = btn.disabled ? "⬇️ " : "SEARCH ";
-                const suffix = btn.disabled ? "%..." : "%";
-                if(pct < 100) btn.innerText = (window.innerWidth < 500) ? `${prefix}${pct}${suffix}` : `${prefix}(${pct}${suffix})`;
-            }
+            // SIMPLIFIED STATUS TEXT
+            if(btn && btn.disabled) btn.innerText = (window.innerWidth < 500) ? "⬇️ SYNCING" : "⬇️ SYNCING...";
 
             const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
             if(r.status!==200) return; const d = await r.json(); if(!d.records) break;
             
-            // MICRO-BATCH PROCESSING (10 AT A TIME)
             const chunks = [];
             for (let i = 0; i < d.records.length; i += 10) chunks.push(d.records.slice(i, i + 10));
             
             for (const chunk of chunks) {
-                await new Promise(r => setTimeout(r, 5)); // BREATH BETWEEN CHUNKS
+                await new Promise(r => setTimeout(r, 5)); 
                 chunk.forEach(r => {
                     const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                     const url = r.fields['Control Panel PDF']?.[0]?.url;
