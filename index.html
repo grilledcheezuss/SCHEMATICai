@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.9)</title>
+    <title>Cox Research | SCHEMATICai (v22.10)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -217,7 +217,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.9</div>
+    <div class="version-badge">SCHEMATICai v22.10</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -292,7 +292,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.9 (PERSISTENT DARK MODE) ---
+// --- SCHEMATICai v22.10 (NAIVE BAYES RE-INTEGRATION) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -617,6 +617,62 @@ class TheHealer {
     }
 }
 
+// --- NEW CLASS: NAIVE BAYES (ISOLATED) ---
+class NaiveBayes {
+    static tokenMap = {}; 
+    static categoryCounts = {};
+    static totalDocs = 0;
+    static vocabSize = 0;
+
+    static tokenize(text) {
+        return text.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(t => t.length > 2);
+    }
+
+    static train(data) {
+        // Reset Model
+        this.tokenMap = {}; this.categoryCounts = {}; this.totalDocs = 0;
+        
+        data.forEach(r => {
+            if (!r.mfg) return;
+            const cat = r.mfg;
+            const tokens = this.tokenize(r.desc || "");
+            
+            if (!this.categoryCounts[cat]) this.categoryCounts[cat] = { count: 0, docCount: 0 };
+            this.categoryCounts[cat].docCount++;
+            this.totalDocs++;
+
+            tokens.forEach(t => {
+                if (!this.tokenMap[t]) this.tokenMap[t] = {};
+                if (!this.tokenMap[t][cat]) this.tokenMap[t][cat] = 0;
+                this.tokenMap[t][cat]++;
+                this.categoryCounts[cat].count++;
+            });
+        });
+        this.vocabSize = Object.keys(this.tokenMap).length;
+    }
+
+    static classify(text) {
+        const tokens = this.tokenize(text);
+        let bestCat = null;
+        let maxScore = -Infinity;
+
+        for (const cat in this.categoryCounts) {
+            let score = Math.log(this.categoryCounts[cat].docCount / this.totalDocs);
+            tokens.forEach(t => {
+                if (this.tokenMap[t]) {
+                    const countInCat = this.tokenMap[t][cat] || 0;
+                    score += Math.log((countInCat + 1) / (this.categoryCounts[cat].count + this.vocabSize));
+                }
+            });
+            if (score > maxScore) {
+                maxScore = score;
+                bestCat = cat;
+            }
+        }
+        return { category: bestCat, score: maxScore };
+    }
+}
+
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
@@ -668,6 +724,9 @@ class DataLoader {
         });
 
         if(hasData) {
+            // --- TRAIN MODEL ON LOAD ---
+            NaiveBayes.train(window.LOCAL_DB);
+
             UI.pop();
             if(localStorage.getItem('cox_db_complete')) {
                 localStorage.setItem('cox_sync_attempts', '0');
@@ -748,6 +807,10 @@ class DataLoader {
                 
                 await CacheService.saveShard(`shard_${Date.now()}_final`, buffer);
             }
+            
+            // Re-train after new data sync
+            NaiveBayes.train(window.LOCAL_DB);
+
         } catch(e) {
             console.error("Sync Critical Error", e);
         } finally {
@@ -769,6 +832,15 @@ class SearchEngine {
             if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) { p=false; miss++; w-=10000; } }
             if(crit.phase!=="Any") { if(r.phase && r.phase!==crit.phase) return; if(!r.phase) { p=false; miss++; w-=5000; } }
             if(crit.enc!=="Any") { if(r.enc!==crit.enc) { p=false; miss++; w-=1000; } }
+            
+            // --- BAYES SCORING INTEGRATION ---
+            if(crit.mfg !== "Any" && !r.mfg) {
+                const bayes = NaiveBayes.classify(r.desc || "");
+                if(bayes.category === crit.mfg.toUpperCase() && bayes.score > -20) {
+                     w += 5000; // Boost weight if Bayes is confident
+                }
+            }
+
             if(!p && miss===1 && crit.hp!=="Any" && r.hp && parseFloat(r.hp)!==parseFloat(crit.hp)) hpV=true;
             r.w=w; r.p=p; r.hpV=hpV; res.push(r);
         });
@@ -779,7 +851,6 @@ class SearchEngine {
 
 class UI {
     static init() {
-        // Theme Persistence
         if(localStorage.getItem('cox_theme') === 'dark') {
             document.body.classList.add('dark-mode');
         }
@@ -818,7 +889,7 @@ class UI {
 }
 
 document.addEventListener('DOMContentLoaded', () => { 
-    UI.init(); // Initialize UI Preference
+    UI.init(); 
     if(AuthService.init()) { DataLoader.preload(); } 
 });
 </script>
