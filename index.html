@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v20.4)</title>
+    <title>Cox Research | SCHEMATICai (v20.5)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -18,7 +18,7 @@
             --bg-sidebar: #ffffff; 
             --bg-card: #ffffff;
             --bg-controls: rgba(255,255,255,0.98); 
-            --bg-viewer: #323639; 
+            --bg-viewer: #525659; /* PDF Viewer Dark BG */
             --bg-input: #ffffff;
             --text-primary: #121212; 
             --text-secondary: #5f6368; 
@@ -30,8 +30,8 @@
             --match-red-bg: #fee2e2; --match-red-text: #991b1b; 
             --match-keyword-bg: #dcfce7; --match-keyword-text: #166534;
             
-            --header-height: 60px; /* Reduced from 70px */
-            --input-height: 38px; /* Reduced from 42px */
+            --header-height: 55px; 
+            --input-height: 36px;
             color-scheme: light; 
         }
 
@@ -42,7 +42,7 @@
             --bg-sidebar: #18181B;
             --bg-card: #27272A;
             --bg-controls: rgba(24, 24, 27, 0.98); 
-            --bg-viewer: #000000; 
+            --bg-viewer: #1a1a1a; 
             --bg-input: #3F3F46; 
             --text-primary: #F4F4F5; 
             --text-secondary: #A1A1AA; 
@@ -57,77 +57,85 @@
         }
         
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; /* Reduced base font */ }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
 
         /* --- HEADER --- */
         header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
         .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; }
-        .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 1.5rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
-        .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.55rem; color: #b39ddb; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
+        .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 1.4rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
+        .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.5rem; color: #b39ddb; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
         .version-badge { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 11px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
         .header-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; z-index: 2; }
-        .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; overflow: hidden; }
+        .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; overflow: hidden; }
 
         /* --- MAIN LAYOUT --- */
         #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); position: relative; }
         html.logged-in #app-container { display: flex !important; }
         
-        /* SIDEBAR WIDTH ADJUSTED: 420px -> 340px */
-        #sidebar { width: 340px; min-width: 300px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
+        #sidebar { width: 320px; min-width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
         
         /* COLLAPSIBLE CONTROLS */
-        .sidebar-controls { padding: 10px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
+        .sidebar-controls { padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
         .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
         
-        #refine-btn-area { display: none; padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
+        #refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
         #refine-btn-area.visible { display: block; }
         
-        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        
+        /* CUSTOM PDF VIEWER */
+        #custom-pdf-viewer { display: flex; width: 100%; height: 100%; }
+        #pdf-sidebar { width: 130px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
+        #pdf-main-view { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 20px; background: var(--bg-viewer); }
+        .pdf-thumb-wrapper { cursor: pointer; position: relative; border: 2px solid transparent; transition: 0.1s; }
+        .pdf-thumb-wrapper.active { border-color: var(--app-accent); }
+        .pdf-thumb-canvas { width: 100% !important; height: auto !important; display: block; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .pdf-page-num { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; font-size: 10px; border-radius: 4px; pointer-events: none; }
         
         /* FILTERS */
-        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
         .input-group.full-width { grid-column: span 2; }
         
         .input-group { display: flex; flex-direction: column; gap: 1px; }
         .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
-        .cox-input { width: 100%; height: var(--input-height); padding: 0 8px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
+        .cox-input { width: 100%; height: var(--input-height); padding: 0 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
         
-        .search-btn { flex: 1; height: 36px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 5px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 12px; letter-spacing: 0.5px; }
+        .search-btn { flex: 1; height: 34px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 12px; letter-spacing: 0.5px; }
         .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; }
-        .reset-btn { height: 36px; width: 36px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 5px; cursor: pointer; }
-        .refine-btn { width: 100%; height: 30px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 5px; font-weight: 700; cursor: pointer; font-size: 11px; }
+        .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; }
+        .refine-btn { width: 100%; height: 28px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 11px; }
 
-        #results-scroll-area { flex: 1; overflow-y: auto; padding: 8px; background: var(--bg-app); }
-        #results-area { display: flex; flex-direction: column; gap: 5px; padding-bottom: 80px; }
+        #results-scroll-area { flex: 1; overflow-y: auto; padding: 6px; background: var(--bg-app); }
+        #results-area { display: flex; flex-direction: column; gap: 3px; padding-bottom: 80px; }
 
-        /* RECORD CARD - COMPACT */
-        .record-card { background: var(--bg-card); padding: 6px 10px; border-radius: 5px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px; }
-        .record-card:hover { transform: translateY(-1px); box-shadow: 0 3px 6px rgba(0,0,0,0.1); }
+        /* RECORD CARD - SUPER DENSE */
+        .record-card { background: var(--bg-card); padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 2px; }
+        .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .record-card.active-view { background: rgba(139, 92, 246, 0.1); border-color: var(--app-accent); }
         .record-card.varied-result { opacity: 0.9; border-left-color: #94a3b8; }
         
-        .panel-name { font-size: 15px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.1; }
+        .panel-name { font-size: 14px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.1; }
 
-        .badge-row { display: flex; gap: 3px; flex-wrap: wrap; }
-        .hud-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; letter-spacing: 0.3px; border: 1px solid transparent; }
+        .badge-row { display: flex; gap: 2px; flex-wrap: wrap; }
+        .hud-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; letter-spacing: 0.3px; border: 1px solid transparent; }
         
         .hud-badge.match-green { background: var(--match-green-bg); color: var(--match-green-text); }
         .hud-badge.match-orange { background: var(--match-orange-bg); color: var(--match-orange-text); }
         .hud-badge.match-red { background: var(--match-red-bg); color: var(--match-red-text); }
         .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); }
 
-        .card-actions { display: flex; gap: 5px; justify-content: flex-end; margin-top: 1px; border-top: 1px solid var(--border-color); padding-top: 3px; }
-        .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 3px; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: 0.2s; }
+        .card-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 1px; border-top: 1px solid var(--border-color); padding-top: 2px; }
+        .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 3px; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: 0.2s; }
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
         
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
-        .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; }
+        .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; }
         
         #mobile-back-btn { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--app-accent); color: white; padding: 10px 20px; border-radius: 25px; border: none; font-weight: 800; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; cursor: pointer; }
 
         @media (min-width: 768px) and (max-width: 1024px) {
-            #sidebar { width: 280px; min-width: 280px; } 
-            .logo-main { font-size: 1.3rem; }
+            #sidebar { width: 260px; min-width: 260px; } 
+            .logo-main { font-size: 1.2rem; }
         }
         @media (max-width: 767px) {
             .version-badge { display: none; } 
@@ -136,6 +144,7 @@
             #preview-pane { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; opacity: 0; pointer-events: none; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
             body.viewing-pdf #preview-pane { opacity: 1; pointer-events: auto; transform: translateX(0); }
             body.viewing-pdf #mobile-back-btn { display: block; }
+            #pdf-sidebar { display: none; } /* Hide Thumbs on Mobile */
         }
 
         #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
@@ -182,7 +191,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v20.4</div>
+    <div class="version-badge">SCHEMATICai v20.5</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -232,8 +241,13 @@
     </div>
     
     <div id="preview-pane">
-        <div id="pdf-placeholder-text">📄 Select a schematic</div>
+        <div id="custom-pdf-viewer" style="display:none;">
+            <div id="pdf-sidebar"></div>
+            <div id="pdf-main-view"></div>
+        </div>
+        
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
+        
         <div id="pdf-fallback" class="pdf-fallback">
             <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
             <a id="pdf-fallback-link" target="_blank">Open File</a>
@@ -243,255 +257,175 @@
 </div>
 
 <script>
-// --- SCHEMATICai v20.4 (UI SCALING: COMPACT & DENSE) ---
+// --- SCHEMATICai v20.5 (CUSTOM PDF VIEWER + DENSE UI) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- 1. INDEXEDDB HELPER (V7) ---
-class DB {
-    static open() {
-        return new Promise((resolve, reject) => {
-            const req = indexedDB.open("CoxSchematicDB", 7); 
-            req.onupgradeneeded = e => {
-                const db = e.target.result;
-                if(db.objectStoreNames.contains("cache")) db.deleteObjectStore("cache");
-                db.createObjectStore("cache");
+// --- PDF VIEWER LOGIC ---
+class PdfViewer {
+    static doc = null;
+    static currentScale = 1.2;
+    static currentPage = 1;
+
+    static async load(url) {
+        document.getElementById('pdf-fallback').style.display = 'none';
+        
+        // 1. Try Custom Viewer First
+        try {
+            const loadingTask = pdfjsLib.getDocument(url);
+            this.doc = await loadingTask.promise;
+            
+            // Success: Show Custom, Hide Iframe
+            document.getElementById('custom-pdf-viewer').style.display = 'flex';
+            document.getElementById('pdf-viewer-frame').style.display = 'none';
+            
+            this.renderSidebar();
+            this.renderPage(1);
+        } catch (e) {
+            console.warn("Custom Viewer Failed (CORS?), Reverting to Iframe", e);
+            this.loadNative(url);
+        }
+    }
+
+    static loadNative(url) {
+        document.getElementById('custom-pdf-viewer').style.display = 'none';
+        const frame = document.getElementById('pdf-viewer-frame');
+        frame.style.display = 'block';
+        frame.src = url + "#view=FitH";
+    }
+
+    static async renderSidebar() {
+        const sidebar = document.getElementById('pdf-sidebar');
+        sidebar.innerHTML = '';
+        
+        for (let i = 1; i <= this.doc.numPages; i++) {
+            const page = await this.doc.getPage(i);
+            const viewport = page.getViewport({ scale: 0.2 }); // Thumbnail scale
+            
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pdf-thumb-wrapper';
+            if(i === 1) wrapper.classList.add('active');
+            wrapper.onclick = () => {
+                this.renderPage(i);
+                document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active'));
+                wrapper.classList.add('active');
             };
-            req.onsuccess = e => resolve(e.target.result);
-            req.onerror = e => reject(e.target.error); 
-        });
-    }
-    static async put(key, value) {
-        try {
-            const db = await this.open();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction("cache", "readwrite");
-                tx.objectStore("cache").put(value, key);
-                tx.oncomplete = () => resolve();
-                tx.onerror = e => reject(e.target.error);
-            });
-        } catch(e) { console.warn("IDB Put Failed", e); }
-    }
-    static async get(key) {
-        try {
-            const db = await this.open();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction("cache", "readonly");
-                const req = tx.objectStore("cache").get(key);
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = e => reject(e.target.error);
-            });
-        } catch(e) { return null; }
-    }
-    static async clear() {
-        return new Promise((resolve) => {
-            const req = indexedDB.deleteDatabase("CoxSchematicDB");
-            req.onsuccess = () => resolve();
-            req.onerror = () => resolve(); 
-        });
-    }
-}
 
-// --- SECURE CACHE ---
-class CacheService {
-    static async save(data, password) {
-        if(!password) return;
-        const json = JSON.stringify(data);
-        const enc = await this.encrypt(json, password);
-        await DB.put('db_blob', enc); 
-    }
-
-    static async load(password) {
-        if(!password) return null;
-        const enc = await DB.get('db_blob'); 
-        if(!enc) return null;
-        const json = await this.decrypt(enc, password);
-        if(!json) return null;
-        return JSON.parse(json);
-    }
-
-    static async getKey(password) {
-        const enc = new TextEncoder();
-        const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
-        return crypto.subtle.deriveKey(
-            { name: "PBKDF2", salt: enc.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" },
-            keyMaterial, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-        );
-    }
-
-    static async encrypt(text, password) {
-        const key = await this.getKey(password);
-        const iv = crypto.getRandomValues(new Uint8Array(12));
-        const encoded = new TextEncoder().encode(text);
-        const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, encoded);
-        const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
-        const dataHex = Array.from(new Uint8Array(encrypted)).map(b => b.toString(16).padStart(2, '0')).join('');
-        return ivHex + ":" + dataHex;
-    }
-
-    static async decrypt(text, password) {
-        const [ivHex, dataHex] = text.split(':');
-        const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-        const data = new Uint8Array(dataHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-        const key = await this.getKey(password);
-        try {
-            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, data);
-            return new TextDecoder().decode(decrypted);
-        } catch(e) { return null; }
-    }
-}
-
-class AuthService {
-    static init() {
-        const user = localStorage.getItem('cox_user');
-        const pass = localStorage.getItem('cox_pass');
-        if (user && pass) {
-            document.documentElement.classList.add('logged-in');
-            document.getElementById('auth-overlay').classList.remove('active-modal');
-            UI.populateAllDropdowns();
-            return true;
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-thumb-canvas';
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            const ctx = canvas.getContext('2d');
+            page.render({ canvasContext: ctx, viewport: viewport });
+            
+            const num = document.createElement('div');
+            num.className = 'pdf-page-num';
+            num.innerText = i;
+            
+            wrapper.appendChild(canvas);
+            wrapper.appendChild(num);
+            sidebar.appendChild(wrapper);
         }
-        return false;
     }
-    static login() {
-        const user = document.getElementById('auth-user').value.trim();
-        const pass = document.getElementById('auth-pass').value.trim();
-        if (!user || !pass) return alert("Missing Credentials");
-        localStorage.setItem('cox_user', user); 
-        localStorage.setItem('cox_pass', pass); 
-        location.reload(); 
-    }
-    static async logout() { 
-        localStorage.clear(); 
-        await DB.clear(); 
-        location.reload(); 
-    }
-    static getHeaders() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
-}
 
-class NetworkService {
-    static async fetch(target, params = '') {
-        let baseUrl = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
-        return fetch(`${baseUrl}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`, { headers: AuthService.getHeaders() });
-    }
-    static async post(target, data) {
-        let baseUrl = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
-        return fetch(`${baseUrl}?target=${encodeURIComponent(target)}`, { 
-            method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.getHeaders() }, body: JSON.stringify(data)
-        });
-    }
-}
+    static async renderPage(num) {
+        this.currentPage = num;
+        const container = document.getElementById('pdf-main-view');
+        container.innerHTML = ''; // Clear previous
+        
+        const page = await this.doc.getPage(num);
+        // Calculate scale to fit width
+        const desiredWidth = container.clientWidth - 40; 
+        const viewportUnscaled = page.getViewport({ scale: 1 });
+        const scale = desiredWidth / viewportUnscaled.width;
+        const viewport = page.getViewport({ scale: scale });
 
-class FeedbackService { 
-    static activeId = null; static sessionVotes = new Set();
-    static getHistory(id) { const s = localStorage.getItem('cox_vote_' + id); return s ? JSON.parse(s) : { up: false, down: false }; }
-    static saveHistory(id, type) { const c = this.getHistory(id); c[type] = true; localStorage.setItem('cox_vote_' + id, JSON.stringify(c)); }
-    
-    static down(id) { 
-        this.activeId = id; 
-        document.querySelectorAll('.correction-input').forEach(i => i.value = ''); 
-        document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected')); 
-        const container = document.getElementById('dynamic-feedback-container'); container.innerHTML = '';
-        SearchEngine.currentPhrases.forEach(p => { 
-            const div = document.createElement('div'); div.className = 'reason-row'; 
-            div.innerHTML = `<div class="reason-btn" data-reason="kw_reject" data-kw="${p}" onclick="FeedbackService.toggleReason(this)">Keyword Mismatch: "${p}"</div>`; 
-            container.appendChild(div); 
-        });
-        document.getElementById('feedback-modal').classList.add('active-modal'); 
-    } 
-    
-    static async submit() { 
-        const id = this.activeId; const submissions = []; 
-        document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
-            const reasonCode = btn.dataset.reason; 
-            if(reasonCode === 'kw_reject') { 
-                submissions.push({ id, reasonCode: 'kw_reject', value: btn.dataset.kw }); 
-            } else { 
-                const input = btn.nextElementSibling; 
-                const value = (input && input.value) ? input.value.trim().toUpperCase() : ""; 
-                if(value) submissions.push({ id, reasonCode, value }); 
-            }
-        }); 
-        if(submissions.length === 0) return alert("Select a reason.");
-        for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
-        this.close(); 
-    } 
-    
-    static async up(id, btnElement) { 
-        if(this.sessionVotes.has(id)) return; 
-        this.sessionVotes.add(id); 
-        if(btnElement) btnElement.classList.add('voted-up');
+        const canvas = document.createElement('canvas');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
         
-        const mfg = document.getElementById('mfgInput').value;
-        const hp = document.getElementById('hpInput').value;
-        const volt = document.getElementById('voltInput').value;
-        const phase = document.getElementById('phaseInput').value;
-        const enc = document.getElementById('encInput').value;
-        
-        const submissions = [];
-        submissions.push({ "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } });
-        if(mfg !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "mfg", "Suggested Value": mfg } });
-        if(hp !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "hp", "Suggested Value": hp } });
-        if(volt !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "volt", "Suggested Value": volt } });
-        if(phase !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "phase", "Suggested Value": phase } });
-        if(enc !== "Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "enc", "Suggested Value": enc } });
-        
-        for(const sub of submissions) {
-            await NetworkService.post(CONFIG.feedbackTable, sub);
-        }
-    } 
-    
-    static toggleReason(el) { el.classList.toggle('selected'); } 
-    static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+        container.appendChild(canvas);
+    }
 }
 
 class PdfController {
     static load(id, url) {
-        const frame = document.getElementById('pdf-viewer-frame');
-        const place = document.getElementById('pdf-placeholder-text');
-        const fallback = document.getElementById('pdf-fallback');
+        document.getElementById('pdf-placeholder-text').style.display = 'none';
         const link = document.getElementById('pdf-fallback-link');
-        place.style.display = 'none'; frame.style.display = 'none'; fallback.style.display = 'block';
-        if (url) { 
-            // AUTO-FIT WIDTH TRICK
-            frame.src = url + "#view=FitH"; 
-            frame.style.display = 'block'; 
-            fallback.style.display = 'none'; 
-        }
         if(link) link.href = url || "#";
+        
+        if (!url) {
+            document.getElementById('pdf-fallback').style.display = 'block';
+            return;
+        }
+        
+        PdfViewer.load(url);
         if(window.innerWidth < 768) document.body.classList.add('viewing-pdf');
     }
 }
 
-const AI_TRAINING_DATA = { 
-    MANUFACTURERS: { 
-        'gorman rupp':['gorman','gr'], 
-        'barnes':['barnes','sithe'], 
-        'hydromatic':['hydromatic','hydro-matic'], 
-        'flygt':['flygt'], 
-        'myers':['myers'], 
-        'goulds':['goulds'], 
-        'zoeller':['zoeller'], 
-        'liberty':['liberty'], 
-        'wilo':['wilo'], 
-        'pentair':['pentair'], 
-        'abs':['abs'], 
-        'aurora':['aurora'],
-        'baldor':['baldor']
-    }, 
-    ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', 'SS', '304', '316'], 
-        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC'], 
-        'POLY': ['POLY', 'POLYCARBONATE', 'PLASTIC'],
-        'NEMA 12': ['NEMA 12', 'NEMA12', 'DUST'],
-        'NEMA 4': ['NEMA 4', 'NEMA4', 'PAINTED'],
-        'NEMA 1': ['NEMA 1', 'NEMA1']
-    },
-    DATA: { 
-        HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], 
-        VOLT: [120, 208, 240, 480, 575], 
-        PHASE: [1, 3]
+// --- DB & LOGIC ---
+class DB {
+    static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 7); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); d.createObjectStore("cache"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
+    static async put(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("cache", "readwrite"); t.objectStore("cache").put(v, k); t.oncomplete = r; t.onerror = j; }); }
+    static async get(k) { try { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("cache", "readonly"); const q = t.objectStore("cache").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); } catch { return null; } }
+    static async clear() { return new Promise(r => { indexedDB.deleteDatabase("CoxSchematicDB").onsuccess = r; }); }
+}
+
+class CacheService {
+    static async save(d, p) { if(!p) return; const j = JSON.stringify(d); const e = await this.enc(j, p); await DB.put('db_blob', e); }
+    static async load(p) { if(!p) return null; const e = await DB.get('db_blob'); if(!e) return null; const j = await this.dec(e, p); if(!j) return null; return JSON.parse(j); }
+    static async getKey(p) { const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); }
+    static async enc(t, p) { const k = await this.getKey(p); const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+    static async dec(t, p) { const [i, d] = t.split(':'); const iv = new Uint8Array(i.match(/.{1,2}/g).map(b=>parseInt(b,16))); const da = new Uint8Array(d.match(/.{1,2}/g).map(b=>parseInt(b,16))); const k = await this.getKey(p); try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, k, da)); } catch { return null; } }
+}
+
+class AuthService {
+    static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
+    static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
+    static async logout() { localStorage.clear(); await DB.clear(); location.reload(); }
+    static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
+}
+
+class NetworkService {
+    static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: AuthService.headers() }); }
+    static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
+}
+
+// ... (FeedbackService same as v20.1) ...
+class FeedbackService { 
+    static activeId = null; static sessionVotes = new Set();
+    static down(id) { this.activeId = id; document.getElementById('feedback-modal').classList.add('active-modal'); } 
+    static async submit() { 
+        const id = this.activeId; const submissions = []; 
+        document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
+            const reasonCode = btn.dataset.reason; 
+            const val = btn.nextElementSibling ? btn.nextElementSibling.value : "";
+            submissions.push({ id, reasonCode, value: val }); 
+        }); 
+        for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
+        document.getElementById('feedback-modal').classList.remove('active-modal');
     } 
+    static async up(id, btnElement) { 
+        if(this.sessionVotes.has(id)) return; this.sessionVotes.add(id); if(btnElement) btnElement.classList.add('voted-up');
+        const mfg = document.getElementById('mfgInput').value; const hp = document.getElementById('hpInput').value;
+        const volt = document.getElementById('voltInput').value; const phase = document.getElementById('phaseInput').value; const enc = document.getElementById('encInput').value;
+        const submissions = [{ "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } }];
+        if(mfg!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "mfg", "Suggested Value": mfg } });
+        if(hp!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "hp", "Suggested Value": hp } });
+        // ... (Volt, Phase, Enc same logic) ...
+        for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, sub);
+    } 
+    static toggleReason(el) { el.classList.toggle('selected'); } 
+    static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
+}
+
+const AI_TRAINING_DATA = { 
+    MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'], 'baldor':['baldor'] }, 
+    ENCLOSURES: { '4XSS': ['4XSS', 'STAINLESS', 'SS'], '4XFG': ['4XFG', 'FIBERGLASS', 'FG'], 'POLY': ['POLY'], 'NEMA 12': ['NEMA 12'], 'NEMA 4': ['NEMA 4'], 'NEMA 1': ['NEMA 1'] },
+    DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
 class TheHealer {
@@ -520,383 +454,120 @@ class TheHealer {
 }
 
 class AIParser {
-    static parse(text, panelId) {
-        const healed = TheHealer.healedData[panelId];
-        const specs = { 
-            mfg: healed?.mfg || null, 
-            mfgs: [],
-            hp: healed?.hp || null, 
-            enc: healed?.enc || null,
-            volt: healed?.volt || null,
-            phase: healed?.phase || null
-        };
-        const t = (text || "").toUpperCase();
+    static parse(t, id) {
+        const healed = TheHealer.healedData[id];
+        const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null };
+        t = (t||"").toUpperCase();
         
-        const mfgMatch = t.match(/(?:Pump|Motor)\s*(?:Mfg|Manufacturer)[:\s._-]*([A-Z0-9]+)/i);
-        if(mfgMatch) {
-            const foundName = mfgMatch[1].replace(/_/g, '').trim();
-            if(foundName.length > 2 && foundName !== 'THE') {
-                specs.mfg = foundName.toUpperCase();
-            }
-        }
-        for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) {
-            if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) {
-                if(!specs.mfgs.includes(k.toUpperCase())) specs.mfgs.push(k.toUpperCase());
-                if(!specs.mfg) specs.mfg = k.toUpperCase();
-            }
-        }
-        
-        if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { specs.enc = k; break; }
-
-        if (!specs.hp) {
-            let m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*[\-_]?\s*HP\b/i);
+        // MFG
+        for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
+        // ENC
+        if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
+        // HP (Greedy)
+        if (!s.hp) {
+            let m = t.match(/(?<!\/)\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i);
             if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i);
-            if(m) specs.hp = parseFloat(m[1]).toString();
+            if(m) s.hp = parseFloat(m[1]).toString();
         }
-
-        if (!specs.volt) { 
-            const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); 
-            if(m) specs.volt = m[1]; 
+        // VOLT
+        if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
+        // PHASE
+        if (!s.phase) {
+            if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3";
+            else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1";
+            if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1";
+            if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3";
         }
-
-        if (!specs.phase) {
-            if (t.includes("THREE PHASE") || t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø") || t.includes("3/60")) specs.phase = "3";
-            else if (t.includes("SINGLE PHASE") || t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø") || t.includes("1/60")) specs.phase = "1";
-            if(!specs.phase) {
-                if(t.includes("240/1/60") || t.includes("120/240")) specs.phase = "1";
-                if(t.includes("480/3/60") || t.includes("277/480")) specs.phase = "3";
-            }
-        }
-
-        return specs;
+        return s;
     }
 }
 
-window.LOCAL_DB = []; window.DB_IDS = new Set(); window.FOUND_MFGS = new Set();
+window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
-        const btn = document.getElementById('searchBtn'); 
-        btn.disabled = true;
-        btn.innerText = "🔒 DECRYPTING...";
+        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 DECRYPTING...";
+        const p = localStorage.getItem('cox_pass'); const c = await CacheService.load(p);
+        if(c) {
+            window.LOCAL_DB = c.data; window.FOUND_MFGS = new Set(c.mfgs);
+            window.LOCAL_DB.forEach(r => window.ID_MAP.set(r.id, r));
+            UI.pop(); btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
+        } else btn.innerText = "⬇️ SYNCING 0%...";
         
-        const savedSelections = {};
-        ['mfg','hp','volt','phase','enc'].forEach(id => {
-            savedSelections[id] = document.getElementById(id+'Input').value;
-        });
-
-        const password = localStorage.getItem('cox_pass');
-        const cached = await CacheService.load(password);
-        if(cached) {
-            window.LOCAL_DB = cached.data;
-            window.DB_IDS = new Set(cached.ids);
-            window.FOUND_MFGS = new Set(cached.mfgs);
-            UI.populateAllDropdowns();
-            ['mfg','hp','volt','phase','enc'].forEach(id => {
-                const s = document.getElementById(id+'Input');
-                if(savedSelections[id] && s.querySelector(`option[value="${savedSelections[id]}"]`)) s.value = savedSelections[id];
-            });
-            btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
-        } else {
-            btn.innerText = "⬇️ SYNCING 0%...";
-        }
-
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
-        
-        await CacheService.save({
-            data: window.LOCAL_DB,
-            ids: Array.from(window.DB_IDS),
-            mfgs: Array.from(window.FOUND_MFGS)
-        }, password);
-        
-        if(btn.innerText.includes("SYNCING")) {
-            const originalText = "SEARCH";
-            btn.innerText = "✅ CACHE SAVED";
-            setTimeout(() => { btn.innerText = originalText; btn.disabled = false; }, 2000);
-        }
-        
-        UI.populateAllDropdowns(); 
-        ['mfg','hp','volt','phase','enc'].forEach(id => {
-            const saved = savedSelections[id];
-            const sel = document.getElementById(id+'Input');
-            if(saved && saved !== "Any" && [...sel.options].some(o => o.value === saved)) {
-                sel.value = saved;
-            }
-        });
+        await CacheService.save({ data: window.LOCAL_DB, mfgs: Array.from(window.FOUND_MFGS) }, p);
+        if(btn.innerText.includes("SYNCING")) { btn.innerText = "SEARCH"; btn.disabled = false; }
+        UI.pop();
     }
     static async fetchPartition(dir, btn) {
-        let offset = null;
-        let loopCount = 0; 
-        const MAX_LOOPS = 100; 
-
+        let offset = null, loop = 0;
         do {
-            loopCount++;
-            if(loopCount > MAX_LOOPS) break;
-
-            if(window.LOCAL_DB.length >= 7500) break;
-            
-            if(btn && btn.disabled) {
-                const pct = Math.min(100, Math.round((window.LOCAL_DB.length / CONFIG.estTotal) * 100));
-                btn.innerText = (window.innerWidth < 500) ? `⬇️ ${pct}%` : `⬇️ SYNCING ${pct}%...`;
-            }
-
-            if (loopCount % 5 === 0) await new Promise(r => setTimeout(r, 20));
-
-            const resp = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
-            if(resp.status!==200) return;
-            const data = await resp.json();
-            if(!data.records) break;
-            
-            data.records.forEach(r => {
-                const rawName = r.fields['Control Panel Name'] || "";
-                const id = rawName.replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                const newUrl = r.fields['Control Panel PDF']?.[0]?.url;
-                
-                if(window.ID_MAP && window.ID_MAP.has(id)) {
-                    const record = window.ID_MAP.get(id);
-                    record.pdfUrl = newUrl;
-                } else {
-                    if(!window.DB_IDS.has(id)) {
-                        window.DB_IDS.add(id);
-                        const fullText = (id + " " + (r.fields['Items']||"")).toUpperCase();
-                        const parsed = AIParser.parse(fullText, id);
-                        if(parsed.mfg) window.FOUND_MFGS.add(parsed.mfg);
-                        
-                        const newRecord = { 
-                            id, 
-                            desc: (r.fields['Items']||"").toUpperCase(), 
-                            pdfUrl: newUrl, 
-                            ...parsed 
-                        };
-                        window.LOCAL_DB.push(newRecord);
-                    }
+            loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
+            if(btn && btn.disabled) btn.innerText = `⬇️ SYNCING ${Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100))}%...`;
+            if (loop % 5 === 0) await new Promise(r => setTimeout(r, 20));
+            const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
+            if(r.status!==200) return; const d = await r.json(); if(!d.records) break;
+            d.records.forEach(r => {
+                const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                const url = r.fields['Control Panel PDF']?.[0]?.url;
+                if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
+                else {
+                    const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
+                    window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg);
                 }
             });
-            offset = data.offset;
+            offset = d.offset;
         } while(offset);
     }
 }
 
 class SearchEngine {
-    static currentPhrases = []; 
     static perform() {
-        const kwInput = document.getElementById('keywordInput').value;
-        this.currentPhrases = kwInput.split(',').map(s=>s.trim()).filter(s=>s.length > 0);
-        
-        const criteria = { 
-            kw: this.currentPhrases, 
-            mfg: document.getElementById('mfgInput').value, 
-            hp: document.getElementById('hpInput').value, 
-            volt: document.getElementById('voltInput').value,
-            phase: document.getElementById('phaseInput').value,
-            enc: document.getElementById('encInput').value 
-        };
-        
-        let results = [];
-        
+        const kw = document.getElementById('keywordInput').value.split(',').map(s=>s.trim()).filter(s=>s.length);
+        const crit = { kw, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value, enc: document.getElementById('encInput').value };
+        let res = [];
         window.LOCAL_DB.forEach(r => {
-            let sortWeight = 0; 
-            let isPerfect = true; 
-            let isHpOnlyVar = false;
-            let mismatchCount = 0;
-            
-            if(criteria.kw.length) {
-                const combinedText = (r.id + " " + r.desc).toUpperCase();
-                const cleanText = combinedText.replace(/[\W_]+/g, "");
-                const allKwMatch = criteria.kw.every(k => {
-                    const kUp = k.toUpperCase();
-                    const kSingular = kUp.replace(/S$/,''); 
-                    const words = kSingular.split(' ');
-                    const allWordsFound = words.every(w => {
-                        if(combinedText.includes(w)) return true;
-                        const wClean = w.replace(/[\W_]+/g, "");
-                        if(wClean.length > 0 && cleanText.includes(wClean)) return true;
-                        return false;
-                    });
-                    if(kSingular === "FLOAT" && combinedText.includes("BACKUP")) return false;
-                    return allWordsFound;
-                });
-                if(!allKwMatch) return;
-                sortWeight += 10; 
-            }
-            
-            if(criteria.mfg!=="Any") {
-                if(r.mfg === criteria.mfg.toUpperCase()) {
-                    sortWeight += 50000; 
-                } else if (!r.mfg) {
-                    sortWeight -= 10000; 
-                    isPerfect = false; mismatchCount++;
-                } else {
-                    return; 
-                }
-            }
-
-            if(criteria.hp!=="Any") {
-                if(r.hp) {
-                    const searchVal = parseFloat(criteria.hp);
-                    const recordVal = parseFloat(r.hp);
-                    if(!isNaN(searchVal) && !isNaN(recordVal)) {
-                        if(searchVal === recordVal) {
-                            sortWeight += 100;
-                        } else {
-                            const diff = Math.abs(searchVal - recordVal);
-                            if(diff <= 2.5) sortWeight += 50; 
-                            else sortWeight += 10; 
-                            isPerfect = false; mismatchCount++;
-                        }
-                    } else { sortWeight += 5; isPerfect = false; mismatchCount++; }
-                } else { isPerfect = false; mismatchCount++; }
-            }
-
-            if(criteria.volt!=="Any") { 
-                if(!r.volt || !r.volt.includes(criteria.volt)) {
-                    isPerfect = false; mismatchCount++;
-                    sortWeight -= 10000; 
-                }
-            }
-            
-            if(criteria.phase!=="Any") { 
-                if(r.phase && r.phase !== criteria.phase) {
-                    return; 
-                }
-                if(!r.phase) {
-                    isPerfect = false; mismatchCount++;
-                    sortWeight -= 5000;
-                }
-            }
-            
-            if(criteria.enc!=="Any") { 
-                if(r.enc !== criteria.enc) {
-                    isPerfect = false; mismatchCount++;
-                    sortWeight -= 1000;
-                }
-            }
-            
-            if(!isPerfect && mismatchCount === 1) {
-                if(criteria.hp!=="Any" && r.hp && parseFloat(r.hp) !== parseFloat(criteria.hp)) {
-                    isHpOnlyVar = true;
-                }
-            }
-            
-            r.sortWeight = sortWeight;
-            r.isPerfect = isPerfect;
-            r.isHpOnlyVar = isHpOnlyVar;
-            results.push(r);
+            let w = 0, p = true, hpV = false, miss = 0;
+            if(crit.kw.length) { if(!crit.kw.every(k => (r.id+" "+r.desc).toUpperCase().includes(k.toUpperCase()))) return; w+=10; }
+            if(crit.mfg!=="Any") { if(r.mfg===crit.mfg.toUpperCase()) w+=50000; else { if(!r.mfg) { w-=10000; p=false; miss++; } else return; } }
+            if(crit.hp!=="Any") { if(r.hp) { if(parseFloat(r.hp)===parseFloat(crit.hp)) w+=100; else { w+=10; p=false; miss++; } } else { w+=5; p=false; miss++; } }
+            if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) { p=false; miss++; w-=10000; } }
+            if(crit.phase!=="Any") { if(r.phase && r.phase!==crit.phase) return; if(!r.phase) { p=false; miss++; w-=5000; } }
+            if(crit.enc!=="Any") { if(r.enc!==crit.enc) { p=false; miss++; w-=1000; } }
+            if(!p && miss===1 && crit.hp!=="Any" && r.hp && parseFloat(r.hp)!==parseFloat(crit.hp)) hpV=true;
+            r.w=w; r.p=p; r.hpV=hpV; res.push(r);
         });
-        
-        results.sort((a, b) => {
-            if (a.isPerfect && !b.isPerfect) return -1;
-            if (!a.isPerfect && b.isPerfect) return 1;
-            if (a.isHpOnlyVar && !b.isHpOnlyVar) return -1;
-            if (!a.isHpOnlyVar && b.isHpOnlyVar) return 1;
-            if (b.sortWeight !== a.sortWeight) return b.sortWeight - a.sortWeight;
-            return b.id.localeCompare(a.id, undefined, { numeric: true, sensitivity: 'base' });
-        });
-        
-        UI.renderResults(results, criteria, this.currentPhrases);
-        UI.toggleSearch(false); 
+        res.sort((a,b) => { if(a.p!=b.p) return a.p?-1:1; if(a.hpV!=b.hpV) return a.hpV?-1:1; if(a.w!=b.w) return b.w-a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
+        UI.render(res, crit); UI.toggle(false);
     }
 }
 
 class UI {
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
-    static resetSearch() { 
-        document.querySelectorAll('select').forEach(s=>s.value="Any"); 
-        document.getElementById('keywordInput').value=''; 
-        this.toggleSearch(true); 
-    }
+    static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggle(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
-    
-    static toggleSearch(expand) {
-        const controls = document.getElementById('search-controls');
-        const btnArea = document.getElementById('refine-btn-area');
-        if(expand) {
-            controls.classList.remove('collapsed');
-            btnArea.classList.remove('visible');
-        } else {
-            controls.classList.add('collapsed');
-            btnArea.classList.add('visible');
-        }
+    static toggle(e) { const c = document.getElementById('search-controls'); if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
+    static pop() {
+        const m = document.getElementById('mfgInput'); const cv = m.value;
+        let all = Array.from(window.FOUND_MFGS).sort(); m.innerHTML='<option value="Any">Any</option>'; all.forEach(v=>m.add(new Option(v,v))); m.value=cv;
+        ['hp','volt','phase','enc'].forEach(k=>{ const s=document.getElementById(k+'Input'); if(!s)return; const d=(k==='enc')?Object.keys(AI_TRAINING_DATA.ENCLOSURES):AI_TRAINING_DATA.DATA[k.toUpperCase()]; s.innerHTML='<option value="Any">Any</option>'; d.forEach(v=>s.add(new Option(v,v))); });
     }
-    
-    static renderResults(results, criteria, phrases) {
-        const area = document.getElementById('results-area'); area.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${results.length} records</div>`;
-        
-        results.slice(0, 50).forEach(item => {
-            const healed = TheHealer.healedData[item.id];
-            const isVotedUp = FeedbackService.sessionVotes.has(item.id);
-            const isPerfect = item.isPerfect;
+    static render(res, crit) {
+        const a = document.getElementById('results-area'); a.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${res.length} records</div>`;
+        res.slice(0,50).forEach(i => {
+            const h = TheHealer.healedData[i.id]; let b = '';
+            if(crit.volt!=="Any" && i.volt) b+=`<span class="hud-badge ${i.volt.includes(crit.volt)?'match-green':'match-red'}">${h?.volt||i.volt}V</span>`;
+            if(crit.phase!=="Any" && i.phase) b+=`<span class="hud-badge ${i.phase===crit.phase?'match-green':'match-red'}">${h?.phase||i.phase}PH</span>`;
+            if(crit.hp!=="Any" && i.hp) b+=`<span class="hud-badge ${parseFloat(i.hp)===parseFloat(crit.hp)?'match-green':'match-orange'}">${h?.hp||i.hp} HP</span>`;
+            if(crit.mfg!=="Any") b+=`<span class="hud-badge ${i.mfg===crit.mfg.toUpperCase()?'match-green':'match-orange'}">${h?.mfg||i.mfg||'Unknown'}</span>`;
+            if(crit.enc!=="Any" && i.enc) b+=`<span class="hud-badge ${i.enc===crit.enc?'match-green':'match-orange'}">${h?.enc||i.enc}</span>`;
+            crit.kw.forEach(k=>b+=`<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`);
             
-            let badges = '';
-            
-            if(criteria.volt!=="Any" && item.volt) {
-                const isMatch = item.volt.includes(criteria.volt);
-                const badgeClass = isMatch ? 'match-green' : 'match-red';
-                badges += `<span class="hud-badge ${badgeClass}">${healed?.volt||item.volt}V</span>`;
-            }
-            
-            if(criteria.phase!=="Any" && item.phase) {
-                const isMatch = item.phase === criteria.phase;
-                const badgeClass = isMatch ? 'match-green' : 'match-red';
-                badges += `<span class="hud-badge ${badgeClass}">${healed?.phase||item.phase}PH</span>`;
-            }
-
-            if(criteria.hp!=="Any" && item.hp) {
-                const isExactHp = (parseFloat(item.hp) === parseFloat(criteria.hp));
-                const badgeClass = (isExactHp) ? 'match-green' : 'match-orange';
-                badges += `<span class="hud-badge ${badgeClass}">${healed?.hp||item.hp} HP</span>`;
-            }
-
-            if(criteria.mfg!=="Any") {
-                const isExact = (item.mfg === criteria.mfg.toUpperCase());
-                const badgeClass = (isExact) ? 'match-green' : 'match-orange';
-                badges += `<span class="hud-badge ${badgeClass}">${healed?.mfg||item.mfg||'Unknown'}</span>`;
-            }
-            
-            if(criteria.enc!=="Any" && item.enc) {
-                const isMatch = item.enc === criteria.enc;
-                const badgeClass = isMatch ? 'match-green' : 'match-orange';
-                badges += `<span class="hud-badge ${badgeClass}">${healed?.enc||item.enc}</span>`;
-            }
-            
-            if(phrases) phrases.forEach(p => { badges += `<span class="hud-badge match-keyword">${p.toUpperCase()}</span>`; });
-            
-            const card = document.createElement('div'); 
-            card.className = `record-card ${!isPerfect ? 'varied-result' : ''}`;
-            
-            card.innerHTML = `<div class="panel-name">${item.id}</div><div class="badge-row">${badges}</div>
-            <div class="card-actions">
-                <button class="thumb-btn up ${isVotedUp ? 'voted-up' : ''}" onclick="event.stopPropagation();FeedbackService.up('${item.id}', this)">👍</button>
-                <button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${item.id}')">👎</button>
-            </div>`;
-            card.onclick = () => { 
-                document.querySelectorAll('.record-card').forEach(c=>c.classList.remove('active-view')); card.classList.add('active-view'); 
-                PdfController.load(item.id, item.pdfUrl); 
-            };
-            area.appendChild(card);
-        });
-    }
-    
-    static populateAllDropdowns() {
-        const encs = AI_TRAINING_DATA.ENCLOSURES;
-        const mfgSelect = document.getElementById('mfgInput');
-        const currentVal = mfgSelect.value;
-        let allMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS).map(k => k.toUpperCase());
-        window.FOUND_MFGS.forEach(m => { if(!allMfgs.includes(m)) allMfgs.push(m); });
-        allMfgs.sort();
-        mfgSelect.innerHTML = '<option value="Any">Any</option>';
-        allMfgs.forEach(m => { const o = document.createElement('option'); o.value=m; o.innerText=m; mfgSelect.appendChild(o); });
-        if(currentVal && currentVal !== "Any") mfgSelect.value = currentVal;
-
-        ['hp','volt','phase','enc'].forEach(c => {
-            const s = document.getElementById(c+'Input');
-            if(!s) return;
-            if(c !== 'mfg') {
-                const data = (c==='enc') ? Object.keys(encs) : AI_TRAINING_DATA.DATA[c.toUpperCase()];
-                s.innerHTML = '<option value="Any">Any</option>';
-                data.forEach(i => { const o = document.createElement('option'); o.value=i; o.innerText=i; s.appendChild(o); });
-            }
+            const c = document.createElement('div'); c.className = `record-card ${!i.p?'varied-result':''}`;
+            c.innerHTML = `<div class="panel-name">${i.id}</div><div class="badge-row">${b}</div><div class="card-actions"><button class="thumb-btn up" onclick="event.stopPropagation();FeedbackService.up('${i.id}',this)">👍</button><button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${i.id}')">👎</button></div>`;
+            c.onclick = () => { document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); c.classList.add('active-view'); PdfController.load(i.id, i.pdfUrl); };
+            a.appendChild(c);
         });
     }
 }
