@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v21.1)</title>
+    <title>Cox Research | SCHEMATICai (v21.3)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -196,7 +196,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v21.1</div>
+    <div class="version-badge">SCHEMATICai v21.3</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -271,7 +271,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v21.1 (MOBILE FAIL-SAFE SYNC) ---
+// --- SCHEMATICai v21.3 (UNIVERSAL PERCENTAGE SYNC) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -422,7 +422,7 @@ class CacheService {
 class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
     static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
-    static async logout() { localStorage.clear(); await DB.clear(); location.reload(); }
+    static async logout() { localStorage.clear(); sessionStorage.clear(); await DB.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 
@@ -522,15 +522,30 @@ class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 DECRYPTING...";
         const p = localStorage.getItem('cox_pass'); const c = await CacheService.load(p);
+        
+        // CHECK SESSION LOCK
+        const alreadySynced = sessionStorage.getItem('cox_sync_done');
+        
         if(c) {
             window.LOCAL_DB = c.data; window.FOUND_MFGS = new Set(c.mfgs);
             window.LOCAL_DB.forEach(r => window.ID_MAP.set(r.id, r));
-            UI.pop(); btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
+            UI.pop();
+            
+            if(alreadySynced) {
+                btn.innerText = "SEARCH"; btn.disabled = false;
+                console.log("Session Sync Skipped (Locked)");
+                return; 
+            } else {
+                btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
+            }
         } else btn.innerText = "⬇️ SYNCING...";
         
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
         await CacheService.save({ data: window.LOCAL_DB, mfgs: Array.from(window.FOUND_MFGS) }, p);
+        
+        // SET LOCK
+        sessionStorage.setItem('cox_sync_done', 'true');
         
         if(btn.innerText.includes("SYNCING") || btn.disabled) { btn.innerText = "SEARCH"; btn.disabled = false; }
         UI.pop();
@@ -542,7 +557,11 @@ class DataLoader {
                 loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
                 await new Promise(r => setTimeout(r, 30));
 
-                if(btn && btn.disabled) btn.innerText = (window.innerWidth < 500) ? "⬇️ SYNCING" : "⬇️ SYNCING...";
+                // PERCENTAGE ON ALL DEVICES
+                if(btn) {
+                    const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
+                    if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`;
+                }
 
                 const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
                 if(r.status!==200) { console.error("Sync Failed", r.status); break; }
@@ -568,7 +587,6 @@ class DataLoader {
         } catch(e) {
             console.error("Sync Critical Error", e);
         } finally {
-            // FAIL-SAFE UNLOCK
             if(btn) { btn.innerText = "SEARCH"; btn.disabled = false; }
         }
     }
