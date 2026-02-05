@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v21.4)</title>
+    <title>Cox Research | SCHEMATICai (v21.5)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -110,6 +110,7 @@
         
         .search-btn { flex: 1; height: 34px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 12px; letter-spacing: 0.5px; }
         .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; }
+        .search-btn.warning { background-color: #f59e0b !important; color: black !important; }
         .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; }
         .refine-btn { width: 100%; height: 28px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 11px; }
 
@@ -196,7 +197,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v21.4</div>
+    <div class="version-badge">SCHEMATICai v21.5</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -271,7 +272,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v21.4 (MOBILE SYNC LOOP FIX + TRY/CATCH SAVE) ---
+// --- SCHEMATICai v21.5 (SYNC INTERRUPT & RESUME) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -523,35 +524,50 @@ class DataLoader {
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 DECRYPTING...";
         const p = localStorage.getItem('cox_pass'); const c = await CacheService.load(p);
         
-        // CHECK SESSION LOCK
-        const alreadySynced = sessionStorage.getItem('cox_sync_done');
+        // CHECK CRASH HISTORY (CIRCUIT BREAKER)
+        let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
+        if(attempts > 2) {
+            console.warn("Sync Loop Detected. Halting.");
+            btn.innerText = "⚠️ SYNC INTERRUPTED (RETRY?)";
+            btn.classList.add('warning');
+            btn.disabled = false;
+            btn.onclick = () => {
+                localStorage.setItem('cox_sync_attempts', '0'); // Reset
+                location.reload();
+            };
+            return; // STOP AUTO-SYNC
+        }
         
+        // INCREMENT ATTEMPT COUNTER
+        localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
+
         if(c) {
             window.LOCAL_DB = c.data; window.FOUND_MFGS = new Set(c.mfgs);
             window.LOCAL_DB.forEach(r => window.ID_MAP.set(r.id, r));
             UI.pop();
             
-            // IF ALREADY SYNCED, ABORT NETWORK FETCH
-            if(alreadySynced) {
+            // CHECK IF ALREADY SYNCED
+            if(sessionStorage.getItem('cox_sync_done')) {
+                localStorage.setItem('cox_sync_attempts', '0'); // Success reset
                 btn.innerText = "SEARCH"; btn.disabled = false;
-                return; // STOP EXECUTION
+                return; 
+            } else {
+                btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
             }
-            
-            btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
         } else btn.innerText = "⬇️ SYNCING...";
         
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
         
-        // SAFE SAVE (PREVENT CRASH LOOP)
+        // FLAG DONE *BEFORE* SAVE (If save crashes, we skip sync next load)
+        sessionStorage.setItem('cox_sync_done', 'true');
+        localStorage.setItem('cox_sync_attempts', '0'); // Success reset
+
         try {
             await CacheService.save({ data: window.LOCAL_DB, mfgs: Array.from(window.FOUND_MFGS) }, p);
         } catch (e) {
             console.warn("Cache Save Failed (Mobile Limit?)", e);
         }
-        
-        // SET LOCK AFTER SYNC
-        sessionStorage.setItem('cox_sync_done', 'true');
         
         if(btn.innerText.includes("SYNCING") || btn.disabled) { btn.innerText = "SEARCH"; btn.disabled = false; }
         UI.pop();
@@ -560,10 +576,10 @@ class DataLoader {
         let offset = null, loop = 0;
         try {
             do {
-                loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
-                await new Promise(r => setTimeout(r, 30));
+                loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break;
+                await new Promise(r => setTimeout(r, 50)); // INCREASED BREATH
 
-                if(btn) {
+                if(btn && !btn.classList.contains('warning')) {
                     const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
                     if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`;
                 }
@@ -572,8 +588,9 @@ class DataLoader {
                 if(r.status!==200) { console.error("Sync Failed", r.status); break; }
                 const d = await r.json(); if(!d.records) break;
                 
+                // SMALLER BATCH (25) FOR MOBILE STABILITY
                 const chunks = [];
-                for (let i = 0; i < d.records.length; i += 50) chunks.push(d.records.slice(i, i + 50));
+                for (let i = 0; i < d.records.length; i += 25) chunks.push(d.records.slice(i, i + 25));
                 
                 for (const chunk of chunks) {
                     await new Promise(r => setTimeout(r, 10)); 
@@ -592,7 +609,7 @@ class DataLoader {
         } catch(e) {
             console.error("Sync Critical Error", e);
         } finally {
-            if(btn) { btn.innerText = "SEARCH"; btn.disabled = false; }
+            if(btn && !btn.classList.contains('warning')) { btn.innerText = "SEARCH"; btn.disabled = false; }
         }
     }
 }
