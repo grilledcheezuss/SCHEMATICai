@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v21.3)</title>
+    <title>Cox Research | SCHEMATICai (v21.4)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -196,7 +196,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v21.3</div>
+    <div class="version-badge">SCHEMATICai v21.4</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -271,7 +271,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v21.3 (UNIVERSAL PERCENTAGE SYNC) ---
+// --- SCHEMATICai v21.4 (MOBILE SYNC LOOP FIX + TRY/CATCH SAVE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -531,20 +531,26 @@ class DataLoader {
             window.LOCAL_DB.forEach(r => window.ID_MAP.set(r.id, r));
             UI.pop();
             
+            // IF ALREADY SYNCED, ABORT NETWORK FETCH
             if(alreadySynced) {
                 btn.innerText = "SEARCH"; btn.disabled = false;
-                console.log("Session Sync Skipped (Locked)");
-                return; 
-            } else {
-                btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
+                return; // STOP EXECUTION
             }
+            
+            btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
         } else btn.innerText = "⬇️ SYNCING...";
         
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
-        await CacheService.save({ data: window.LOCAL_DB, mfgs: Array.from(window.FOUND_MFGS) }, p);
         
-        // SET LOCK
+        // SAFE SAVE (PREVENT CRASH LOOP)
+        try {
+            await CacheService.save({ data: window.LOCAL_DB, mfgs: Array.from(window.FOUND_MFGS) }, p);
+        } catch (e) {
+            console.warn("Cache Save Failed (Mobile Limit?)", e);
+        }
+        
+        // SET LOCK AFTER SYNC
         sessionStorage.setItem('cox_sync_done', 'true');
         
         if(btn.innerText.includes("SYNCING") || btn.disabled) { btn.innerText = "SEARCH"; btn.disabled = false; }
@@ -557,7 +563,6 @@ class DataLoader {
                 loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
                 await new Promise(r => setTimeout(r, 30));
 
-                // PERCENTAGE ON ALL DEVICES
                 if(btn) {
                     const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
                     if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`;
