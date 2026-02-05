@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v20.5)</title>
+    <title>Cox Research | SCHEMATICai (v20.7)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -18,7 +18,7 @@
             --bg-sidebar: #ffffff; 
             --bg-card: #ffffff;
             --bg-controls: rgba(255,255,255,0.98); 
-            --bg-viewer: #525659; /* PDF Viewer Dark BG */
+            --bg-viewer: #525659;
             --bg-input: #ffffff;
             --text-primary: #121212; 
             --text-secondary: #5f6368; 
@@ -81,9 +81,9 @@
         #refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
         #refine-btn-area.visible { display: block; }
         
-        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
+        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         
-        /* CUSTOM PDF VIEWER */
+        /* PDF VIEWER */
         #custom-pdf-viewer { display: flex; width: 100%; height: 100%; }
         #pdf-sidebar { width: 130px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
         #pdf-main-view { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 20px; background: var(--bg-viewer); }
@@ -92,10 +92,11 @@
         .pdf-thumb-canvas { width: 100% !important; height: auto !important; display: block; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         .pdf-page-num { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; font-size: 10px; border-radius: 4px; pointer-events: none; }
         
+        #pdf-placeholder-text { display: flex; align-items: center; justify-content: center; height: 100%; width: 100%; color: rgba(255,255,255,0.3); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+
         /* FILTERS */
         .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
         .input-group.full-width { grid-column: span 2; }
-        
         .input-group { display: flex; flex-direction: column; gap: 1px; }
         .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
         .cox-input { width: 100%; height: var(--input-height); padding: 0 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
@@ -108,7 +109,7 @@
         #results-scroll-area { flex: 1; overflow-y: auto; padding: 6px; background: var(--bg-app); }
         #results-area { display: flex; flex-direction: column; gap: 3px; padding-bottom: 80px; }
 
-        /* RECORD CARD - SUPER DENSE */
+        /* RECORD CARD */
         .record-card { background: var(--bg-card); padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 2px; }
         .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .record-card.active-view { background: rgba(139, 92, 246, 0.1); border-color: var(--app-accent); }
@@ -118,7 +119,6 @@
 
         .badge-row { display: flex; gap: 2px; flex-wrap: wrap; }
         .hud-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; letter-spacing: 0.3px; border: 1px solid transparent; }
-        
         .hud-badge.match-green { background: var(--match-green-bg); color: var(--match-green-text); }
         .hud-badge.match-orange { background: var(--match-orange-bg); color: var(--match-orange-text); }
         .hud-badge.match-red { background: var(--match-red-bg); color: var(--match-red-text); }
@@ -144,7 +144,7 @@
             #preview-pane { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; opacity: 0; pointer-events: none; transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
             body.viewing-pdf #preview-pane { opacity: 1; pointer-events: auto; transform: translateX(0); }
             body.viewing-pdf #mobile-back-btn { display: block; }
-            #pdf-sidebar { display: none; } /* Hide Thumbs on Mobile */
+            #pdf-sidebar { display: none; } 
         }
 
         #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
@@ -152,13 +152,11 @@
         .auth-card, .config-card, .modal-card { background: var(--bg-card); padding: 25px; border-radius: 10px; width: 90%; max-width: 380px; text-align: center; border: 1px solid var(--border-color); }
         .auth-group { margin-bottom: 15px; text-align: left; }
         .auth-label { font-size: 10px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 5px; }
-        
-        .reason-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
-        .reason-btn { padding: 8px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 5px; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
-        .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
-        .correction-input { display: none; width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; }
-        .reason-btn.selected + .correction-input { display: block; }
         .submit-feedback-btn { width: 100%; padding: 10px; background: var(--app-accent); color: white; border: none; border-radius: 5px; font-weight: 700; cursor: pointer; margin-top: 12px; }
+        .reason-btn { padding: 8px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 5px; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; margin-bottom:4px; display:block; }
+        .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
+        .correction-input { display: none; width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; margin-bottom:8px; }
+        .reason-btn.selected + .correction-input { display: block; }
 
     </style>
 </head>
@@ -191,7 +189,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v20.5</div>
+    <div class="version-badge">SCHEMATICai v20.7</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -203,10 +201,10 @@
     <div class="modal-card">
         <h3>Report Inaccuracy</h3>
         <div style="padding:15px; text-align:left;">
-             <div class="reason-row"><div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
-             <div class="reason-row"><div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
-             <div class="reason-row"><div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
-             <div class="reason-row"><div class="reason-btn" data-reason="enc" onclick="FeedbackService.toggleReason(this)">Wrong Enclosure</div><input type="text" class="correction-input" placeholder="Correct Value"></div>
+             <div class="reason-btn" data-reason="mfg" onclick="FeedbackService.toggleReason(this)">Wrong Manufacturer</div><input type="text" class="correction-input" placeholder="Correct Value">
+             <div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value">
+             <div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value">
+             <div class="reason-btn" data-reason="enc" onclick="FeedbackService.toggleReason(this)">Wrong Enclosure</div><input type="text" class="correction-input" placeholder="Correct Value">
              <div id="dynamic-feedback-container"></div>
              <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
              <button class="submit-feedback-btn" style="background:#555;margin-top:5px;" onclick="FeedbackService.close()">CANCEL</button>
@@ -241,6 +239,8 @@
     </div>
     
     <div id="preview-pane">
+        <div id="pdf-placeholder-text">📄 Select a schematic</div>
+
         <div id="custom-pdf-viewer" style="display:none;">
             <div id="pdf-sidebar"></div>
             <div id="pdf-main-view"></div>
@@ -257,11 +257,11 @@
 </div>
 
 <script>
-// --- SCHEMATICai v20.5 (CUSTOM PDF VIEWER + DENSE UI) ---
+// --- SCHEMATICai v20.7 (MOBILE ANTI-LAG: MICRO-BATCHING) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- PDF VIEWER LOGIC ---
+// --- PDF VIEWER ---
 class PdfViewer {
     static doc = null;
     static currentScale = 1.2;
@@ -269,20 +269,15 @@ class PdfViewer {
 
     static async load(url) {
         document.getElementById('pdf-fallback').style.display = 'none';
-        
-        // 1. Try Custom Viewer First
         try {
             const loadingTask = pdfjsLib.getDocument(url);
             this.doc = await loadingTask.promise;
-            
-            // Success: Show Custom, Hide Iframe
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
             document.getElementById('pdf-viewer-frame').style.display = 'none';
-            
             this.renderSidebar();
             this.renderPage(1);
         } catch (e) {
-            console.warn("Custom Viewer Failed (CORS?), Reverting to Iframe", e);
+            console.warn("Custom Viewer Failed, Reverting", e);
             this.loadNative(url);
         }
     }
@@ -297,11 +292,9 @@ class PdfViewer {
     static async renderSidebar() {
         const sidebar = document.getElementById('pdf-sidebar');
         sidebar.innerHTML = '';
-        
         for (let i = 1; i <= this.doc.numPages; i++) {
             const page = await this.doc.getPage(i);
-            const viewport = page.getViewport({ scale: 0.2 }); // Thumbnail scale
-            
+            const viewport = page.getViewport({ scale: 0.2 });
             const wrapper = document.createElement('div');
             wrapper.className = 'pdf-thumb-wrapper';
             if(i === 1) wrapper.classList.add('active');
@@ -310,19 +303,15 @@ class PdfViewer {
                 document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active'));
                 wrapper.classList.add('active');
             };
-
             const canvas = document.createElement('canvas');
             canvas.className = 'pdf-thumb-canvas';
             canvas.height = viewport.height;
             canvas.width = viewport.width;
-            
             const ctx = canvas.getContext('2d');
             page.render({ canvasContext: ctx, viewport: viewport });
-            
             const num = document.createElement('div');
             num.className = 'pdf-page-num';
             num.innerText = i;
-            
             wrapper.appendChild(canvas);
             wrapper.appendChild(num);
             sidebar.appendChild(wrapper);
@@ -332,19 +321,15 @@ class PdfViewer {
     static async renderPage(num) {
         this.currentPage = num;
         const container = document.getElementById('pdf-main-view');
-        container.innerHTML = ''; // Clear previous
-        
+        container.innerHTML = ''; 
         const page = await this.doc.getPage(num);
-        // Calculate scale to fit width
         const desiredWidth = container.clientWidth - 40; 
         const viewportUnscaled = page.getViewport({ scale: 1 });
         const scale = desiredWidth / viewportUnscaled.width;
         const viewport = page.getViewport({ scale: scale });
-
         const canvas = document.createElement('canvas');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-        
         await page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
         container.appendChild(canvas);
     }
@@ -352,15 +337,14 @@ class PdfViewer {
 
 class PdfController {
     static load(id, url) {
-        document.getElementById('pdf-placeholder-text').style.display = 'none';
+        const placeholder = document.getElementById('pdf-placeholder-text');
+        if(placeholder) placeholder.style.display = 'none';
         const link = document.getElementById('pdf-fallback-link');
         if(link) link.href = url || "#";
-        
         if (!url) {
             document.getElementById('pdf-fallback').style.display = 'block';
             return;
         }
-        
         PdfViewer.load(url);
         if(window.innerWidth < 768) document.body.classList.add('viewing-pdf');
     }
@@ -394,7 +378,6 @@ class NetworkService {
     static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
 }
 
-// ... (FeedbackService same as v20.1) ...
 class FeedbackService { 
     static activeId = null; static sessionVotes = new Set();
     static down(id) { this.activeId = id; document.getElementById('feedback-modal').classList.add('active-modal'); } 
@@ -415,7 +398,9 @@ class FeedbackService {
         const submissions = [{ "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } }];
         if(mfg!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "mfg", "Suggested Value": mfg } });
         if(hp!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "hp", "Suggested Value": hp } });
-        // ... (Volt, Phase, Enc same logic) ...
+        if(volt!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "volt", "Suggested Value": volt } });
+        if(phase!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "phase", "Suggested Value": phase } });
+        if(enc!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "enc", "Suggested Value": enc } });
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, sub);
     } 
     static toggleReason(el) { el.classList.toggle('selected'); } 
@@ -459,19 +444,15 @@ class AIParser {
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null };
         t = (t||"").toUpperCase();
         
-        // MFG
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
-        // ENC
         if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
-        // HP (Greedy)
+        
         if (!s.hp) {
             let m = t.match(/(?<!\/)\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i);
             if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i);
             if(m) s.hp = parseFloat(m[1]).toString();
         }
-        // VOLT
         if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
-        // PHASE
         if (!s.phase) {
             if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3";
             else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1";
@@ -496,26 +477,44 @@ class DataLoader {
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn);
         await CacheService.save({ data: window.LOCAL_DB, mfgs: Array.from(window.FOUND_MFGS) }, p);
-        if(btn.innerText.includes("SYNCING")) { btn.innerText = "SEARCH"; btn.disabled = false; }
+        
+        if(btn.innerText.includes("SYNCING") || btn.disabled) { btn.innerText = "SEARCH"; btn.disabled = false; }
         UI.pop();
     }
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0;
         do {
             loop++; if(loop > 100 || window.LOCAL_DB.length >= 7500) break;
-            if(btn && btn.disabled) btn.innerText = `⬇️ SYNCING ${Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100))}%...`;
-            if (loop % 5 === 0) await new Promise(r => setTimeout(r, 20));
+            
+            // AGGRESSIVE YIELD: SLEEP EVERY LOOP TO UNBLOCK UI
+            await new Promise(r => setTimeout(r, 30));
+
+            if(btn) {
+                const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
+                const prefix = btn.disabled ? "⬇️ " : "SEARCH ";
+                const suffix = btn.disabled ? "%..." : "%";
+                if(pct < 100) btn.innerText = (window.innerWidth < 500) ? `${prefix}${pct}${suffix}` : `${prefix}(${pct}${suffix})`;
+            }
+
             const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
             if(r.status!==200) return; const d = await r.json(); if(!d.records) break;
-            d.records.forEach(r => {
-                const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                const url = r.fields['Control Panel PDF']?.[0]?.url;
-                if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
-                else {
-                    const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
-                    window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg);
-                }
-            });
+            
+            // MICRO-BATCH PROCESSING (10 AT A TIME)
+            const chunks = [];
+            for (let i = 0; i < d.records.length; i += 10) chunks.push(d.records.slice(i, i + 10));
+            
+            for (const chunk of chunks) {
+                await new Promise(r => setTimeout(r, 5)); // BREATH BETWEEN CHUNKS
+                chunk.forEach(r => {
+                    const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                    const url = r.fields['Control Panel PDF']?.[0]?.url;
+                    if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
+                    else {
+                        const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
+                        window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg);
+                    }
+                });
+            }
             offset = d.offset;
         } while(offset);
     }
