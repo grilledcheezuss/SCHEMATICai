@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v22.6)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Cox Research | SCHEMATICai (v22.7)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -30,7 +30,8 @@
             --match-red-bg: #fee2e2; --match-red-text: #991b1b; 
             --match-keyword-bg: #dcfce7; --match-keyword-text: #166534;
             
-            --header-height: 55px; 
+            /* HEADER & SAFE AREA VARS */
+            --header-base-height: 55px; 
             --input-height: 36px;
             color-scheme: light; 
         }
@@ -59,17 +60,35 @@
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
 
-        /* --- HEADER --- */
-        header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
+        /* --- HEADER (UPDATED FOR iOS SAFE AREA) --- */
+        header { 
+            background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); 
+            /* Use padding-top to push content below the notch/status bar */
+            padding: 10px 15px;
+            padding-top: max(10px, env(safe-area-inset-top)); 
+            
+            /* Allow height to grow automatically based on padding */
+            height: auto;
+            min-height: var(--header-base-height);
+            
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
+            z-index: 100; 
+            flex-shrink: 0; 
+            position: relative; 
+        }
+
         .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; }
         .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 1.4rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
         .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.5rem; color: #b39ddb; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
-        .version-badge { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 11px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
+        .version-badge { position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 11px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
         .header-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; z-index: 2; }
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; overflow: hidden; }
 
         /* --- MAIN LAYOUT --- */
-        #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); position: relative; }
+        #app-container { display: none; flex: 1; overflow: hidden; position: relative; }
         html.logged-in #app-container { display: flex !important; }
         
         #sidebar { width: 320px; min-width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
@@ -202,7 +221,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.6</div>
+    <div class="version-badge">SCHEMATICai v22.7</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -277,7 +296,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.6 (CRYPTO OPTIMIZED) ---
+// --- SCHEMATICai v22.7 (iOS SAFE AREA + SYNC YIELD FIX) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -628,7 +647,6 @@ class DataLoader {
 
         const p = localStorage.getItem('cox_pass'); 
         
-        // --- 1. DERIVE KEY ONCE (HUGE SPEEDUP) ---
         await CacheService.prepareKey(p);
         
         await DB.deleteLegacy();
@@ -719,10 +737,16 @@ class DataLoader {
             } while(offset);
 
             if(buffer.length > 0) {
-                // --- UI UPDATE: FINALIZING ---
-                // Notify user that we are doing the final save, so the 96% stall feels like a new step.
+                // --- FIX FOR 96% STALL ---
+                // We use requestAnimationFrame wrapped in a Promise to guarantee a paint frame.
+                // This ensures "FINALIZING" appears before the browser freezes for the write.
                 if(btn) btn.innerText = "✅ FINALIZING...";
-                await new Promise(r => setTimeout(r, 20)); // tiny breath
+                
+                await new Promise(resolve => {
+                    requestAnimationFrame(() => {
+                        setTimeout(resolve, 50); // Small timeout to ensure visual update settles
+                    });
+                });
                 
                 await CacheService.saveShard(`shard_${Date.now()}_final`, buffer);
             }
