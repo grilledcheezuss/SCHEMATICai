@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.8)</title>
+    <title>Cox Research | SCHEMATICai (v22.9)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -217,7 +217,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.8</div>
+    <div class="version-badge">SCHEMATICai v22.9</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -292,7 +292,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.8 (REGEX REFINEMENT) ---
+// --- SCHEMATICai v22.9 (PERSISTENT DARK MODE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -625,8 +625,6 @@ class AIParser {
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
         if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
         
-        // --- HP PARSING FIX (v22.8) ---
-        // Using (?:^|[^/]) to avoid lookbehind issues on iOS while correctly ignoring phase info (e.g. 120/1)
         if (!s.hp) { 
             let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); 
             if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); 
@@ -780,7 +778,18 @@ class SearchEngine {
 }
 
 class UI {
-    static toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
+    static init() {
+        // Theme Persistence
+        if(localStorage.getItem('cox_theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    }
+
+    static toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+    }
+
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
@@ -808,7 +817,10 @@ class UI {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => { if(AuthService.init()) { DataLoader.preload(); } });
+document.addEventListener('DOMContentLoaded', () => { 
+    UI.init(); // Initialize UI Preference
+    if(AuthService.init()) { DataLoader.preload(); } 
+});
 </script>
 </body>
 </html>
