@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.7)</title>
+    <title>Cox Research | SCHEMATICai (v22.8)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -60,17 +60,13 @@
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
 
-        /* --- HEADER (UPDATED FOR iOS SAFE AREA) --- */
+        /* --- HEADER (iOS SAFE AREA) --- */
         header { 
             background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); 
-            /* Use padding-top to push content below the notch/status bar */
             padding: 10px 15px;
             padding-top: max(10px, env(safe-area-inset-top)); 
-            
-            /* Allow height to grow automatically based on padding */
             height: auto;
             min-height: var(--header-base-height);
-            
             display: flex; 
             align-items: center; 
             justify-content: space-between; 
@@ -221,7 +217,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.7</div>
+    <div class="version-badge">SCHEMATICai v22.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -296,7 +292,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.7 (iOS SAFE AREA + SYNC YIELD FIX) ---
+// --- SCHEMATICai v22.8 (REGEX REFINEMENT) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -495,7 +491,6 @@ class DB {
 class CacheService {
     static activeKey = null;
 
-    // --- CRYPTO OPTIMIZATION: Prepare key ONCE ---
     static async prepareKey(p) {
         if(!p) return null;
         const e = new TextEncoder(); 
@@ -629,7 +624,15 @@ class AIParser {
         t = (t||"").toUpperCase();
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
         if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
-        if (!s.hp) { let m = t.match(/(?<!\/)\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); if(m) s.hp = parseFloat(m[1]).toString(); }
+        
+        // --- HP PARSING FIX (v22.8) ---
+        // Using (?:^|[^/]) to avoid lookbehind issues on iOS while correctly ignoring phase info (e.g. 120/1)
+        if (!s.hp) { 
+            let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); 
+            if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); 
+            if(m) s.hp = parseFloat(m[1]).toString(); 
+        }
+
         if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
         if (!s.phase) { if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; }
         return s;
@@ -737,14 +740,11 @@ class DataLoader {
             } while(offset);
 
             if(buffer.length > 0) {
-                // --- FIX FOR 96% STALL ---
-                // We use requestAnimationFrame wrapped in a Promise to guarantee a paint frame.
-                // This ensures "FINALIZING" appears before the browser freezes for the write.
                 if(btn) btn.innerText = "✅ FINALIZING...";
                 
                 await new Promise(resolve => {
                     requestAnimationFrame(() => {
-                        setTimeout(resolve, 50); // Small timeout to ensure visual update settles
+                        setTimeout(resolve, 50); 
                     });
                 });
                 
