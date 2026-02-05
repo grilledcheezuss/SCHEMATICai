@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v21.7)</title>
+    <title>Cox Research | SCHEMATICai (v21.8)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v21.7</div>
+    <div class="version-badge">SCHEMATICai v21.8</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -272,14 +272,14 @@
 </div>
 
 <script>
-// --- SCHEMATICai v21.7 (DECRYPT PROGRESS + 1.3 SCALE) ---
+// --- SCHEMATICai v21.8 (STREAMING DECRYPT + 1.3 SCALE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 // --- PDF VIEWER ---
 class PdfViewer {
     static doc = null;
-    static currentScale = 1.3; // ADJUSTED DEFAULT
+    static currentScale = 1.3; // 1.3 DEFAULT
     static currentPage = 1;
     static url = "";
 
@@ -406,38 +406,70 @@ class PdfController {
 
 // --- DB & LOGIC ---
 class DB {
-    static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 7); q.onupgradeneeded = e => { const d = e.target.result; if(!d.objectStoreNames.contains("chunks")) d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
+    static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 7); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(!d.objectStoreNames.contains("chunks")) d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
-    static async getAllChunks() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const req = t.objectStore("chunks").getAll(); req.onsuccess = () => r(req.result); req.onerror = j; }); }
-    static async clear() { return new Promise(r => { indexedDB.deleteDatabase("CoxSchematicDB").onsuccess = r; }); }
+    static async deleteLegacy() { try { const d = await this.open(); const t = d.transaction("cache", "readwrite"); t.objectStore("cache").clear(); } catch(e){} }
+    
+    // STREAMING CURSOR (LOW MEMORY)
+    static async streamChunks(callback) {
+        const d = await this.open();
+        return new Promise((resolve, reject) => {
+            const t = d.transaction("chunks", "readonly");
+            const store = t.objectStore("chunks");
+            const req = store.openCursor();
+            let count = 0;
+            
+            // Get total count first for progress bar
+            const countReq = store.count();
+            countReq.onsuccess = () => {
+                const total = countReq.result;
+                if(total === 0) { resolve(false); return; }
+                
+                req.onsuccess = async (e) => {
+                    const cursor = e.target.result;
+                    if(cursor) {
+                        await callback(cursor.value, ++count, total);
+                        cursor.continue();
+                    } else {
+                        resolve(true);
+                    }
+                };
+            };
+            req.onerror = reject;
+        });
+    }
 }
 
 class CacheService {
     static async saveShard(id, data, p) { if(!p) return; const j = JSON.stringify(data); const e = await this.enc(j, p); await DB.putChunk(id, e); }
+    
     static async loadAllWithProgress(p, progressCallback) { 
-        if(!p) return null; 
-        const chunks = await DB.getAllChunks(); 
-        if(!chunks || chunks.length === 0) return null;
-        let allData = [];
+        if(!p) return null;
         
-        for(let i = 0; i < chunks.length; i++) {
-            // YIELD TO MAIN THREAD EVERY 5 CHUNKS
-            if(i % 5 === 0) await new Promise(r => setTimeout(r, 10));
+        // STREAMING DECRYPTION
+        const success = await DB.streamChunks(async (encryptedChunk, index, total) => {
+            // Update UI
+            if(progressCallback) progressCallback(Math.round((index / total) * 100));
             
-            const dec = await this.dec(chunks[i], p);
-            if(dec) {
-                // OPTIMIZED PUSH
-                const data = JSON.parse(dec);
-                data.forEach(r => {
-                    window.LOCAL_DB.push(r);
-                    window.ID_MAP.set(r.id, r);
-                    if(r.mfg) window.FOUND_MFGS.add(r.mfg);
-                });
-            }
-            if(progressCallback) progressCallback(Math.round(((i + 1) / chunks.length) * 100));
-        }
-        return true;
+            // YIELD to Main Thread (Vital for Mobile)
+            await new Promise(r => setTimeout(r, 0)); 
+            
+            try {
+                const dec = await this.dec(encryptedChunk, p);
+                if(dec) {
+                    const data = JSON.parse(dec);
+                    data.forEach(r => {
+                        window.LOCAL_DB.push(r);
+                        window.ID_MAP.set(r.id, r);
+                        if(r.mfg) window.FOUND_MFGS.add(r.mfg);
+                    });
+                }
+            } catch(e) { console.error("Chunk Decrypt Error", e); }
+        });
+        
+        return success;
     }
+    
     static async getKey(p) { const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); }
     static async enc(t, p) { const k = await this.getKey(p); const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
     static async dec(t, p) { const [i, d] = t.split(':'); const iv = new Uint8Array(i.match(/.{1,2}/g).map(b=>parseInt(b,16))); const da = new Uint8Array(d.match(/.{1,2}/g).map(b=>parseInt(b,16))); const k = await this.getKey(p); try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, k, da)); } catch { return null; } }
@@ -547,10 +579,24 @@ class DataLoader {
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 DECRYPTING...";
         const p = localStorage.getItem('cox_pass'); 
         
+        // CLEANUP LEGACY
+        await DB.deleteLegacy();
+
         // CHECK SESSION LOCK
         const alreadySynced = sessionStorage.getItem('cox_sync_done');
         
-        // --- DECRYPT PHASE WITH PROGRESS ---
+        // CHECK CRASH HISTORY
+        let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
+        if(attempts > 2) {
+            btn.innerText = "⚠️ SYNC INTERRUPTED (RETRY?)";
+            btn.classList.add('warning');
+            btn.disabled = false;
+            btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); };
+            return;
+        }
+        localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
+
+        // --- STREAMING DECRYPT START ---
         const hasData = await CacheService.loadAllWithProgress(p, (pct) => {
             btn.innerText = `🔒 DECRYPTING ${pct}%`;
         });
@@ -558,8 +604,8 @@ class DataLoader {
         if(hasData) {
             UI.pop();
             if(alreadySynced) {
+                localStorage.setItem('cox_sync_attempts', '0');
                 btn.innerText = "SEARCH"; btn.disabled = false;
-                console.log("Session Sync Skipped (Locked)");
                 return; 
             } else {
                 btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
@@ -571,6 +617,7 @@ class DataLoader {
         
         // SET LOCK
         sessionStorage.setItem('cox_sync_done', 'true');
+        localStorage.setItem('cox_sync_attempts', '0');
         
         if(btn.innerText.includes("SYNCING") || btn.disabled) { btn.innerText = "SEARCH"; btn.disabled = false; }
         UI.pop();
@@ -607,7 +654,8 @@ class DataLoader {
                     }
                 });
 
-                if(buffer.length >= 200) {
+                // MICRO-SHARD SAVE (25 items)
+                if(buffer.length >= 25) {
                     await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer, pass);
                     buffer = []; 
                 }
