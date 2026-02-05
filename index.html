@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v21.9)</title>
+    <title>Cox Research | SCHEMATICai (v22.0)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -197,7 +197,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v21.9</div>
+    <div class="version-badge">SCHEMATICai v22.0</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -272,7 +272,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v21.9 (STABLE KEY-BATCH DECRYPTION) ---
+// --- SCHEMATICai v22.0 (DB REBUILD, KEY-BATCHING & FIXES) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -406,7 +406,21 @@ class PdfController {
 
 // --- DB & LOGIC ---
 class DB {
-    static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 7); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(!d.objectStoreNames.contains("chunks")) d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
+    static open() { 
+        return new Promise((r, j) => { 
+            const q = indexedDB.open("CoxSchematicDB", 8); // VERSION 8 FORCE UPGRADE
+            q.onupgradeneeded = e => { 
+                const d = e.target.result; 
+                // CLEANUP OLD STORES
+                if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); 
+                if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); 
+                // CREATE FRESH
+                d.createObjectStore("chunks"); 
+            }; 
+            q.onsuccess = e => r(e.target.result); 
+            q.onerror = e => j(e); 
+        }); 
+    }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
     static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
