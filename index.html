@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v20.9)</title>
+    <title>Cox Research | SCHEMATICai (v21.0)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -91,8 +91,8 @@
 
         /* CUSTOM VIEWER */
         #custom-pdf-viewer { display: flex; width: 100%; height: 100%; flex-direction: row; }
-        /* INCREASED WIDTH FOR THUMBNAIL SIDEBAR */
-        #pdf-sidebar { width: 180px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
+        /* INCREASED WIDTH FOR THUMBNAIL SIDEBAR to 240px */
+        #pdf-sidebar { width: 240px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
         #pdf-main-view { flex: 1; overflow: auto; display: flex; justify-content: center; padding: 20px; background: var(--bg-viewer); }
         
         .pdf-thumb-wrapper { cursor: pointer; position: relative; border: 2px solid transparent; transition: 0.1s; }
@@ -197,7 +197,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v20.9</div>
+    <div class="version-badge">SCHEMATICai v21.0</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -249,7 +249,7 @@
     <div id="preview-pane">
         <div id="pdf-toolbar">
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)">-</button>
-            <span id="pdf-zoom-level">FIT</span>
+            <span id="pdf-zoom-level">150%</span>
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)">+</button>
             <button class="pdf-tool-btn" style="margin-left:10px;" onclick="PdfViewer.print()">🖨️</button>
         </div>
@@ -272,14 +272,14 @@
 </div>
 
 <script>
-// --- SCHEMATICai v20.9 (Hi-DPI PDF & WIDE SIDEBAR) ---
+// --- SCHEMATICai v21.0 (BUTTON FIX + WIDE SIDEBAR + 150% DEFAULT) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 // --- PDF VIEWER ---
 class PdfViewer {
     static doc = null;
-    static currentScale = 1.0;
+    static currentScale = 1.5; // DEFAULT 150%
     static currentPage = 1;
     static url = "";
 
@@ -294,7 +294,8 @@ class PdfViewer {
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
             document.getElementById('pdf-viewer-frame').style.display = 'none';
             this.renderSidebar();
-            this.renderPage(1, true); 
+            this.currentScale = 1.5; // RESET TO 150% ON NEW LOAD
+            this.renderPage(1, false); // FALSE = NO AUTO FIT
         } catch (e) {
             console.warn("Custom Viewer Failed, Reverting", e);
             this.loadNative(url);
@@ -325,7 +326,6 @@ class PdfViewer {
                 wrapper.classList.add('active');
             };
             
-            // Hi-DPI Thumbnail
             const viewport = page.getViewport({ scale: 0.2 }); 
             const outputScale = 0.2 * dpr;
             const renderViewport = page.getViewport({ scale: outputScale });
@@ -363,12 +363,11 @@ class PdfViewer {
         
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
 
-        // Hi-DPI Logic
         const dpr = window.devicePixelRatio || 1;
         const outputScale = this.currentScale * dpr;
         
-        const viewport = page.getViewport({ scale: this.currentScale }); // CSS Size
-        const renderViewport = page.getViewport({ scale: outputScale }); // Render Size
+        const viewport = page.getViewport({ scale: this.currentScale });
+        const renderViewport = page.getViewport({ scale: outputScale });
 
         const canvas = document.createElement('canvas');
         canvas.width = renderViewport.width;
@@ -586,16 +585,16 @@ class SearchEngine {
             r.w=w; r.p=p; r.hpV=hpV; res.push(r);
         });
         res.sort((a,b) => { if(a.p!=b.p) return a.p?-1:1; if(a.hpV!=b.hpV) return a.hpV?-1:1; if(a.w!=b.w) return b.w-a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
-        UI.render(res, crit); UI.toggle(false);
+        UI.render(res, crit); UI.toggleSearch(false);
     }
 }
 
 class UI {
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
-    static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggle(true); }
+    static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
-    static toggle(e) { const c = document.getElementById('search-controls'); if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
+    static toggleSearch(e) { const c = document.getElementById('search-controls'); if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
     static pop() {
         const m = document.getElementById('mfgInput'); const cv = m.value;
         let all = Array.from(window.FOUND_MFGS).sort(); m.innerHTML='<option value="Any">Any</option>'; all.forEach(v=>m.add(new Option(v,v))); m.value=cv;
