@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v22.4)</title>
+    <title>Cox Research | SCHEMATICai (v22.5)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -202,7 +202,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.4</div>
+    <div class="version-badge">SCHEMATICai v22.5</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -277,7 +277,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.4 (COMPLETION STAMP FIX) ---
+// --- SCHEMATICai v22.5 (BREATH STRATEGY) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -516,7 +516,6 @@ class NetworkService {
     static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
 }
 
-// ... (FeedbackService unchanged) ...
 class FeedbackService { 
     static activeId = null; static sessionVotes = new Set();
     static down(id) { this.activeId = id; document.getElementById('feedback-modal').classList.add('active-modal'); } 
@@ -594,7 +593,17 @@ class AIParser {
 window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
-        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 DECRYPTING...";
+        const btn = document.getElementById('searchBtn'); 
+        
+        // 1. Immediate UI Feedback
+        btn.disabled = true; 
+        btn.innerText = "🔒 DECRYPTING...";
+        
+        // --- BREATH STRATEGY (UI FIX) ---
+        // Pause here for 200ms to allow the UI to repaint the "DECRYPTING" state 
+        // before blocking the main thread with crypto operations.
+        await new Promise(r => setTimeout(r, 200)); 
+
         const p = localStorage.getItem('cox_pass'); 
         
         await DB.deleteLegacy();
@@ -627,6 +636,9 @@ class DataLoader {
         } else {
             btn.innerText = "⬇️ SYNCING...";
         }
+        
+        // Optional short breath before network start
+        await new Promise(r => setTimeout(r, 50));
         
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn, p);
