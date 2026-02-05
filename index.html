@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v20.3)</title>
+    <title>Cox Research | SCHEMATICai (v20.4)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -30,8 +30,8 @@
             --match-red-bg: #fee2e2; --match-red-text: #991b1b; 
             --match-keyword-bg: #dcfce7; --match-keyword-text: #166534;
             
-            --header-height: 70px; 
-            --input-height: 42px;
+            --header-height: 60px; /* Reduced from 70px */
+            --input-height: 38px; /* Reduced from 42px */
             color-scheme: light; 
         }
 
@@ -57,76 +57,77 @@
         }
         
         * { box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 14px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; /* Reduced base font */ }
 
         /* --- HEADER --- */
-        header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
+        header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); height: var(--header-height); padding: 0 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
         .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; }
-        .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 1.8rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
-        .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.65rem; color: #b39ddb; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-top: 3px; }
-        .version-badge { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 12px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
-        .header-controls { display: flex; align-items: center; gap: 10px; margin-left: auto; z-index: 2; }
-        .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: all 0.2s; overflow: hidden; }
+        .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 1.5rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
+        .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.55rem; color: #b39ddb; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
+        .version-badge { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 11px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
+        .header-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; z-index: 2; }
+        .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: all 0.2s; overflow: hidden; }
 
         /* --- MAIN LAYOUT --- */
         #app-container { display: none; flex: 1; overflow: hidden; height: calc(100vh - var(--header-height)); position: relative; }
         html.logged-in #app-container { display: flex !important; }
         
-        #sidebar { width: 420px; min-width: 320px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
+        /* SIDEBAR WIDTH ADJUSTED: 420px -> 340px */
+        #sidebar { width: 340px; min-width: 300px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
         
         /* COLLAPSIBLE CONTROLS */
-        .sidebar-controls { padding: 12px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 8px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
+        .sidebar-controls { padding: 10px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
         .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
         
-        #refine-btn-area { display: none; padding: 10px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
+        #refine-btn-area { display: none; padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
         #refine-btn-area.visible { display: block; }
         
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); font-size: 20px; position:relative; overflow: hidden; }
         
         /* FILTERS */
-        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
         .input-group.full-width { grid-column: span 2; }
         
-        .input-group { display: flex; flex-direction: column; gap: 2px; }
+        .input-group { display: flex; flex-direction: column; gap: 1px; }
         .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
-        .cox-input { width: 100%; height: var(--input-height); padding: 0 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--bg-input); color: var(--text-primary); outline: none; }
+        .cox-input { width: 100%; height: var(--input-height); padding: 0 8px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
         
-        .search-btn { flex: 1; height: 38px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 13px; letter-spacing: 0.5px; }
+        .search-btn { flex: 1; height: 36px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 5px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 12px; letter-spacing: 0.5px; }
         .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; }
-        .reset-btn { height: 38px; width: 38px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
-        .refine-btn { width: 100%; height: 32px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 12px; }
+        .reset-btn { height: 36px; width: 36px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 5px; cursor: pointer; }
+        .refine-btn { width: 100%; height: 30px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 5px; font-weight: 700; cursor: pointer; font-size: 11px; }
 
-        #results-scroll-area { flex: 1; overflow-y: auto; padding: 10px; background: var(--bg-app); }
-        #results-area { display: flex; flex-direction: column; gap: 6px; padding-bottom: 80px; }
+        #results-scroll-area { flex: 1; overflow-y: auto; padding: 8px; background: var(--bg-app); }
+        #results-area { display: flex; flex-direction: column; gap: 5px; padding-bottom: 80px; }
 
-        /* RECORD CARD */
-        .record-card { background: var(--bg-card); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); border-left: 5px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 6px; }
-        .record-card:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        /* RECORD CARD - COMPACT */
+        .record-card { background: var(--bg-card); padding: 6px 10px; border-radius: 5px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px; }
+        .record-card:hover { transform: translateY(-1px); box-shadow: 0 3px 6px rgba(0,0,0,0.1); }
         .record-card.active-view { background: rgba(139, 92, 246, 0.1); border-color: var(--app-accent); }
         .record-card.varied-result { opacity: 0.9; border-left-color: #94a3b8; }
         
-        .panel-name { font-size: 18px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.2; }
+        .panel-name { font-size: 15px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.1; }
 
-        .badge-row { display: flex; gap: 4px; flex-wrap: wrap; }
-        .hud-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.3px; border: 1px solid transparent; }
+        .badge-row { display: flex; gap: 3px; flex-wrap: wrap; }
+        .hud-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; letter-spacing: 0.3px; border: 1px solid transparent; }
         
         .hud-badge.match-green { background: var(--match-green-bg); color: var(--match-green-text); }
         .hud-badge.match-orange { background: var(--match-orange-bg); color: var(--match-orange-text); }
         .hud-badge.match-red { background: var(--match-red-bg); color: var(--match-red-text); }
         .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); }
 
-        .card-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 2px; border-top: 1px solid var(--border-color); padding-top: 4px; }
-        .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 4px; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: 0.2s; }
+        .card-actions { display: flex; gap: 5px; justify-content: flex-end; margin-top: 1px; border-top: 1px solid var(--border-color); padding-top: 3px; }
+        .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 3px; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; transition: 0.2s; }
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
         
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
         .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; }
         
-        #mobile-back-btn { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--app-accent); color: white; padding: 12px 24px; border-radius: 30px; border: none; font-weight: 800; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; cursor: pointer; }
+        #mobile-back-btn { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--app-accent); color: white; padding: 10px 20px; border-radius: 25px; border: none; font-weight: 800; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; cursor: pointer; }
 
         @media (min-width: 768px) and (max-width: 1024px) {
-            #sidebar { width: 300px; min-width: 300px; } 
-            .logo-main { font-size: 1.5rem; }
+            #sidebar { width: 280px; min-width: 280px; } 
+            .logo-main { font-size: 1.3rem; }
         }
         @media (max-width: 767px) {
             .version-badge { display: none; } 
@@ -139,16 +140,16 @@
 
         #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; overflow-y: auto; }
         .active-modal { display: flex !important; }
-        .auth-card, .config-card, .modal-card { background: var(--bg-card); padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; border: 1px solid var(--border-color); }
-        .auth-group { margin-bottom: 20px; text-align: left; }
-        .auth-label { font-size: 10px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px; }
+        .auth-card, .config-card, .modal-card { background: var(--bg-card); padding: 25px; border-radius: 10px; width: 90%; max-width: 380px; text-align: center; border: 1px solid var(--border-color); }
+        .auth-group { margin-bottom: 15px; text-align: left; }
+        .auth-label { font-size: 10px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 5px; }
         
-        .reason-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
-        .reason-btn { padding: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 6px; cursor: pointer; text-align: center; font-size: 12px; font-weight: 600; }
+        .reason-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+        .reason-btn { padding: 8px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary); border-radius: 5px; cursor: pointer; text-align: center; font-size: 11px; font-weight: 600; }
         .reason-btn.selected { background: var(--status-error); color: white; border-color: var(--status-error); }
-        .correction-input { display: none; width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; }
+        .correction-input { display: none; width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; }
         .reason-btn.selected + .correction-input { display: block; }
-        .submit-feedback-btn { width: 100%; padding: 12px; background: var(--app-accent); color: white; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; margin-top: 15px; }
+        .submit-feedback-btn { width: 100%; padding: 10px; background: var(--app-accent); color: white; border: none; border-radius: 5px; font-weight: 700; cursor: pointer; margin-top: 12px; }
 
     </style>
 </head>
@@ -156,7 +157,7 @@
 
 <div id="auth-overlay" class="active-modal">
     <div class="auth-card">
-        <div style="font-size:32px;margin-bottom:20px;">👤</div>
+        <div style="font-size:32px;margin-bottom:15px;">👤</div>
         <h2 style="color:var(--app-primary); margin-top:0;">SCHEMATICai</h2>
         <div class="auth-group">
             <label for="auth-user" class="auth-label">Username</label>
@@ -181,7 +182,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v20.3</div>
+    <div class="version-badge">SCHEMATICai v20.4</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -242,7 +243,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v20.3 (PHASE FIX & SMART FILTER) ---
+// --- SCHEMATICai v20.4 (UI SCALING: COMPACT & DENSE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -451,7 +452,12 @@ class PdfController {
         const fallback = document.getElementById('pdf-fallback');
         const link = document.getElementById('pdf-fallback-link');
         place.style.display = 'none'; frame.style.display = 'none'; fallback.style.display = 'block';
-        if (url) { frame.src = url; frame.style.display = 'block'; fallback.style.display = 'none'; }
+        if (url) { 
+            // AUTO-FIT WIDTH TRICK
+            frame.src = url + "#view=FitH"; 
+            frame.style.display = 'block'; 
+            fallback.style.display = 'none'; 
+        }
         if(link) link.href = url || "#";
         if(window.innerWidth < 768) document.body.classList.add('viewing-pdf');
     }
@@ -542,9 +548,8 @@ class AIParser {
         
         if (!specs.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { specs.enc = k; break; }
 
-        // GREEDY HP (v20.2)
         if (!specs.hp) {
-            let m = t.match(/(?<!\/)\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i);
+            let m = t.match(/(?<!\/)\b(\d+(\.\d+)?)\s*[\-_]?\s*HP\b/i);
             if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i);
             if(m) specs.hp = parseFloat(m[1]).toString();
         }
@@ -554,13 +559,9 @@ class AIParser {
             if(m) specs.volt = m[1]; 
         }
 
-        // --- ENHANCED PHASE PARSING (v20.3) ---
         if (!specs.phase) {
-            // 1. Explicit Text
             if (t.includes("THREE PHASE") || t.includes("3 PHASE") || t.includes("3PH") || t.includes("3-PH") || t.includes("3Ø") || t.includes("3/60")) specs.phase = "3";
             else if (t.includes("SINGLE PHASE") || t.includes("1 PHASE") || t.includes("1PH") || t.includes("1-PH") || t.includes("1Ø") || t.includes("1/60")) specs.phase = "1";
-            
-            // 2. Inference from Voltage if empty (Slash notation often implies phase)
             if(!specs.phase) {
                 if(t.includes("240/1/60") || t.includes("120/240")) specs.phase = "1";
                 if(t.includes("480/3/60") || t.includes("277/480")) specs.phase = "3";
@@ -754,13 +755,10 @@ class SearchEngine {
                 }
             }
             
-            // PHASE (STRICT BUT SAFE)
             if(criteria.phase!=="Any") { 
-                // If defined and mismatch -> KILL
                 if(r.phase && r.phase !== criteria.phase) {
                     return; 
                 }
-                // If unknown -> ALLOW (but penalize)
                 if(!r.phase) {
                     isPerfect = false; mismatchCount++;
                     sortWeight -= 5000;
