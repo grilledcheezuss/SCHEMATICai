@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v21.6)</title>
+    <title>Cox Research | SCHEMATICai (v21.7)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -110,6 +110,7 @@
         
         .search-btn { flex: 1; height: 34px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 12px; letter-spacing: 0.5px; }
         .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; }
+        .search-btn.warning { background-color: #f59e0b !important; color: black !important; }
         .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; }
         .refine-btn { width: 100%; height: 28px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 11px; }
 
@@ -196,7 +197,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v21.6</div>
+    <div class="version-badge">SCHEMATICai v21.7</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -248,7 +249,7 @@
     <div id="preview-pane">
         <div id="pdf-toolbar">
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)">-</button>
-            <span id="pdf-zoom-level">150%</span>
+            <span id="pdf-zoom-level">130%</span>
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)">+</button>
             <button class="pdf-tool-btn" style="margin-left:10px;" onclick="PdfViewer.print()">🖨️</button>
         </div>
@@ -271,69 +272,135 @@
 </div>
 
 <script>
-// --- SCHEMATICai v21.6 (TRUE INCREMENTAL SHARDING) ---
+// --- SCHEMATICai v21.7 (DECRYPT PROGRESS + 1.3 SCALE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 // --- PDF VIEWER ---
 class PdfViewer {
-    static doc = null; static currentScale = 1.5; static currentPage = 1; static url = "";
+    static doc = null;
+    static currentScale = 1.3; // ADJUSTED DEFAULT
+    static currentPage = 1;
+    static url = "";
+
     static async load(url) {
-        this.url = url; document.getElementById('pdf-fallback').style.display = 'none';
+        this.url = url;
+        document.getElementById('pdf-fallback').style.display = 'none';
         document.getElementById('pdf-toolbar').style.display = 'flex'; 
+        
         try {
-            const loadingTask = pdfjsLib.getDocument(url); this.doc = await loadingTask.promise;
+            const loadingTask = pdfjsLib.getDocument(url);
+            this.doc = await loadingTask.promise;
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
             document.getElementById('pdf-viewer-frame').style.display = 'none';
-            this.renderSidebar(); this.currentScale = 1.5; this.renderPage(1, false); 
-        } catch (e) { this.loadNative(url); }
+            this.renderSidebar();
+            this.currentScale = 1.3; 
+            this.renderPage(1, false); 
+        } catch (e) {
+            console.warn("Custom Viewer Failed, Reverting", e);
+            this.loadNative(url);
+        }
     }
+
     static loadNative(url) {
         document.getElementById('custom-pdf-viewer').style.display = 'none';
         document.getElementById('pdf-toolbar').style.display = 'none'; 
-        const frame = document.getElementById('pdf-viewer-frame'); frame.style.display = 'block'; frame.src = url + "#view=FitH";
+        const frame = document.getElementById('pdf-viewer-frame');
+        frame.style.display = 'block';
+        frame.src = url + "#view=FitH";
     }
+
     static async renderSidebar() {
-        const sidebar = document.getElementById('pdf-sidebar'); sidebar.innerHTML = '';
+        const sidebar = document.getElementById('pdf-sidebar');
+        sidebar.innerHTML = '';
         const dpr = window.devicePixelRatio || 1;
+        
         for (let i = 1; i <= this.doc.numPages; i++) {
-            const page = await this.doc.getPage(i); const wrapper = document.createElement('div');
-            wrapper.className = 'pdf-thumb-wrapper'; if(i===1) wrapper.classList.add('active');
-            wrapper.onclick = () => { this.renderPage(i, false); document.querySelectorAll('.pdf-thumb-wrapper').forEach(w=>w.classList.remove('active')); wrapper.classList.add('active'); };
-            const viewport = page.getViewport({ scale: 0.2 }); const outputScale = 0.2 * dpr;
-            const canvas = document.createElement('canvas'); canvas.className = 'pdf-thumb-canvas';
-            canvas.width = viewport.width * dpr; canvas.height = viewport.height * dpr;
-            canvas.style.width = "100%"; canvas.style.height = "auto";
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport: page.getViewport({ scale: outputScale }) }).promise;
-            const num = document.createElement('div'); num.className = 'pdf-page-num'; num.innerText = i;
-            wrapper.appendChild(canvas); wrapper.appendChild(num); sidebar.appendChild(wrapper);
+            const page = await this.doc.getPage(i);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pdf-thumb-wrapper';
+            if(i === 1) wrapper.classList.add('active');
+            wrapper.onclick = () => {
+                this.renderPage(i, false);
+                document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active'));
+                wrapper.classList.add('active');
+            };
+            
+            const viewport = page.getViewport({ scale: 0.2 }); 
+            const outputScale = 0.2 * dpr;
+            const renderViewport = page.getViewport({ scale: outputScale });
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-thumb-canvas';
+            canvas.width = renderViewport.width;
+            canvas.height = renderViewport.height;
+            canvas.style.width = Math.floor(viewport.width) + "px";
+            canvas.style.height = Math.floor(viewport.height) + "px";
+            
+            const ctx = canvas.getContext('2d');
+            page.render({ canvasContext: ctx, viewport: renderViewport });
+            
+            const num = document.createElement('div');
+            num.className = 'pdf-page-num';
+            num.innerText = i;
+            wrapper.appendChild(canvas);
+            wrapper.appendChild(num);
+            sidebar.appendChild(wrapper);
         }
     }
+
     static async renderPage(num, autoFit) {
-        this.currentPage = num; const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
+        this.currentPage = num;
+        const container = document.getElementById('pdf-main-view');
+        container.innerHTML = ''; 
         const page = await this.doc.getPage(num);
+        
         if (autoFit) {
-            const desiredWidth = container.clientWidth - 40; const viewportUnscaled = page.getViewport({ scale: 1 });
+            const desiredWidth = container.clientWidth - 40; 
+            const viewportUnscaled = page.getViewport({ scale: 1 });
             this.currentScale = desiredWidth / viewportUnscaled.width;
         }
+        
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
-        const dpr = window.devicePixelRatio || 1; const outputScale = this.currentScale * dpr;
+
+        const dpr = window.devicePixelRatio || 1;
+        const outputScale = this.currentScale * dpr;
         const viewport = page.getViewport({ scale: this.currentScale });
-        const canvas = document.createElement('canvas'); canvas.width = viewport.width * dpr; canvas.height = viewport.height * dpr;
-        canvas.style.width = viewport.width + "px"; canvas.style.height = viewport.height + "px";
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport: page.getViewport({ scale: outputScale }) }).promise;
+        const renderViewport = page.getViewport({ scale: outputScale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = renderViewport.width;
+        canvas.height = renderViewport.height;
+        canvas.style.width = Math.floor(viewport.width) + "px";
+        canvas.style.height = Math.floor(viewport.height) + "px";
+        
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: renderViewport }).promise;
         container.appendChild(canvas);
     }
-    static zoom(delta) { this.currentScale += delta; if(this.currentScale < 0.2) this.currentScale = 0.2; this.renderPage(this.currentPage, false); }
-    static print() { if(this.url) window.open(this.url, '_blank'); }
+    
+    static zoom(delta) {
+        this.currentScale += delta;
+        if(this.currentScale < 0.2) this.currentScale = 0.2;
+        this.renderPage(this.currentPage, false);
+    }
+    
+    static print() {
+        if(this.url) window.open(this.url, '_blank');
+    }
 }
 
 class PdfController {
     static load(id, url) {
-        const placeholder = document.getElementById('pdf-placeholder-text'); if(placeholder) placeholder.style.display = 'none';
-        const link = document.getElementById('pdf-fallback-link'); if(link) link.href = url || "#";
-        if (!url) { document.getElementById('pdf-fallback').style.display = 'block'; return; }
-        PdfViewer.load(url); if(window.innerWidth < 768) document.body.classList.add('viewing-pdf');
+        const placeholder = document.getElementById('pdf-placeholder-text');
+        if(placeholder) placeholder.style.display = 'none';
+        const link = document.getElementById('pdf-fallback-link');
+        if(link) link.href = url || "#";
+        if (!url) {
+            document.getElementById('pdf-fallback').style.display = 'block';
+            return;
+        }
+        PdfViewer.load(url);
+        if(window.innerWidth < 768) document.body.classList.add('viewing-pdf');
     }
 }
 
@@ -341,30 +408,35 @@ class PdfController {
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 7); q.onupgradeneeded = e => { const d = e.target.result; if(!d.objectStoreNames.contains("chunks")) d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
-    static async getAllChunks() { 
-        const d = await this.open(); 
-        return new Promise((r, j) => { 
-            const t = d.transaction("chunks", "readonly"); 
-            const req = t.objectStore("chunks").getAll(); 
-            req.onsuccess = () => r(req.result); 
-            req.onerror = j; 
-        }); 
-    }
+    static async getAllChunks() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const req = t.objectStore("chunks").getAll(); req.onsuccess = () => r(req.result); req.onerror = j; }); }
     static async clear() { return new Promise(r => { indexedDB.deleteDatabase("CoxSchematicDB").onsuccess = r; }); }
 }
 
 class CacheService {
     static async saveShard(id, data, p) { if(!p) return; const j = JSON.stringify(data); const e = await this.enc(j, p); await DB.putChunk(id, e); }
-    static async loadAll(p) { 
+    static async loadAllWithProgress(p, progressCallback) { 
         if(!p) return null; 
         const chunks = await DB.getAllChunks(); 
         if(!chunks || chunks.length === 0) return null;
         let allData = [];
-        for(const chunk of chunks) {
-            const dec = await this.dec(chunk, p);
-            if(dec) allData = allData.concat(JSON.parse(dec));
+        
+        for(let i = 0; i < chunks.length; i++) {
+            // YIELD TO MAIN THREAD EVERY 5 CHUNKS
+            if(i % 5 === 0) await new Promise(r => setTimeout(r, 10));
+            
+            const dec = await this.dec(chunks[i], p);
+            if(dec) {
+                // OPTIMIZED PUSH
+                const data = JSON.parse(dec);
+                data.forEach(r => {
+                    window.LOCAL_DB.push(r);
+                    window.ID_MAP.set(r.id, r);
+                    if(r.mfg) window.FOUND_MFGS.add(r.mfg);
+                });
+            }
+            if(progressCallback) progressCallback(Math.round(((i + 1) / chunks.length) * 100));
         }
-        return allData;
+        return true;
     }
     static async getKey(p) { const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); }
     static async enc(t, p) { const k = await this.getKey(p); const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
@@ -383,19 +455,30 @@ class NetworkService {
     static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
 }
 
+// ... (FeedbackService unchanged) ...
 class FeedbackService { 
     static activeId = null; static sessionVotes = new Set();
     static down(id) { this.activeId = id; document.getElementById('feedback-modal').classList.add('active-modal'); } 
     static async submit() { 
         const id = this.activeId; const submissions = []; 
-        document.querySelectorAll('.reason-btn.selected').forEach(btn => { const val = btn.nextElementSibling ? btn.nextElementSibling.value : ""; submissions.push({ id, reasonCode: btn.dataset.reason, value: val }); }); 
+        document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
+            const reasonCode = btn.dataset.reason; 
+            const val = btn.nextElementSibling ? btn.nextElementSibling.value : "";
+            submissions.push({ id, reasonCode, value: val }); 
+        }); 
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
         document.getElementById('feedback-modal').classList.remove('active-modal');
     } 
     static async up(id, btnElement) { 
         if(this.sessionVotes.has(id)) return; this.sessionVotes.add(id); if(btnElement) btnElement.classList.add('voted-up');
+        const mfg = document.getElementById('mfgInput').value; const hp = document.getElementById('hpInput').value;
+        const volt = document.getElementById('voltInput').value; const phase = document.getElementById('phaseInput').value; const enc = document.getElementById('encInput').value;
         const submissions = [{ "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } }];
-        // Add other fields if not "Any"
+        if(mfg!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "mfg", "Suggested Value": mfg } });
+        if(hp!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "hp", "Suggested Value": hp } });
+        if(volt!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "volt", "Suggested Value": volt } });
+        if(phase!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "phase", "Suggested Value": phase } });
+        if(enc!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "enc", "Suggested Value": enc } });
         for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, sub);
     } 
     static toggleReason(el) { el.classList.toggle('selected'); } 
@@ -410,7 +493,27 @@ const AI_TRAINING_DATA = {
 
 class TheHealer {
     static healedData = {}; 
-    static async fetchAndTally() { try { const r = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); if(r.status===401){AuthService.logout();return;} const d=await r.json(); if(d.records) d.records.forEach(x => { if(!this.healedData[x.fields['Panel ID']]) this.healedData[x.fields['Panel ID']]={}; this.healedData[x.fields['Panel ID']][x.fields['Parameter']]=x.fields['Suggested Value']; }); } catch(e){} }
+    static async fetchAndTally() {
+        try {
+            const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100');
+            if(resp.status === 401) { AuthService.logout(); return; }
+            const data = await resp.json();
+            if(data.records) {
+                const tallies = {};
+                data.records.forEach(r => {
+                    const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`;
+                    tallies[key] = (tallies[key] || 0) + 1;
+                });
+                for (const [key, count] of Object.entries(tallies)) {
+                    if (count >= CONFIG.voteThreshold) {
+                        const [id, param, value] = key.split('|');
+                        if (!this.healedData[id]) this.healedData[id] = {};
+                        this.healedData[id][param] = value;
+                    }
+                }
+            }
+        } catch(e) { console.error("Healing Failed", e); }
+    }
 }
 
 class AIParser {
@@ -418,11 +521,22 @@ class AIParser {
         const healed = TheHealer.healedData[id];
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null };
         t = (t||"").toUpperCase();
+        
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
         if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
-        if (!s.hp) { let m = t.match(/(?<!\/)\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); if(m) s.hp = parseFloat(m[1]).toString(); }
+        
+        if (!s.hp) {
+            let m = t.match(/(?<!\/)\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i);
+            if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i);
+            if(m) s.hp = parseFloat(m[1]).toString();
+        }
         if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
-        if (!s.phase) { if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; }
+        if (!s.phase) {
+            if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3";
+            else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1";
+            if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1";
+            if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3";
+        }
         return s;
     }
 }
@@ -433,71 +547,81 @@ class DataLoader {
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 DECRYPTING...";
         const p = localStorage.getItem('cox_pass'); 
         
-        // LOAD EXISTING SHARDS FIRST (INSTANT RESUME)
-        const cachedData = await CacheService.loadAll(p);
-        if(cachedData && cachedData.length > 0) {
-            window.LOCAL_DB = cachedData;
-            window.LOCAL_DB.forEach(r => {
-                window.ID_MAP.set(r.id, r);
-                if(r.mfg) window.FOUND_MFGS.add(r.mfg);
-            });
+        // CHECK SESSION LOCK
+        const alreadySynced = sessionStorage.getItem('cox_sync_done');
+        
+        // --- DECRYPT PHASE WITH PROGRESS ---
+        const hasData = await CacheService.loadAllWithProgress(p, (pct) => {
+            btn.innerText = `🔒 DECRYPTING ${pct}%`;
+        });
+
+        if(hasData) {
             UI.pop();
-            btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
-        } else {
-            btn.innerText = "⬇️ SYNCING 0%";
-        }
+            if(alreadySynced) {
+                btn.innerText = "SEARCH"; btn.disabled = false;
+                console.log("Session Sync Skipped (Locked)");
+                return; 
+            } else {
+                btn.innerText = "SEARCH (SYNCING...)"; btn.disabled = false;
+            }
+        } else btn.innerText = "⬇️ SYNCING...";
         
         await TheHealer.fetchAndTally();
         await this.fetchPartition('desc', btn, p);
         
-        btn.innerText = "SEARCH"; btn.disabled = false;
+        // SET LOCK
+        sessionStorage.setItem('cox_sync_done', 'true');
+        
+        if(btn.innerText.includes("SYNCING") || btn.disabled) { btn.innerText = "SEARCH"; btn.disabled = false; }
         UI.pop();
     }
     static async fetchPartition(dir, btn, pass) {
         let offset = null, loop = 0;
-        let buffer = []; // Micro-batch buffer
+        let buffer = []; 
         let shardCount = 0;
 
-        do {
-            loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break;
-            await new Promise(r => setTimeout(r, 10));
+        try {
+            do {
+                loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break;
+                await new Promise(r => setTimeout(r, 10));
 
-            if(btn) {
-                const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
-                if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`;
-            }
-
-            const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
-            if(r.status!==200) break; const d = await r.json(); if(!d.records) break;
-            
-            d.records.forEach(r => {
-                const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                const url = r.fields['Control Panel PDF']?.[0]?.url;
-                
-                // If ID exists, just update URL (Fast)
-                if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
-                else {
-                    // New Record
-                    const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
-                    window.LOCAL_DB.push(rec); 
-                    window.ID_MAP.set(id, rec); 
-                    if(rec.mfg) window.FOUND_MFGS.add(rec.mfg);
-                    buffer.push(rec);
+                if(btn && !btn.classList.contains('warning')) {
+                    const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
+                    if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`;
                 }
-            });
 
-            // INCREMENTAL SHARD SAVE (Every 200 records)
-            if(buffer.length >= 200) {
-                await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer, pass);
-                buffer = []; // Clear buffer to free RAM
+                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
+                if(r.status!==200) { console.error("Sync Failed", r.status); break; }
+                const d = await r.json(); if(!d.records) break;
+                
+                d.records.forEach(r => {
+                    const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                    const url = r.fields['Control Panel PDF']?.[0]?.url;
+                    if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
+                    else {
+                        const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
+                        window.LOCAL_DB.push(rec); 
+                        window.ID_MAP.set(id, rec); 
+                        if(rec.mfg) window.FOUND_MFGS.add(rec.mfg);
+                        buffer.push(rec);
+                    }
+                });
+
+                if(buffer.length >= 200) {
+                    await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer, pass);
+                    buffer = []; 
+                }
+
+                offset = d.offset;
+            } while(offset);
+
+            if(buffer.length > 0) {
+                await CacheService.saveShard(`shard_${Date.now()}_final`, buffer, pass);
             }
-
-            offset = d.offset;
-        } while(offset);
-
-        // Final Save of leftover buffer
-        if(buffer.length > 0) {
-            await CacheService.saveShard(`shard_${Date.now()}_final`, buffer, pass);
+        } catch(e) {
+            console.error("Sync Critical Error", e);
+        } finally {
+            if(btn && !btn.classList.contains('warning')) { btn.innerText = "SEARCH"; btn.disabled = false; }
         }
     }
 }
