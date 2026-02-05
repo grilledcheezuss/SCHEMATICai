@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v22.5)</title>
+    <title>Cox Research | SCHEMATICai (v22.6)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -202,7 +202,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.5</div>
+    <div class="version-badge">SCHEMATICai v22.6</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -277,7 +277,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.5 (BREATH STRATEGY) ---
+// --- SCHEMATICai v22.6 (CRYPTO OPTIMIZED) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -474,9 +474,26 @@ class DB {
 }
 
 class CacheService {
-    static async saveShard(id, data, p) { if(!p) return; const j = JSON.stringify(data); const e = await this.enc(j, p); await DB.putChunk(id, e); }
-    static async loadAllWithProgress(p, progressCallback) { 
+    static activeKey = null;
+
+    // --- CRYPTO OPTIMIZATION: Prepare key ONCE ---
+    static async prepareKey(p) {
         if(!p) return null;
+        const e = new TextEncoder(); 
+        const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); 
+        this.activeKey = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+        return this.activeKey;
+    }
+
+    static async saveShard(id, data) { 
+        if(!this.activeKey) return; 
+        const j = JSON.stringify(data); 
+        const e = await this.enc(j); 
+        await DB.putChunk(id, e); 
+    }
+
+    static async loadAllWithProgress(progressCallback) { 
+        if(!this.activeKey) return null;
         const keys = await DB.getChunkKeys();
         if(!keys || keys.length === 0) return null;
         for(let i = 0; i < keys.length; i++) {
@@ -484,7 +501,7 @@ class CacheService {
             const chunk = await DB.getChunk(keys[i]);
             if(chunk) {
                 try {
-                    const dec = await this.dec(chunk, p);
+                    const dec = await this.dec(chunk);
                     if(dec) {
                         const data = JSON.parse(dec);
                         data.forEach(r => {
@@ -499,9 +516,19 @@ class CacheService {
         }
         return true;
     }
-    static async getKey(p) { const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); }
-    static async enc(t, p) { const k = await this.getKey(p); const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
-    static async dec(t, p) { const [i, d] = t.split(':'); const iv = new Uint8Array(i.match(/.{1,2}/g).map(b=>parseInt(b,16))); const da = new Uint8Array(d.match(/.{1,2}/g).map(b=>parseInt(b,16))); const k = await this.getKey(p); try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, k, da)); } catch { return null; } }
+
+    static async enc(t) { 
+        const iv = crypto.getRandomValues(new Uint8Array(12)); 
+        const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, this.activeKey, new TextEncoder().encode(t)); 
+        return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); 
+    }
+
+    static async dec(t) { 
+        const [i, d] = t.split(':'); 
+        const iv = new Uint8Array(i.match(/.{1,2}/g).map(b=>parseInt(b,16))); 
+        const da = new Uint8Array(d.match(/.{1,2}/g).map(b=>parseInt(b,16))); 
+        try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, this.activeKey, da)); } catch { return null; } 
+    }
 }
 
 class AuthService {
@@ -594,17 +621,15 @@ window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); 
-        
-        // 1. Immediate UI Feedback
         btn.disabled = true; 
-        btn.innerText = "🔒 DECRYPTING...";
+        btn.innerText = "🔒 PREPARING...";
         
-        // --- BREATH STRATEGY (UI FIX) ---
-        // Pause here for 200ms to allow the UI to repaint the "DECRYPTING" state 
-        // before blocking the main thread with crypto operations.
         await new Promise(r => setTimeout(r, 200)); 
 
         const p = localStorage.getItem('cox_pass'); 
+        
+        // --- 1. DERIVE KEY ONCE (HUGE SPEEDUP) ---
+        await CacheService.prepareKey(p);
         
         await DB.deleteLegacy();
 
@@ -619,13 +644,12 @@ class DataLoader {
         localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
 
         // --- BATCHED DECRYPT START ---
-        const hasData = await CacheService.loadAllWithProgress(p, (pct) => {
+        const hasData = await CacheService.loadAllWithProgress((pct) => {
             btn.innerText = `🔒 DECRYPTING ${pct}%`;
         });
 
         if(hasData) {
             UI.pop();
-            // CHECK PERSISTENT FLAG
             if(localStorage.getItem('cox_db_complete')) {
                 localStorage.setItem('cox_sync_attempts', '0');
                 btn.innerText = "SEARCH"; btn.disabled = false;
@@ -637,20 +661,19 @@ class DataLoader {
             btn.innerText = "⬇️ SYNCING...";
         }
         
-        // Optional short breath before network start
         await new Promise(r => setTimeout(r, 50));
         
         await TheHealer.fetchAndTally();
-        await this.fetchPartition('desc', btn, p);
+        await this.fetchPartition('desc', btn);
         
         localStorage.setItem('cox_sync_attempts', '0');
         
-        if(btn.innerText.includes("SYNCING") || btn.innerText.includes("RESUMING") || btn.disabled) { 
+        if(btn.innerText.includes("SYNCING") || btn.innerText.includes("RESUMING") || btn.innerText.includes("FINALIZING") || btn.disabled) { 
             btn.innerText = "SEARCH"; btn.disabled = false; 
         }
         UI.pop();
     }
-    static async fetchPartition(dir, btn, pass) {
+    static async fetchPartition(dir, btn) {
         let offset = null, loop = 0;
         let buffer = []; 
         let shardCount = 0;
@@ -661,7 +684,7 @@ class DataLoader {
                 await new Promise(r => setTimeout(r, 10));
 
                 if(btn && !btn.classList.contains('warning')) {
-                    const pct = Math.min(100, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
+                    const pct = Math.min(99, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100));
                     if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`;
                 }
 
@@ -669,7 +692,6 @@ class DataLoader {
                 if(r.status!==200) { console.error("Sync Failed", r.status); break; }
                 const d = await r.json(); 
                 
-                // IF NO MORE RECORDS, MARK COMPLETE
                 if(!d.records || d.records.length === 0) {
                     localStorage.setItem('cox_db_complete', 'true');
                     break;
@@ -689,7 +711,7 @@ class DataLoader {
                 });
 
                 if(buffer.length >= 25) {
-                    await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer, pass);
+                    await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer);
                     buffer = []; 
                 }
 
@@ -697,7 +719,12 @@ class DataLoader {
             } while(offset);
 
             if(buffer.length > 0) {
-                await CacheService.saveShard(`shard_${Date.now()}_final`, buffer, pass);
+                // --- UI UPDATE: FINALIZING ---
+                // Notify user that we are doing the final save, so the 96% stall feels like a new step.
+                if(btn) btn.innerText = "✅ FINALIZING...";
+                await new Promise(r => setTimeout(r, 20)); // tiny breath
+                
+                await CacheService.saveShard(`shard_${Date.now()}_final`, buffer);
             }
         } catch(e) {
             console.error("Sync Critical Error", e);
