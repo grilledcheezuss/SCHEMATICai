@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v22.3)</title>
+    <title>Cox Research | SCHEMATICai (v22.4)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -202,7 +202,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.3</div>
+    <div class="version-badge">SCHEMATICai v22.4</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -277,7 +277,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.3 (PLATFORM-AWARE SCALING) ---
+// --- SCHEMATICai v22.4 (COMPLETION STAMP FIX) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -293,7 +293,7 @@ class PdfViewer {
         this.url = url;
         this.isMobile = window.innerWidth < 768;
         
-        // AUTO-SCALE LOGIC
+        // AUTO-SCALE
         this.currentScale = this.isMobile ? 0.7 : 1.3;
 
         document.getElementById('pdf-fallback').style.display = 'none';
@@ -362,7 +362,6 @@ class PdfViewer {
         }
     }
 
-    // DESKTOP: SINGLE PAGE RENDER
     static async renderPage(num, autoFit) {
         this.currentPage = num;
         const container = document.getElementById('pdf-main-view');
@@ -391,10 +390,9 @@ class PdfViewer {
         container.appendChild(canvas);
     }
 
-    // MOBILE: VERTICAL SCROLL STACK
     static async renderMobileStack() {
         const container = document.getElementById('pdf-main-view');
-        container.innerHTML = ''; // Clear
+        container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
         
         const dpr = window.devicePixelRatio || 1;
@@ -618,10 +616,11 @@ class DataLoader {
 
         if(hasData) {
             UI.pop();
-            if(window.LOCAL_DB.length >= CONFIG.estTotal) {
+            // CHECK PERSISTENT FLAG
+            if(localStorage.getItem('cox_db_complete')) {
                 localStorage.setItem('cox_sync_attempts', '0');
                 btn.innerText = "SEARCH"; btn.disabled = false;
-                return; 
+                return; // DONE
             } else {
                 btn.innerText = "⬇️ RESUMING..."; 
             }
@@ -656,7 +655,13 @@ class DataLoader {
 
                 const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
                 if(r.status!==200) { console.error("Sync Failed", r.status); break; }
-                const d = await r.json(); if(!d.records) break;
+                const d = await r.json(); 
+                
+                // IF NO MORE RECORDS, MARK COMPLETE
+                if(!d.records || d.records.length === 0) {
+                    localStorage.setItem('cox_db_complete', 'true');
+                    break;
+                }
                 
                 d.records.forEach(r => {
                     const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
