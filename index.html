@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cox Research | SCHEMATICai (v22.2)</title>
+    <title>Cox Research | SCHEMATICai (v22.3)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -202,7 +202,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.2</div>
+    <div class="version-badge">SCHEMATICai v22.3</div>
     <div class="header-controls">
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
@@ -277,7 +277,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.2 (MOBILE VERTICAL SCROLL + DESKTOP SIDEBAR) ---
+// --- SCHEMATICai v22.3 (PLATFORM-AWARE SCALING) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -293,6 +293,9 @@ class PdfViewer {
         this.url = url;
         this.isMobile = window.innerWidth < 768;
         
+        // AUTO-SCALE LOGIC
+        this.currentScale = this.isMobile ? 0.7 : 1.3;
+
         document.getElementById('pdf-fallback').style.display = 'none';
         document.getElementById('pdf-toolbar').style.display = 'flex'; 
         
@@ -308,8 +311,6 @@ class PdfViewer {
                 this.renderSidebar();
                 this.renderPage(1, false); 
             }
-            
-            this.currentScale = 1.3; 
         } catch (e) {
             console.warn("Custom Viewer Failed, Reverting", e);
             this.loadNative(url);
@@ -365,7 +366,7 @@ class PdfViewer {
     static async renderPage(num, autoFit) {
         this.currentPage = num;
         const container = document.getElementById('pdf-main-view');
-        container.innerHTML = ''; // Clear previous
+        container.innerHTML = ''; 
         const page = await this.doc.getPage(num);
         
         if (autoFit) {
@@ -400,7 +401,6 @@ class PdfViewer {
         const outputScale = this.currentScale * dpr;
 
         for (let i = 1; i <= this.doc.numPages; i++) {
-            // Render sequentially with a tiny delay to keep UI responsive
             await new Promise(r => setTimeout(r, 10));
             
             const page = await this.doc.getPage(i);
@@ -454,7 +454,7 @@ class PdfController {
     }
 }
 
-// --- DB & LOGIC (SAME AS v22.1) ---
+// --- DB & LOGIC ---
 class DB {
     static open() { 
         return new Promise((r, j) => { 
@@ -518,7 +518,7 @@ class NetworkService {
     static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
 }
 
-// ... (FeedbackService, TheHealer, AIParser, UI, etc. same as before) ...
+// ... (FeedbackService unchanged) ...
 class FeedbackService { 
     static activeId = null; static sessionVotes = new Set();
     static down(id) { this.activeId = id; document.getElementById('feedback-modal').classList.add('active-modal'); } 
