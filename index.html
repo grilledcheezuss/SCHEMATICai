@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.15)</title>
+    <title>Cox Research | SCHEMATICai (v22.17)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -117,7 +117,7 @@
         .editor-title { font-weight: 800; color: var(--app-primary); text-transform: uppercase; }
         .editor-section { margin-bottom: 15px; }
         .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; }
-        .disabled-overlay { opacity: 0.5; pointer-events: none; } /* Used when no box is selected */
+        .disabled-overlay { opacity: 0.5; pointer-events: none; }
 
         /* DEMO CONTEXT PANEL */
         #demo-context-panel {
@@ -169,6 +169,8 @@
         /* VIEWER & REDACTION */
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; }
         #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); }
+        
+        /* Wrapper ensures Redactions are relative to the canvas size */
         .pdf-page-wrapper { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: white; margin-bottom: 20px; }
         .pdf-page-canvas { display: block; }
         
@@ -184,8 +186,8 @@
             position: absolute;
             background: var(--redaction-fill);
             color: var(--cad-text);
-            font-size: 14px; /* Default */
-            font-family: 'Courier New', monospace; /* Default */
+            font-size: 14px; 
+            font-family: 'Courier New', monospace; 
             font-weight: bold;
             display: flex;
             align-items: center;
@@ -197,16 +199,17 @@
             user-select: none;
         }
         
-        .redaction-layer.editing .redaction-box { border: 1px solid #ccc; } /* Light border for non-selected */
-        .redaction-box.selected { border: 2px solid var(--redaction-outline) !important; z-index: 20; }
+        /* Outline only active when editing */
+        .redaction-layer.editing .redaction-box { border: 2px solid var(--redaction-outline); }
+        .redaction-box.selected { border: 2px dashed blue !important; z-index: 20; }
         
         .redaction-resize-handle {
-            width: 10px; height: 10px; background: var(--redaction-outline);
+            width: 12px; height: 12px; background: var(--redaction-outline);
             position: absolute; bottom: 0; right: 0;
             cursor: nwse-resize;
             display: none;
         }
-        .redaction-box.selected .redaction-resize-handle { display: block; }
+        .redaction-layer.editing .redaction-resize-handle { display: block; }
 
         /* PDF Sidebar & Toolbar */
         #pdf-sidebar { width: 240px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
@@ -251,7 +254,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.15</div>
+    <div class="version-badge">SCHEMATICai v22.17</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -354,11 +357,110 @@
 </div>
 
 <script>
-// --- CORE CONFIG ---
+// --- SCHEMATICai v22.17 (STABILITY RELEASE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- DEMO MANAGER ---
+// --- PDF VIEWER CLASSES (Moved to TOP to prevent ReferenceError) ---
+class PdfViewer {
+    static doc = null;
+    static currentWrapper = null; 
+    static currentScale = 1.3;
+    static currentPage = 1;
+    static isMobile = false;
+
+    static async load(url) {
+        document.getElementById('pdf-fallback').style.display = 'none';
+        document.getElementById('pdf-toolbar').style.display = 'flex';
+        document.getElementById('custom-pdf-viewer').style.display = 'flex';
+        document.getElementById('pdf-viewer-frame').style.display = 'none';
+        this.isMobile = window.innerWidth < 768;
+        this.currentScale = this.isMobile ? 0.7 : 1.3;
+        try {
+            const task = pdfjsLib.getDocument(url);
+            this.doc = await task.promise;
+            this.renderPage(1); 
+            if(!this.isMobile) this.renderSidebar();
+        } catch(e) { console.warn(e); }
+    }
+
+    static async renderPage(num) {
+        this.currentPage = num;
+        const container = document.getElementById('pdf-main-view');
+        container.innerHTML = ''; 
+        const page = await this.doc.getPage(num);
+        const viewport = page.getViewport({ scale: this.currentScale }); 
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pdf-page-wrapper';
+        wrapper.style.width = Math.floor(viewport.width) + "px";
+        wrapper.style.height = Math.floor(viewport.height) + "px";
+        this.currentWrapper = wrapper;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        wrapper.appendChild(canvas);
+
+        const rLayer = document.createElement('div');
+        rLayer.className = 'redaction-layer';
+        // Apply editing state if panel is open
+        if(document.getElementById('redaction-editor').classList.contains('active')) rLayer.classList.add('editing');
+        wrapper.appendChild(rLayer);
+
+        container.appendChild(wrapper);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
+
+        // Auto-Scan only in active Demo Mode
+        if(DemoManager.isActive) { setTimeout(() => LayoutScanner.autoScan(), 500); }
+    }
+    
+    static async renderSidebar() {
+        const sidebar = document.getElementById('pdf-sidebar');
+        sidebar.innerHTML = '';
+        for (let i = 1; i <= this.doc.numPages; i++) {
+            const page = await this.doc.getPage(i);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pdf-thumb-wrapper';
+            if(i === 1) wrapper.classList.add('active');
+            wrapper.onclick = () => {
+                this.renderPage(i);
+                document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active'));
+                wrapper.classList.add('active');
+            };
+            const viewport = page.getViewport({ scale: 0.2 }); 
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width; canvas.height = viewport.height;
+            canvas.style.width = "100%";
+            page.render({ canvasContext: canvas.getContext('2d'), viewport });
+            const num = document.createElement('div'); num.className = 'pdf-page-num'; num.innerText = i;
+            wrapper.appendChild(canvas); wrapper.appendChild(num); sidebar.appendChild(wrapper);
+        }
+    }
+
+    static zoom(delta) {
+        this.currentScale += delta;
+        if(this.currentScale < 0.2) this.currentScale = 0.2;
+        this.renderPage(this.currentPage);
+    }
+    static print() { if(this.doc) window.open(this.doc.loadingTask.url, '_blank'); }
+}
+
+class PdfController {
+    static load(id, url) {
+        const placeholder = document.getElementById('pdf-placeholder-text');
+        if(placeholder) placeholder.style.display = 'none';
+        const link = document.getElementById('pdf-fallback-link');
+        if(link) link.href = url || "#";
+        if (!url) { document.getElementById('pdf-fallback').style.display = 'block'; return; }
+        PdfViewer.load(url);
+    }
+}
+
+// --- DEMO & REDACTION LOGIC ---
 class DemoManager {
     static isActive = false;
     static toggle() {
@@ -387,7 +489,6 @@ class DemoManager {
     }
 }
 
-// --- REDACTION EDITOR UI ---
 class RedactionEditor {
     static open() {
         document.getElementById('config-modal').classList.remove('active-modal');
@@ -401,33 +502,25 @@ class RedactionEditor {
     }
 }
 
-// --- LAYOUT SCANNER (SIMULATED AI) ---
 class LayoutScanner {
     static autoScan() {
         if(!PdfViewer.currentWrapper) return;
         RedactionManager.clearAll();
-        
         const width = PdfViewer.currentWrapper.offsetWidth;
         const height = PdfViewer.currentWrapper.offsetHeight;
-        
-        // DEFAULT TEMPLATE (Smart defaults with Individual Font Sizes)
+        // Default Template
         const template = [
             { x: 0.70, y: 0.02, w: 0.28, h: 0.08, map: 'cust', fontSize: 18 }, 
             { x: 0.70, y: 0.11, w: 0.28, h: 0.05, map: 'job', fontSize: 14 },  
             { x: 0.70, y: 0.85, w: 0.28, h: 0.12, map: 'stage', fontSize: 24 } 
         ];
-
         template.forEach(zone => {
-            RedactionManager.createZone(
-                zone.x * width, zone.y * height, zone.w * width, zone.h * height,
-                zone.map, zone.fontSize
-            );
+            RedactionManager.createZone(zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize);
         });
         RedactionManager.refreshContent();
     }
 }
 
-// --- REDACTION MANAGER (MODULAR INSPECTOR) ---
 class RedactionManager {
     static activeBox = null;
     static zones = []; 
@@ -435,25 +528,16 @@ class RedactionManager {
     static createZone(x, y, w, h, mapKey, fontSize = 14) {
         const layer = document.querySelector('.redaction-layer');
         if(!layer) return;
-
         const box = document.createElement('div');
         box.className = 'redaction-box';
-        box.style.left = x + 'px';
-        box.style.top = y + 'px';
-        box.style.width = w + 'px';
-        box.style.height = h + 'px';
-        
-        // Individual Properties
+        box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
         box.dataset.map = mapKey || 'custom';
         box.style.fontSize = fontSize + 'px';
-        box.style.fontFamily = "'Courier New', monospace"; // Default
-        
+        box.style.fontFamily = "'Courier New', monospace"; 
         const handle = document.createElement('div');
         handle.className = 'redaction-resize-handle';
         box.appendChild(handle);
-
         box.onmousedown = (e) => this.selectZone(e, box);
-        
         layer.appendChild(box);
         this.zones.push(box);
         return box;
@@ -464,17 +548,10 @@ class RedactionManager {
         if(this.activeBox) this.activeBox.classList.remove('selected');
         this.activeBox = box;
         box.classList.add('selected');
-        
-        // ENABLE CONTROLS & SYNC VALUES
         document.getElementById('editor-controls').classList.remove('disabled-overlay');
         document.getElementById('zone-map-select').value = box.dataset.map;
-        
-        // SYNC FONT CONTROLS TO ACTIVE BOX
-        const currentSize = parseInt(box.style.fontSize) || 14;
-        document.getElementById('redact-size').value = currentSize;
-        
-        const currentFont = box.style.fontFamily.replace(/"/g, "'");
-        document.getElementById('redact-font').value = currentFont;
+        document.getElementById('redact-size').value = parseInt(box.style.fontSize) || 14;
+        document.getElementById('redact-font').value = box.style.fontFamily.replace(/"/g, "'");
     }
 
     static deselect() {
@@ -485,11 +562,8 @@ class RedactionManager {
 
     static updateActiveStyle() {
         if(!this.activeBox) return;
-        const font = document.getElementById('redact-font').value;
-        const size = document.getElementById('redact-size').value;
-        
-        this.activeBox.style.fontFamily = font;
-        this.activeBox.style.fontSize = size + 'px';
+        this.activeBox.style.fontFamily = document.getElementById('redact-font').value;
+        this.activeBox.style.fontSize = document.getElementById('redact-size').value + 'px';
     }
 
     static mapSelectedZone() {
@@ -507,8 +581,6 @@ class RedactionManager {
             else if(map === 'job') text = ctx.job;
             else if(map === 'date') text = ctx.date;
             else if(map === 'stage') text = ctx.stage;
-            
-            // Retain handle
             box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`;
         });
     }
@@ -521,71 +593,13 @@ class RedactionManager {
     }
 }
 
-// --- PDF VIEWER (INTEGRATED) ---
-class PdfViewer {
-    static doc = null;
-    static currentWrapper = null; 
-
-    static async load(url) {
-        document.getElementById('pdf-fallback').style.display = 'none';
-        document.getElementById('pdf-toolbar').style.display = 'flex';
-        document.getElementById('custom-pdf-viewer').style.display = 'flex';
-        document.getElementById('pdf-viewer-frame').style.display = 'none';
-        try {
-            const task = pdfjsLib.getDocument(url);
-            this.doc = await task.promise;
-            this.renderPage(1); 
-        } catch(e) { console.warn(e); }
-    }
-
-    static async renderPage(num) {
-        const container = document.getElementById('pdf-main-view');
-        container.innerHTML = ''; 
-        const page = await this.doc.getPage(num);
-        const viewport = page.getViewport({ scale: 1.3 }); 
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'pdf-page-wrapper';
-        wrapper.style.width = Math.floor(viewport.width) + "px";
-        wrapper.style.height = Math.floor(viewport.height) + "px";
-        this.currentWrapper = wrapper;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        wrapper.appendChild(canvas);
-
-        const rLayer = document.createElement('div');
-        rLayer.className = 'redaction-layer';
-        if(document.getElementById('redaction-editor').classList.contains('active')) rLayer.classList.add('editing');
-        wrapper.appendChild(rLayer);
-
-        container.appendChild(wrapper);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-
-        if(DemoManager.isActive) { setTimeout(() => LayoutScanner.autoScan(), 500); }
-    }
-    
-    static zoom(delta) {} // Simplified
-    static print() { if(this.url) window.open(this.url, '_blank'); }
-    static async renderSidebar() {} // Simplified
-    static async renderMobileStack() {} // Simplified
-}
-
-// --- STANDARD APP LOGIC (RESTORED) ---
+// --- STANDARD APP LOGIC ---
 
 class DB {
     static open() { 
         return new Promise((r, j) => { 
             const q = indexedDB.open("CoxSchematicDB", 8); 
-            q.onupgradeneeded = e => { 
-                const d = e.target.result; 
-                if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); 
-                if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); 
-                d.createObjectStore("chunks"); 
-            }; 
+            q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; 
             q.onsuccess = e => r(e.target.result); 
             q.onerror = e => j(e); 
         }); 
@@ -623,11 +637,7 @@ class CacheService {
                     const dec = await this.dec(chunk);
                     if(dec) {
                         const data = JSON.parse(dec);
-                        data.forEach(r => {
-                            window.LOCAL_DB.push(r);
-                            window.ID_MAP.set(r.id, r);
-                            if(r.mfg) window.FOUND_MFGS.add(r.mfg);
-                        });
+                        data.forEach(r => { window.LOCAL_DB.push(r); window.ID_MAP.set(r.id, r); if(r.mfg) window.FOUND_MFGS.add(r.mfg); });
                     }
                 } catch(e) {}
             }
@@ -704,27 +714,15 @@ class TheHealer {
             const data = await resp.json();
             if(data.records) {
                 const tallies = {};
-                data.records.forEach(r => {
-                    const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`;
-                    tallies[key] = (tallies[key] || 0) + 1;
-                });
-                for (const [key, count] of Object.entries(tallies)) {
-                    if (count >= CONFIG.voteThreshold) {
-                        const [id, param, value] = key.split('|');
-                        if (!this.healedData[id]) this.healedData[id] = {};
-                        this.healedData[id][param] = value;
-                    }
-                }
+                data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; });
+                for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } }
             }
         } catch(e) { console.error("Healing Failed", e); }
     }
 }
 
 class NaiveBayes {
-    static tokenMap = {}; 
-    static categoryCounts = {};
-    static totalDocs = 0;
-    static vocabSize = 0;
+    static tokenMap = {}; static categoryCounts = {}; static totalDocs = 0; static vocabSize = 0;
     static tokenize(text) { return text.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(t => t.length > 2); }
     static train(data) {
         this.tokenMap = {}; this.categoryCounts = {}; this.totalDocs = 0;
@@ -733,11 +731,7 @@ class NaiveBayes {
             const cat = r.mfg; const tokens = this.tokenize(r.desc || "");
             if (!this.categoryCounts[cat]) this.categoryCounts[cat] = { count: 0, docCount: 0 };
             this.categoryCounts[cat].docCount++; this.totalDocs++;
-            tokens.forEach(t => {
-                if (!this.tokenMap[t]) this.tokenMap[t] = {};
-                if (!this.tokenMap[t][cat]) this.tokenMap[t][cat] = 0;
-                this.tokenMap[t][cat]++; this.categoryCounts[cat].count++;
-            });
+            tokens.forEach(t => { if (!this.tokenMap[t]) this.tokenMap[t] = {}; if (!this.tokenMap[t][cat]) this.tokenMap[t][cat] = 0; this.tokenMap[t][cat]++; this.categoryCounts[cat].count++; });
         });
         this.vocabSize = Object.keys(this.tokenMap).length;
     }
@@ -759,11 +753,7 @@ class AIParser {
         t = (t||"").toUpperCase();
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
         if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
-        if (!s.hp) { 
-            let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); 
-            if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); 
-            if(m) s.hp = parseFloat(m[1]).toString(); 
-        }
+        if (!s.hp) { let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); if(m) s.hp = parseFloat(m[1]).toString(); }
         if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
         if (!s.phase) { if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; }
         return s;
@@ -779,7 +769,10 @@ class DataLoader {
         if(attempts > 2) { btn.innerText = "⚠️ SYNC INTERRUPTED (RETRY?)"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
         localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
         const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
-        if(hasData) { NaiveBayes.train(window.LOCAL_DB); UI.pop(); if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; return; } else { btn.innerText = "⬇️ RESUMING..."; } } else { btn.innerText = "⬇️ SYNCING..."; }
+        if(hasData) { 
+            setTimeout(() => NaiveBayes.train(window.LOCAL_DB), 10); // Train in background
+            UI.pop(); if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; return; } else { btn.innerText = "⬇️ RESUMING..."; } 
+        } else { btn.innerText = "⬇️ SYNCING..."; }
         await new Promise(r => setTimeout(r, 50)); await TheHealer.fetchAndTally(); await this.fetchPartition('desc', btn);
         localStorage.setItem('cox_sync_attempts', '0'); if(btn.innerText.includes("SYNCING") || btn.innerText.includes("RESUMING") || btn.innerText.includes("FINALIZING") || btn.disabled) { btn.innerText = "SEARCH"; btn.disabled = false; } UI.pop();
     }
@@ -806,7 +799,7 @@ class DataLoader {
                 offset = d.offset;
             } while(offset);
             if(buffer.length > 0) { if(btn) btn.innerText = "✅ FINALIZING..."; await new Promise(resolve => { requestAnimationFrame(() => { setTimeout(resolve, 50); }); }); await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
-            NaiveBayes.train(window.LOCAL_DB);
+            setTimeout(() => NaiveBayes.train(window.LOCAL_DB), 10);
         } catch(e) { console.error("Sync Critical Error", e); } finally { if(btn && !btn.classList.contains('warning')) { btn.innerText = "SEARCH"; btn.disabled = false; } }
     }
     static harvestCSV() { alert('Harvesting...'); }
