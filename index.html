@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.30)</title>
+    <title>Cox Research | SCHEMATICai (v22.31)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-    
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
     
@@ -87,7 +86,6 @@
         html.logged-in #app-container { display: flex !important; }
         #sidebar { width: 320px; min-width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; position: relative; }
         
-        /* SEARCH CONTROLS */
         .sidebar-controls { padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
         .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
         #refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
@@ -137,27 +135,32 @@
             font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size:1.2em;
         }
 
-        .redaction-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; cursor: crosshair; }
-        body.demo-mode .redaction-layer { display: block; }
+        .redaction-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; display: none; cursor: crosshair; pointer-events: auto; }
+        
+        /* FIX: FORCE VISIBILITY IN DEMO MODE */
+        body.demo-mode .redaction-layer { display: block !important; }
+        
         .redaction-box {
             position: absolute;
             background: var(--redaction-fill);
             color: var(--cad-text);
             font-size: 14px; font-family: 'Courier New', monospace; font-weight: bold;
             display: flex; align-items: center; justify-content: center; text-align: center;
-            overflow: hidden; cursor: move; z-index: 15; user-select: none;
+            overflow: hidden; cursor: move; z-index: 55; user-select: none;
+            border: 2px solid var(--redaction-outline); /* Always visible in demo mode */
         }
-        .redaction-layer.editing .redaction-box { border: 2px solid var(--redaction-outline); }
-        .redaction-box.selected { border: 2px dashed blue !important; z-index: 20; }
+        .redaction-box.selected { border: 2px dashed blue !important; z-index: 60; }
         .redaction-resize-handle {
             width: 12px; height: 12px; background: var(--redaction-outline);
-            position: absolute; bottom: 0; right: 0; cursor: nwse-resize; display: none;
+            position: absolute; bottom: 0; right: 0; cursor: nwse-resize; display: block;
         }
-        .redaction-layer.editing .redaction-resize-handle { display: block; }
 
         /* REDACTION EDITOR SIDEBAR */
         #redaction-editor { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-sidebar); z-index: 30; display: none; flex-direction: column; padding: 15px; border-right: 1px solid var(--border-color); }
-        #redaction-editor.active { display: flex; }
+        
+        /* FIX: FORCE EDITOR VISIBILITY */
+        body.demo-mode #redaction-editor { display: flex !important; }
+        
         .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
         .editor-title { font-weight: 800; color: var(--app-primary); text-transform: uppercase; }
         .editor-section { margin-bottom: 15px; }
@@ -201,7 +204,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.30</div>
+    <div class="version-badge">SCHEMATICai v22.31</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -311,7 +314,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.30 (FIXED TOGGLE & SYNC) ---
+// --- SCHEMATICai v22.31 (FIXED SIDEBAR & INSTANT REDACTION) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -321,7 +324,6 @@ const AI_TRAINING_DATA = {
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
-// --- UTILS ---
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -349,87 +351,42 @@ class NetworkService {
     static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') } }); }
 }
 
-// --- PDF EXPORTER ---
 class PdfExporter {
     static async export() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
         const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
-        const origText = btn.innerText;
-        btn.innerText = "⏳ PROCESSING...";
-        btn.disabled = true;
-
+        const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
         try {
             const existingPdfBytes = await fetch(PdfViewer.url).then(res => res.arrayBuffer());
             const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
             const pages = pdfDoc.getPages();
             const watermarkText = document.getElementById('watermark-input').value;
-
             pages.forEach((page, index) => {
-                const pdfWidth = page.getWidth();
-                const pdfHeight = page.getHeight();
-
+                const pdfWidth = page.getWidth(); const pdfHeight = page.getHeight();
                 if (watermarkText) {
-                    page.drawText(watermarkText, {
-                        x: pdfWidth / 4, y: pdfHeight / 2,
-                        size: 50,
-                        opacity: 0.2,
-                        rotate: PDFLib.degrees(45),
-                        color: PDFLib.rgb(0.7, 0.7, 0.7)
-                    });
+                    page.drawText(watermarkText, { x: pdfWidth/4, y: pdfHeight/2, size: 50, opacity: 0.2, rotate: PDFLib.degrees(45), color: PDFLib.rgb(0.7,0.7,0.7) });
                 }
-
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
                 if (wrapper) {
                     const zones = wrapper.querySelectorAll('.redaction-box');
                     zones.forEach(box => {
-                        const relX = box.offsetLeft / wrapper.offsetWidth;
-                        const relY = box.offsetTop / wrapper.offsetHeight;
-                        const relW = box.offsetWidth / wrapper.offsetWidth;
-                        const relH = box.offsetHeight / wrapper.offsetHeight;
-
-                        const drawX = relX * pdfWidth;
-                        const drawH = relH * pdfHeight;
-                        const drawY = pdfHeight - (relY * pdfHeight) - drawH; 
-                        const drawW = relW * pdfWidth;
-
-                        page.drawRectangle({
-                            x: drawX, y: drawY, width: drawW, height: drawH,
-                            color: PDFLib.rgb(1, 1, 1),
-                            borderColor: PDFLib.rgb(1, 1, 1),
-                            borderWidth: 1,
-                        });
-
+                        const relX = box.offsetLeft / wrapper.offsetWidth; const relY = box.offsetTop / wrapper.offsetHeight;
+                        const relW = box.offsetWidth / wrapper.offsetWidth; const relH = box.offsetHeight / wrapper.offsetHeight;
+                        const drawX = relX * pdfWidth; const drawH = relH * pdfHeight;
+                        const drawY = pdfHeight - (relY * pdfHeight) - drawH; const drawW = relW * pdfWidth;
+                        page.drawRectangle({ x: drawX, y: drawY, width: drawW, height: drawH, color: PDFLib.rgb(1,1,1), borderColor: PDFLib.rgb(1,1,1), borderWidth: 1 });
                         const text = box.querySelector('span')?.innerText || "";
-                        if (text) {
-                            page.drawText(text, {
-                                x: drawX + 2,
-                                y: drawY + (drawH / 2) - 4, 
-                                size: 12,
-                                color: PDFLib.rgb(0, 0, 0)
-                            });
-                        }
+                        if (text) { page.drawText(text, { x: drawX+2, y: drawY+(drawH/2)-4, size: 12, color: PDFLib.rgb(0,0,0) }); }
                     });
                 }
             });
-
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `redacted_${new Date().getTime()}.pdf`;
-            link.click();
-
-        } catch (e) {
-            console.error("Export Failed", e);
-            alert("Export Failed: " + e.message);
-        } finally {
-            btn.innerText = origText;
-            btn.disabled = false;
-        }
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `redacted_${new Date().getTime()}.pdf`; link.click();
+        } catch (e) { alert("Export Failed: " + e.message); } finally { btn.innerText = origText; btn.disabled = false; }
     }
 }
 
-// --- PDF VIEWER ---
 class PdfViewer {
     static doc = null; static currentScale = 1.3; static url = "";
     static async load(url) {
@@ -438,11 +395,9 @@ class PdfViewer {
         document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
         try { const task = pdfjsLib.getDocument(url); this.doc = await task.promise; this.renderStack(); } catch(e) {}
     }
-    
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
-        
         for (let i = 1; i <= this.doc.numPages; i++) {
             await new Promise(r => setTimeout(r, 10)); 
             const page = await this.doc.getPage(i); const viewport = page.getViewport({ scale: this.currentScale });
@@ -452,13 +407,13 @@ class PdfViewer {
             const canvas = document.createElement('canvas'); canvas.className = 'pdf-page-canvas';
             canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%"; canvas.style.height = "100%";
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
-            if(document.getElementById('redaction-editor').classList.contains('active')) rLayer.classList.add('editing');
+            // Force editing class if demo active, handled via CSS now too but safer here
+            if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
             
             rLayer.onmousemove = (e) => RedactionManager.handleDrag(e); rLayer.onmouseup = () => RedactionManager.endDrag();
             wrapper.appendChild(canvas); wrapper.appendChild(rLayer); container.appendChild(wrapper);
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
         }
-        // KEEP: Scan triggers on new PDF load if demo active
         if(DemoManager.isActive) { setTimeout(() => LayoutScanner.scanAllPages(), 500); }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
@@ -478,27 +433,18 @@ class DemoManager {
         this.isActive = !this.isActive;
         const btn = document.getElementById('demo-btn');
         const dateInput = document.getElementById('demo-date');
-        
         if(this.isActive) { 
-            // TURN ON
             document.body.classList.add('demo-mode'); 
             btn.classList.add('active-mode'); 
             document.getElementById('demo-settings-area').style.display = 'block'; 
             if(!dateInput.value) dateInput.valueAsDate = new Date();
-            
-            // KEY FIXES:
-            // 1. Force Inspector Open immediately
-            RedactionEditor.open();
-            
-            // 2. Scan immediately if doc exists
-            if(PdfViewer.doc) { LayoutScanner.scanAllPages(); }
-            
+            // FIX: INSTANT TRIGGER
+            if(PdfViewer.doc) LayoutScanner.scanAllPages();
         } else { 
-            // TURN OFF
             document.body.classList.remove('demo-mode'); 
             btn.classList.remove('active-mode'); 
             document.getElementById('demo-settings-area').style.display = 'none'; 
-            RedactionEditor.close();
+            RedactionEditor.close(); // Clears selection
         }
     }
     static getContext() {
@@ -512,8 +458,7 @@ class DemoManager {
 }
 
 class RedactionEditor {
-    static open() { document.getElementById('config-modal').classList.remove('active-modal'); document.getElementById('redaction-editor').classList.add('active'); document.querySelectorAll('.redaction-layer').forEach(el => el.classList.add('editing')); }
-    static close() { document.getElementById('redaction-editor').classList.remove('active'); document.querySelectorAll('.redaction-layer').forEach(el => el.classList.remove('editing')); RedactionManager.deselect(); }
+    static close() { RedactionManager.deselect(); }
 }
 
 const LAYOUT_RULES = {
@@ -688,38 +633,19 @@ class DataLoader {
             UI.pop(); if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; return; } else { btn.innerText = "⬇️ RESUMING..."; } 
         } else { btn.innerText = "⬇️ SYNCING..."; }
         await new Promise(r => setTimeout(r, 50)); await TheHealer.fetchAndTally(); await this.fetchPartition('desc', btn);
-        
-        requestAnimationFrame(() => {
-            btn.innerText = "✅ FINALIZING...";
-            localStorage.setItem('cox_sync_attempts', '0'); 
-            setTimeout(() => {
-                NaiveBayes.trainAsync(window.LOCAL_DB).then(() => {
-                    btn.innerText = "SEARCH"; btn.disabled = false;
-                });
-            }, 100);
-        });
-        UI.pop();
+        requestAnimationFrame(() => { btn.innerText = "✅ FINALIZING..."; localStorage.setItem('cox_sync_attempts', '0'); setTimeout(() => { NaiveBayes.trainAsync(window.LOCAL_DB).then(() => { btn.innerText = "SEARCH"; btn.disabled = false; }); }, 100); }); UI.pop();
     }
-    
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0; let buffer = []; let shardCount = 0;
         try {
             do {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break;
-                // FIX: Yield thread to let UI update
-                await new Promise(r => setTimeout(r, 0)); 
-                
-                if(btn && !btn.classList.contains('warning')) { 
-                    const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); 
-                    if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; 
-                }
-                
+                await new Promise(r => setTimeout(r, 0)); // YIELD THREAD
+                if(btn && !btn.classList.contains('warning')) { const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; }
                 const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
                 if(r.status!==200) { console.error("Sync Failed", r.status); break; }
                 const d = await r.json(); 
-                
                 if(!d.records || d.records.length === 0) { localStorage.setItem('cox_db_complete', 'true'); break; }
-                
                 d.records.forEach(r => {
                     const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                     const url = r.fields['Control Panel PDF']?.[0]?.url;
@@ -729,13 +655,10 @@ class DataLoader {
                         window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); buffer.push(rec);
                     }
                 });
-                
                 if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset;
             } while(offset);
-            
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
-            
         } catch(e) { console.error("Sync Critical Error", e); } 
     }
     static harvestCSV() { alert('Harvesting...'); }
