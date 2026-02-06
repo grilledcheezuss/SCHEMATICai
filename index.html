@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.35)</title>
+    <title>Cox Research | SCHEMATICai (v22.37)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -83,48 +83,47 @@
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; overflow: hidden; }
         .control-btn.active-mode { background: #166534; color:white; border-color: #166534; box-shadow: 0 0 8px #166534; }
 
-        /* --- LAYOUT CONTAINER (3-COLUMN FLEX) --- */
         #app-container { display: none; flex: 1; overflow: hidden; position: relative; flex-direction: row; }
         html.logged-in #app-container { display: flex !important; }
         
-        /* LEFT SIDEBAR (SEARCH) */
+        /* SIDEBARS */
         #sidebar-left { 
             width: var(--sidebar-width); min-width: 250px; 
             background: var(--bg-sidebar); border-right: 1px solid var(--border-color); 
             display: flex; flex-direction: column; z-index: 20; 
             transition: all 0.3s ease; 
             overflow: hidden;
+            flex-shrink: 0; 
         }
         #sidebar-left.collapsed { width: 0; min-width: 0; border: none; }
 
-        /* RIGHT SIDEBAR (REDACTION) */
         #sidebar-right {
             width: 0; min-width: 0; 
             background: var(--bg-sidebar); border-left: 1px solid var(--border-color);
             display: flex; flex-direction: column; z-index: 20;
             transition: all 0.3s ease;
             overflow: hidden;
+            flex-shrink: 0;
         }
         body.demo-mode #sidebar-right { width: var(--sidebar-width); min-width: 250px; }
         body.demo-mode #sidebar-right.collapsed { width: 0 !important; min-width: 0 !important; border: none; }
 
-        /* TOGGLE BUTTONS (Now Siblings, not Children) */
+        /* TOGGLE BUTTONS */
         .collapse-btn {
             width: 20px;
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; z-index: 30; font-weight: bold; color: var(--text-secondary);
+            cursor: pointer; z-index: 100; font-weight: bold; color: var(--text-secondary);
             transition: 0.3s;
+            flex-shrink: 0; 
         }
         .collapse-btn:hover { background: var(--bg-app); color: var(--app-primary); }
         
-        #toggle-left { border-left: none; border-radius: 0 4px 4px 0; margin-right: 2px; }
-        #toggle-right { border-right: none; border-radius: 4px 0 0 4px; margin-left: 2px; display: none; }
+        #toggle-left { border-left: none; border-radius: 0 4px 4px 0; margin-right: 0; }
+        #toggle-right { border-right: none; border-radius: 4px 0 0 4px; margin-left: 0; display: none; }
         body.demo-mode #toggle-right { display: flex; }
 
-        
-        /* CONTENT STYLES */
         .sidebar-controls { padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
         .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
         #refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
@@ -184,7 +183,7 @@
             display: flex; align-items: center; justify-content: center; text-align: center;
             overflow: hidden; cursor: grab; z-index: 55; user-select: none;
             border: 2px solid var(--redaction-outline);
-            pointer-events: auto; 
+            pointer-events: auto;
         }
         .redaction-box:active { cursor: grabbing; }
         .redaction-layer.editing .redaction-box { border: 2px solid var(--redaction-outline); }
@@ -195,9 +194,7 @@
             pointer-events: auto;
         }
 
-        /* REDACTION EDITOR CONTENT */
         #redaction-editor-content { display: flex; flex-direction: column; padding: 15px; height: 100%; width: var(--sidebar-width); }
-        
         .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
         .editor-title { font-weight: 800; color: var(--app-primary); text-transform: uppercase; }
         .editor-section { margin-bottom: 15px; }
@@ -232,6 +229,7 @@
     <div class="config-card">
         <h3>🛠️ Settings</h3>
         <button class="search-btn" onclick="DataLoader.harvestCSV()">📥 Harvest CSV</button>
+        <button class="search-btn" style="background:#555; margin-top:8px;" onclick="DataLoader.resetSync()">🔄 Force Reset Sync</button>
         <button class="search-btn" style="background:var(--status-error); margin-top:8px; border:1px solid #991b1b; font-weight:800;" onclick="AuthService.logout()">⏻ LOGOUT</button>
         <div style="margin-top:10px;"><button class="search-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
     </div>
@@ -239,7 +237,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.35</div>
+    <div class="version-badge">SCHEMATICai v22.37</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -356,7 +354,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.35 (FIXED TOGGLE VISIBILITY) ---
+// --- SCHEMATICai v22.37 (CORS PROXY FIX + RESILIENT LAYOUT) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -399,7 +397,10 @@ class PdfExporter {
         const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
         const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
         try {
-            const existingPdfBytes = await fetch(PdfViewer.url).then(res => res.arrayBuffer());
+            // FIX: Use Proxied URL to avoid CORS
+            const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(PdfViewer.url)}`;
+            const existingPdfBytes = await fetch(proxyUrl).then(res => res.arrayBuffer());
+            
             const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
             const pages = pdfDoc.getPages();
             const watermarkText = document.getElementById('watermark-input').value;
@@ -435,7 +436,13 @@ class PdfViewer {
         this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; document.getElementById('pdf-toolbar').style.display = 'flex';
         document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
-        try { const task = pdfjsLib.getDocument(url); this.doc = await task.promise; this.renderStack(); } catch(e) {}
+        try {
+            // FIX: PROXY REQUEST VIA WORKER
+            const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
+            const task = pdfjsLib.getDocument(proxyUrl);
+            this.doc = await task.promise; 
+            this.renderStack(); 
+        } catch(e) { console.error("PDF Load Error", e); }
     }
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
@@ -449,7 +456,6 @@ class PdfViewer {
             const canvas = document.createElement('canvas'); canvas.className = 'pdf-page-canvas';
             canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%"; canvas.style.height = "100%";
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
-            // DEMO VISIBILITY IS NOW HANDLED BY CSS, BUT WE ENSURE EDIT CLASS
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
             
             rLayer.onmousemove = (e) => RedactionManager.handleDrag(e); rLayer.onmouseup = () => RedactionManager.endDrag();
@@ -475,19 +481,14 @@ class DemoManager {
         this.isActive = !this.isActive;
         const btn = document.getElementById('demo-btn');
         const dateInput = document.getElementById('demo-date');
-        
         if(this.isActive) { 
-            // ACTIVE: Add Class, Show Sidebar, Run Scan
             document.body.classList.add('demo-mode'); 
             btn.classList.add('active-mode'); 
             document.getElementById('sidebar-right').classList.remove('collapsed');
             document.getElementById('toggle-right').innerText = '›';
-            
             if(!dateInput.value) dateInput.valueAsDate = new Date();
             if(PdfViewer.doc) LayoutScanner.scanAllPages();
-            
         } else { 
-            // INACTIVE: Remove Class, Hide Sidebar, Clear
             document.body.classList.remove('demo-mode'); 
             btn.classList.remove('active-mode'); 
             document.getElementById('sidebar-right').classList.add('collapsed');
@@ -675,7 +676,7 @@ class DataLoader {
         await new Promise(r => setTimeout(r, 200)); 
         const p = localStorage.getItem('cox_pass'); await CacheService.prepareKey(p); await DB.deleteLegacy();
         let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
-        if(attempts > 2) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
+        if(attempts > 5) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
         localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
         const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
         if(hasData) { 
@@ -693,19 +694,15 @@ class DataLoader {
                 btn.innerText = "⬇️ RESUMING..."; 
             } 
         } else { btn.innerText = "⬇️ SYNCING..."; }
-        
         await new Promise(r => setTimeout(r, 50)); await TheHealer.fetchAndTally(); await this.fetchPartition('desc', btn);
-        
-        requestAnimationFrame(() => {
-            btn.innerText = "✅ FINALIZING...";
-            localStorage.setItem('cox_sync_attempts', '0'); 
-            setTimeout(() => {
-                NaiveBayes.trainAsync(window.LOCAL_DB).then(() => {
-                    btn.innerText = "SEARCH"; btn.disabled = false;
-                });
-            }, 100);
-        });
-        UI.pop();
+        requestAnimationFrame(() => { btn.innerText = "✅ FINALIZING..."; localStorage.setItem('cox_sync_attempts', '0'); setTimeout(() => { NaiveBayes.trainAsync(window.LOCAL_DB).then(() => { btn.innerText = "SEARCH"; btn.disabled = false; }); }, 100); }); UI.pop();
+    }
+    
+    // FIX: ADDED RESET METHOD FOR UI BUTTON
+    static resetSync() {
+        localStorage.removeItem('cox_db_complete');
+        localStorage.setItem('cox_sync_attempts', '0');
+        location.reload();
     }
     
     static async fetchPartition(dir, btn) {
@@ -731,7 +728,6 @@ class DataLoader {
                 if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset;
             } while(offset);
-            
             localStorage.setItem('cox_db_complete', 'true'); 
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
         } catch(e) { console.error("Sync Critical Error", e); } 
@@ -768,7 +764,6 @@ class UI {
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
     
-    // --- SIDEBAR TOGGLES (UPDATED FOR SIBLINGS) ---
     static toggleLeftSidebar() {
         const sidebar = document.getElementById('sidebar-left');
         const btn = document.getElementById('toggle-left');
