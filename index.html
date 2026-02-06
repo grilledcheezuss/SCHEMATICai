@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.38)</title>
+    <title>Cox Research | SCHEMATICai (v22.39)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -237,7 +237,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.38</div>
+    <div class="version-badge">SCHEMATICai v22.39</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -354,7 +354,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.38 (AUTHENTICATED PDF PROXY) ---
+// --- SCHEMATICai v22.39 (BLOB FETCH STRATEGY) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -385,7 +385,6 @@ class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
     static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
-    // EXPORT HELPER
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 
@@ -399,10 +398,8 @@ class PdfExporter {
         const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
         const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
         try {
-            // FIX: PROXY + AUTH HEADERS
-            const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(PdfViewer.url)}`;
-            const existingPdfBytes = await fetch(proxyUrl, { headers: AuthService.headers() }).then(res => res.arrayBuffer());
-            
+            // RE-USE CACHED BYTES IF POSSIBLE OR FETCH AGAIN
+            const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
             const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
             const pages = pdfDoc.getPages();
             const watermarkText = document.getElementById('watermark-input').value;
@@ -432,27 +429,39 @@ class PdfExporter {
     }
 }
 
+// --- PDF VIEWER (BLOB STRATEGY) ---
 class PdfViewer {
-    static doc = null; static currentScale = 1.3; static url = "";
+    static doc = null; static currentScale = 1.3; static url = ""; static currentBlobUrl = "";
+    
     static async load(url) {
         this.url = url;
-        document.getElementById('pdf-fallback').style.display = 'none'; document.getElementById('pdf-toolbar').style.display = 'flex';
-        document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
+        document.getElementById('pdf-fallback').style.display = 'none'; 
+        document.getElementById('pdf-toolbar').style.display = 'flex';
+        document.getElementById('custom-pdf-viewer').style.display = 'flex'; 
+        document.getElementById('pdf-viewer-frame').style.display = 'none';
+        
         try { 
+            // 1. FETCH AS BLOB MANUALLY (To avoid CORS & 400 errors from pdf.js ranges)
             const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
-            // FIX: AUTH HEADERS FOR PDF.JS
-            const task = pdfjsLib.getDocument({
-                url: proxyUrl,
-                httpHeaders: AuthService.headers(),
-                withCredentials: false
-            });
+            const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+            
+            if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
+            
+            const blob = await resp.blob();
+            this.currentBlobUrl = URL.createObjectURL(blob);
+            
+            // 2. LOAD BLOB URL INTO PDF.JS
+            const task = pdfjsLib.getDocument(this.currentBlobUrl);
             this.doc = await task.promise; 
             this.renderStack(); 
+            
         } catch(e) { 
             console.error("PDF Load Error", e);
-            document.getElementById('pdf-fallback').style.display = 'block'; // Show fallback on auth error
+            document.getElementById('pdf-fallback').innerHTML = `<div>⚠️ Failed to load PDF (${e.message})</div><a href="${url}" target="_blank">Open Original</a>`;
+            document.getElementById('pdf-fallback').style.display = 'block'; 
         }
     }
+    
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
@@ -707,7 +716,6 @@ class DataLoader {
         requestAnimationFrame(() => { btn.innerText = "✅ FINALIZING..."; localStorage.setItem('cox_sync_attempts', '0'); setTimeout(() => { NaiveBayes.trainAsync(window.LOCAL_DB).then(() => { btn.innerText = "SEARCH"; btn.disabled = false; }); }, 100); }); UI.pop();
     }
     
-    // FIX: ADDED RESET METHOD FOR UI BUTTON
     static resetSync() {
         localStorage.removeItem('cox_db_complete');
         localStorage.setItem('cox_sync_attempts', '0');
