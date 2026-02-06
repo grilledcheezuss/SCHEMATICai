@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.34)</title>
+    <title>Cox Research | SCHEMATICai (v22.35)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -83,7 +83,7 @@
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; overflow: hidden; }
         .control-btn.active-mode { background: #166534; color:white; border-color: #166534; box-shadow: 0 0 8px #166534; }
 
-        /* --- LAYOUT CONTAINER (3-COLUMN) --- */
+        /* --- LAYOUT CONTAINER (3-COLUMN FLEX) --- */
         #app-container { display: none; flex: 1; overflow: hidden; position: relative; flex-direction: row; }
         html.logged-in #app-container { display: flex !important; }
         
@@ -92,40 +92,36 @@
             width: var(--sidebar-width); min-width: 250px; 
             background: var(--bg-sidebar); border-right: 1px solid var(--border-color); 
             display: flex; flex-direction: column; z-index: 20; 
-            transition: width 0.3s ease, transform 0.3s ease; 
-            position: relative; 
+            transition: all 0.3s ease; 
+            overflow: hidden;
         }
-        #sidebar-left.collapsed { width: 0; min-width: 0; overflow: hidden; border-right: none; }
+        #sidebar-left.collapsed { width: 0; min-width: 0; border: none; }
 
         /* RIGHT SIDEBAR (REDACTION) */
         #sidebar-right {
-            width: 0; min-width: 0; /* Default Hidden */
+            width: 0; min-width: 0; 
             background: var(--bg-sidebar); border-left: 1px solid var(--border-color);
             display: flex; flex-direction: column; z-index: 20;
-            transition: width 0.3s ease, min-width 0.3s ease;
-            position: relative; overflow: hidden;
+            transition: all 0.3s ease;
+            overflow: hidden;
         }
-        body.demo-mode #sidebar-right { width: var(--sidebar-width); min-width: 250px; border-left: 1px solid var(--border-color); }
-        #sidebar-right.collapsed { width: 0 !important; min-width: 0 !important; border-left: none; }
+        body.demo-mode #sidebar-right { width: var(--sidebar-width); min-width: 250px; }
+        body.demo-mode #sidebar-right.collapsed { width: 0 !important; min-width: 0 !important; border: none; }
 
-        /* COLLAPSE TOGGLES */
-        .collapse-toggle {
-            position: absolute; top: 50%; width: 24px; height: 48px;
-            background: var(--app-primary); color: white;
-            border: none; border-radius: 0 4px 4px 0;
+        /* TOGGLE BUTTONS (Now Siblings, not Children) */
+        .collapse-btn {
+            width: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             display: flex; align-items: center; justify-content: center;
-            cursor: pointer; z-index: 50; transform: translateY(-50%);
-            font-weight: bold; font-size: 16px;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            cursor: pointer; z-index: 30; font-weight: bold; color: var(--text-secondary);
+            transition: 0.3s;
         }
-        /* Left Toggle sits on right edge of left sidebar */
-        #left-toggle { right: -24px; border-radius: 0 4px 4px 0; }
-        #sidebar-left.collapsed #left-toggle { right: -24px; border-radius: 0 4px 4px 0; } 
-        /* When collapsed, button stays attached to the zero-width container's edge */
-
-        /* Right Toggle sits on left edge of right sidebar */
-        #right-toggle { left: -24px; border-radius: 4px 0 0 4px; box-shadow: -2px 0 5px rgba(0,0,0,0.1); display: none; }
-        body.demo-mode #right-toggle { display: flex; } /* Only show when demo mode is active */
+        .collapse-btn:hover { background: var(--bg-app); color: var(--app-primary); }
+        
+        #toggle-left { border-left: none; border-radius: 0 4px 4px 0; margin-right: 2px; }
+        #toggle-right { border-right: none; border-radius: 4px 0 0 4px; margin-left: 2px; display: none; }
+        body.demo-mode #toggle-right { display: flex; }
 
         
         /* CONTENT STYLES */
@@ -163,7 +159,6 @@
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 3px; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: 0.2s; }
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
 
-        /* CENTRAL PREVIEW PANE */
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; }
         #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; }
         .pdf-page-wrapper { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: white; margin-bottom: 20px; }
@@ -189,7 +184,7 @@
             display: flex; align-items: center; justify-content: center; text-align: center;
             overflow: hidden; cursor: grab; z-index: 55; user-select: none;
             border: 2px solid var(--redaction-outline);
-            pointer-events: auto; /* ENABLE CLICK ON BOXES ONLY */
+            pointer-events: auto; 
         }
         .redaction-box:active { cursor: grabbing; }
         .redaction-layer.editing .redaction-box { border: 2px solid var(--redaction-outline); }
@@ -201,7 +196,7 @@
         }
 
         /* REDACTION EDITOR CONTENT */
-        #redaction-editor-content { display: flex; flex-direction: column; padding: 15px; height: 100%; }
+        #redaction-editor-content { display: flex; flex-direction: column; padding: 15px; height: 100%; width: var(--sidebar-width); }
         
         .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
         .editor-title { font-weight: 800; color: var(--app-primary); text-transform: uppercase; }
@@ -209,17 +204,7 @@
         .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; }
         .disabled-overlay { opacity: 0.5; pointer-events: none; }
 
-        /* DEMO CONTEXT IN RIGHT SIDEBAR */
-        #demo-context-panel { 
-            display: flex; 
-            padding: 10px;
-            margin-bottom: 15px;
-            background: var(--demo-bg);
-            border: 2px dashed var(--demo-border);
-            border-radius: 8px;
-            flex-direction: column;
-            gap: 6px;
-        }
+        #demo-context-panel { display: flex; padding: 10px; margin-bottom: 15px; background: var(--demo-bg); border: 2px dashed var(--demo-border); border-radius: 8px; flex-direction: column; gap: 6px; }
         .demo-label { font-size: 10px; font-weight: 800; color: var(--app-primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
         .demo-input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--demo-border); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
 
@@ -254,7 +239,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.34</div>
+    <div class="version-badge">SCHEMATICai v22.35</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -278,8 +263,6 @@
 
 <div id="app-container">
     <div id="sidebar-left">
-        <button id="left-toggle" class="collapse-toggle" onclick="UI.toggleLeftSidebar()">‹</button>
-        
         <div id="search-controls" class="sidebar-controls">
             <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" class="cox-input" onkeypress="UI.handleEnter(event)"></div>
             <div class="filter-grid">
@@ -298,6 +281,8 @@
         <div id="results-scroll-area"><div id="results-area"></div></div>
     </div>
     
+    <div id="toggle-left" class="collapse-btn" onclick="UI.toggleLeftSidebar()">‹</div>
+
     <div id="preview-pane">
         <div id="pdf-toolbar">
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)">-</button><span id="pdf-zoom-level">130%</span><button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)">+</button>
@@ -311,9 +296,9 @@
         <div id="pdf-placeholder-text">📄 Select a schematic</div>
     </div>
 
+    <div id="toggle-right" class="collapse-btn" onclick="UI.toggleRightSidebar()">›</div>
+
     <div id="sidebar-right">
-        <button id="right-toggle" class="collapse-toggle" onclick="UI.toggleRightSidebar()">›</button>
-        
         <div id="redaction-editor-content">
             <div class="editor-header">
                 <span class="editor-title">Redaction Inspector</span>
@@ -371,7 +356,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.34 (DUAL SIDEBAR & COLLAPSE) ---
+// --- SCHEMATICai v22.35 (FIXED TOGGLE VISIBILITY) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -381,7 +366,6 @@ const AI_TRAINING_DATA = {
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
-// --- UTILS ---
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -409,7 +393,6 @@ class NetworkService {
     static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') } }); }
 }
 
-// --- PDF EXPORTER ---
 class PdfExporter {
     static async export() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
@@ -446,7 +429,6 @@ class PdfExporter {
     }
 }
 
-// --- PDF VIEWER ---
 class PdfViewer {
     static doc = null; static currentScale = 1.3; static url = "";
     static async load(url) {
@@ -467,6 +449,7 @@ class PdfViewer {
             const canvas = document.createElement('canvas'); canvas.className = 'pdf-page-canvas';
             canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%"; canvas.style.height = "100%";
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
+            // DEMO VISIBILITY IS NOW HANDLED BY CSS, BUT WE ENSURE EDIT CLASS
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
             
             rLayer.onmousemove = (e) => RedactionManager.handleDrag(e); rLayer.onmouseup = () => RedactionManager.endDrag();
@@ -492,19 +475,23 @@ class DemoManager {
         this.isActive = !this.isActive;
         const btn = document.getElementById('demo-btn');
         const dateInput = document.getElementById('demo-date');
+        
         if(this.isActive) { 
+            // ACTIVE: Add Class, Show Sidebar, Run Scan
             document.body.classList.add('demo-mode'); 
             btn.classList.add('active-mode'); 
-            // Show Right Sidebar
             document.getElementById('sidebar-right').classList.remove('collapsed');
+            document.getElementById('toggle-right').innerText = '›';
             
             if(!dateInput.value) dateInput.valueAsDate = new Date();
             if(PdfViewer.doc) LayoutScanner.scanAllPages();
+            
         } else { 
+            // INACTIVE: Remove Class, Hide Sidebar, Clear
             document.body.classList.remove('demo-mode'); 
             btn.classList.remove('active-mode'); 
-            // Hide Right Sidebar
             document.getElementById('sidebar-right').classList.add('collapsed');
+            document.getElementById('toggle-right').innerText = '‹';
             RedactionEditor.close(); 
         }
     }
@@ -781,16 +768,16 @@ class UI {
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
     
-    // --- SIDEBAR TOGGLES ---
+    // --- SIDEBAR TOGGLES (UPDATED FOR SIBLINGS) ---
     static toggleLeftSidebar() {
         const sidebar = document.getElementById('sidebar-left');
-        const btn = document.getElementById('left-toggle');
+        const btn = document.getElementById('toggle-left');
         sidebar.classList.toggle('collapsed');
         btn.innerText = sidebar.classList.contains('collapsed') ? '›' : '‹';
     }
     static toggleRightSidebar() {
         const sidebar = document.getElementById('sidebar-right');
-        const btn = document.getElementById('right-toggle');
+        const btn = document.getElementById('toggle-right');
         sidebar.classList.toggle('collapsed');
         btn.innerText = sidebar.classList.contains('collapsed') ? '‹' : '›';
     }
