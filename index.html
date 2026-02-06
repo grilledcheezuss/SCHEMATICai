@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.12)</title>
+    <title>Cox Research | SCHEMATICai (v22.13)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -30,9 +30,11 @@
             --match-red-bg: #fee2e2; --match-red-text: #991b1b; 
             --match-keyword-bg: #dcfce7; --match-keyword-text: #166534;
             
-            /* DEMO SPECIFIC */
+            /* DEMO & REDACTION */
             --demo-border: #8b5cf6;
             --demo-bg: rgba(139, 92, 246, 0.05);
+            --cad-color: #00ff00; /* Classic CAD Green */
+            --cad-font: 'Consolas', 'Courier New', monospace;
 
             /* HEADER & SAFE AREA VARS */
             --header-base-height: 55px; 
@@ -97,9 +99,9 @@
         
         #sidebar { width: 320px; min-width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; }
         
-        /* DEMO CONTEXT PANEL (NEW) */
+        /* DEMO CONTEXT PANEL */
         #demo-context-panel {
-            display: none; /* Hidden by default */
+            display: none; 
             padding: 10px;
             margin: 10px;
             background: var(--demo-bg);
@@ -130,16 +132,59 @@
         .pdf-tool-btn:hover { background: rgba(255,255,255,0.2); }
         #pdf-zoom-level { color: white; font-size: 12px; font-weight: 600; min-width: 40px; text-align: center; }
 
-        /* CUSTOM VIEWER */
+        /* CUSTOM VIEWER & REDACTION STYLES */
         #custom-pdf-viewer { display: flex; width: 100%; height: 100%; flex-direction: row; }
         #pdf-sidebar { width: 240px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
         
-        /* MOBILE OVERRIDE: STACK LAYOUT */
-        #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); gap: 20px; }
+        /* The container holding the canvas AND the redaction layer */
+        .pdf-page-wrapper {
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+            background: white;
+            margin-bottom: 20px;
+        }
         
-        .pdf-page-container { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: white; }
+        #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); }
+        
         .pdf-page-canvas { display: block; }
         
+        /* REDACTION LAYER */
+        .redaction-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            cursor: crosshair;
+            display: none; /* Hidden unless demo mode */
+        }
+        body.demo-mode .redaction-layer { display: block; }
+
+        .redaction-box {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid var(--cad-color);
+            color: var(--cad-color);
+            font-family: var(--cad-font);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            overflow: hidden;
+            cursor: move;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        
+        .redaction-box.selected {
+            border: 2px dashed white;
+            z-index: 20;
+        }
+        
+        .redaction-resize-handle {
+            width: 8px; height: 8px; background: var(--cad-color);
+            position: absolute; bottom: 0; right: 0;
+            cursor: nwse-resize;
+        }
+
         .pdf-thumb-wrapper { cursor: pointer; position: relative; border: 2px solid transparent; transition: 0.1s; }
         .pdf-thumb-wrapper.active { border-color: var(--app-accent); }
         .pdf-thumb-canvas { width: 100% !important; height: auto !important; display: block; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
@@ -243,7 +288,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.12</div>
+    <div class="version-badge">SCHEMATICai v22.13</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
@@ -271,13 +316,10 @@
     <div id="sidebar">
         <div id="demo-context-panel">
             <div style="margin-bottom:4px; font-weight:800; color:var(--app-primary); text-transform:uppercase;">🔬 Project Context</div>
-            
             <span class="demo-label">Customer Name</span>
             <input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Customer...">
-            
             <span class="demo-label">Job Name</span>
             <input type="text" id="demo-job-name" class="demo-input" placeholder="Enter Job Name...">
-            
             <div style="display:flex; gap:5px;">
                 <div style="flex:1;">
                     <span class="demo-label">Date</span>
@@ -297,7 +339,6 @@
 
         <div id="search-controls" class="sidebar-controls">
             <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" class="cox-input" placeholder="Separate phrases with commas (e.g. Main Pump, 1PH)" onkeypress="UI.handleEnter(event)"></div>
-            
             <div class="filter-grid">
                 <div class="input-group"><span class="input-label">Mfg</span><select id="mfgInput" class="cox-input"><option value="Any">Any</option></select></div>
                 <div class="input-group"><span class="input-label">HP</span><select id="hpInput" class="cox-input"><option value="Any">Any</option></select></div>
@@ -305,7 +346,6 @@
                 <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="Any">Any</option></select></div>
                 <div class="input-group full-width"><span class="input-label">Enclosure</span><select id="encInput" class="cox-input"><option value="Any">Any</option></select></div>
             </div>
-            
             <div style="display:flex; gap:8px; margin-top:5px;">
                 <button class="reset-btn" onclick="UI.resetSearch()">↺</button>
                 <button id="searchBtn" class="search-btn" onclick="SearchEngine.perform()" disabled>INITIALIZING...</button>
@@ -345,34 +385,98 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.12 (INTEGRATED DEMO CONTEXT) ---
+// --- SCHEMATICai v22.13 (REDACTION SCANNER) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- DEMO MANAGER (UPDATED) ---
+// --- DEMO MANAGER ---
 class DemoManager {
     static isActive = false;
-    
     static toggle() {
         this.isActive = !this.isActive;
         const btn = document.getElementById('demo-btn');
         const dateInput = document.getElementById('demo-date');
-        
         if(this.isActive) {
             document.body.classList.add('demo-mode');
             btn.classList.add('active-mode');
-            // Auto-set today's date if empty
-            if(!dateInput.value) {
-                dateInput.valueAsDate = new Date();
-            }
+            if(!dateInput.value) dateInput.valueAsDate = new Date();
         } else {
             document.body.classList.remove('demo-mode');
             btn.classList.remove('active-mode');
         }
     }
+    static getContextData() {
+        return {
+            cust: document.getElementById('demo-cust-name').value || "CUSTOMER",
+            job: document.getElementById('demo-job-name').value || "PROJECT",
+            date: document.getElementById('demo-date').value || new Date().toLocaleDateString(),
+            stage: document.getElementById('demo-stage').value || "Preliminary"
+        };
+    }
 }
 
-// --- PDF VIEWER ---
+// --- REDACTION MANAGER (NEW) ---
+class RedactionManager {
+    static isDrawing = false;
+    static startX = 0; static startY = 0;
+    static activeBox = null;
+
+    static init(layer) {
+        layer.onmousedown = (e) => this.startDraw(e, layer);
+        layer.onmousemove = (e) => this.draw(e);
+        layer.onmouseup = () => this.endDraw();
+    }
+
+    static startDraw(e, layer) {
+        if (!DemoManager.isActive) return;
+        this.isDrawing = true;
+        const rect = layer.getBoundingClientRect();
+        this.startX = e.clientX - rect.left;
+        this.startY = e.clientY - rect.top;
+        
+        const box = document.createElement('div');
+        box.className = 'redaction-box';
+        box.style.left = this.startX + 'px';
+        box.style.top = this.startY + 'px';
+        
+        // AUTO-FILL DATA FROM DEMO PANEL
+        const data = DemoManager.getContextData();
+        box.innerHTML = `<div>${data.cust}<br/><span style="font-size:0.8em; opacity:0.8;">${data.job}</span></div><div class="redaction-resize-handle"></div>`;
+        
+        layer.appendChild(box);
+        this.activeBox = box;
+    }
+
+    static draw(e) {
+        if (!this.isDrawing || !this.activeBox) return;
+        const layer = this.activeBox.parentElement;
+        const rect = layer.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        
+        const width = currentX - this.startX;
+        const height = currentY - this.startY;
+        
+        this.activeBox.style.width = Math.abs(width) + 'px';
+        this.activeBox.style.height = Math.abs(height) + 'px';
+        
+        if (width < 0) this.activeBox.style.left = currentX + 'px';
+        if (height < 0) this.activeBox.style.top = currentY + 'px';
+    }
+
+    static endDraw() {
+        this.isDrawing = false;
+        if(this.activeBox) {
+            // Add click-to-delete or edit logic here later
+            const box = this.activeBox;
+            box.onmousedown = (e) => e.stopPropagation(); // Prevent drawing new box on top
+            box.ondblclick = () => box.remove();
+        }
+        this.activeBox = null;
+    }
+}
+
+// --- PDF VIEWER (UPDATED FOR SCANNER) ---
 class PdfViewer {
     static doc = null;
     static currentScale = 1.3; 
@@ -383,8 +487,6 @@ class PdfViewer {
     static async load(url) {
         this.url = url;
         this.isMobile = window.innerWidth < 768;
-        
-        // AUTO-SCALE
         this.currentScale = this.isMobile ? 0.7 : 1.3;
 
         document.getElementById('pdf-fallback').style.display = 'none';
@@ -420,7 +522,6 @@ class PdfViewer {
         const sidebar = document.getElementById('pdf-sidebar');
         sidebar.innerHTML = '';
         const dpr = window.devicePixelRatio || 1;
-        
         for (let i = 1; i <= this.doc.numPages; i++) {
             const page = await this.doc.getPage(i);
             const wrapper = document.createElement('div');
@@ -431,7 +532,6 @@ class PdfViewer {
                 document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active'));
                 wrapper.classList.add('active');
             };
-            
             const viewport = page.getViewport({ scale: 0.2 }); 
             const outputScale = 0.2 * dpr;
             const canvas = document.createElement('canvas');
@@ -440,10 +540,8 @@ class PdfViewer {
             canvas.height = viewport.height * dpr;
             canvas.style.width = Math.floor(viewport.width) + "px";
             canvas.style.height = Math.floor(viewport.height) + "px";
-            
             const ctx = canvas.getContext('2d');
             page.render({ canvasContext: ctx, viewport: page.getViewport({ scale: outputScale }) });
-            
             const num = document.createElement('div');
             num.className = 'pdf-page-num';
             num.innerText = i;
@@ -453,6 +551,7 @@ class PdfViewer {
         }
     }
 
+    // --- UPDATED RENDER PAGE (SCANNER LOGIC) ---
     static async renderPage(num, autoFit) {
         this.currentPage = num;
         const container = document.getElementById('pdf-main-view');
@@ -471,43 +570,54 @@ class PdfViewer {
         const outputScale = this.currentScale * dpr;
         const viewport = page.getViewport({ scale: this.currentScale });
 
+        // WRAPPER FOR LAYOUT & REDACTION
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pdf-page-wrapper';
+        wrapper.style.width = Math.floor(viewport.width) + "px";
+        wrapper.style.height = Math.floor(viewport.height) + "px";
+
         const canvas = document.createElement('canvas');
+        canvas.className = 'pdf-page-canvas';
         canvas.width = viewport.width * dpr;
         canvas.height = viewport.height * dpr;
-        canvas.style.width = Math.floor(viewport.width) + "px";
-        canvas.style.height = Math.floor(viewport.height) + "px";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+        
+        // REDACTION LAYER
+        const redactionLayer = document.createElement('div');
+        redactionLayer.className = 'redaction-layer';
+        
+        // Init Redaction Tools
+        RedactionManager.init(redactionLayer);
+
+        wrapper.appendChild(canvas);
+        wrapper.appendChild(redactionLayer);
+        container.appendChild(wrapper);
         
         await page.render({ canvasContext: canvas.getContext('2d'), viewport: page.getViewport({ scale: outputScale }) }).promise;
-        container.appendChild(canvas);
     }
 
     static async renderMobileStack() {
         const container = document.getElementById('pdf-main-view');
         container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
-        
         const dpr = window.devicePixelRatio || 1;
         const outputScale = this.currentScale * dpr;
 
         for (let i = 1; i <= this.doc.numPages; i++) {
             await new Promise(r => setTimeout(r, 10));
-            
             const page = await this.doc.getPage(i);
             const viewport = page.getViewport({ scale: this.currentScale });
-            
             const wrapper = document.createElement('div');
             wrapper.className = 'pdf-page-container';
-            
             const canvas = document.createElement('canvas');
             canvas.className = 'pdf-page-canvas';
             canvas.width = viewport.width * dpr;
             canvas.height = viewport.height * dpr;
             canvas.style.width = Math.floor(viewport.width) + "px";
             canvas.style.height = Math.floor(viewport.height) + "px";
-            
             wrapper.appendChild(canvas);
             container.appendChild(wrapper);
-            
             page.render({ canvasContext: canvas.getContext('2d'), viewport: page.getViewport({ scale: outputScale }) });
         }
     }
@@ -515,17 +625,10 @@ class PdfViewer {
     static zoom(delta) {
         this.currentScale += delta;
         if(this.currentScale < 0.2) this.currentScale = 0.2;
-        
-        if(this.isMobile) {
-            this.renderMobileStack();
-        } else {
-            this.renderPage(this.currentPage, false);
-        }
+        if(this.isMobile) { this.renderMobileStack(); } else { this.renderPage(this.currentPage, false); }
     }
     
-    static print() {
-        if(this.url) window.open(this.url, '_blank');
-    }
+    static print() { if(this.url) window.open(this.url, '_blank'); }
 }
 
 class PdfController {
