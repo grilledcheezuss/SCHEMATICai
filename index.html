@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.10)</title>
+    <title>Cox Research | SCHEMATICai (v22.11)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -82,6 +82,7 @@
         .version-badge { position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%); background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 11px; letter-spacing: 1px; white-space: nowrap; pointer-events: none; }
         .header-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; z-index: 2; }
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; overflow: hidden; }
+        .control-btn.active-mode { background: var(--match-green-text); color:white; border-color: var(--match-green-text); box-shadow: 0 0 8px var(--match-green-text); }
 
         /* --- MAIN LAYOUT --- */
         #app-container { display: none; flex: 1; overflow: hidden; position: relative; }
@@ -186,6 +187,30 @@
         .correction-input { display: none; width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; margin-top: 4px; margin-bottom:8px; }
         .reason-btn.selected + .correction-input { display: block; }
 
+        /* --- DEMO MODE LAYER --- */
+        #demo-layer {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-app);
+            z-index: 500;
+            flex-direction: column;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #demo-layer.active { display: flex; }
+        .demo-placeholder {
+            border: 2px dashed var(--border-color);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 20px;
+        }
+
     </style>
 </head>
 <body>
@@ -217,8 +242,9 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.10</div>
+    <div class="version-badge">SCHEMATICai v22.11</div>
     <div class="header-controls">
+        <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <div id="settings-btn-wrapper"><button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button></div>
         <button class="control-btn btn-bug" onclick="FeedbackService.down(null)">🐞</button>
         <button class="control-btn" onclick="UI.toggleDarkMode()">🌓</button>
@@ -241,6 +267,16 @@
 </div>
 
 <div id="app-container">
+    <div id="demo-layer">
+        <h2 style="color: var(--app-primary);">🔬 Research Lab (Demo Mode)</h2>
+        <p style="color: var(--text-secondary);">Experimental features for trade shows.</p>
+        
+        <div id="scanner-mount-point" class="demo-placeholder">
+            <h3>📄 PDF Scanner / Redactor</h3>
+            <p>Module Not Loaded.</p>
+        </div>
+    </div>
+
     <div id="sidebar">
         <div id="search-controls" class="sidebar-controls">
             <div class="input-group"><span class="input-label">Keywords</span><input type="text" id="keywordInput" class="cox-input" placeholder="Separate phrases with commas (e.g. Main Pump, 1PH)" onkeypress="UI.handleEnter(event)"></div>
@@ -292,9 +328,28 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.10 (NAIVE BAYES RE-INTEGRATION) ---
+// --- SCHEMATICai v22.11 (DEMO MODE LAYER) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
+
+// --- DEMO MANAGER (NEW ISOLATED CLASS) ---
+class DemoManager {
+    static isActive = false;
+    
+    static toggle() {
+        this.isActive = !this.isActive;
+        const layer = document.getElementById('demo-layer');
+        const btn = document.getElementById('demo-btn');
+        
+        if(this.isActive) {
+            layer.classList.add('active');
+            btn.classList.add('active-mode');
+        } else {
+            layer.classList.remove('active');
+            btn.classList.remove('active-mode');
+        }
+    }
+}
 
 // --- PDF VIEWER ---
 class PdfViewer {
@@ -617,7 +672,7 @@ class TheHealer {
     }
 }
 
-// --- NEW CLASS: NAIVE BAYES (ISOLATED) ---
+// --- NAIVE BAYES (ISOLATED) ---
 class NaiveBayes {
     static tokenMap = {}; 
     static categoryCounts = {};
@@ -629,18 +684,14 @@ class NaiveBayes {
     }
 
     static train(data) {
-        // Reset Model
         this.tokenMap = {}; this.categoryCounts = {}; this.totalDocs = 0;
-        
         data.forEach(r => {
             if (!r.mfg) return;
             const cat = r.mfg;
             const tokens = this.tokenize(r.desc || "");
-            
             if (!this.categoryCounts[cat]) this.categoryCounts[cat] = { count: 0, docCount: 0 };
             this.categoryCounts[cat].docCount++;
             this.totalDocs++;
-
             tokens.forEach(t => {
                 if (!this.tokenMap[t]) this.tokenMap[t] = {};
                 if (!this.tokenMap[t][cat]) this.tokenMap[t][cat] = 0;
@@ -655,7 +706,6 @@ class NaiveBayes {
         const tokens = this.tokenize(text);
         let bestCat = null;
         let maxScore = -Infinity;
-
         for (const cat in this.categoryCounts) {
             let score = Math.log(this.categoryCounts[cat].docCount / this.totalDocs);
             tokens.forEach(t => {
@@ -718,20 +768,17 @@ class DataLoader {
         }
         localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
 
-        // --- BATCHED DECRYPT START ---
         const hasData = await CacheService.loadAllWithProgress((pct) => {
             btn.innerText = `🔒 DECRYPTING ${pct}%`;
         });
 
         if(hasData) {
-            // --- TRAIN MODEL ON LOAD ---
             NaiveBayes.train(window.LOCAL_DB);
-
             UI.pop();
             if(localStorage.getItem('cox_db_complete')) {
                 localStorage.setItem('cox_sync_attempts', '0');
                 btn.innerText = "SEARCH"; btn.disabled = false;
-                return; // DONE
+                return; 
             } else {
                 btn.innerText = "⬇️ RESUMING..."; 
             }
@@ -798,17 +845,12 @@ class DataLoader {
 
             if(buffer.length > 0) {
                 if(btn) btn.innerText = "✅ FINALIZING...";
-                
                 await new Promise(resolve => {
-                    requestAnimationFrame(() => {
-                        setTimeout(resolve, 50); 
-                    });
+                    requestAnimationFrame(() => { setTimeout(resolve, 50); });
                 });
-                
                 await CacheService.saveShard(`shard_${Date.now()}_final`, buffer);
             }
             
-            // Re-train after new data sync
             NaiveBayes.train(window.LOCAL_DB);
 
         } catch(e) {
@@ -833,11 +875,10 @@ class SearchEngine {
             if(crit.phase!=="Any") { if(r.phase && r.phase!==crit.phase) return; if(!r.phase) { p=false; miss++; w-=5000; } }
             if(crit.enc!=="Any") { if(r.enc!==crit.enc) { p=false; miss++; w-=1000; } }
             
-            // --- BAYES SCORING INTEGRATION ---
             if(crit.mfg !== "Any" && !r.mfg) {
                 const bayes = NaiveBayes.classify(r.desc || "");
                 if(bayes.category === crit.mfg.toUpperCase() && bayes.score > -20) {
-                     w += 5000; // Boost weight if Bayes is confident
+                     w += 5000; 
                 }
             }
 
