@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.37)</title>
+    <title>Cox Research | SCHEMATICai (v22.38)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -237,7 +237,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.37</div>
+    <div class="version-badge">SCHEMATICai v22.38</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -354,7 +354,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.37 (CORS PROXY FIX + RESILIENT LAYOUT) ---
+// --- SCHEMATICai v22.38 (AUTHENTICATED PDF PROXY) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -385,10 +385,12 @@ class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
     static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
+    // EXPORT HELPER
+    static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 
 class NetworkService {
-    static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') } }); }
+    static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: AuthService.headers() }); }
 }
 
 class PdfExporter {
@@ -397,9 +399,9 @@ class PdfExporter {
         const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
         const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
         try {
-            // FIX: Use Proxied URL to avoid CORS
+            // FIX: PROXY + AUTH HEADERS
             const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(PdfViewer.url)}`;
-            const existingPdfBytes = await fetch(proxyUrl).then(res => res.arrayBuffer());
+            const existingPdfBytes = await fetch(proxyUrl, { headers: AuthService.headers() }).then(res => res.arrayBuffer());
             
             const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
             const pages = pdfDoc.getPages();
@@ -436,13 +438,20 @@ class PdfViewer {
         this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; document.getElementById('pdf-toolbar').style.display = 'flex';
         document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
-        try {
-            // FIX: PROXY REQUEST VIA WORKER
+        try { 
             const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
-            const task = pdfjsLib.getDocument(proxyUrl);
+            // FIX: AUTH HEADERS FOR PDF.JS
+            const task = pdfjsLib.getDocument({
+                url: proxyUrl,
+                httpHeaders: AuthService.headers(),
+                withCredentials: false
+            });
             this.doc = await task.promise; 
             this.renderStack(); 
-        } catch(e) { console.error("PDF Load Error", e); }
+        } catch(e) { 
+            console.error("PDF Load Error", e);
+            document.getElementById('pdf-fallback').style.display = 'block'; // Show fallback on auth error
+        }
     }
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
