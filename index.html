@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.22)</title>
+    <title>Cox Research | SCHEMATICai (v22.23)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -131,7 +131,7 @@
             font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size:1.2em;
         }
 
-        .redaction-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
+        .redaction-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; cursor: crosshair; }
         body.demo-mode .redaction-layer { display: block; }
         .redaction-box {
             position: absolute;
@@ -198,7 +198,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.22</div>
+    <div class="version-badge">SCHEMATICai v22.23</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -295,18 +295,17 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.22 (RESTORED GLOBALS) ---
+// --- SCHEMATICai v22.23 (96% FIX + MANUAL DRAG RESTORED) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- GLOBAL CONFIG (Fixed ReferenceError) ---
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'], 'baldor':['baldor'] }, 
     ENCLOSURES: { '4XSS': ['4XSS', 'STAINLESS', 'SS'], '4XFG': ['4XFG', 'FIBERGLASS', 'FG'], 'POLY': ['POLY'], 'NEMA 12': ['NEMA 12'], 'NEMA 4': ['NEMA 4'], 'NEMA 1': ['NEMA 1'] }, 
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
-// --- CORE UTILITIES ---
+// --- UTILS ---
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -334,7 +333,7 @@ class NetworkService {
     static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') } }); }
 }
 
-// --- PDF & DEMO ---
+// --- PDF & REDACTION ---
 class PdfViewer {
     static doc = null; static currentWrapper = null; static currentScale = 1.3;
     static async load(url) {
@@ -354,7 +353,7 @@ class PdfViewer {
         const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
         if(document.getElementById('redaction-editor').classList.contains('active')) rLayer.classList.add('editing');
         
-        // Manual Drag
+        // MANUAL DRAG HANDLERS
         rLayer.onmousemove = (e) => RedactionManager.handleDrag(e);
         rLayer.onmouseup = () => RedactionManager.endDrag();
         
@@ -380,7 +379,8 @@ class DemoManager {
     static toggle() {
         this.isActive = !this.isActive;
         const btn = document.getElementById('demo-btn');
-        if(this.isActive) { document.body.classList.add('demo-mode'); btn.classList.add('active-mode'); document.getElementById('demo-settings-area').style.display = 'block'; }
+        const dateInput = document.getElementById('demo-date');
+        if(this.isActive) { document.body.classList.add('demo-mode'); btn.classList.add('active-mode'); document.getElementById('demo-settings-area').style.display = 'block'; if(!dateInput.value) dateInput.valueAsDate = new Date(); }
         else { document.body.classList.remove('demo-mode'); btn.classList.remove('active-mode'); document.getElementById('demo-settings-area').style.display = 'none'; RedactionEditor.close(); }
     }
     static getContext() {
@@ -403,10 +403,11 @@ class LayoutScanner {
         if(!PdfViewer.currentWrapper) return;
         RedactionManager.clearAll();
         const width = PdfViewer.currentWrapper.offsetWidth; const height = PdfViewer.currentWrapper.offsetHeight;
+        // Adjusted to Bottom-Right Corner (Title Block)
         const template = [
-            { x: 0.65, y: 0.75, w: 0.30, h: 0.08, map: 'cust', fontSize: 18 }, 
-            { x: 0.65, y: 0.84, w: 0.30, h: 0.05, map: 'job', fontSize: 14 }, 
-            { x: 0.65, y: 0.90, w: 0.30, h: 0.08, map: 'stage', fontSize: 24 } 
+            { x: 0.65, y: 0.82, w: 0.30, h: 0.05, map: 'cust', fontSize: 16 }, 
+            { x: 0.65, y: 0.88, w: 0.30, h: 0.04, map: 'job', fontSize: 14 }, 
+            { x: 0.65, y: 0.93, w: 0.30, h: 0.05, map: 'stage', fontSize: 18 } 
         ];
         template.forEach(zone => { RedactionManager.createZone(zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize); });
         RedactionManager.refreshContent();
@@ -421,8 +422,10 @@ class RedactionManager {
         const box = document.createElement('div'); box.className = 'redaction-box';
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
         box.dataset.map = mapKey || 'custom'; box.style.fontSize = fontSize + 'px'; box.style.fontFamily = "'Courier New', monospace"; 
+        
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
         box.onmousedown = (e) => this.startDrag(e, box);
+        
         layer.appendChild(box); this.zones.push(box);
         return box;
     }
@@ -441,7 +444,7 @@ class RedactionManager {
         if(!this.isDragging || !this.activeBox) return;
         e.preventDefault();
         const layer = document.querySelector('.redaction-layer');
-        
+        // Drag Calculation
         let newX = e.clientX - layer.getBoundingClientRect().left - this.dragOffset.x;
         let newY = e.clientY - layer.getBoundingClientRect().top - this.dragOffset.y;
         
@@ -449,7 +452,10 @@ class RedactionManager {
         this.activeBox.style.top = newY + 'px';
     }
 
-    static endDrag() { if(this.activeBox) this.activeBox.style.cursor = 'move'; this.isDragging = false; }
+    static endDrag() {
+        if(this.activeBox) this.activeBox.style.cursor = 'move';
+        this.isDragging = false;
+    }
 
     static selectZone(box) {
         if(this.activeBox) this.activeBox.classList.remove('selected');
@@ -461,7 +467,7 @@ class RedactionManager {
     static deselect() { if(this.activeBox) this.activeBox.classList.remove('selected'); this.activeBox = null; document.getElementById('editor-controls').classList.add('disabled-overlay'); }
     static updateActiveStyle() { if(!this.activeBox) return; this.activeBox.style.fontFamily = document.getElementById('redact-font').value; this.activeBox.style.fontSize = document.getElementById('redact-size').value + 'px'; }
     static mapSelectedZone() { if(!this.activeBox) return; this.activeBox.dataset.map = document.getElementById('zone-map-select').value; this.refreshContent(); }
-    static refreshContent() { const ctx = DemoManager.getContext(); this.zones.forEach(box => { const map = box.dataset.map; let text = ""; if(map === 'cust') text = ctx.cust; else if(map === 'job') text = ctx.job; else if(map === 'date') text = ctx.date; else if(map === 'stage') text = ctx.stage; box.innerHTML = `<span>${text}</span>`; }); }
+    static refreshContent() { const ctx = DemoManager.getContext(); this.zones.forEach(box => { const map = box.dataset.map; let text = ""; if(map === 'cust') text = ctx.cust; else if(map === 'job') text = ctx.job; else if(map === 'date') text = ctx.date; else if(map === 'stage') text = ctx.stage; box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`; }); }
     static clearAll() { const layer = document.querySelector('.redaction-layer'); if(layer) layer.innerHTML = ''; this.zones = []; this.deselect(); }
 }
 
@@ -542,11 +548,19 @@ class DataLoader {
         try {
             do {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break; await new Promise(r => setTimeout(r, 10));
-                if(btn && !btn.classList.contains('warning')) { const pct = Math.min(99, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; }
+                
+                // 96% BUG FIX: Force Loop Break on !offset
+                if(btn && !btn.classList.contains('warning')) { 
+                    const pct = Math.min(99, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); 
+                    if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; 
+                }
+                
                 const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
                 if(r.status!==200) { console.error("Sync Failed", r.status); break; }
                 const d = await r.json(); 
+                
                 if(!d.records || d.records.length === 0) { localStorage.setItem('cox_db_complete', 'true'); break; }
+                
                 d.records.forEach(r => {
                     const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                     const url = r.fields['Control Panel PDF']?.[0]?.url;
@@ -556,11 +570,18 @@ class DataLoader {
                         window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); buffer.push(rec);
                     }
                 });
+                
                 if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
-                offset = d.offset;
-            } while(offset);
+                
+                offset = d.offset; // UPDATE OFFSET
+                
+            } while(offset); // LOOP CONDITION
+            
+            // FORCE FINISH
+            if(btn) btn.innerText = "✅ FINALIZING..."; 
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
             NaiveBayes.trainAsync(window.LOCAL_DB);
+            
         } catch(e) { console.error("Sync Critical Error", e); } 
     }
     static harvestCSV() { alert('Harvesting...'); }
