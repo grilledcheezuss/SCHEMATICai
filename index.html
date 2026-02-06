@@ -3,11 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.23)</title>
+    <title>Cox Research | SCHEMATICai (v22.29)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
 
     <style>
@@ -118,7 +122,7 @@
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
 
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; }
-        #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); }
+        #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; }
         .pdf-page-wrapper { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: white; margin-bottom: 20px; }
         .pdf-page-canvas { display: block; }
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
@@ -163,7 +167,6 @@
         .demo-label { font-size: 10px; font-weight: 800; color: var(--app-primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
         .demo-input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--demo-border); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
 
-        #pdf-sidebar { width: 240px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
         #pdf-toolbar { display: none; height: 45px; background: #2a2a2a; border-bottom: 1px solid #444; align-items: center; justify-content: center; gap: 15px; flex-shrink: 0; width: 100%; }
         
         #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
@@ -198,7 +201,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.23</div>
+    <div class="version-badge">SCHEMATICai v22.29</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -243,11 +246,21 @@
                         <option value="date">Date</option>
                         <option value="stage">Design Stage</option>
                         <option value="custom">Custom Text...</option>
+                        <option value="logo">Branding/Logo (Block)</option>
                     </select>
                 </div>
             </div>
+            
+            <div class="editor-section">
+                <span class="editor-label">Watermark Text</span>
+                <input type="text" id="watermark-input" class="cox-input" placeholder="e.g. CONFIDENTIAL" value="CONFIDENTIAL">
+            </div>
+
             <div style="margin-top:auto;">
-                <button class="search-btn" onclick="LayoutScanner.autoScan()">🔄 Re-Scan Layout</button>
+                <button class="search-btn" style="background:var(--match-green-text) !important; margin-bottom:5px;" onclick="RedactionManager.addManualZone()">➕ Add Redaction Box</button>
+                <button class="search-btn" style="background:var(--app-accent) !important; margin-bottom:5px;" onclick="LayoutScanner.applyTitleLayout()">📄 Apply Title Layout</button>
+                <button class="search-btn" style="background:var(--app-primary) !important; margin-bottom:5px;" onclick="PdfExporter.export()">💾 Export Redacted PDF</button>
+                <button class="search-btn" onclick="LayoutScanner.scanAllPages()">🔄 Scan All</button>
                 <button class="search-btn" style="background:#555; margin-top:5px;" onclick="RedactionManager.clearAll()">🗑️ Clear All</button>
             </div>
         </div>
@@ -284,7 +297,7 @@
         <div id="pdf-toolbar">
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)">-</button><span id="pdf-zoom-level">130%</span><button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)">+</button>
         </div>
-        <div id="custom-pdf-viewer" style="display:none;"><div id="pdf-sidebar"></div><div id="pdf-main-view"></div></div>
+        <div id="custom-pdf-viewer" style="display:none;"><div id="pdf-main-view"></div></div>
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
         <div id="pdf-fallback" class="pdf-fallback">
             <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
@@ -295,7 +308,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.23 (96% FIX + MANUAL DRAG RESTORED) ---
+// --- SCHEMATICai v22.29 (PDF EXPORT & WATERMARK) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -333,37 +346,132 @@ class NetworkService {
     static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') } }); }
 }
 
-// --- PDF & REDACTION ---
+// --- PDF EXPORTER (NEW) ---
+class PdfExporter {
+    static async export() {
+        if (!PdfViewer.doc) return alert("No PDF loaded!");
+        const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
+        const origText = btn.innerText;
+        btn.innerText = "⏳ PROCESSING...";
+        btn.disabled = true;
+
+        try {
+            // 1. Fetch Original Bytes
+            const existingPdfBytes = await fetch(PdfViewer.url).then(res => res.arrayBuffer());
+            
+            // 2. Load into PDF-Lib
+            const pdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+            const pages = pdfDoc.getPages();
+            const { width, height } = pages[0].getSize();
+            
+            // 3. Get Watermark
+            const watermarkText = document.getElementById('watermark-input').value;
+
+            // 4. Iterate Pages
+            pages.forEach((page, index) => {
+                const pdfWidth = page.getWidth();
+                const pdfHeight = page.getHeight();
+
+                // Draw Watermark
+                if (watermarkText) {
+                    page.drawText(watermarkText, {
+                        x: pdfWidth / 4, y: pdfHeight / 2,
+                        size: 50,
+                        opacity: 0.2,
+                        rotate: PDFLib.degrees(45),
+                        color: PDFLib.rgb(0.7, 0.7, 0.7)
+                    });
+                }
+
+                // Draw Redactions
+                // Find zones belonging to this page index (1-based in our data)
+                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
+                if (wrapper) {
+                    const zones = wrapper.querySelectorAll('.redaction-box');
+                    zones.forEach(box => {
+                        // Calc Ratios
+                        const relX = box.offsetLeft / wrapper.offsetWidth;
+                        const relY = box.offsetTop / wrapper.offsetHeight;
+                        const relW = box.offsetWidth / wrapper.offsetWidth;
+                        const relH = box.offsetHeight / wrapper.offsetHeight;
+
+                        // Convert to PDF Coords (Inverted Y)
+                        const drawX = relX * pdfWidth;
+                        const drawH = relH * pdfHeight;
+                        const drawY = pdfHeight - (relY * pdfHeight) - drawH; // Bottom-left origin
+                        const drawW = relW * pdfWidth;
+
+                        // Draw White Box
+                        page.drawRectangle({
+                            x: drawX, y: drawY, width: drawW, height: drawH,
+                            color: PDFLib.rgb(1, 1, 1),
+                            borderColor: PDFLib.rgb(1, 1, 1),
+                            borderWidth: 1,
+                        });
+
+                        // Draw Text Overlay
+                        const text = box.querySelector('span')?.innerText || "";
+                        if (text) {
+                            page.drawText(text, {
+                                x: drawX + 2,
+                                y: drawY + (drawH / 2) - 4, // Approx vertically centered
+                                size: 12,
+                                color: PDFLib.rgb(0, 0, 0)
+                            });
+                        }
+                    });
+                }
+            });
+
+            // 5. Save & Download
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `redacted_${new Date().getTime()}.pdf`;
+            link.click();
+
+        } catch (e) {
+            console.error("Export Failed", e);
+            alert("Export Failed: " + e.message);
+        } finally {
+            btn.innerText = origText;
+            btn.disabled = false;
+        }
+    }
+}
+
+// --- PDF VIEWER ---
 class PdfViewer {
-    static doc = null; static currentWrapper = null; static currentScale = 1.3;
+    static doc = null; static currentScale = 1.3; static url = "";
     static async load(url) {
+        this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; document.getElementById('pdf-toolbar').style.display = 'flex';
         document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
-        try { const task = pdfjsLib.getDocument(url); this.doc = await task.promise; this.renderPage(1); if(window.innerWidth>768) this.renderSidebar(); } catch(e) {}
+        try { const task = pdfjsLib.getDocument(url); this.doc = await task.promise; this.renderStack(); } catch(e) {}
     }
-    static async renderPage(num) {
+    
+    static async renderStack() {
         const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
-        const page = await this.doc.getPage(num); const viewport = page.getViewport({ scale: this.currentScale }); 
-        const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
-        wrapper.style.width = Math.floor(viewport.width) + "px"; wrapper.style.height = Math.floor(viewport.height) + "px";
-        this.currentWrapper = wrapper;
-        const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height;
-        canvas.style.width = "100%"; canvas.style.height = "100%";
-        wrapper.appendChild(canvas);
-        const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
-        if(document.getElementById('redaction-editor').classList.contains('active')) rLayer.classList.add('editing');
+        document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
         
-        // MANUAL DRAG HANDLERS
-        rLayer.onmousemove = (e) => RedactionManager.handleDrag(e);
-        rLayer.onmouseup = () => RedactionManager.endDrag();
-        
-        wrapper.appendChild(rLayer);
-        container.appendChild(wrapper);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-        if(DemoManager.isActive) { setTimeout(() => LayoutScanner.autoScan(), 500); }
+        for (let i = 1; i <= this.doc.numPages; i++) {
+            await new Promise(r => setTimeout(r, 10)); 
+            const page = await this.doc.getPage(i); const viewport = page.getViewport({ scale: this.currentScale });
+            const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
+            wrapper.style.width = Math.floor(viewport.width) + "px"; wrapper.style.height = Math.floor(viewport.height) + "px";
+            wrapper.dataset.pageNumber = i; 
+            const canvas = document.createElement('canvas'); canvas.className = 'pdf-page-canvas';
+            canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%"; canvas.style.height = "100%";
+            const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
+            if(document.getElementById('redaction-editor').classList.contains('active')) rLayer.classList.add('editing');
+            rLayer.onmousemove = (e) => RedactionManager.handleDrag(e); rLayer.onmouseup = () => RedactionManager.endDrag();
+            wrapper.appendChild(canvas); wrapper.appendChild(rLayer); container.appendChild(wrapper);
+            page.render({ canvasContext: canvas.getContext('2d'), viewport });
+        }
+        if(DemoManager.isActive) { setTimeout(() => LayoutScanner.scanAllPages(), 500); }
     }
-    static async renderSidebar() { /* simplified */ }
-    static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderPage(1); }
+    static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
 }
 
 class PdfController {
@@ -398,64 +506,83 @@ class RedactionEditor {
     static close() { document.getElementById('redaction-editor').classList.remove('active'); document.querySelectorAll('.redaction-layer').forEach(el => el.classList.remove('editing')); RedactionManager.deselect(); }
 }
 
+// --- UPDATED LAYOUT RULES (V22.28) ---
+const LAYOUT_RULES = {
+    STANDARD: [
+        { x: 0.65, y: 0.82, w: 0.30, h: 0.05, map: 'cust', fontSize: 16 }, 
+        { x: 0.65, y: 0.88, w: 0.30, h: 0.04, map: 'job', fontSize: 14 }, 
+        { x: 0.65, y: 0.93, w: 0.30, h: 0.05, map: 'stage', fontSize: 18 },
+        { x: 0.75, y: 0.03, w: 0.22, h: 0.06, map: 'logo', fontSize: 14 } // Top-Right Branding Catch
+    ],
+    TITLE: [
+        { x: 0.25, y: 0.15, w: 0.50, h: 0.12, map: 'logo', fontSize: 14 }, // Top Center Logo
+        { x: 0.20, y: 0.44, w: 0.60, h: 0.05, map: 'job', fontSize: 18 },  // Center Job Title
+        { x: 0.30, y: 0.58, w: 0.40, h: 0.20, map: 'logo', fontSize: 14 }, // Engineers/Address Block
+        { x: 0.40, y: 0.90, w: 0.20, h: 0.05, map: 'date', fontSize: 16 }  // Date
+    ]
+};
+
 class LayoutScanner {
-    static autoScan() {
-        if(!PdfViewer.currentWrapper) return;
+    static scanAllPages() {
         RedactionManager.clearAll();
-        const width = PdfViewer.currentWrapper.offsetWidth; const height = PdfViewer.currentWrapper.offsetHeight;
-        // Adjusted to Bottom-Right Corner (Title Block)
-        const template = [
-            { x: 0.65, y: 0.82, w: 0.30, h: 0.05, map: 'cust', fontSize: 16 }, 
-            { x: 0.65, y: 0.88, w: 0.30, h: 0.04, map: 'job', fontSize: 14 }, 
-            { x: 0.65, y: 0.93, w: 0.30, h: 0.05, map: 'stage', fontSize: 18 } 
-        ];
-        template.forEach(zone => { RedactionManager.createZone(zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize); });
+        document.querySelectorAll('.pdf-page-wrapper').forEach(wrapper => {
+            this.applyRuleToWrapper(wrapper, LAYOUT_RULES.STANDARD);
+        });
         RedactionManager.refreshContent();
+    }
+    static applyTitleLayout() {
+        const firstPage = document.querySelector('.pdf-page-wrapper[data-page-number="1"]');
+        if(firstPage) {
+            const layer = firstPage.querySelector('.redaction-layer');
+            if(layer) layer.innerHTML = ''; 
+            this.applyRuleToWrapper(firstPage, LAYOUT_RULES.TITLE);
+            RedactionManager.refreshContent();
+        }
+    }
+    static applyRuleToWrapper(wrapper, ruleSet) {
+        const width = wrapper.offsetWidth; const height = wrapper.offsetHeight;
+        ruleSet.forEach(zone => {
+            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize);
+        });
     }
 }
 
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; static dragOffset = {x:0, y:0};
 
-    static createZone(x, y, w, h, mapKey, fontSize = 14) {
-        const layer = document.querySelector('.redaction-layer'); if(!layer) return;
+    static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14) {
+        const layer = wrapper.querySelector('.redaction-layer'); if(!layer) return;
         const box = document.createElement('div'); box.className = 'redaction-box';
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
         box.dataset.map = mapKey || 'custom'; box.style.fontSize = fontSize + 'px'; box.style.fontFamily = "'Courier New', monospace"; 
-        
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
         box.onmousedown = (e) => this.startDrag(e, box);
-        
         layer.appendChild(box); this.zones.push(box);
         return box;
     }
 
+    static addManualZone() {
+        const pages = document.querySelectorAll('.pdf-page-wrapper'); if(pages.length === 0) return;
+        const wrapper = pages[0]; const w = wrapper.offsetWidth; const h = wrapper.offsetHeight;
+        this.createZoneOnWrapper(wrapper, w*0.3, h*0.4, w*0.4, h*0.1, 'custom', 16);
+        this.refreshContent();
+    }
+
     static startDrag(e, box) {
-        e.stopPropagation();
-        this.selectZone(box);
-        this.isDragging = true;
-        this.activeBox = box;
-        this.dragOffset.x = e.clientX - box.offsetLeft;
-        this.dragOffset.y = e.clientY - box.offsetTop;
+        e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box;
+        this.dragOffset.x = e.clientX - box.offsetLeft; this.dragOffset.y = e.clientY - box.offsetTop;
         box.style.cursor = 'grabbing';
     }
 
     static handleDrag(e) {
-        if(!this.isDragging || !this.activeBox) return;
-        e.preventDefault();
-        const layer = document.querySelector('.redaction-layer');
-        // Drag Calculation
+        if(!this.isDragging || !this.activeBox) return; e.preventDefault();
+        const layer = this.activeBox.parentElement; 
         let newX = e.clientX - layer.getBoundingClientRect().left - this.dragOffset.x;
         let newY = e.clientY - layer.getBoundingClientRect().top - this.dragOffset.y;
-        
-        this.activeBox.style.left = newX + 'px';
-        this.activeBox.style.top = newY + 'px';
+        this.activeBox.style.left = newX + 'px'; this.activeBox.style.top = newY + 'px';
     }
 
-    static endDrag() {
-        if(this.activeBox) this.activeBox.style.cursor = 'move';
-        this.isDragging = false;
-    }
+    static endDrag() { if(this.activeBox) this.activeBox.style.cursor = 'move'; this.isDragging = false; }
 
     static selectZone(box) {
         if(this.activeBox) this.activeBox.classList.remove('selected');
@@ -467,8 +594,20 @@ class RedactionManager {
     static deselect() { if(this.activeBox) this.activeBox.classList.remove('selected'); this.activeBox = null; document.getElementById('editor-controls').classList.add('disabled-overlay'); }
     static updateActiveStyle() { if(!this.activeBox) return; this.activeBox.style.fontFamily = document.getElementById('redact-font').value; this.activeBox.style.fontSize = document.getElementById('redact-size').value + 'px'; }
     static mapSelectedZone() { if(!this.activeBox) return; this.activeBox.dataset.map = document.getElementById('zone-map-select').value; this.refreshContent(); }
-    static refreshContent() { const ctx = DemoManager.getContext(); this.zones.forEach(box => { const map = box.dataset.map; let text = ""; if(map === 'cust') text = ctx.cust; else if(map === 'job') text = ctx.job; else if(map === 'date') text = ctx.date; else if(map === 'stage') text = ctx.stage; box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`; }); }
-    static clearAll() { const layer = document.querySelector('.redaction-layer'); if(layer) layer.innerHTML = ''; this.zones = []; this.deselect(); }
+    static refreshContent() { 
+        const ctx = DemoManager.getContext(); 
+        this.zones.forEach(box => { 
+            const map = box.dataset.map; 
+            let text = ""; 
+            if(map === 'cust') text = ctx.cust; 
+            else if(map === 'job') text = ctx.job; 
+            else if(map === 'date') text = ctx.date; 
+            else if(map === 'stage') text = ctx.stage; 
+            else if(map === 'logo') text = ""; 
+            box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`; 
+        }); 
+    }
+    static clearAll() { document.querySelectorAll('.redaction-layer').forEach(l => l.innerHTML = ''); this.zones = []; this.deselect(); }
 }
 
 // --- LOGIC ---
@@ -541,17 +680,28 @@ class DataLoader {
             UI.pop(); if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; return; } else { btn.innerText = "⬇️ RESUMING..."; } 
         } else { btn.innerText = "⬇️ SYNCING..."; }
         await new Promise(r => setTimeout(r, 50)); await TheHealer.fetchAndTally(); await this.fetchPartition('desc', btn);
-        btn.innerText = "✅ FINALIZING..."; localStorage.setItem('cox_sync_attempts', '0'); setTimeout(() => { btn.innerText = "SEARCH"; btn.disabled = false; }, 500); UI.pop();
+        
+        // --- FORCE REPAINT ---
+        requestAnimationFrame(() => {
+            btn.innerText = "✅ FINALIZING...";
+            localStorage.setItem('cox_sync_attempts', '0'); 
+            setTimeout(() => {
+                NaiveBayes.trainAsync(window.LOCAL_DB).then(() => {
+                    btn.innerText = "SEARCH"; btn.disabled = false;
+                });
+            }, 100);
+        });
+        UI.pop();
     }
+    
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0; let buffer = []; let shardCount = 0;
         try {
             do {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break; await new Promise(r => setTimeout(r, 10));
                 
-                // 96% BUG FIX: Force Loop Break on !offset
                 if(btn && !btn.classList.contains('warning')) { 
-                    const pct = Math.min(99, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); 
+                    const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); 
                     if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; 
                 }
                 
@@ -572,15 +722,10 @@ class DataLoader {
                 });
                 
                 if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
-                
-                offset = d.offset; // UPDATE OFFSET
-                
-            } while(offset); // LOOP CONDITION
+                offset = d.offset;
+            } while(offset);
             
-            // FORCE FINISH
-            if(btn) btn.innerText = "✅ FINALIZING..."; 
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
-            NaiveBayes.trainAsync(window.LOCAL_DB);
             
         } catch(e) { console.error("Sync Critical Error", e); } 
     }
