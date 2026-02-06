@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.19)</title>
+    <title>Cox Research | SCHEMATICai (v22.20)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -23,6 +23,7 @@
             --bg-input: #ffffff;
             --text-primary: #121212; 
             --text-secondary: #5f6368; 
+            --text-placeholder: rgba(0,0,0,0.4);
             --border-color: #c7c7cc; 
             
             /* BADGE COLORS */
@@ -53,7 +54,8 @@
             --bg-viewer: #1a1a1a; 
             --bg-input: #3F3F46; 
             --text-primary: #F4F4F5; 
-            --text-secondary: #E4E4E7; /* Lightened for visibility */
+            --text-secondary: #A1A1AA; 
+            --text-placeholder: rgba(255,255,255,0.3);
             --border-color: #3F3F46;
             
             --match-green-bg: #064E3B; --match-green-text: #6EE7B7;
@@ -96,7 +98,11 @@
         .input-group.full-width { grid-column: span 2; }
         .input-group { display: flex; flex-direction: column; gap: 1px; }
         .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
+        
+        /* INPUT STYLING */
         .cox-input { width: 100%; height: var(--input-height); padding: 0 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
+        .cox-input::placeholder { color: var(--text-placeholder); }
+        
         .search-btn { flex: 1; height: 34px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 12px; letter-spacing: 0.5px; }
         .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; }
         .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; }
@@ -126,12 +132,14 @@
         .pdf-page-wrapper { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: white; margin-bottom: 20px; }
         .pdf-page-canvas { display: block; }
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
+        
+        /* RESTORED: This was missing in previous version causing crash */
         .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; }
         
         #pdf-placeholder-text { 
             display: flex; align-items: center; justify-content: center; 
             height: 100%; width: 100%; 
-            color: rgba(255,255,255,0.5); /* Fixed contrast */
+            color: rgba(255,255,255,0.5); 
             font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size:1.2em;
         }
 
@@ -204,7 +212,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.18</div>
+    <div class="version-badge">SCHEMATICai v22.20</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -292,16 +300,20 @@
         </div>
         <div id="custom-pdf-viewer" style="display:none;"><div id="pdf-sidebar"></div><div id="pdf-main-view"></div></div>
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
+        <div id="pdf-fallback" class="pdf-fallback">
+            <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
+            <a id="pdf-fallback-link" target="_blank">Open File</a>
+        </div>
         <div id="pdf-placeholder-text">📄 Select a schematic</div>
     </div>
 </div>
 
 <script>
-// --- SCHEMATICai v22.19 (FIXED ORDER & VISIBILITY) ---
+// --- SCHEMATICai v22.20 (RECOVERY RELEASE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- 1. CORE UTILITIES (Moved to Top) ---
+// --- CORE UTILITIES (First to load) ---
 class DB {
     static open() { 
         return new Promise((r, j) => { 
@@ -376,7 +388,7 @@ class NetworkService {
     static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
 }
 
-// --- 2. PDF & DEMO CLASSES ---
+// --- 2. PDF & DEMO (Restored) ---
 class PdfViewer {
     static doc = null; static currentWrapper = null; static currentScale = 1.3; static currentPage = 1; static isMobile = false;
     static async load(url) {
@@ -614,8 +626,12 @@ class DataLoader {
                 if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset;
             } while(offset);
-            if(buffer.length > 0) { if(btn) btn.innerText = "✅ FINALIZING..."; await new Promise(resolve => { requestAnimationFrame(() => { setTimeout(resolve, 50); }); }); await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
+            
+            // --- FIX 96% STALL: FORCE FINALIZE ---
+            if(btn) btn.innerText = "✅ FINALIZING..."; 
+            if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
             NaiveBayes.trainAsync(window.LOCAL_DB);
+            
         } catch(e) { console.error("Sync Critical Error", e); } finally { if(btn && !btn.classList.contains('warning')) { btn.innerText = "SEARCH"; btn.disabled = false; } }
     }
     static harvestCSV() { alert('Harvesting...'); }
@@ -649,12 +665,7 @@ class UI {
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
-    static toggleSearch(e) { 
-        const c = document.getElementById('search-controls'); 
-        if(!c) return; 
-        if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } 
-        else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } 
-    }
+    static toggleSearch(e) { const c = document.getElementById('search-controls'); if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
     static pop() {
         const m = document.getElementById('mfgInput'); const cv = m.value;
         let all = Array.from(window.FOUND_MFGS).sort(); m.innerHTML='<option value="Any">Any</option>'; all.forEach(v=>m.add(new Option(v,v))); m.value=cv;
