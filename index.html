@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.17)</title>
+    <title>Cox Research | SCHEMATICai (v22.18)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -25,13 +25,11 @@
             --text-secondary: #5f6368; 
             --border-color: #c7c7cc; 
             
-            /* BADGE COLORS */
             --match-green-bg: #dcfce7; --match-green-text: #166534; 
             --match-orange-bg: #ffedd5; --match-orange-text: #9a3412; 
             --match-red-bg: #fee2e2; --match-red-text: #991b1b; 
             --match-keyword-bg: #dcfce7; --match-keyword-text: #166534;
             
-            /* REDACTION / DEMO */
             --demo-border: #8b5cf6;
             --demo-bg: rgba(139, 92, 246, 0.05);
             --redaction-outline: #ff0000;
@@ -53,7 +51,7 @@
             --bg-viewer: #1a1a1a; 
             --bg-input: #3F3F46; 
             --text-primary: #F4F4F5; 
-            --text-secondary: #A1A1AA; 
+            --text-secondary: #E4E4E7; /* Lightened for visibility */
             --border-color: #3F3F46;
             
             --match-green-bg: #064E3B; --match-green-text: #6EE7B7;
@@ -70,22 +68,8 @@
         * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: var(--bg-app); color: var(--text-primary); height: 100vh; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
 
-        /* --- HEADER --- */
-        header { 
-            background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); 
-            padding: 10px 15px;
-            padding-top: max(10px, env(safe-area-inset-top)); 
-            height: auto;
-            min-height: var(--header-base-height);
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
-            z-index: 100; 
-            flex-shrink: 0; 
-            position: relative; 
-        }
-
+        /* HEADER */
+        header { background: linear-gradient(135deg, #461D7C 0%, #2e0e57 100%); padding: 10px 15px; padding-top: max(10px, env(safe-area-inset-top)); height: auto; min-height: var(--header-base-height); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 100; flex-shrink: 0; position: relative; }
         .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; }
         .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 1.4rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; }
         .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.5rem; color: #b39ddb; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
@@ -94,138 +78,102 @@
         .control-btn { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: all 0.2s; overflow: hidden; }
         .control-btn.active-mode { background: #166534; color:white; border-color: #166534; box-shadow: 0 0 8px #166534; }
 
-        /* --- MAIN LAYOUT --- */
+        /* LAYOUT */
         #app-container { display: none; flex: 1; overflow: hidden; position: relative; }
         html.logged-in #app-container { display: flex !important; }
-        
         #sidebar { width: 320px; min-width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: transform 0.3s ease; position: relative; }
         
-        /* REDACTION EDITOR (INSPECTOR PANEL) */
-        #redaction-editor {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg-sidebar);
-            z-index: 30;
-            display: none;
-            flex-direction: column;
-            padding: 15px;
-            border-right: 1px solid var(--border-color);
-        }
-        #redaction-editor.active { display: flex; }
+        /* SEARCH CONTROLS */
+        .sidebar-controls { padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; }
+        .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
+        #refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; }
+        #refine-btn-area.visible { display: block; }
         
-        .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
-        .editor-title { font-weight: 800; color: var(--app-primary); text-transform: uppercase; }
-        .editor-section { margin-bottom: 15px; }
-        .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; }
-        .disabled-overlay { opacity: 0.5; pointer-events: none; }
-
-        /* DEMO CONTEXT PANEL */
-        #demo-context-panel {
-            display: none; 
-            padding: 10px;
-            margin: 10px;
-            background: var(--demo-bg);
-            border: 2px dashed var(--demo-border);
-            border-radius: 8px;
-            flex-direction: column;
-            gap: 6px;
-        }
-        body.demo-mode #demo-context-panel { display: flex; animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .demo-label { font-size: 10px; font-weight: 800; color: var(--app-primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-        .demo-input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--demo-border); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
-        
-        /* GENERAL UI */
+        /* FILTERS & INPUTS */
+        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+        .input-group.full-width { grid-column: span 2; }
+        .input-group { display: flex; flex-direction: column; gap: 1px; }
+        .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
         .cox-input { width: 100%; height: var(--input-height); padding: 0 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
         .search-btn { flex: 1; height: 34px; background-color: var(--app-accent) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; cursor: pointer; transition: 0.3s; font-size: 12px; letter-spacing: 0.5px; }
         .search-btn:disabled { background-color: #9ca3af !important; cursor: not-allowed; opacity: 0.7; }
-        .search-btn.warning { background-color: #f59e0b !important; color: black !important; }
         .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; }
         .refine-btn { width: 100%; height: 28px; background: var(--bg-input); border: 1px solid var(--app-accent); color: var(--app-accent); border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 11px; }
 
+        /* RESULTS */
         #results-scroll-area { flex: 1; overflow-y: auto; padding: 6px; background: var(--bg-app); }
         #results-area { display: flex; flex-direction: column; gap: 3px; padding-bottom: 80px; }
-
-        /* RECORD CARD */
         .record-card { background: var(--bg-card); padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 2px; }
         .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .record-card.active-view { background: rgba(139, 92, 246, 0.1); border-color: var(--app-accent); }
         .record-card.varied-result { opacity: 0.9; border-left-color: #94a3b8; }
-        
         .panel-name { font-size: 14px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.1; }
-
         .badge-row { display: flex; gap: 2px; flex-wrap: wrap; }
         .hud-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; letter-spacing: 0.3px; border: 1px solid transparent; }
         .hud-badge.match-green { background: var(--match-green-bg); color: var(--match-green-text); }
         .hud-badge.match-orange { background: var(--match-orange-bg); color: var(--match-orange-text); }
         .hud-badge.match-red { background: var(--match-red-bg); color: var(--match-red-text); }
         .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); }
-
         .card-actions { display: flex; gap: 4px; justify-content: flex-end; margin-top: 1px; border-top: 1px solid var(--border-color); padding-top: 2px; }
         .thumb-btn { background: transparent; border: 1px solid var(--border-color); border-radius: 3px; width: 22px; height: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; transition: 0.2s; }
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
-        
-        /* VIEWER & REDACTION */
+
+        /* PREVIEW & REDACTION */
         #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; }
         #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); }
-        
-        /* Wrapper ensures Redactions are relative to the canvas size */
         .pdf-page-wrapper { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: white; margin-bottom: 20px; }
         .pdf-page-canvas { display: block; }
-        
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
         .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; }
         
-        #mobile-back-btn { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--app-accent); color: white; padding: 10px 20px; border-radius: 25px; border: none; font-weight: 800; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 50; cursor: pointer; }
+        /* FIXED: Ensure placeholder text is visible in Dark Mode */
+        #pdf-placeholder-text { 
+            display: flex; align-items: center; justify-content: center; 
+            height: 100%; width: 100%; 
+            color: rgba(255,255,255,0.5); /* Lighter grey for better contrast */
+            font-weight: 700; text-transform: uppercase; letter-spacing: 1px; font-size:1.2em;
+        }
 
+        /* REDACTION ELEMENTS */
         .redaction-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; display: none; }
         body.demo-mode .redaction-layer { display: block; }
-
         .redaction-box {
             position: absolute;
             background: var(--redaction-fill);
             color: var(--cad-text);
-            font-size: 14px; 
-            font-family: 'Courier New', monospace; 
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            overflow: hidden;
-            cursor: move;
-            z-index: 15;
-            user-select: none;
+            font-size: 14px; font-family: 'Courier New', monospace; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            overflow: hidden; cursor: move; z-index: 15; user-select: none;
         }
-        
-        /* Outline only active when editing */
         .redaction-layer.editing .redaction-box { border: 2px solid var(--redaction-outline); }
         .redaction-box.selected { border: 2px dashed blue !important; z-index: 20; }
-        
         .redaction-resize-handle {
             width: 12px; height: 12px; background: var(--redaction-outline);
-            position: absolute; bottom: 0; right: 0;
-            cursor: nwse-resize;
-            display: none;
+            position: absolute; bottom: 0; right: 0; cursor: nwse-resize; display: none;
         }
         .redaction-layer.editing .redaction-resize-handle { display: block; }
 
-        /* PDF Sidebar & Toolbar */
+        /* EDITOR & DEMO PANELS */
+        #redaction-editor { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-sidebar); z-index: 30; display: none; flex-direction: column; padding: 15px; border-right: 1px solid var(--border-color); }
+        #redaction-editor.active { display: flex; }
+        .editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+        .editor-title { font-weight: 800; color: var(--app-primary); text-transform: uppercase; }
+        .editor-section { margin-bottom: 15px; }
+        .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; }
+        .disabled-overlay { opacity: 0.5; pointer-events: none; }
+
+        #demo-context-panel { display: none; padding: 10px; margin: 10px; background: var(--demo-bg); border: 2px dashed var(--demo-border); border-radius: 8px; flex-direction: column; gap: 6px; }
+        body.demo-mode #demo-context-panel { display: flex; animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .demo-label { font-size: 10px; font-weight: 800; color: var(--app-primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+        .demo-input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--demo-border); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
+
         #pdf-sidebar { width: 240px; background: #2a2a2a; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; flex-shrink: 0; }
         #pdf-toolbar { display: none; height: 45px; background: #2a2a2a; border-bottom: 1px solid #444; align-items: center; justify-content: center; gap: 15px; flex-shrink: 0; width: 100%; }
-        .pdf-tool-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; width: 30px; height: 30px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
         
-        /* Filters Layout */
-        .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-        .input-group.full-width { grid-column: span 2; }
-        .input-group { display: flex; flex-direction: column; gap: 1px; }
-        .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--text-secondary); }
-
         #auth-overlay, #feedback-modal, #config-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; }
         .active-modal { display: flex !important; }
         .auth-card, .config-card, .modal-card { background: var(--bg-card); padding: 25px; border-radius: 10px; width: 90%; max-width: 380px; text-align: center; border: 1px solid var(--border-color); }
-        .auth-group { margin-bottom: 15px; text-align: left; }
     </style>
 </head>
 <body>
@@ -254,7 +202,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.17</div>
+    <div class="version-badge">SCHEMATICai v22.18</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -270,8 +218,7 @@
              <div class="reason-btn" data-reason="hp" onclick="FeedbackService.toggleReason(this)">Wrong HP</div><input type="text" class="correction-input" placeholder="Correct Value">
              <div class="reason-btn" data-reason="volt" onclick="FeedbackService.toggleReason(this)">Wrong Voltage</div><input type="text" class="correction-input" placeholder="Correct Value">
              <div class="reason-btn" data-reason="enc" onclick="FeedbackService.toggleReason(this)">Wrong Enclosure</div><input type="text" class="correction-input" placeholder="Correct Value">
-             <div id="dynamic-feedback-container"></div>
-             <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT & VOTE</button>
+             <button class="submit-feedback-btn" onclick="FeedbackService.submit()">SUBMIT</button>
              <button class="submit-feedback-btn" style="background:#555;margin-top:5px;" onclick="FeedbackService.close()">CANCEL</button>
         </div>
     </div>
@@ -280,11 +227,7 @@
 <div id="app-container">
     <div id="sidebar">
         <div id="redaction-editor">
-            <div class="editor-header">
-                <span class="editor-title">Redaction Inspector</span>
-                <button onclick="RedactionEditor.close()" style="background:none;border:none;cursor:pointer;">✖</button>
-            </div>
-            
+            <div class="editor-header"><span class="editor-title">Redaction Inspector</span><button onclick="RedactionEditor.close()" style="background:none;border:none;cursor:pointer;">✖</button></div>
             <div id="editor-controls" class="disabled-overlay">
                 <div class="editor-section">
                     <span class="editor-label">CAD Font Style</span>
@@ -295,12 +238,7 @@
                         <option value="'Consolas', monospace">Consolas</option>
                     </select>
                 </div>
-
-                <div class="editor-section">
-                    <span class="editor-label">Text Size (px)</span>
-                    <input type="range" id="redact-size" min="8" max="48" value="14" oninput="RedactionManager.updateActiveStyle()">
-                </div>
-
+                <div class="editor-section"><span class="editor-label">Text Size (px)</span><input type="range" id="redact-size" min="8" max="48" value="14" oninput="RedactionManager.updateActiveStyle()"></div>
                 <div class="editor-section">
                     <span class="editor-label">Mapped Data</span>
                     <select id="zone-map-select" class="cox-input" onchange="RedactionManager.mapSelectedZone()">
@@ -312,7 +250,6 @@
                     </select>
                 </div>
             </div>
-
             <div style="margin-top:auto;">
                 <button class="search-btn" onclick="LayoutScanner.autoScan()">🔄 Re-Scan Layout</button>
                 <button class="search-btn" style="background:#555; margin-top:5px;" onclick="RedactionManager.clearAll()">🗑️ Clear All</button>
@@ -343,6 +280,7 @@
                 <button id="searchBtn" class="search-btn" onclick="SearchEngine.perform()" disabled>INITIALIZING...</button>
             </div>
         </div>
+        <div id="refine-btn-area"><button class="refine-btn" onclick="UI.toggleSearch(true)">🔍 REFINE SEARCH</button></div>
         <div id="results-scroll-area"><div id="results-area"></div></div>
     </div>
     
@@ -357,124 +295,79 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.17 (STABILITY RELEASE) ---
+// --- SCHEMATICai v22.18 (FIXED UI & ASYNC AI) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
-// --- PDF VIEWER CLASSES (Moved to TOP to prevent ReferenceError) ---
+// --- PDF CONTROLLERS (Defined FIRST) ---
 class PdfViewer {
-    static doc = null;
-    static currentWrapper = null; 
-    static currentScale = 1.3;
-    static currentPage = 1;
-    static isMobile = false;
-
+    static doc = null; static currentWrapper = null; static currentScale = 1.3; static currentPage = 1; static isMobile = false;
     static async load(url) {
-        document.getElementById('pdf-fallback').style.display = 'none';
-        document.getElementById('pdf-toolbar').style.display = 'flex';
-        document.getElementById('custom-pdf-viewer').style.display = 'flex';
-        document.getElementById('pdf-viewer-frame').style.display = 'none';
-        this.isMobile = window.innerWidth < 768;
-        this.currentScale = this.isMobile ? 0.7 : 1.3;
+        document.getElementById('pdf-fallback').style.display = 'none'; document.getElementById('pdf-toolbar').style.display = 'flex';
+        document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
+        this.isMobile = window.innerWidth < 768; this.currentScale = this.isMobile ? 0.7 : 1.3;
         try {
-            const task = pdfjsLib.getDocument(url);
-            this.doc = await task.promise;
-            this.renderPage(1); 
-            if(!this.isMobile) this.renderSidebar();
+            const task = pdfjsLib.getDocument(url); this.doc = await task.promise;
+            this.renderPage(1); if(!this.isMobile) this.renderSidebar();
         } catch(e) { console.warn(e); }
     }
-
     static async renderPage(num) {
         this.currentPage = num;
-        const container = document.getElementById('pdf-main-view');
-        container.innerHTML = ''; 
+        const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
         const page = await this.doc.getPage(num);
         const viewport = page.getViewport({ scale: this.currentScale }); 
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'pdf-page-wrapper';
-        wrapper.style.width = Math.floor(viewport.width) + "px";
-        wrapper.style.height = Math.floor(viewport.height) + "px";
+        const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
+        wrapper.style.width = Math.floor(viewport.width) + "px"; wrapper.style.height = Math.floor(viewport.height) + "px";
         this.currentWrapper = wrapper;
-
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
+        const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height;
+        canvas.style.width = "100%"; canvas.style.height = "100%";
         wrapper.appendChild(canvas);
-
-        const rLayer = document.createElement('div');
-        rLayer.className = 'redaction-layer';
-        // Apply editing state if panel is open
+        const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
         if(document.getElementById('redaction-editor').classList.contains('active')) rLayer.classList.add('editing');
         wrapper.appendChild(rLayer);
-
         container.appendChild(wrapper);
         await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
-
-        // Auto-Scan only in active Demo Mode
         if(DemoManager.isActive) { setTimeout(() => LayoutScanner.autoScan(), 500); }
     }
-    
     static async renderSidebar() {
-        const sidebar = document.getElementById('pdf-sidebar');
-        sidebar.innerHTML = '';
+        const sidebar = document.getElementById('pdf-sidebar'); sidebar.innerHTML = '';
         for (let i = 1; i <= this.doc.numPages; i++) {
             const page = await this.doc.getPage(i);
-            const wrapper = document.createElement('div');
-            wrapper.className = 'pdf-thumb-wrapper';
+            const wrapper = document.createElement('div'); wrapper.className = 'pdf-thumb-wrapper';
             if(i === 1) wrapper.classList.add('active');
-            wrapper.onclick = () => {
-                this.renderPage(i);
-                document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active'));
-                wrapper.classList.add('active');
-            };
+            wrapper.onclick = () => { this.renderPage(i); document.querySelectorAll('.pdf-thumb-wrapper').forEach(w => w.classList.remove('active')); wrapper.classList.add('active'); };
             const viewport = page.getViewport({ scale: 0.2 }); 
-            const canvas = document.createElement('canvas');
-            canvas.width = viewport.width; canvas.height = viewport.height;
-            canvas.style.width = "100%";
+            const canvas = document.createElement('canvas'); canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%";
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
             const num = document.createElement('div'); num.className = 'pdf-page-num'; num.innerText = i;
             wrapper.appendChild(canvas); wrapper.appendChild(num); sidebar.appendChild(wrapper);
         }
     }
-
-    static zoom(delta) {
-        this.currentScale += delta;
-        if(this.currentScale < 0.2) this.currentScale = 0.2;
-        this.renderPage(this.currentPage);
-    }
+    static zoom(delta) { this.currentScale += delta; if(this.currentScale < 0.2) this.currentScale = 0.2; this.renderPage(this.currentPage); }
     static print() { if(this.doc) window.open(this.doc.loadingTask.url, '_blank'); }
 }
 
 class PdfController {
     static load(id, url) {
-        const placeholder = document.getElementById('pdf-placeholder-text');
-        if(placeholder) placeholder.style.display = 'none';
-        const link = document.getElementById('pdf-fallback-link');
-        if(link) link.href = url || "#";
+        document.getElementById('pdf-placeholder-text').style.display = 'none';
         if (!url) { document.getElementById('pdf-fallback').style.display = 'block'; return; }
         PdfViewer.load(url);
     }
 }
 
-// --- DEMO & REDACTION LOGIC ---
+// --- DEMO / REDACTION ---
 class DemoManager {
     static isActive = false;
     static toggle() {
         this.isActive = !this.isActive;
         const btn = document.getElementById('demo-btn');
-        const dateInput = document.getElementById('demo-date');
         if(this.isActive) {
-            document.body.classList.add('demo-mode');
-            btn.classList.add('active-mode');
+            document.body.classList.add('demo-mode'); btn.classList.add('active-mode');
             document.getElementById('demo-settings-area').style.display = 'block';
-            if(!dateInput.value) dateInput.valueAsDate = new Date();
+            if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date();
         } else {
-            document.body.classList.remove('demo-mode');
-            btn.classList.remove('active-mode');
+            document.body.classList.remove('demo-mode'); btn.classList.remove('active-mode');
             document.getElementById('demo-settings-area').style.display = 'none';
             RedactionEditor.close();
         }
@@ -490,252 +383,98 @@ class DemoManager {
 }
 
 class RedactionEditor {
-    static open() {
-        document.getElementById('config-modal').classList.remove('active-modal');
-        document.getElementById('redaction-editor').classList.add('active');
-        document.querySelectorAll('.redaction-layer').forEach(el => el.classList.add('editing'));
-    }
-    static close() {
-        document.getElementById('redaction-editor').classList.remove('active');
-        document.querySelectorAll('.redaction-layer').forEach(el => el.classList.remove('editing'));
-        RedactionManager.deselect();
-    }
+    static open() { document.getElementById('config-modal').classList.remove('active-modal'); document.getElementById('redaction-editor').classList.add('active'); document.querySelectorAll('.redaction-layer').forEach(el => el.classList.add('editing')); }
+    static close() { document.getElementById('redaction-editor').classList.remove('active'); document.querySelectorAll('.redaction-layer').forEach(el => el.classList.remove('editing')); RedactionManager.deselect(); }
 }
 
 class LayoutScanner {
     static autoScan() {
         if(!PdfViewer.currentWrapper) return;
         RedactionManager.clearAll();
-        const width = PdfViewer.currentWrapper.offsetWidth;
-        const height = PdfViewer.currentWrapper.offsetHeight;
-        // Default Template
-        const template = [
-            { x: 0.70, y: 0.02, w: 0.28, h: 0.08, map: 'cust', fontSize: 18 }, 
-            { x: 0.70, y: 0.11, w: 0.28, h: 0.05, map: 'job', fontSize: 14 },  
-            { x: 0.70, y: 0.85, w: 0.28, h: 0.12, map: 'stage', fontSize: 24 } 
-        ];
-        template.forEach(zone => {
-            RedactionManager.createZone(zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize);
-        });
+        const width = PdfViewer.currentWrapper.offsetWidth; const height = PdfViewer.currentWrapper.offsetHeight;
+        const template = [ { x: 0.70, y: 0.02, w: 0.28, h: 0.08, map: 'cust', fontSize: 18 }, { x: 0.70, y: 0.11, w: 0.28, h: 0.05, map: 'job', fontSize: 14 }, { x: 0.70, y: 0.85, w: 0.28, h: 0.12, map: 'stage', fontSize: 24 } ];
+        template.forEach(zone => { RedactionManager.createZone(zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize); });
         RedactionManager.refreshContent();
     }
 }
 
 class RedactionManager {
-    static activeBox = null;
-    static zones = []; 
-
+    static activeBox = null; static zones = []; 
     static createZone(x, y, w, h, mapKey, fontSize = 14) {
-        const layer = document.querySelector('.redaction-layer');
-        if(!layer) return;
-        const box = document.createElement('div');
-        box.className = 'redaction-box';
+        const layer = document.querySelector('.redaction-layer'); if(!layer) return;
+        const box = document.createElement('div'); box.className = 'redaction-box';
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
-        box.dataset.map = mapKey || 'custom';
-        box.style.fontSize = fontSize + 'px';
-        box.style.fontFamily = "'Courier New', monospace"; 
-        const handle = document.createElement('div');
-        handle.className = 'redaction-resize-handle';
-        box.appendChild(handle);
+        box.dataset.map = mapKey || 'custom'; box.style.fontSize = fontSize + 'px'; box.style.fontFamily = "'Courier New', monospace"; 
+        const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
         box.onmousedown = (e) => this.selectZone(e, box);
-        layer.appendChild(box);
-        this.zones.push(box);
+        layer.appendChild(box); this.zones.push(box);
         return box;
     }
-
     static selectZone(e, box) {
         e.stopPropagation();
         if(this.activeBox) this.activeBox.classList.remove('selected');
-        this.activeBox = box;
-        box.classList.add('selected');
+        this.activeBox = box; box.classList.add('selected');
         document.getElementById('editor-controls').classList.remove('disabled-overlay');
         document.getElementById('zone-map-select').value = box.dataset.map;
         document.getElementById('redact-size').value = parseInt(box.style.fontSize) || 14;
         document.getElementById('redact-font').value = box.style.fontFamily.replace(/"/g, "'");
     }
-
     static deselect() {
         if(this.activeBox) this.activeBox.classList.remove('selected');
-        this.activeBox = null;
-        document.getElementById('editor-controls').classList.add('disabled-overlay');
+        this.activeBox = null; document.getElementById('editor-controls').classList.add('disabled-overlay');
     }
-
-    static updateActiveStyle() {
-        if(!this.activeBox) return;
-        this.activeBox.style.fontFamily = document.getElementById('redact-font').value;
-        this.activeBox.style.fontSize = document.getElementById('redact-size').value + 'px';
-    }
-
-    static mapSelectedZone() {
-        if(!this.activeBox) return;
-        this.activeBox.dataset.map = document.getElementById('zone-map-select').value;
-        this.refreshContent();
-    }
-
+    static updateActiveStyle() { if(!this.activeBox) return; this.activeBox.style.fontFamily = document.getElementById('redact-font').value; this.activeBox.style.fontSize = document.getElementById('redact-size').value + 'px'; }
+    static mapSelectedZone() { if(!this.activeBox) return; this.activeBox.dataset.map = document.getElementById('zone-map-select').value; this.refreshContent(); }
     static refreshContent() {
         const ctx = DemoManager.getContext();
         this.zones.forEach(box => {
             const map = box.dataset.map;
             let text = "";
-            if(map === 'cust') text = ctx.cust;
-            else if(map === 'job') text = ctx.job;
-            else if(map === 'date') text = ctx.date;
-            else if(map === 'stage') text = ctx.stage;
+            if(map === 'cust') text = ctx.cust; else if(map === 'job') text = ctx.job; else if(map === 'date') text = ctx.date; else if(map === 'stage') text = ctx.stage;
             box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`;
         });
     }
-
-    static clearAll() {
-        const layer = document.querySelector('.redaction-layer');
-        if(layer) layer.innerHTML = '';
-        this.zones = [];
-        this.deselect();
-    }
+    static clearAll() { const layer = document.querySelector('.redaction-layer'); if(layer) layer.innerHTML = ''; this.zones = []; this.deselect(); }
 }
 
-// --- STANDARD APP LOGIC ---
-
-class DB {
-    static open() { 
-        return new Promise((r, j) => { 
-            const q = indexedDB.open("CoxSchematicDB", 8); 
-            q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; 
-            q.onsuccess = e => r(e.target.result); 
-            q.onerror = e => j(e); 
-        }); 
-    }
-    static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
-    static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
-    static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
-    static async deleteLegacy() { try { const d = await this.open(); const t = d.transaction("cache", "readwrite"); t.objectStore("cache").clear(); } catch(e){} }
-}
-
-class CacheService {
-    static activeKey = null;
-    static async prepareKey(p) {
-        if(!p) return null;
-        const e = new TextEncoder(); 
-        const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); 
-        this.activeKey = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-        return this.activeKey;
-    }
-    static async saveShard(id, data) { 
-        if(!this.activeKey) return; 
-        const j = JSON.stringify(data); 
-        const e = await this.enc(j); 
-        await DB.putChunk(id, e); 
-    }
-    static async loadAllWithProgress(progressCallback) { 
-        if(!this.activeKey) return null;
-        const keys = await DB.getChunkKeys();
-        if(!keys || keys.length === 0) return null;
-        for(let i = 0; i < keys.length; i++) {
-            if(i % 5 === 0) await new Promise(r => setTimeout(r, 5));
-            const chunk = await DB.getChunk(keys[i]);
-            if(chunk) {
-                try {
-                    const dec = await this.dec(chunk);
-                    if(dec) {
-                        const data = JSON.parse(dec);
-                        data.forEach(r => { window.LOCAL_DB.push(r); window.ID_MAP.set(r.id, r); if(r.mfg) window.FOUND_MFGS.add(r.mfg); });
-                    }
-                } catch(e) {}
-            }
-            if(progressCallback) progressCallback(Math.round(((i + 1) / keys.length) * 100));
-        }
-        return true;
-    }
-    static async enc(t) { 
-        const iv = crypto.getRandomValues(new Uint8Array(12)); 
-        const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, this.activeKey, new TextEncoder().encode(t)); 
-        return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); 
-    }
-    static async dec(t) { 
-        const [i, d] = t.split(':'); 
-        const iv = new Uint8Array(i.match(/.{1,2}/g).map(b=>parseInt(b,16))); 
-        const da = new Uint8Array(d.match(/.{1,2}/g).map(b=>parseInt(b,16))); 
-        try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, this.activeKey, da)); } catch { return null; } 
-    }
-}
-
-class AuthService {
-    static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
-    static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
-    static async logout() { localStorage.clear(); sessionStorage.clear(); await DB.clear(); location.reload(); }
-    static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
-}
-
-class NetworkService {
-    static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: AuthService.headers() }); }
-    static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
-}
-
-class FeedbackService { 
-    static activeId = null; static sessionVotes = new Set();
-    static down(id) { this.activeId = id; document.getElementById('feedback-modal').classList.add('active-modal'); } 
-    static async submit() { 
-        const id = this.activeId; const submissions = []; 
-        document.querySelectorAll('.reason-btn.selected').forEach(btn => { 
-            const reasonCode = btn.dataset.reason; 
-            const val = btn.nextElementSibling ? btn.nextElementSibling.value : "";
-            submissions.push({ id, reasonCode, value: val }); 
-        }); 
-        for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, { "fields": { "Panel ID": sub.id, "Parameter": sub.reasonCode, "Suggested Value": sub.value } }); 
-        document.getElementById('feedback-modal').classList.remove('active-modal');
-    } 
-    static async up(id, btnElement) { 
-        if(this.sessionVotes.has(id)) return; this.sessionVotes.add(id); if(btnElement) btnElement.classList.add('voted-up');
-        const mfg = document.getElementById('mfgInput').value; const hp = document.getElementById('hpInput').value;
-        const volt = document.getElementById('voltInput').value; const phase = document.getElementById('phaseInput').value; const enc = document.getElementById('encInput').value;
-        const submissions = [{ "fields": { "Panel ID": id, "Parameter": "VERIFIED", "Suggested Value": "General Match" } }];
-        if(mfg!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "mfg", "Suggested Value": mfg } });
-        if(hp!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "hp", "Suggested Value": hp } });
-        if(volt!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "volt", "Suggested Value": volt } });
-        if(phase!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "phase", "Suggested Value": phase } });
-        if(enc!=="Any") submissions.push({ "fields": { "Panel ID": id, "Parameter": "enc", "Suggested Value": enc } });
-        for(const sub of submissions) await NetworkService.post(CONFIG.feedbackTable, sub);
-    } 
-    static toggleReason(el) { el.classList.toggle('selected'); } 
-    static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); } 
-}
-
-const AI_TRAINING_DATA = { 
-    MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'], 'baldor':['baldor'] }, 
-    ENCLOSURES: { '4XSS': ['4XSS', 'STAINLESS', 'SS'], '4XFG': ['4XFG', 'FIBERGLASS', 'FG'], 'POLY': ['POLY'], 'NEMA 12': ['NEMA 12'], 'NEMA 4': ['NEMA 4'], 'NEMA 1': ['NEMA 1'] },
-    DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
-};
+// --- CORE APP LOGIC ---
+const AI_TRAINING_DATA = { MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'], 'baldor':['baldor'] }, ENCLOSURES: { '4XSS': ['4XSS', 'STAINLESS', 'SS'], '4XFG': ['4XFG', 'FIBERGLASS', 'FG'], 'POLY': ['POLY'], 'NEMA 12': ['NEMA 12'], 'NEMA 4': ['NEMA 4'], 'NEMA 1': ['NEMA 1'] }, DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } };
 
 class TheHealer {
     static healedData = {}; 
-    static async fetchAndTally() {
-        try {
-            const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100');
-            if(resp.status === 401) { AuthService.logout(); return; }
-            const data = await resp.json();
-            if(data.records) {
-                const tallies = {};
-                data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; });
-                for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } }
-            }
-        } catch(e) { console.error("Healing Failed", e); }
-    }
+    static async fetchAndTally() { try { const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); if(resp.status === 401) { AuthService.logout(); return; } const data = await resp.json(); if(data.records) { const tallies = {}; data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; }); for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } } } } catch(e) { console.error("Healing Failed", e); } }
 }
 
 class NaiveBayes {
     static tokenMap = {}; static categoryCounts = {}; static totalDocs = 0; static vocabSize = 0;
     static tokenize(text) { return text.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(t => t.length > 2); }
-    static train(data) {
-        this.tokenMap = {}; this.categoryCounts = {}; this.totalDocs = 0;
-        data.forEach(r => {
-            if (!r.mfg) return;
-            const cat = r.mfg; const tokens = this.tokenize(r.desc || "");
-            if (!this.categoryCounts[cat]) this.categoryCounts[cat] = { count: 0, docCount: 0 };
-            this.categoryCounts[cat].docCount++; this.totalDocs++;
-            tokens.forEach(t => { if (!this.tokenMap[t]) this.tokenMap[t] = {}; if (!this.tokenMap[t][cat]) this.tokenMap[t][cat] = 0; this.tokenMap[t][cat]++; this.categoryCounts[cat].count++; });
+    
+    // --- ASYNC TRAINING (Fixes 96% Stall) ---
+    static async trainAsync(data) {
+        return new Promise(resolve => {
+            this.tokenMap = {}; this.categoryCounts = {}; this.totalDocs = 0;
+            const CHUNK_SIZE = 1000;
+            let index = 0;
+
+            const processChunk = () => {
+                const chunk = data.slice(index, index + CHUNK_SIZE);
+                chunk.forEach(r => {
+                    if (!r.mfg) return;
+                    const cat = r.mfg; const tokens = this.tokenize(r.desc || "");
+                    if (!this.categoryCounts[cat]) this.categoryCounts[cat] = { count: 0, docCount: 0 };
+                    this.categoryCounts[cat].docCount++; this.totalDocs++;
+                    tokens.forEach(t => { if (!this.tokenMap[t]) this.tokenMap[t] = {}; if (!this.tokenMap[t][cat]) this.tokenMap[t][cat] = 0; this.tokenMap[t][cat]++; this.categoryCounts[cat].count++; });
+                });
+                index += CHUNK_SIZE;
+                if (index < data.length) { requestAnimationFrame(processChunk); } 
+                else { this.vocabSize = Object.keys(this.tokenMap).length; resolve(); }
+            };
+            processChunk();
         });
-        this.vocabSize = Object.keys(this.tokenMap).length;
     }
+
     static classify(text) {
+        if(this.totalDocs === 0) return { category: null, score: -Infinity };
         const tokens = this.tokenize(text); let bestCat = null; let maxScore = -Infinity;
         for (const cat in this.categoryCounts) {
             let score = Math.log(this.categoryCounts[cat].docCount / this.totalDocs);
@@ -770,7 +509,7 @@ class DataLoader {
         localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
         const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
         if(hasData) { 
-            setTimeout(() => NaiveBayes.train(window.LOCAL_DB), 10); // Train in background
+            NaiveBayes.trainAsync(window.LOCAL_DB); // Fire and forget
             UI.pop(); if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; return; } else { btn.innerText = "⬇️ RESUMING..."; } 
         } else { btn.innerText = "⬇️ SYNCING..."; }
         await new Promise(r => setTimeout(r, 50)); await TheHealer.fetchAndTally(); await this.fetchPartition('desc', btn);
@@ -799,10 +538,24 @@ class DataLoader {
                 offset = d.offset;
             } while(offset);
             if(buffer.length > 0) { if(btn) btn.innerText = "✅ FINALIZING..."; await new Promise(resolve => { requestAnimationFrame(() => { setTimeout(resolve, 50); }); }); await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
-            setTimeout(() => NaiveBayes.train(window.LOCAL_DB), 10);
+            NaiveBayes.trainAsync(window.LOCAL_DB);
         } catch(e) { console.error("Sync Critical Error", e); } finally { if(btn && !btn.classList.contains('warning')) { btn.innerText = "SEARCH"; btn.disabled = false; } }
     }
     static harvestCSV() { alert('Harvesting...'); }
+}
+
+class DB {
+    static open() { 
+        return new Promise((r, j) => { 
+            const q = indexedDB.open("CoxSchematicDB", 8); 
+            q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; 
+            q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); 
+        }); 
+    }
+    static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
+    static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
+    static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
+    static async deleteLegacy() { try { const d = await this.open(); const t = d.transaction("cache", "readwrite"); t.objectStore("cache").clear(); } catch(e){} }
 }
 
 class SearchEngine {
@@ -833,7 +586,12 @@ class UI {
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
-    static toggleSearch(e) { const c = document.getElementById('search-controls'); if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
+    static toggleSearch(e) { 
+        const c = document.getElementById('search-controls'); 
+        if(!c) return; // FIX: Safety Check
+        if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } 
+        else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } 
+    }
     static pop() {
         const m = document.getElementById('mfgInput'); const cv = m.value;
         let all = Array.from(window.FOUND_MFGS).sort(); m.innerHTML='<option value="Any">Any</option>'; all.forEach(v=>m.add(new Option(v,v))); m.value=cv;
@@ -855,6 +613,18 @@ class UI {
             a.appendChild(c);
         });
     }
+}
+
+class AuthService { 
+    static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
+    static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
+    static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
+    static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
+}
+
+class NetworkService {
+    static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: AuthService.headers() }); }
+    static async post(t, d) { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...AuthService.headers() }, body: JSON.stringify(d) }); }
 }
 
 window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
