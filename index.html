@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.42)</title>
+    <title>Cox Research | SCHEMATICai (v22.43)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -238,7 +238,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.42</div>
+    <div class="version-badge">SCHEMATICai v22.43</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -355,7 +355,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.42 (FIXED 400 RECOVERY) ---
+// --- SCHEMATICai v22.43 (RECOVERY MODE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -365,6 +365,7 @@ const AI_TRAINING_DATA = {
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
+// --- UTILS ---
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -429,43 +430,6 @@ class PdfExporter {
     }
 }
 
-class PdfController {
-    static async load(id, url) {
-        document.getElementById('pdf-placeholder-text').style.display = 'none';
-        
-        try {
-            if (!url) throw new Error("Missing URL");
-            await PdfViewer.load(url);
-        } catch(e) {
-            const btn = document.querySelector('.record-card.active-view .panel-name');
-            if(btn) btn.innerText = "REFETCHING...";
-            document.getElementById('pdf-main-view').innerHTML = `<div style="padding:20px;text-align:center;color:white;"><h3>🔄 Link Expired - Refreshing...</h3></div>`;
-            
-            try {
-                // FIX: PROPER ENCODING FOR FORMULA
-                const formula = `filterByFormula=${encodeURIComponent(`{Control Panel Name}='${id}'`)}`;
-                const r = await NetworkService.fetch(CONFIG.mainTable, `?${formula}`);
-                const d = await r.json();
-                
-                if(d.records && d.records.length > 0) {
-                    const freshRec = d.records[0];
-                    const newUrl = freshRec.fields['Control Panel PDF']?.[0]?.url;
-                    
-                    if(newUrl) {
-                        const localRec = window.ID_MAP.get(id);
-                        if(localRec) localRec.pdfUrl = newUrl;
-                        console.log("Refreshed expired URL for", id);
-                        await PdfViewer.load(newUrl);
-                    } else { throw new Error("No PDF in record"); }
-                }
-            } catch(retryErr) {
-                console.error("Retry failed", retryErr);
-                document.getElementById('pdf-fallback').style.display = 'block'; 
-            } finally { if(btn) btn.innerText = id; }
-        }
-    }
-}
-
 class PdfViewer {
     static doc = null; static currentScale = 1.3; static url = ""; static currentBlobUrl = "";
     
@@ -511,6 +475,43 @@ class PdfViewer {
         if(DemoManager.isActive) { setTimeout(() => LayoutScanner.scanAllPages(), 500); }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
+}
+
+class PdfController {
+    static async load(id, url) {
+        document.getElementById('pdf-placeholder-text').style.display = 'none';
+        
+        try {
+            if (!url) throw new Error("Missing URL");
+            await PdfViewer.load(url);
+        } catch(e) {
+            const btn = document.querySelector('.record-card.active-view .panel-name');
+            if(btn) btn.innerText = "REFETCHING...";
+            document.getElementById('pdf-main-view').innerHTML = `<div style="padding:20px;text-align:center;color:white;"><h3>🔄 Link Expired - Refreshing...</h3></div>`;
+            
+            try {
+                // REFRESH LOGIC
+                const formula = `filterByFormula=${encodeURIComponent(`{Control Panel Name}='${id}'`)}`;
+                const r = await NetworkService.fetch(CONFIG.mainTable, `?${formula}`);
+                const d = await r.json();
+                
+                if(d.records && d.records.length > 0) {
+                    const freshRec = d.records[0];
+                    const newUrl = freshRec.fields['Control Panel PDF']?.[0]?.url;
+                    
+                    if(newUrl) {
+                        const localRec = window.ID_MAP.get(id);
+                        if(localRec) localRec.pdfUrl = newUrl;
+                        console.log("Refreshed expired URL for", id);
+                        await PdfViewer.load(newUrl);
+                    } else { throw new Error("No PDF in record"); }
+                }
+            } catch(retryErr) {
+                console.error("Retry failed", retryErr);
+                document.getElementById('pdf-fallback').style.display = 'block'; 
+            } finally { if(btn) btn.innerText = id; }
+        }
+    }
 }
 
 class DemoManager {
@@ -694,6 +695,106 @@ class NaiveBayes {
     }
 }
 
+class AIParser {
+    static parse(t, id) {
+        const healed = TheHealer.healedData[id];
+        const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null };
+        t = (t||"").toUpperCase();
+        for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
+        if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
+        if (!s.hp) { let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); if(m) s.hp = parseFloat(m[1]).toString(); }
+        if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
+        if (!s.phase) { if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; }
+        return s;
+    }
+}
+
+class DataLoader {
+    static async preload() {
+        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 PREPARING...";
+        await new Promise(r => setTimeout(r, 200)); 
+        const p = localStorage.getItem('cox_pass'); await CacheService.prepareKey(p); await DB.deleteLegacy();
+        let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
+        if(attempts > 5) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
+        localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
+        const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
+        if(hasData) { 
+            if(window.LOCAL_DB.length > 7000) { 
+                localStorage.setItem('cox_db_complete', 'true'); 
+                btn.innerText = "SEARCH"; btn.disabled = false; 
+                NaiveBayes.trainAsync(window.LOCAL_DB);
+                UI.pop(); return; 
+            }
+            if(localStorage.getItem('cox_db_complete')) { 
+                localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; 
+                NaiveBayes.trainAsync(window.LOCAL_DB);
+                UI.pop(); return; 
+            } else { 
+                btn.innerText = "⬇️ RESUMING..."; 
+            } 
+        } else { btn.innerText = "⬇️ SYNCING..."; }
+        await new Promise(r => setTimeout(r, 50)); await TheHealer.fetchAndTally(); await this.fetchPartition('desc', btn);
+        requestAnimationFrame(() => { btn.innerText = "✅ FINALIZING..."; localStorage.setItem('cox_sync_attempts', '0'); setTimeout(() => { NaiveBayes.trainAsync(window.LOCAL_DB).then(() => { btn.innerText = "SEARCH"; btn.disabled = false; }); }, 100); }); UI.pop();
+    }
+    
+    static resetSync() {
+        localStorage.removeItem('cox_db_complete');
+        localStorage.setItem('cox_sync_attempts', '0');
+        location.reload();
+    }
+    
+    static async fetchPartition(dir, btn) {
+        let offset = null, loop = 0; let buffer = []; let shardCount = 0;
+        try {
+            do {
+                loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break;
+                await new Promise(r => setTimeout(r, 0)); 
+                if(btn && !btn.classList.contains('warning')) { const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; }
+                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
+                if(r.status!==200) { console.error("Sync Failed", r.status); break; }
+                const d = await r.json(); 
+                if(!d.records || d.records.length === 0) { localStorage.setItem('cox_db_complete', 'true'); break; }
+                d.records.forEach(r => {
+                    const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                    const url = r.fields['Control Panel PDF']?.[0]?.url;
+                    if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
+                    else {
+                        const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
+                        window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); buffer.push(rec);
+                    }
+                });
+                if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
+                offset = d.offset;
+            } while(offset);
+            localStorage.setItem('cox_db_complete', 'true'); 
+            if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
+        } catch(e) { console.error("Sync Critical Error", e); } 
+    }
+    static harvestCSV() { alert('Harvesting...'); }
+}
+
+class SearchEngine {
+    static perform() {
+        const kw = document.getElementById('keywordInput').value.split(',').map(s=>s.trim()).filter(s=>s.length);
+        const crit = { kw, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value, enc: document.getElementById('encInput').value };
+        let res = [];
+        window.LOCAL_DB.forEach(r => {
+            let w = 0, p = true, hpV = false, miss = 0;
+            if(crit.kw.length) { if(!crit.kw.every(k => (r.id+" "+r.desc).toUpperCase().includes(k.toUpperCase()))) return; w+=10; }
+            if(crit.mfg!=="Any") { if(r.mfg===crit.mfg.toUpperCase()) w+=50000; else { if(!r.mfg) { w-=10000; p=false; miss++; } else return; } }
+            if(crit.hp!=="Any") { if(r.hp) { if(parseFloat(r.hp)===parseFloat(crit.hp)) w+=100; else { w+=10; p=false; miss++; } } else { w+=5; p=false; miss++; } }
+            if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) { p=false; miss++; w-=10000; } }
+            if(crit.phase!=="Any") { if(r.phase && r.phase!==crit.phase) return; if(!r.phase) { p=false; miss++; w-=5000; } }
+            if(crit.enc!=="Any") { if(r.enc!==crit.enc) { p=false; miss++; w-=1000; } }
+            if(crit.mfg !== "Any" && !r.mfg) { const bayes = NaiveBayes.classify(r.desc || ""); if(bayes.category === crit.mfg.toUpperCase() && bayes.score > -20) w += 5000; }
+            if(!p && miss===1 && crit.hp!=="Any" && r.hp && parseFloat(r.hp)!==parseFloat(crit.hp)) hpV=true;
+            r.w=w; r.p=p; r.hpV=hpV; res.push(r);
+        });
+        res.sort((a,b) => { if(a.p!=b.p) return a.p?-1:1; if(a.hpV!=b.hpV) return a.hpV?-1:1; if(a.w!=b.w) return b.w-a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
+        UI.render(res, crit); UI.toggleSearch(false);
+    }
+}
+
 class UI {
     static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
@@ -739,7 +840,17 @@ class UI {
 }
 
 window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
-document.addEventListener('DOMContentLoaded', () => { UI.init(); if(AuthService.init()) { DataLoader.preload(); } });
+document.addEventListener('DOMContentLoaded', () => { 
+    try {
+        UI.init(); 
+        if(AuthService.init()) { 
+            DataLoader.preload(); 
+        }
+    } catch(e) {
+        console.error("Critical Init Error:", e);
+        alert("System failed to initialize. Please clear cache and reload.");
+    }
+});
 </script>
 </body>
 </html>
