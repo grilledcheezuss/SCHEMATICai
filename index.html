@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.57)</title>
+    <title>Cox Research | SCHEMATICai (v22.59)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.57</div>
+    <div class="version-badge">SCHEMATICai v22.59</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.57 (FULLY GLOBALIZED) ---
+// --- SCHEMATICai v22.59 (SAFE FEEDBACK) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -618,16 +618,32 @@ class FeedbackService {
 
     static async up(id, btn) {
         btn.classList.add('voted-up');
+        // SAFETY: WE COMMENT OUT 'USER' TO PREVENT 422 ERROR UNTIL WORKER IS UPDATED
         const payload = {
             records: [{
-                fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user') }
-            }]
+                fields: { 
+                    'Panel ID': id, 
+                    'Vote': 'Up'
+                    // 'User': localStorage.getItem('cox_user')  <-- DISABLED FOR SAFETY
+                }
+            }],
+            typecast: true
         };
-        await fetch(`${WORKER_URL}?target=FEEDBACK`, {
-            method: 'POST',
-            headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        
+        try {
+            const response = await fetch(`${WORKER_URL}?target=FEEDBACK`, {
+                method: 'POST',
+                headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            if(!response.ok) {
+                const errData = await response.json();
+                alert("Feedback Error: " + JSON.stringify(errData));
+            }
+        } catch(e) {
+            alert("Network Error: " + e.message);
+        }
     }
 
     static down(id) {
@@ -659,26 +675,37 @@ class FeedbackService {
             if(i.value) corrections[i.previousElementSibling.dataset.reason] = i.value;
         });
 
+        // SAFETY: WE COMMENT OUT 'USER' HERE TOO
         const payload = {
             records: [{
                 fields: {
                     'Panel ID': this.currentId,
                     'Vote': 'Down',
-                    'User': localStorage.getItem('cox_user'),
+                    // 'User': localStorage.getItem('cox_user'), <-- DISABLED FOR SAFETY
                     'Reasons': Array.from(this.activeReasons).join(','),
                     'Corrections': JSON.stringify(corrections)
                 }
-            }]
+            }],
+            typecast: true
         };
 
-        await fetch(`${WORKER_URL}?target=FEEDBACK`, {
-            method: 'POST',
-            headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        try {
+            const response = await fetch(`${WORKER_URL}?target=FEEDBACK`, {
+                method: 'POST',
+                headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        this.close();
-        alert("Feedback Sent. Thank you!");
+            if(!response.ok) {
+                const errData = await response.json();
+                alert("Feedback Error: " + JSON.stringify(errData));
+            } else {
+                this.close();
+                alert("Feedback Sent. Thank you!");
+            }
+        } catch(e) {
+            alert("Network Error: " + e.message);
+        }
     }
 
     static close() {
