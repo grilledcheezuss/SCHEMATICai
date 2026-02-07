@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.53)</title>
+    <title>Cox Research | SCHEMATICai (v22.55)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -37,6 +37,7 @@
             --demo-border: #8b5cf6;
             --demo-bg: rgba(139, 92, 246, 0.05);
             
+            /* High Contrast Redaction */
             --redaction-outline: #ff0000;
             --redaction-fill: #000000; 
             --cad-text: #ffffff;       
@@ -228,7 +229,7 @@
         .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; }
         .disabled-overlay { opacity: 0.5; pointer-events: none; }
 
-        /* --- FEEDBACK MODAL STYLES (v22.53) --- */
+        /* --- FEEDBACK MODAL STYLES --- */
         .reason-btn {
             display: block; padding: 8px; margin-bottom: 4px;
             border: 1px solid var(--border-color); border-radius: 4px;
@@ -245,7 +246,7 @@
             width: 100%; padding: 6px; margin-bottom: 8px;
             border: 1px solid var(--border-color); border-radius: 4px;
             font-size: 12px; background: var(--bg-input); color: var(--text-primary);
-            display: none; /* Hidden until reason selected? Or always visible? Let's leave visible for simplicity if needed, or hide */
+            display: none; 
         }
         .reason-btn.selected + .correction-input { display: block; }
         
@@ -291,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.53</div>
+    <div class="version-badge">SCHEMATICai v22.55</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -410,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.53 (FEEDBACK SERVICE RESTORED) ---
+// --- SCHEMATICai v22.55 (GLOBAL EXPORTS & ORDERING FIX) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -420,7 +421,7 @@ const AI_TRAINING_DATA = {
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
 };
 
-// --- GLOBAL CONFIGURATION (HOISTED FOR SAFETY) ---
+// --- GLOBAL CONFIGURATION (HOISTED) ---
 const LAYOUT_RULES = {
     STANDARD: [
         { x: 0.65, y: 0.82, w: 0.30, h: 0.05, map: 'cust', fontSize: 16 }, 
@@ -465,7 +466,39 @@ class NetworkService {
     static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: AuthService.headers() }); }
 }
 
-// --- 2. MANAGER LAYER (MOVED UP FOR SAFETY) ---
+// --- 2. MANAGER LAYER (MOVED UP FOR SAFETY & EXPORTED) ---
+class DemoManager {
+    static isActive = false;
+    static toggle() {
+        this.isActive = !this.isActive;
+        const btn = document.getElementById('demo-btn');
+        const dateInput = document.getElementById('demo-date');
+        if(this.isActive) { 
+            document.body.classList.add('demo-mode'); 
+            btn.classList.add('active-mode'); 
+            document.getElementById('sidebar-right').classList.remove('collapsed');
+            document.getElementById('toggle-right').innerText = '›';
+            if(!dateInput.value) dateInput.valueAsDate = new Date();
+            if(PdfViewer.doc) LayoutScanner.scanAllPages();
+        } else { 
+            document.body.classList.remove('demo-mode'); 
+            btn.classList.remove('active-mode'); 
+            document.getElementById('sidebar-right').classList.add('collapsed');
+            document.getElementById('toggle-right').innerText = '‹';
+            RedactionEditor.close(); 
+        }
+    }
+    static getContext() {
+        return {
+            cust: document.getElementById('demo-cust-name').value || "CUSTOMER NAME",
+            job: document.getElementById('demo-job-name').value || "JOB TITLE",
+            date: document.getElementById('demo-date').value || "YYYY-MM-DD",
+            stage: document.getElementById('demo-stage').value || "STAGE"
+        };
+    }
+}
+window.DemoManager = DemoManager;
+
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; 
     static startX = 0; static startY = 0; static startLeft = 0; static startTop = 0;
@@ -530,37 +563,7 @@ class RedactionManager {
     }
     static clearAll() { document.querySelectorAll('.redaction-layer').forEach(l => l.innerHTML = ''); this.zones = []; this.deselect(); }
 }
-
-class DemoManager {
-    static isActive = false;
-    static toggle() {
-        this.isActive = !this.isActive;
-        const btn = document.getElementById('demo-btn');
-        const dateInput = document.getElementById('demo-date');
-        if(this.isActive) { 
-            document.body.classList.add('demo-mode'); 
-            btn.classList.add('active-mode'); 
-            document.getElementById('sidebar-right').classList.remove('collapsed');
-            document.getElementById('toggle-right').innerText = '›';
-            if(!dateInput.value) dateInput.valueAsDate = new Date();
-            if(PdfViewer.doc) LayoutScanner.scanAllPages();
-        } else { 
-            document.body.classList.remove('demo-mode'); 
-            btn.classList.remove('active-mode'); 
-            document.getElementById('sidebar-right').classList.add('collapsed');
-            document.getElementById('toggle-right').innerText = '‹';
-            RedactionEditor.close(); 
-        }
-    }
-    static getContext() {
-        return {
-            cust: document.getElementById('demo-cust-name').value || "CUSTOMER NAME",
-            job: document.getElementById('demo-job-name').value || "JOB TITLE",
-            date: document.getElementById('demo-date').value || "YYYY-MM-DD",
-            stage: document.getElementById('demo-stage').value || "STAGE"
-        };
-    }
-}
+window.RedactionManager = RedactionManager;
 
 class RedactionEditor {
     static close() { RedactionManager.deselect(); }
@@ -595,6 +598,7 @@ class LayoutScanner {
         });
     }
 }
+window.LayoutScanner = LayoutScanner;
 
 // --- 3. LOGIC MODULES ---
 class TheHealer {
@@ -675,6 +679,7 @@ class FeedbackService {
         document.getElementById('feedback-modal').classList.remove('active-modal');
     }
 }
+window.FeedbackService = FeedbackService;
 
 class NaiveBayes {
     static tokenMap = {}; static categoryCounts = {}; static totalDocs = 0; static vocabSize = 0;
@@ -918,6 +923,7 @@ class PdfController {
         PdfViewer.load(url);
     }
 }
+window.PdfController = PdfController; // EXPORT PDF CONTROLLER TOO
 
 // --- 6. UI METHODS ---
 class UI {
