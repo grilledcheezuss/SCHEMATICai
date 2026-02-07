@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.59)</title>
+    <title>Cox Research | SCHEMATICai (v22.60)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.59</div>
+    <div class="version-badge">SCHEMATICai v22.60</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.59 (SAFE FEEDBACK) ---
+// --- SCHEMATICai v22.60 (SAFE FEEDBACK & 401 HANDLING) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -637,6 +637,13 @@ class FeedbackService {
                 body: JSON.stringify(payload)
             });
             
+            // CHECK 401 UNAUTHORIZED
+            if (response.status === 401) {
+                alert("Authentication Failed. Please log in again with correct credentials.");
+                AuthService.logout();
+                return;
+            }
+            
             if(!response.ok) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
@@ -695,6 +702,13 @@ class FeedbackService {
                 headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
+            // CHECK 401 UNAUTHORIZED
+            if (response.status === 401) {
+                alert("Authentication Failed. Please log in again with correct credentials.");
+                AuthService.logout();
+                return;
+            }
 
             if(!response.ok) {
                 const errData = await response.json();
