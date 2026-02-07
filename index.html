@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.60)</title>
+    <title>Cox Research | SCHEMATICai (v22.61)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.60</div>
+    <div class="version-badge">SCHEMATICai v22.61</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.60 (SAFE FEEDBACK & 401 HANDLING) ---
+// --- SCHEMATICai v22.61 (CENTRAL NETWORK HANDLER) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -437,7 +437,7 @@ const LAYOUT_RULES = {
     ]
 };
 
-// --- 1. CORE UTILS (NO DEPENDENCIES) ---
+// --- 1. CORE UTILS ---
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -465,12 +465,38 @@ class AuthService {
 }
 window.AuthService = AuthService;
 
+// --- 2. CENTRAL NETWORK SERVICE (GATEKEEPER) ---
 class NetworkService {
-    static async fetch(t, p='') { const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: AuthService.headers() }); }
+    static async fetch(target, params='', method='GET', body=null) { 
+        const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; 
+        const opts = {
+            method: method,
+            headers: AuthService.headers()
+        };
+        if(body) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+        }
+        
+        try {
+            const resp = await fetch(`${b}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`, opts);
+            
+            // GLOBAL 401 TRAP
+            if(resp.status === 401) {
+                alert("Session Expired. Please login with correct credentials (cox/schematic).");
+                AuthService.logout();
+                return { status: 401, ok: false, json: async () => ({ error: "Unauthorized" }) };
+            }
+            return resp;
+        } catch(e) {
+            console.error("Network Error:", e);
+            throw e;
+        }
+    }
 }
 window.NetworkService = NetworkService;
 
-// --- 2. MANAGER LAYER (MOVED UP FOR SAFETY & EXPORTED) ---
+// --- 3. MANAGER LAYER ---
 class DemoManager {
     static isActive = false;
     static toggle() {
@@ -577,7 +603,6 @@ window.RedactionEditor = RedactionEditor;
 class LayoutScanner {
     static scanAllPages() {
         RedactionManager.clearAll();
-        // SAFE GUARD: Only try to scan if wrappers exist
         const wrappers = document.querySelectorAll('.pdf-page-wrapper');
         if(wrappers.length > 0) {
             wrappers.forEach(wrapper => {
@@ -596,7 +621,7 @@ class LayoutScanner {
         }
     }
     static applyRuleToWrapper(wrapper, ruleSet) {
-        if(!wrapper || !ruleSet) return; // EXTRA SAFETY
+        if(!wrapper || !ruleSet) return; 
         const width = wrapper.offsetWidth; const height = wrapper.offsetHeight;
         ruleSet.forEach(zone => {
             RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize);
@@ -605,10 +630,10 @@ class LayoutScanner {
 }
 window.LayoutScanner = LayoutScanner;
 
-// --- 3. LOGIC MODULES ---
+// --- 4. LOGIC MODULES ---
 class TheHealer {
     static healedData = {}; 
-    static async fetchAndTally() { try { const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); if(resp.status === 401) { AuthService.logout(); return; } const data = await resp.json(); if(data.records) { const tallies = {}; data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; }); for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } } } } catch(e) { console.error("Healing Failed", e); } }
+    static async fetchAndTally() { try { const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); if(!resp.ok) return; const data = await resp.json(); if(data.records) { const tallies = {}; data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; }); for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } } } } catch(e) { console.error("Healing Failed", e); } }
 }
 window.TheHealer = TheHealer;
 
@@ -618,39 +643,21 @@ class FeedbackService {
 
     static async up(id, btn) {
         btn.classList.add('voted-up');
-        // SAFETY: WE COMMENT OUT 'USER' TO PREVENT 422 ERROR UNTIL WORKER IS UPDATED
+        // DISABLED 'USER' FIELD TO PREVENT 422 ERRORS FOR NOW
         const payload = {
             records: [{
-                fields: { 
-                    'Panel ID': id, 
-                    'Vote': 'Up'
-                    // 'User': localStorage.getItem('cox_user')  <-- DISABLED FOR SAFETY
-                }
+                fields: { 'Panel ID': id, 'Vote': 'Up' }
             }],
             typecast: true
         };
-        
+        // USE CENTRAL NETWORK SERVICE TO CATCH 401
         try {
-            const response = await fetch(`${WORKER_URL}?target=FEEDBACK`, {
-                method: 'POST',
-                headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            
-            // CHECK 401 UNAUTHORIZED
-            if (response.status === 401) {
-                alert("Authentication Failed. Please log in again with correct credentials.");
-                AuthService.logout();
-                return;
-            }
-            
-            if(!response.ok) {
+            const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
+            if(!response.ok && response.status !== 401) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
             }
-        } catch(e) {
-            alert("Network Error: " + e.message);
-        }
+        } catch(e) { /* Error handled by NetworkService if 401 */ }
     }
 
     static down(id) {
@@ -682,13 +689,11 @@ class FeedbackService {
             if(i.value) corrections[i.previousElementSibling.dataset.reason] = i.value;
         });
 
-        // SAFETY: WE COMMENT OUT 'USER' HERE TOO
         const payload = {
             records: [{
                 fields: {
                     'Panel ID': this.currentId,
                     'Vote': 'Down',
-                    // 'User': localStorage.getItem('cox_user'), <-- DISABLED FOR SAFETY
                     'Reasons': Array.from(this.activeReasons).join(','),
                     'Corrections': JSON.stringify(corrections)
                 }
@@ -697,29 +702,15 @@ class FeedbackService {
         };
 
         try {
-            const response = await fetch(`${WORKER_URL}?target=FEEDBACK`, {
-                method: 'POST',
-                headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            // CHECK 401 UNAUTHORIZED
-            if (response.status === 401) {
-                alert("Authentication Failed. Please log in again with correct credentials.");
-                AuthService.logout();
-                return;
-            }
-
-            if(!response.ok) {
+            const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
+            if(!response.ok && response.status !== 401) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
-            } else {
+            } else if (response.ok) {
                 this.close();
                 alert("Feedback Sent. Thank you!");
             }
-        } catch(e) {
-            alert("Network Error: " + e.message);
-        }
+        } catch(e) { }
     }
 
     static close() {
@@ -780,7 +771,7 @@ class AIParser {
 }
 window.AIParser = AIParser;
 
-// --- 4. DATA LAYER ---
+// --- 5. DATA LAYER ---
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 PREPARING...";
@@ -823,7 +814,7 @@ class DataLoader {
                 await new Promise(r => setTimeout(r, 0)); 
                 if(btn && !btn.classList.contains('warning')) { const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; }
                 const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
-                if(r.status!==200) { console.error("Sync Failed", r.status); break; }
+                if(!r.ok) { console.error("Sync Failed", r.status); break; }
                 const d = await r.json(); 
                 if(!d.records || d.records.length === 0) { localStorage.setItem('cox_db_complete', 'true'); break; }
                 d.records.forEach(r => {
@@ -846,7 +837,7 @@ class DataLoader {
 }
 window.DataLoader = DataLoader;
 
-// --- 5. SEARCH & PDF ---
+// --- 6. SEARCH & PDF ---
 class SearchEngine {
     static perform() {
         const kw = document.getElementById('keywordInput').value.split(',').map(s=>s.trim()).filter(s=>s.length);
@@ -917,7 +908,7 @@ class PdfViewer {
         document.getElementById('pdf-viewer-frame').style.display = 'none';
         
         const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
-        const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+        const resp = await NetworkService.fetch("pdf", `&url=${encodeURIComponent(url)}`);
         
         if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
         
@@ -930,7 +921,6 @@ class PdfViewer {
         this.renderStack(); 
     }
     
-    // --- PRINT FUNCTIONALITY ---
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe');
@@ -978,7 +968,7 @@ class PdfController {
 }
 window.PdfController = PdfController;
 
-// --- 6. UI METHODS ---
+// --- 7. UI METHODS ---
 class UI {
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); }
