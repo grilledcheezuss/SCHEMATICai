@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.51)</title>
+    <title>Cox Research | SCHEMATICai (v22.52)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -37,10 +37,10 @@
             --demo-border: #8b5cf6;
             --demo-bg: rgba(139, 92, 246, 0.05);
             
-            /* UPDATED: High Contrast Redaction */
+            /* High Contrast Redaction */
             --redaction-outline: #ff0000;
-            --redaction-fill: #000000; /* Black Box */
-            --cad-text: #ffffff;       /* White Text */
+            --redaction-fill: #000000; 
+            --cad-text: #ffffff;       
 
             --header-base-height: 55px; 
             --input-height: 36px;
@@ -265,7 +265,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.51</div>
+    <div class="version-badge">SCHEMATICai v22.52</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -384,7 +384,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.51 (WHITE TEXT / BLACK BOX + PRINT) ---
+// --- SCHEMATICai v22.52 (LAYOUT RULES HOISTED) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -392,6 +392,22 @@ const AI_TRAINING_DATA = {
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'], 'baldor':['baldor'] }, 
     ENCLOSURES: { '4XSS': ['4XSS', 'STAINLESS', 'SS'], '4XFG': ['4XFG', 'FIBERGLASS', 'FG'], 'POLY': ['POLY'], 'NEMA 12': ['NEMA 12'], 'NEMA 4': ['NEMA 4'], 'NEMA 1': ['NEMA 1'] }, 
     DATA: { HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100], VOLT: [120, 208, 240, 480, 575], PHASE: [1, 3] } 
+};
+
+// --- GLOBAL CONFIGURATION (HOISTED FOR SAFETY) ---
+const LAYOUT_RULES = {
+    STANDARD: [
+        { x: 0.65, y: 0.82, w: 0.30, h: 0.05, map: 'cust', fontSize: 16 }, 
+        { x: 0.65, y: 0.88, w: 0.30, h: 0.04, map: 'job', fontSize: 14 }, 
+        { x: 0.65, y: 0.93, w: 0.30, h: 0.05, map: 'stage', fontSize: 18 },
+        { x: 0.75, y: 0.03, w: 0.22, h: 0.06, map: 'logo', fontSize: 14 }
+    ],
+    TITLE: [
+        { x: 0.30, y: 0.20, w: 0.40, h: 0.15, map: 'logo', fontSize: 14 }, 
+        { x: 0.20, y: 0.44, w: 0.60, h: 0.05, map: 'job', fontSize: 18 },  
+        { x: 0.30, y: 0.70, w: 0.40, h: 0.15, map: 'logo', fontSize: 14 }, 
+        { x: 0.40, y: 0.90, w: 0.20, h: 0.05, map: 'date', fontSize: 16 }  
+    ]
 };
 
 // --- 1. CORE UTILS (NO DEPENDENCIES) ---
@@ -527,10 +543,14 @@ class RedactionEditor {
 class LayoutScanner {
     static scanAllPages() {
         RedactionManager.clearAll();
-        document.querySelectorAll('.pdf-page-wrapper').forEach(wrapper => {
-            this.applyRuleToWrapper(wrapper, LAYOUT_RULES.STANDARD);
-        });
-        RedactionManager.refreshContent();
+        // SAFE GUARD: Only try to scan if wrappers exist
+        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
+        if(wrappers.length > 0) {
+            wrappers.forEach(wrapper => {
+                this.applyRuleToWrapper(wrapper, LAYOUT_RULES.STANDARD);
+            });
+            RedactionManager.refreshContent();
+        }
     }
     static applyTitleLayout() {
         const firstPage = document.querySelector('.pdf-page-wrapper[data-page-number="1"]');
@@ -542,6 +562,7 @@ class LayoutScanner {
         }
     }
     static applyRuleToWrapper(wrapper, ruleSet) {
+        if(!wrapper || !ruleSet) return; // EXTRA SAFETY
         const width = wrapper.offsetWidth; const height = wrapper.offsetHeight;
         ruleSet.forEach(zone => {
             RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize);
@@ -752,7 +773,7 @@ class PdfViewer {
         this.renderStack(); 
     }
     
-    // --- PRINT FUNCTIONALITY (v22.51) ---
+    // --- PRINT FUNCTIONALITY ---
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe');
@@ -762,7 +783,6 @@ class PdfViewer {
         iframe.onload = () => {
             iframe.contentWindow.focus();
             iframe.contentWindow.print();
-            // Cleanup after a delay to ensure print dialog has time to engage
             setTimeout(() => { document.body.removeChild(iframe); }, 2000);
         };
     }
