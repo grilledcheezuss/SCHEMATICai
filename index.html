@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.52)</title>
+    <title>Cox Research | SCHEMATICai (v22.53)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -37,7 +37,6 @@
             --demo-border: #8b5cf6;
             --demo-bg: rgba(139, 92, 246, 0.05);
             
-            /* High Contrast Redaction */
             --redaction-outline: #ff0000;
             --redaction-fill: #000000; 
             --cad-text: #ffffff;       
@@ -229,6 +228,33 @@
         .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; }
         .disabled-overlay { opacity: 0.5; pointer-events: none; }
 
+        /* --- FEEDBACK MODAL STYLES (v22.53) --- */
+        .reason-btn {
+            display: block; padding: 8px; margin-bottom: 4px;
+            border: 1px solid var(--border-color); border-radius: 4px;
+            cursor: pointer; background: var(--bg-input); font-size: 12px;
+            transition: all 0.2s;
+        }
+        .reason-btn:hover { background: var(--bg-app); }
+        .reason-btn.selected { 
+            background: var(--app-primary); 
+            color: white; 
+            border-color: var(--app-primary);
+        }
+        .correction-input {
+            width: 100%; padding: 6px; margin-bottom: 8px;
+            border: 1px solid var(--border-color); border-radius: 4px;
+            font-size: 12px; background: var(--bg-input); color: var(--text-primary);
+            display: none; /* Hidden until reason selected? Or always visible? Let's leave visible for simplicity if needed, or hide */
+        }
+        .reason-btn.selected + .correction-input { display: block; }
+        
+        .submit-feedback-btn {
+            width: 100%; padding: 10px; border: none; border-radius: 4px;
+            background: var(--app-primary); color: white; font-weight: bold;
+            cursor: pointer; margin-top: 5px;
+        }
+
         #demo-context-panel { display: flex; padding: 10px; margin-bottom: 15px; background: var(--demo-bg); border: 2px dashed var(--demo-border); border-radius: 8px; flex-direction: column; gap: 6px; }
         .demo-label { font-size: 10px; font-weight: 800; color: var(--app-primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
         .demo-input { width: 100%; height: 30px; padding: 0 8px; border: 1px solid var(--demo-border); border-radius: 4px; font-size: 12px; background: var(--bg-input); color: var(--text-primary); outline: none; }
@@ -265,7 +291,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.52</div>
+    <div class="version-badge">SCHEMATICai v22.53</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -384,7 +410,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.52 (LAYOUT RULES HOISTED) ---
+// --- SCHEMATICai v22.53 (FEEDBACK SERVICE RESTORED) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -574,6 +600,80 @@ class LayoutScanner {
 class TheHealer {
     static healedData = {}; 
     static async fetchAndTally() { try { const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); if(resp.status === 401) { AuthService.logout(); return; } const data = await resp.json(); if(data.records) { const tallies = {}; data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; }); for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } } } } catch(e) { console.error("Healing Failed", e); } }
+}
+
+class FeedbackService {
+    static currentId = null;
+    static activeReasons = new Set();
+
+    static async up(id, btn) {
+        btn.classList.add('voted-up');
+        const payload = {
+            records: [{
+                fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user') }
+            }]
+        };
+        await fetch(`${WORKER_URL}?target=FEEDBACK`, {
+            method: 'POST',
+            headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    static down(id) {
+        this.currentId = id;
+        this.activeReasons.clear();
+        document.querySelectorAll('.reason-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelectorAll('.correction-input').forEach(i => { i.value = ''; i.style.display = 'none'; });
+        document.getElementById('feedback-modal').classList.add('active-modal');
+    }
+
+    static toggleReason(btn) {
+        const r = btn.dataset.reason;
+        const input = btn.nextElementSibling;
+        if(this.activeReasons.has(r)) {
+            this.activeReasons.delete(r);
+            btn.classList.remove('selected');
+            if(input) input.style.display = 'none';
+        } else {
+            this.activeReasons.add(r);
+            btn.classList.add('selected');
+            if(input) input.style.display = 'block';
+        }
+    }
+
+    static async submit() {
+        const inputs = document.querySelectorAll('.correction-input');
+        const corrections = {};
+        inputs.forEach(i => {
+            if(i.value) corrections[i.previousElementSibling.dataset.reason] = i.value;
+        });
+
+        const payload = {
+            records: [{
+                fields: {
+                    'Panel ID': this.currentId,
+                    'Vote': 'Down',
+                    'User': localStorage.getItem('cox_user'),
+                    'Reasons': Array.from(this.activeReasons).join(','),
+                    'Corrections': JSON.stringify(corrections)
+                }
+            }]
+        };
+
+        await fetch(`${WORKER_URL}?target=FEEDBACK`, {
+            method: 'POST',
+            headers: { ...AuthService.headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        this.close();
+        alert("Feedback Sent. Thank you!");
+    }
+
+    static close() {
+        document.getElementById('feedback-modal').classList.remove('active-modal');
+    }
 }
 
 class NaiveBayes {
@@ -800,6 +900,9 @@ class PdfViewer {
             canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%"; canvas.style.height = "100%";
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
+            
+            // GLOBAL DRAG LISTENERS ATTACHED IN UI.INIT
+            
             wrapper.appendChild(canvas); wrapper.appendChild(rLayer); container.appendChild(wrapper);
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
         }
