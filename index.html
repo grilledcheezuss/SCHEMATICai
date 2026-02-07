@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.43)</title>
+    <title>Cox Research | SCHEMATICai (v22.45)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -159,9 +159,25 @@
         .thumb-btn.voted-up { background: #dcfce7 !important; border-color: #166534 !important; color: #166534 !important; opacity: 1 !important; pointer-events: none; cursor: default; }
 
         /* PREVIEW & REDACTION */
-        #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; }
-        #pdf-main-view { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; }
-        .pdf-page-wrapper { position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.5); background: white; margin-bottom: 20px; }
+        #preview-pane { 
+            flex: 1; background: var(--bg-viewer); 
+            display: flex; flex-direction: column; 
+            position:relative; overflow: hidden; 
+            min-width: 0; z-index: 1; 
+        }
+        #pdf-main-view { 
+            flex: 1; overflow: auto; 
+            display: flex; flex-direction: column; align-items: center; 
+            padding: 20px; background: var(--bg-viewer); 
+            width:100%; height:100%; 
+        }
+        .pdf-page-wrapper { 
+            position: relative; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
+            background: white; 
+            margin-bottom: 20px;
+            display: block; 
+        }
         .pdf-page-canvas { display: block; }
         #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; }
         .pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; }
@@ -238,7 +254,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.43</div>
+    <div class="version-badge">SCHEMATICai v22.45</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -355,7 +371,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.43 (RECOVERY MODE) ---
+// --- SCHEMATICai v22.45 (CLEANED UP PROXY MODE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -440,18 +456,28 @@ class PdfViewer {
         document.getElementById('custom-pdf-viewer').style.display = 'flex'; 
         document.getElementById('pdf-viewer-frame').style.display = 'none';
         
-        const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
-        const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
-        
-        if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
-        
-        const blob = await resp.blob();
-        if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-        this.currentBlobUrl = URL.createObjectURL(blob);
-        
-        const task = pdfjsLib.getDocument(this.currentBlobUrl);
-        this.doc = await task.promise; 
-        this.renderStack(); 
+        // --- V22.45: CLEAN BLOB FETCH ---
+        try {
+            const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
+            const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+            
+            if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
+            
+            const blob = await resp.blob();
+            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentBlobUrl = URL.createObjectURL(blob);
+            
+            const task = pdfjsLib.getDocument(this.currentBlobUrl);
+            this.doc = await task.promise; 
+            this.renderStack();
+        } catch(e) {
+            console.error("PDF Load Failed", e);
+            document.getElementById('pdf-fallback').innerHTML = `
+                <div>⚠️ Failed to load PDF via Proxy (${e.message})</div>
+                <a href="${url}" target="_blank" style="display:inline-block;margin-top:10px;padding:8px 15px;background:#461D7C;color:white;text-decoration:none;border-radius:4px;">Open Original Link</a>
+            `;
+            document.getElementById('pdf-fallback').style.display = 'block';
+        }
     }
     
     static async renderStack() {
@@ -478,39 +504,10 @@ class PdfViewer {
 }
 
 class PdfController {
-    static async load(id, url) {
+    static load(id, url) {
         document.getElementById('pdf-placeholder-text').style.display = 'none';
-        
-        try {
-            if (!url) throw new Error("Missing URL");
-            await PdfViewer.load(url);
-        } catch(e) {
-            const btn = document.querySelector('.record-card.active-view .panel-name');
-            if(btn) btn.innerText = "REFETCHING...";
-            document.getElementById('pdf-main-view').innerHTML = `<div style="padding:20px;text-align:center;color:white;"><h3>🔄 Link Expired - Refreshing...</h3></div>`;
-            
-            try {
-                // REFRESH LOGIC
-                const formula = `filterByFormula=${encodeURIComponent(`{Control Panel Name}='${id}'`)}`;
-                const r = await NetworkService.fetch(CONFIG.mainTable, `?${formula}`);
-                const d = await r.json();
-                
-                if(d.records && d.records.length > 0) {
-                    const freshRec = d.records[0];
-                    const newUrl = freshRec.fields['Control Panel PDF']?.[0]?.url;
-                    
-                    if(newUrl) {
-                        const localRec = window.ID_MAP.get(id);
-                        if(localRec) localRec.pdfUrl = newUrl;
-                        console.log("Refreshed expired URL for", id);
-                        await PdfViewer.load(newUrl);
-                    } else { throw new Error("No PDF in record"); }
-                }
-            } catch(retryErr) {
-                console.error("Retry failed", retryErr);
-                document.getElementById('pdf-fallback').style.display = 'block'; 
-            } finally { if(btn) btn.innerText = id; }
-        }
+        if (!url) { document.getElementById('pdf-fallback').style.display = 'block'; return; }
+        PdfViewer.load(url);
     }
 }
 
@@ -692,20 +689,6 @@ class NaiveBayes {
             if (score > maxScore) { maxScore = score; bestCat = cat; }
         }
         return { category: bestCat, score: maxScore };
-    }
-}
-
-class AIParser {
-    static parse(t, id) {
-        const healed = TheHealer.healedData[id];
-        const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null };
-        t = (t||"").toUpperCase();
-        for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
-        if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
-        if (!s.hp) { let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); if(m) s.hp = parseFloat(m[1]).toString(); }
-        if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
-        if (!s.phase) { if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; }
-        return s;
     }
 }
 
