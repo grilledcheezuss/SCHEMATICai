@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.61)</title>
+    <title>Cox Research | SCHEMATICai (v22.62)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -276,7 +276,7 @@
         <h2 style="color:var(--app-primary); margin-top:0;">SCHEMATICai</h2>
         <div class="auth-group"><label class="auth-label">Username</label><input type="text" id="auth-user" class="cox-input"></div>
         <div class="auth-group"><label class="auth-label">Passcode</label><input type="password" id="auth-pass" class="cox-input" onkeypress="if(event.key==='Enter') AuthService.login()"></div>
-        <button class="search-btn" onclick="AuthService.login()">Authenticate</button>
+        <button id="loginBtn" class="search-btn" onclick="AuthService.login()">Authenticate</button>
     </div>
 </div>
 
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.61 (CENTRAL NETWORK HANDLER) ---
+// --- SCHEMATICai v22.62 (SECURE PRE-LOGIN CHECK) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -459,13 +459,45 @@ window.CacheService = CacheService;
 
 class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
-    static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
+    
+    static async login() { 
+        const u = document.getElementById('auth-user').value.trim(); 
+        const p = document.getElementById('auth-pass').value.trim(); 
+        if (!u || !p) return alert("Missing Credentials"); 
+        
+        const btn = document.getElementById('loginBtn');
+        btn.disabled = true; btn.innerText = "Checking...";
+        
+        // --- NEW: PRE-LOGIN SECURITY CHECK ---
+        const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
+        try {
+            const resp = await fetch(`${b}?target=${encodeURIComponent(CONFIG.mainTable)}&pageSize=1`, {
+                headers: { 'X-Cox-User': u, 'X-Cox-Pass': p }
+            });
+            
+            if(resp.status === 401 || resp.status === 403) {
+                alert("❌ INVALID CREDENTIALS. Access Denied.");
+                btn.disabled = false; btn.innerText = "Authenticate";
+                return;
+            }
+            
+            // Credentials Valid
+            localStorage.setItem('cox_user', u); 
+            localStorage.setItem('cox_pass', p); 
+            location.reload();
+            
+        } catch(e) {
+            alert("Connection Error: " + e.message);
+            btn.disabled = false; btn.innerText = "Authenticate";
+        }
+    }
+    
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
 window.AuthService = AuthService;
 
-// --- 2. CENTRAL NETWORK SERVICE (GATEKEEPER) ---
+// --- 2. CENTRAL NETWORK SERVICE ---
 class NetworkService {
     static async fetch(target, params='', method='GET', body=null) { 
         const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; 
@@ -481,11 +513,10 @@ class NetworkService {
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`, opts);
             
-            // GLOBAL 401 TRAP
             if(resp.status === 401) {
-                alert("Session Expired. Please login with correct credentials (cox/schematic).");
+                alert("Session Expired. Logging out...");
                 AuthService.logout();
-                return { status: 401, ok: false, json: async () => ({ error: "Unauthorized" }) };
+                return { ok: false, status: 401, json: async () => ({ error: "Unauthorized" }) };
             }
             return resp;
         } catch(e) {
@@ -633,7 +664,18 @@ window.LayoutScanner = LayoutScanner;
 // --- 4. LOGIC MODULES ---
 class TheHealer {
     static healedData = {}; 
-    static async fetchAndTally() { try { const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); if(!resp.ok) return; const data = await resp.json(); if(data.records) { const tallies = {}; data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; }); for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } } } } catch(e) { console.error("Healing Failed", e); } }
+    static async fetchAndTally() { 
+        try { 
+            const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); 
+            if(!resp.ok) return; 
+            const data = await resp.json(); 
+            if(data.records) { 
+                const tallies = {}; 
+                data.records.forEach(r => { const key = `${r.fields['Panel ID']}|${r.fields['Parameter']}|${r.fields['Suggested Value']}`; tallies[key] = (tallies[key] || 0) + 1; }); 
+                for (const [key, count] of Object.entries(tallies)) { if (count >= CONFIG.voteThreshold) { const [id, param, value] = key.split('|'); if (!this.healedData[id]) this.healedData[id] = {}; this.healedData[id][param] = value; } } 
+            } 
+        } catch(e) { console.error("Healing Failed", e); } 
+    }
 }
 window.TheHealer = TheHealer;
 
@@ -643,17 +685,21 @@ class FeedbackService {
 
     static async up(id, btn) {
         btn.classList.add('voted-up');
-        // DISABLED 'USER' FIELD TO PREVENT 422 ERRORS FOR NOW
+        // SAFETY: WE COMMENT OUT 'USER' TO PREVENT 422 ERROR UNTIL WORKER IS UPDATED
         const payload = {
             records: [{
-                fields: { 'Panel ID': id, 'Vote': 'Up' }
+                fields: { 
+                    'Panel ID': id, 
+                    'Vote': 'Up'
+                    // 'User': localStorage.getItem('cox_user')  <-- DISABLED FOR SAFETY
+                }
             }],
             typecast: true
         };
-        // USE CENTRAL NETWORK SERVICE TO CATCH 401
+        
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok && response.status !== 401) {
+            if(!response.ok) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
             }
@@ -689,11 +735,13 @@ class FeedbackService {
             if(i.value) corrections[i.previousElementSibling.dataset.reason] = i.value;
         });
 
+        // SAFETY: WE COMMENT OUT 'USER' HERE TOO
         const payload = {
             records: [{
                 fields: {
                     'Panel ID': this.currentId,
                     'Vote': 'Down',
+                    // 'User': localStorage.getItem('cox_user'), <-- DISABLED FOR SAFETY
                     'Reasons': Array.from(this.activeReasons).join(','),
                     'Corrections': JSON.stringify(corrections)
                 }
@@ -703,14 +751,14 @@ class FeedbackService {
 
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok && response.status !== 401) {
+            if(!response.ok) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
-            } else if (response.ok) {
+            } else {
                 this.close();
                 alert("Feedback Sent. Thank you!");
             }
-        } catch(e) { }
+        } catch(e) { /* NetworkService handles 401 */ }
     }
 
     static close() {
@@ -908,7 +956,7 @@ class PdfViewer {
         document.getElementById('pdf-viewer-frame').style.display = 'none';
         
         const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
-        const resp = await NetworkService.fetch("pdf", `&url=${encodeURIComponent(url)}`);
+        const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
         
         if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
         
@@ -921,6 +969,7 @@ class PdfViewer {
         this.renderStack(); 
     }
     
+    // --- PRINT FUNCTIONALITY ---
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe');
