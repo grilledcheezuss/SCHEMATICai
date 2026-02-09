@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.65)</title>
+    <title>Cox Research | SCHEMATICai (v22.71)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.65</div>
+    <div class="version-badge">SCHEMATICai v22.71</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.65 (DYNAMIC AUTH VIA USERS TABLE) ---
+// --- SCHEMATICai v22.71 (ROBUST DROPDOWNS & REACTIVE PROGRESS) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', usersTable: 'USERS', voteThreshold: 3, estTotal: 7500 };
 
@@ -470,9 +470,6 @@ class AuthService {
         btn.disabled = true; btn.innerText = "Verifying...";
         
         const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
-        
-        // Construct formula to check Username AND Password
-        // Note: In production, password hashing is recommended. This checks plain text matching as requested.
         const formula = `AND({Username}='${u}', {Password}='${p}')`;
         
         try {
@@ -485,12 +482,10 @@ class AuthService {
             const data = await resp.json();
             
             if (data.records && data.records.length > 0) {
-                // Success! Record found.
                 localStorage.setItem('cox_user', u); 
                 localStorage.setItem('cox_pass', p); 
                 location.reload();
             } else {
-                // Failure! No matching record.
                 alert("❌ INVALID CREDENTIALS. Access Denied.");
                 btn.disabled = false; btn.innerText = "Authenticate";
             }
@@ -514,7 +509,6 @@ class NetworkService {
         
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, opts);
-            // The worker no longer throws 401 on its own, but Airtable might if API key is invalid
             if(resp.status === 401 || resp.status === 403) {
                 alert("API Access Denied. Check API Key in Worker.");
                 AuthService.logout();
@@ -833,18 +827,18 @@ class DataLoader {
                 localStorage.setItem('cox_db_complete', 'true'); 
                 btn.innerText = "SEARCH"; btn.disabled = false; 
                 NaiveBayes.trainAsync(window.LOCAL_DB);
-                UI.pop(); return; 
+                UI.populateDropdowns(); return; 
             }
             if(localStorage.getItem('cox_db_complete')) { 
                 localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; 
                 NaiveBayes.trainAsync(window.LOCAL_DB);
-                UI.pop(); return; 
+                UI.populateDropdowns(); return; 
             } else { 
                 btn.innerText = "⬇️ RESUMING..."; 
             } 
         } else { btn.innerText = "⬇️ SYNCING..."; }
         await new Promise(r => setTimeout(r, 50)); await TheHealer.fetchAndTally(); await this.fetchPartition('desc', btn);
-        requestAnimationFrame(() => { btn.innerText = "✅ FINALIZING..."; localStorage.setItem('cox_sync_attempts', '0'); setTimeout(() => { NaiveBayes.trainAsync(window.LOCAL_DB).then(() => { btn.innerText = "SEARCH"; btn.disabled = false; }); }, 100); }); UI.pop();
+        requestAnimationFrame(() => { btn.innerText = "✅ FINALIZING..."; localStorage.setItem('cox_sync_attempts', '0'); setTimeout(() => { NaiveBayes.trainAsync(window.LOCAL_DB).then(() => { btn.innerText = "SEARCH"; btn.disabled = false; }); }, 100); }); UI.populateDropdowns();
     }
     
     static resetSync() {
@@ -859,7 +853,13 @@ class DataLoader {
             do {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break;
                 await new Promise(r => setTimeout(r, 0)); 
-                if(btn && !btn.classList.contains('warning')) { const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); if(pct < 100) btn.innerText = `⬇️ SYNCING ${pct}%`; }
+                
+                // --- PROGRESS UPDATE FIX (LIVE UPDATE) ---
+                if(btn && !btn.classList.contains('warning')) { 
+                    const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); 
+                    btn.innerText = pct < 100 ? `⬇️ SYNCING ${pct}%` : "✅ FINALIZING..."; 
+                }
+                
                 const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
                 if(!r.ok) { console.error("Sync Failed", r.status); break; }
                 const d = await r.json(); 
@@ -875,6 +875,7 @@ class DataLoader {
                 });
                 if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset;
+                UI.populateDropdowns(); // Update dropdowns live as data comes in
             } while(offset);
             localStorage.setItem('cox_db_complete', 'true'); 
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
@@ -968,7 +969,6 @@ class PdfViewer {
         this.renderStack(); 
     }
     
-    // --- PRINT FUNCTIONALITY ---
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe');
@@ -996,8 +996,6 @@ class PdfViewer {
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
             
-            // GLOBAL DRAG LISTENERS ATTACHED IN UI.INIT
-            
             wrapper.appendChild(canvas); wrapper.appendChild(rLayer); container.appendChild(wrapper);
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
         }
@@ -1020,7 +1018,8 @@ window.PdfController = PdfController;
 class UI {
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); }
-        // GLOBAL DRAG LISTENERS
+        // Populate dropdowns IMMEDIATELY on load with static data
+        this.populateDropdowns();
         window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e));
         window.addEventListener('mouseup', () => RedactionManager.endDrag());
     }
@@ -1043,11 +1042,51 @@ class UI {
     }
     
     static toggleSearch(e) { const c = document.getElementById('search-controls'); if(!c) return; if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
-    static pop() {
-        const m = document.getElementById('mfgInput'); const cv = m.value;
-        let all = Array.from(window.FOUND_MFGS).sort(); m.innerHTML='<option value="Any">Any</option>'; all.forEach(v=>m.add(new Option(v,v))); m.value=cv;
-        ['hp','volt','phase','enc'].forEach(k=>{ const s=document.getElementById(k+'Input'); if(!s)return; const d=(k==='enc')?Object.keys(AI_TRAINING_DATA.ENCLOSURES):AI_TRAINING_DATA.DATA[k.toUpperCase()]; s.innerHTML='<option value="Any">Any</option>'; d.forEach(v=>s.add(new Option(v,v))); });
+    
+    // --- ROBUST DROPDOWN POPULATION ---
+    static populateDropdowns() {
+        const m = document.getElementById('mfgInput'); 
+        if(!m) return;
+        
+        const cv = m.value;
+        
+        // 1. Start with static data (AI_TRAINING_DATA)
+        let staticMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS);
+        
+        // 2. Merge with dynamic data (FOUND_MFGS)
+        let dynamicMfgs = Array.from(window.FOUND_MFGS || []);
+        
+        // 3. Combine, unique-ify, and sort
+        let combined = [...new Set([...staticMfgs, ...dynamicMfgs])].sort();
+        
+        // 4. Rebuild dropdown safely
+        m.innerHTML = '<option value="Any">Any</option>'; // Clear and set default
+        combined.forEach(v => {
+            // Check if option already exists (paranoid check)
+            if(!m.querySelector(`option[value="${v}"]`)) {
+                m.add(new Option(v, v));
+            }
+        });
+        
+        // 5. Restore selection if valid
+        if(cv && cv !== "Any" && m.querySelector(`option[value="${cv}"]`)) {
+            m.value = cv;
+        }
+
+        // Populate other dropdowns similarly if needed (static only for now)
+        ['hp','volt','phase','enc'].forEach(k=>{ 
+            const s=document.getElementById(k+'Input'); 
+            if(!s)return; 
+            const currentVal = s.value;
+            const d=(k==='enc')?Object.keys(AI_TRAINING_DATA.ENCLOSURES):AI_TRAINING_DATA.DATA[k.toUpperCase()]; 
+            
+            s.innerHTML='<option value="Any">Any</option>'; 
+            d.forEach(v=>s.add(new Option(v,v))); 
+            
+            if(currentVal && currentVal !== "Any") s.value = currentVal;
+        });
     }
+
     static render(res, crit) {
         const a = document.getElementById('results-area'); a.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${res.length} records</div>`;
         res.slice(0,50).forEach(i => {
