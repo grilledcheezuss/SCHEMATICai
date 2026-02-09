@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.71)</title>
+    <title>Cox Research | SCHEMATICai (v22.72)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.71</div>
+    <div class="version-badge">SCHEMATICai v22.72</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.71 (ROBUST DROPDOWNS & REACTIVE PROGRESS) ---
+// --- SCHEMATICai v22.72 (FIXED UI.POP & DROPDOWNS) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', usersTable: 'USERS', voteThreshold: 3, estTotal: 7500 };
 
@@ -458,7 +458,7 @@ class CacheService {
 window.CacheService = CacheService;
 
 class AuthService {
-    static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
+    static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.populateDropdowns(); return true; } return false; }
     
     // --- DYNAMIC LOGIN VALIDATION (USES AIRTABLE 'USERS' TABLE) ---
     static async login() { 
@@ -969,6 +969,7 @@ class PdfViewer {
         this.renderStack(); 
     }
     
+    // --- PRINT FUNCTIONALITY ---
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe');
@@ -995,6 +996,8 @@ class PdfViewer {
             canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%"; canvas.style.height = "100%";
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
+            
+            // GLOBAL DRAG LISTENERS ATTACHED IN UI.INIT
             
             wrapper.appendChild(canvas); wrapper.appendChild(rLayer); container.appendChild(wrapper);
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
@@ -1085,6 +1088,11 @@ class UI {
             
             if(currentVal && currentVal !== "Any") s.value = currentVal;
         });
+    }
+    
+    // ALIAS FOR BACKWARD COMPATIBILITY
+    static pop() {
+        this.populateDropdowns();
     }
 
     static render(res, crit) {
