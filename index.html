@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.63)</title>
+    <title>Cox Research | SCHEMATICai (v22.65)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.63</div>
+    <div class="version-badge">SCHEMATICai v22.65</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,9 +411,9 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.63 (PRE-LOGIN CHECK & RECOVERY) ---
+// --- SCHEMATICai v22.65 (DYNAMIC AUTH VIA USERS TABLE) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
-const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
+const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', usersTable: 'USERS', voteThreshold: 3, estTotal: 7500 };
 
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 'gorman rupp':['gorman','gr'], 'barnes':['barnes','sithe'], 'hydromatic':['hydromatic'], 'flygt':['flygt'], 'myers':['myers'], 'goulds':['goulds'], 'zoeller':['zoeller'], 'liberty':['liberty'], 'wilo':['wilo'], 'pentair':['pentair'], 'abs':['abs'], 'aurora':['aurora'], 'baldor':['baldor'] }, 
@@ -460,31 +460,40 @@ window.CacheService = CacheService;
 class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
     
-    // --- PRE-LOGIN VALIDATION (FIX FOR 401 LOOP) ---
+    // --- DYNAMIC LOGIN VALIDATION (USES AIRTABLE 'USERS' TABLE) ---
     static async login() { 
         const u = document.getElementById('auth-user').value.trim(); 
         const p = document.getElementById('auth-pass').value.trim(); 
         if (!u || !p) return alert("Missing Credentials"); 
         
         const btn = document.getElementById('loginBtn');
-        btn.disabled = true; btn.innerText = "Checking...";
+        btn.disabled = true; btn.innerText = "Verifying...";
         
         const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
+        
+        // Construct formula to check Username AND Password
+        // Note: In production, password hashing is recommended. This checks plain text matching as requested.
+        const formula = `AND({Username}='${u}', {Password}='${p}')`;
+        
         try {
-            // Dry run fetch to validate creds
-            const resp = await fetch(`${b}?target=${encodeURIComponent(CONFIG.mainTable)}&pageSize=1`, {
-                headers: { 'X-Cox-User': u, 'X-Cox-Pass': p }
-            });
+            const resp = await fetch(`${b}?target=${encodeURIComponent(CONFIG.usersTable)}&filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`);
             
-            if(resp.status === 401 || resp.status === 403) {
-                alert("❌ INVALID CREDENTIALS. Access Denied.");
-                btn.disabled = false; btn.innerText = "Authenticate";
-                return;
+            if(!resp.ok) {
+                throw new Error(`Auth Server Error: ${resp.status}`);
             }
             
-            localStorage.setItem('cox_user', u); 
-            localStorage.setItem('cox_pass', p); 
-            location.reload();
+            const data = await resp.json();
+            
+            if (data.records && data.records.length > 0) {
+                // Success! Record found.
+                localStorage.setItem('cox_user', u); 
+                localStorage.setItem('cox_pass', p); 
+                location.reload();
+            } else {
+                // Failure! No matching record.
+                alert("❌ INVALID CREDENTIALS. Access Denied.");
+                btn.disabled = false; btn.innerText = "Authenticate";
+            }
             
         } catch(e) {
             alert("Connection Error: " + e.message);
@@ -497,33 +506,22 @@ class AuthService {
 }
 window.AuthService = AuthService;
 
-// --- 2. CENTRAL NETWORK SERVICE ---
 class NetworkService {
-    static async fetch(target, params='', method='GET', body=null) { 
+    static async fetch(t, p='', method='GET', body=null) { 
         const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`; 
-        const opts = {
-            method: method,
-            headers: AuthService.headers()
-        };
-        if(body) {
-            opts.headers['Content-Type'] = 'application/json';
-            opts.body = JSON.stringify(body);
-        }
+        const opts = { method, headers: AuthService.headers() };
+        if(body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
         
         try {
-            const resp = await fetch(`${b}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`, opts);
-            
-            // GLOBAL 401 TRAP
-            if(resp.status === 401) {
-                alert("Session Expired. Please login again.");
+            const resp = await fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, opts);
+            // The worker no longer throws 401 on its own, but Airtable might if API key is invalid
+            if(resp.status === 401 || resp.status === 403) {
+                alert("API Access Denied. Check API Key in Worker.");
                 AuthService.logout();
-                return { ok: false, status: 401, json: async () => ({ error: "Unauthorized" }) };
+                return { ok: false, status: resp.status };
             }
             return resp;
-        } catch(e) {
-            console.error("Network Error:", e);
-            throw e;
-        }
+        } catch(e) { console.error("Network Error:", e); throw e; }
     }
 }
 window.NetworkService = NetworkService;
@@ -700,7 +698,7 @@ class FeedbackService {
         
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok && response.status !== 401) {
+            if(!response.ok) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
             }
@@ -752,10 +750,10 @@ class FeedbackService {
 
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok && response.status !== 401) {
+            if(!response.ok) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
-            } else if(response.ok) {
+            } else {
                 this.close();
                 alert("Feedback Sent. Thank you!");
             }
