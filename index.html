@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.75)</title>
+    <title>Cox Research | SCHEMATICai (v22.76)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -40,7 +40,7 @@
             /* High Contrast Redaction */
             --redaction-outline: #ff0000;
             --redaction-fill: #000000; 
-            --cad-text: #ffffff;       
+            --cad-text: #ffffff;        
 
             --header-base-height: 55px; 
             --input-height: 36px;
@@ -291,7 +291,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.75</div>
+    <div class="version-badge">SCHEMATICai v22.76</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -410,7 +410,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.75 (NUCLEAR RESET & DIAGNOSTICS) ---
+// --- SCHEMATICai v22.76 (NUCLEAR RESET & DIAGNOSTICS) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', usersTable: 'USERS', voteThreshold: 3, estTotal: 7500 };
 
@@ -469,7 +469,9 @@ class AuthService {
         btn.disabled = true; btn.innerText = "Verifying...";
         
         const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
-        const formula = `AND({Username}='${u}', {Password}='${p}')`;
+        
+        // FIX: Changed {Password} to {Passcode} to match Airtable column name
+        const formula = `AND({Username}='${u}', {Passcode}='${p}')`;
         
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(CONFIG.usersTable)}&filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`);
