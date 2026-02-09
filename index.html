@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.72)</title>
+    <title>Cox Research | SCHEMATICai (v22.73)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
 
     <style>
-        /* --- 1. COLOR SYSTEM --- */
+        /* --- 1. COLOR SYSTEM (RESTORED STABLE THEME) --- */
         :root { 
             --app-primary: #461D7C;
             --app-accent: #461D7C;
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.72</div>
+    <div class="version-badge">SCHEMATICai v22.73</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.72 (FIXED UI.POP & DROPDOWNS) ---
+// --- SCHEMATICai v22.73 (AUDIT: STABLE CORE RESTORED) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', usersTable: 'USERS', voteThreshold: 3, estTotal: 7500 };
 
@@ -459,8 +459,6 @@ window.CacheService = CacheService;
 
 class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.populateDropdowns(); return true; } return false; }
-    
-    // --- DYNAMIC LOGIN VALIDATION (USES AIRTABLE 'USERS' TABLE) ---
     static async login() { 
         const u = document.getElementById('auth-user').value.trim(); 
         const p = document.getElementById('auth-pass').value.trim(); 
@@ -495,7 +493,6 @@ class AuthService {
             btn.disabled = false; btn.innerText = "Authenticate";
         }
     }
-    
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
@@ -654,7 +651,7 @@ class LayoutScanner {
 }
 window.LayoutScanner = LayoutScanner;
 
-// --- 4. LOGIC MODULES ---
+// --- 4. LOGIC MODULES (RESTORED GOLD STANDARD) ---
 class TheHealer {
     static healedData = {}; 
     static async fetchAndTally() { 
@@ -678,24 +675,18 @@ class FeedbackService {
 
     static async up(id, btn) {
         btn.classList.add('voted-up');
-        // SAFETY: WE COMMENT OUT 'USER' TO PREVENT 422 ERROR UNTIL WORKER IS UPDATED
         const payload = {
             records: [{
                 fields: { 
                     'Panel ID': id, 
                     'Vote': 'Up'
-                    // 'User': localStorage.getItem('cox_user')  <-- DISABLED FOR SAFETY
                 }
             }],
             typecast: true
         };
-        
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok) {
-                const errData = await response.json();
-                alert("Feedback Error: " + JSON.stringify(errData));
-            }
+            if(!response.ok) { console.error("Feedback failed", await response.json()); }
         } catch(e) { }
     }
 
@@ -728,13 +719,11 @@ class FeedbackService {
             if(i.value) corrections[i.previousElementSibling.dataset.reason] = i.value;
         });
 
-        // SAFETY: WE COMMENT OUT 'USER' HERE TOO
         const payload = {
             records: [{
                 fields: {
                     'Panel ID': this.currentId,
                     'Vote': 'Down',
-                    // 'User': localStorage.getItem('cox_user'), <-- DISABLED FOR SAFETY
                     'Reasons': Array.from(this.activeReasons).join(','),
                     'Corrections': JSON.stringify(corrections)
                 }
@@ -744,13 +733,8 @@ class FeedbackService {
 
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok) {
-                const errData = await response.json();
-                alert("Feedback Error: " + JSON.stringify(errData));
-            } else {
-                this.close();
-                alert("Feedback Sent. Thank you!");
-            }
+            if(!response.ok) { alert("Feedback Error: " + JSON.stringify(await response.json())); }
+            else { this.close(); alert("Feedback Sent. Thank you!"); }
         } catch(e) { }
     }
 
@@ -797,22 +781,56 @@ class NaiveBayes {
 }
 window.NaiveBayes = NaiveBayes;
 
+// --- CRITICAL RESTORATION: ROBUST PARSING LOGIC ---
 class AIParser {
     static parse(t, id) {
+        // 1. Check Healer First
         const healed = TheHealer.healedData[id];
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null };
+        
         t = (t||"").toUpperCase();
-        for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) s.mfg = k.toUpperCase();
-        if (!s.enc) for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) if (v.some(val => t.includes(val))) { s.enc = k; break; }
-        if (!s.hp) { let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); if(m) s.hp = parseFloat(m[1]).toString(); }
-        if (!s.volt) { const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
-        if (!s.phase) { if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; }
+        
+        // 2. MFG Detection (Dictionary Match)
+        for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) {
+            if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) { s.mfg = k.toUpperCase(); break; }
+        }
+        
+        // 3. Enclosure Detection
+        if (!s.enc) {
+            for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) {
+                if (v.some(val => t.includes(val))) { s.enc = k; break; }
+            }
+        }
+        
+        // 4. HP Detection (Regex)
+        if (!s.hp) { 
+            let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); 
+            if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); 
+            if(m) s.hp = parseFloat(m[1]).toString(); 
+        }
+        
+        // 5. Voltage Detection
+        if (!s.volt) { 
+            const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); 
+            if(m) s.volt = m[1]; 
+        }
+        
+        // 6. Phase Detection
+        if (!s.phase) { 
+            if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; 
+            else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; 
+            
+            // Contextual Phase Guess
+            if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; 
+            if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; 
+        }
+        
         return s;
     }
 }
 window.AIParser = AIParser;
 
-// --- 5. DATA LAYER ---
+// --- 5. DATA LAYER (STABILIZED) ---
 class DataLoader {
     static async preload() {
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 PREPARING...";
@@ -854,28 +872,33 @@ class DataLoader {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 7500) break;
                 await new Promise(r => setTimeout(r, 0)); 
                 
-                // --- PROGRESS UPDATE FIX (LIVE UPDATE) ---
+                // PROGRESS: Simple record count display (more accurate than %)
                 if(btn && !btn.classList.contains('warning')) { 
-                    const pct = Math.min(95, Math.round((window.LOCAL_DB.length/CONFIG.estTotal)*100)); 
-                    btn.innerText = pct < 100 ? `⬇️ SYNCING ${pct}%` : "✅ FINALIZING..."; 
+                    btn.innerText = `⬇️ SYNCING (${window.LOCAL_DB.length})`; 
                 }
                 
                 const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
                 if(!r.ok) { console.error("Sync Failed", r.status); break; }
                 const d = await r.json(); 
                 if(!d.records || d.records.length === 0) { localStorage.setItem('cox_db_complete', 'true'); break; }
+                
                 d.records.forEach(r => {
-                    const id = (r.fields['Control Panel Name']||"").replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                    const rawID = r.fields['Control Panel Name'];
+                    if(!rawID) return; // CRITICAL FIX: Skip records with no ID to prevent "Unknown" cards
+                    
+                    const id = rawID.replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                     const url = r.fields['Control Panel PDF']?.[0]?.url;
+                    
                     if(window.ID_MAP.has(id)) { window.ID_MAP.get(id).pdfUrl = url; }
                     else {
                         const rec = { id, desc: (r.fields['Items']||"").toUpperCase(), pdfUrl: url, ...AIParser.parse((id+" "+(r.fields['Items']||"")).toUpperCase(), id) };
                         window.LOCAL_DB.push(rec); window.ID_MAP.set(id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); buffer.push(rec);
                     }
                 });
+                
                 if(buffer.length >= 25) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset;
-                UI.populateDropdowns(); // Update dropdowns live as data comes in
+                UI.populateDropdowns(); 
             } while(offset);
             localStorage.setItem('cox_db_complete', 'true'); 
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
@@ -885,7 +908,7 @@ class DataLoader {
 }
 window.DataLoader = DataLoader;
 
-// --- 6. SEARCH & PDF ---
+// --- 6. SEARCH & PDF (GOLD STANDARD LOGIC) ---
 class SearchEngine {
     static perform() {
         const kw = document.getElementById('keywordInput').value.split(',').map(s=>s.trim()).filter(s=>s.length);
@@ -957,7 +980,6 @@ class PdfViewer {
         
         const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
         const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
-        
         if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
         
         const blob = await resp.blob();
@@ -968,8 +990,6 @@ class PdfViewer {
         this.doc = await task.promise; 
         this.renderStack(); 
     }
-    
-    // --- PRINT FUNCTIONALITY ---
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe');
@@ -982,7 +1002,6 @@ class PdfViewer {
             setTimeout(() => { document.body.removeChild(iframe); }, 2000);
         };
     }
-    
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
@@ -996,9 +1015,6 @@ class PdfViewer {
             canvas.width = viewport.width; canvas.height = viewport.height; canvas.style.width = "100%"; canvas.style.height = "100%";
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
-            
-            // GLOBAL DRAG LISTENERS ATTACHED IN UI.INIT
-            
             wrapper.appendChild(canvas); wrapper.appendChild(rLayer); container.appendChild(wrapper);
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
         }
@@ -1017,11 +1033,10 @@ class PdfController {
 }
 window.PdfController = PdfController;
 
-// --- 7. UI METHODS ---
+// --- 7. UI METHODS (ROBUST RESTORATION) ---
 class UI {
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); }
-        // Populate dropdowns IMMEDIATELY on load with static data
         this.populateDropdowns();
         window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e));
         window.addEventListener('mouseup', () => RedactionManager.endDrag());
@@ -1046,54 +1061,40 @@ class UI {
     
     static toggleSearch(e) { const c = document.getElementById('search-controls'); if(!c) return; if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
     
-    // --- ROBUST DROPDOWN POPULATION ---
+    // --- DROPDOWN FIX: SIMPLE & SAFE ---
     static populateDropdowns() {
         const m = document.getElementById('mfgInput'); 
         if(!m) return;
         
         const cv = m.value;
+        const staticMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS);
+        const dynamicMfgs = Array.from(window.FOUND_MFGS || []);
         
-        // 1. Start with static data (AI_TRAINING_DATA)
-        let staticMfgs = Object.keys(AI_TRAINING_DATA.MANUFACTURERS);
+        // Use SET to destroy duplicates, filter bad values
+        const uniqueSet = new Set([...staticMfgs, ...dynamicMfgs]);
+        uniqueSet.delete("Any"); // Ensure "Any" isn't in the list twice
+        uniqueSet.delete("");
+        uniqueSet.delete(null);
         
-        // 2. Merge with dynamic data (FOUND_MFGS)
-        let dynamicMfgs = Array.from(window.FOUND_MFGS || []);
+        const sorted = Array.from(uniqueSet).sort();
         
-        // 3. Combine, unique-ify, and sort
-        let combined = [...new Set([...staticMfgs, ...dynamicMfgs])].sort();
-        
-        // 4. Rebuild dropdown safely
-        m.innerHTML = '<option value="Any">Any</option>'; // Clear and set default
-        combined.forEach(v => {
-            // Check if option already exists (paranoid check)
-            if(!m.querySelector(`option[value="${v}"]`)) {
-                m.add(new Option(v, v));
-            }
+        m.innerHTML = '<option value="Any">Any</option>'; 
+        sorted.forEach(v => {
+            m.add(new Option(v, v));
         });
         
-        // 5. Restore selection if valid
-        if(cv && cv !== "Any" && m.querySelector(`option[value="${cv}"]`)) {
-            m.value = cv;
-        }
+        if(cv && cv !== "Any" && uniqueSet.has(cv)) { m.value = cv; }
 
-        // Populate other dropdowns similarly if needed (static only for now)
         ['hp','volt','phase','enc'].forEach(k=>{ 
-            const s=document.getElementById(k+'Input'); 
-            if(!s)return; 
+            const s=document.getElementById(k+'Input'); if(!s)return; 
             const currentVal = s.value;
             const d=(k==='enc')?Object.keys(AI_TRAINING_DATA.ENCLOSURES):AI_TRAINING_DATA.DATA[k.toUpperCase()]; 
-            
             s.innerHTML='<option value="Any">Any</option>'; 
             d.forEach(v=>s.add(new Option(v,v))); 
-            
             if(currentVal && currentVal !== "Any") s.value = currentVal;
         });
     }
-    
-    // ALIAS FOR BACKWARD COMPATIBILITY
-    static pop() {
-        this.populateDropdowns();
-    }
+    static pop() { this.populateDropdowns(); }
 
     static render(res, crit) {
         const a = document.getElementById('results-area'); a.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${res.length} records</div>`;
