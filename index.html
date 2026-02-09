@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.73)</title>
+    <title>Cox Research | SCHEMATICai (v22.74)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -14,7 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
 
     <style>
-        /* --- 1. COLOR SYSTEM (RESTORED STABLE THEME) --- */
+        /* --- 1. COLOR SYSTEM --- */
         :root { 
             --app-primary: #461D7C;
             --app-accent: #461D7C;
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.73</div>
+    <div class="version-badge">SCHEMATICai v22.74</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.73 (AUDIT: STABLE CORE RESTORED) ---
+// --- SCHEMATICai v22.74 (PERMISSION SCOPE DEBUGGER) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', usersTable: 'USERS', voteThreshold: 3, estTotal: 7500 };
 
@@ -459,6 +459,7 @@ window.CacheService = CacheService;
 
 class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.populateDropdowns(); return true; } return false; }
+    
     static async login() { 
         const u = document.getElementById('auth-user').value.trim(); 
         const p = document.getElementById('auth-pass').value.trim(); 
@@ -472,6 +473,13 @@ class AuthService {
         
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(CONFIG.usersTable)}&filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`);
+            
+            // --- SPECIFIC ERROR CATCHING FOR AIRTABLE PERMISSIONS ---
+            if(resp.status === 403) {
+                alert("⛔ PERMISSION DENIED: The API Token used for Users/Feedback does not have access to the 'MarkovData' Base. Please check Airtable Developer Hub.");
+                btn.disabled = false; btn.innerText = "Authenticate";
+                return;
+            }
             
             if(!resp.ok) {
                 throw new Error(`Auth Server Error: ${resp.status}`);
@@ -493,6 +501,7 @@ class AuthService {
             btn.disabled = false; btn.innerText = "Authenticate";
         }
     }
+    
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
@@ -507,7 +516,7 @@ class NetworkService {
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, opts);
             if(resp.status === 401 || resp.status === 403) {
-                alert("API Access Denied. Check API Key in Worker.");
+                alert("Access Denied: Check API Token permissions for 'MarkovData' Base.");
                 AuthService.logout();
                 return { ok: false, status: resp.status };
             }
