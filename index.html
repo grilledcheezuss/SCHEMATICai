@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.62)</title>
+    <title>Cox Research | SCHEMATICai (v22.63)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -292,7 +292,7 @@
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.61</div>
+    <div class="version-badge">SCHEMATICai v22.63</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +411,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.62 (SECURE PRE-LOGIN CHECK) ---
+// --- SCHEMATICai v22.63 (PRE-LOGIN CHECK & RECOVERY) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -460,6 +460,7 @@ window.CacheService = CacheService;
 class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
     
+    // --- PRE-LOGIN VALIDATION (FIX FOR 401 LOOP) ---
     static async login() { 
         const u = document.getElementById('auth-user').value.trim(); 
         const p = document.getElementById('auth-pass').value.trim(); 
@@ -468,9 +469,9 @@ class AuthService {
         const btn = document.getElementById('loginBtn');
         btn.disabled = true; btn.innerText = "Checking...";
         
-        // --- NEW: PRE-LOGIN SECURITY CHECK ---
         const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
         try {
+            // Dry run fetch to validate creds
             const resp = await fetch(`${b}?target=${encodeURIComponent(CONFIG.mainTable)}&pageSize=1`, {
                 headers: { 'X-Cox-User': u, 'X-Cox-Pass': p }
             });
@@ -481,7 +482,6 @@ class AuthService {
                 return;
             }
             
-            // Credentials Valid
             localStorage.setItem('cox_user', u); 
             localStorage.setItem('cox_pass', p); 
             location.reload();
@@ -513,8 +513,9 @@ class NetworkService {
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(target)}${params.replace('?', '&')}`, opts);
             
+            // GLOBAL 401 TRAP
             if(resp.status === 401) {
-                alert("Session Expired. Logging out...");
+                alert("Session Expired. Please login again.");
                 AuthService.logout();
                 return { ok: false, status: 401, json: async () => ({ error: "Unauthorized" }) };
             }
@@ -699,11 +700,11 @@ class FeedbackService {
         
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok) {
+            if(!response.ok && response.status !== 401) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
             }
-        } catch(e) { /* Error handled by NetworkService if 401 */ }
+        } catch(e) { }
     }
 
     static down(id) {
@@ -751,14 +752,14 @@ class FeedbackService {
 
         try {
             const response = await NetworkService.fetch(CONFIG.feedbackTable, '', 'POST', payload);
-            if(!response.ok) {
+            if(!response.ok && response.status !== 401) {
                 const errData = await response.json();
                 alert("Feedback Error: " + JSON.stringify(errData));
-            } else {
+            } else if(response.ok) {
                 this.close();
                 alert("Feedback Sent. Thank you!");
             }
-        } catch(e) { /* NetworkService handles 401 */ }
+        } catch(e) { }
     }
 
     static close() {
