@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICai (v22.74)</title>
+    <title>Cox Research | SCHEMATICai (v22.75)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -283,16 +283,15 @@
 <div id="config-modal">
     <div class="config-card">
         <h3>🛠️ Settings</h3>
-        <button class="search-btn" onclick="DataLoader.harvestCSV()">📥 Harvest CSV</button>
-        <button class="search-btn" style="background:#555; margin-top:8px;" onclick="DataLoader.resetSync()">🔄 Force Reset Sync</button>
-        <button class="search-btn" style="background:var(--status-error); margin-top:8px; border:1px solid #991b1b; font-weight:800;" onclick="AuthService.logout()">⏻ LOGOUT</button>
+        <button class="search-btn" style="background:var(--status-error); margin-top:8px; border:1px solid #991b1b; font-weight:800;" onclick="AuthService.nukeAndReset()">🧨 NUKE DATABASE & RESET</button>
+        <button class="search-btn" style="background:#555; margin-top:8px;" onclick="AuthService.logout()">⏻ LOGOUT</button>
         <div style="margin-top:10px;"><button class="search-btn" style="background:#555;" onclick="document.getElementById('config-modal').classList.remove('active-modal')">Close</button></div>
     </div>
 </div>
 
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
-    <div class="version-badge">SCHEMATICai v22.74</div>
+    <div class="version-badge">SCHEMATICai v22.75</div>
     <div class="header-controls">
         <button id="demo-btn" class="control-btn" onclick="DemoManager.toggle()">🔬</button>
         <button class="control-btn" onclick="document.getElementById('config-modal').classList.add('active-modal')">⚙️</button>
@@ -411,7 +410,7 @@
 </div>
 
 <script>
-// --- SCHEMATICai v22.74 (PERMISSION SCOPE DEBUGGER) ---
+// --- SCHEMATICai v22.75 (NUCLEAR RESET & DIAGNOSTICS) ---
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', usersTable: 'USERS', voteThreshold: 3, estTotal: 7500 };
 
@@ -444,6 +443,7 @@ class DB {
     static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async deleteLegacy() { try { const d = await this.open(); const t = d.transaction("cache", "readwrite"); t.objectStore("cache").clear(); } catch(e){} }
+    static async nuke() { const d = await this.open(); const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").clear(); return new Promise(r => t.oncomplete = r); }
 }
 window.DB = DB;
 
@@ -474,7 +474,6 @@ class AuthService {
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(CONFIG.usersTable)}&filterByFormula=${encodeURIComponent(formula)}&maxRecords=1`);
             
-            // --- SPECIFIC ERROR CATCHING FOR AIRTABLE PERMISSIONS ---
             if(resp.status === 403) {
                 alert("⛔ PERMISSION DENIED: The API Token used for Users/Feedback does not have access to the 'MarkovData' Base. Please check Airtable Developer Hub.");
                 btn.disabled = false; btn.innerText = "Authenticate";
@@ -502,6 +501,13 @@ class AuthService {
         }
     }
     
+    static async nukeAndReset() {
+        if(!confirm("⚠️ NUCLEAR RESET ⚠️\n\nThis will delete your local database cache and force a complete re-download of all schematic data.\n\nAre you sure?")) return;
+        localStorage.clear();
+        await DB.nuke();
+        location.reload();
+    }
+    
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
@@ -516,7 +522,12 @@ class NetworkService {
         try {
             const resp = await fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, opts);
             if(resp.status === 401 || resp.status === 403) {
-                alert("Access Denied: Check API Token permissions for 'MarkovData' Base.");
+                // If main data fetch fails with 403/401, it's a key issue
+                if(t === CONFIG.mainTable) {
+                    alert("⚠️ MAIN DATABASE ERROR: Access Denied.\nThe 'Read-Only' API Key in your Worker does not have access to the 'COX RESEARCH' Base.\n\nPlease check Airtable Developer Hub.");
+                } else {
+                    alert("Access Denied: Check API Token permissions.");
+                }
                 AuthService.logout();
                 return { ok: false, status: resp.status };
             }
@@ -793,47 +804,32 @@ window.NaiveBayes = NaiveBayes;
 // --- CRITICAL RESTORATION: ROBUST PARSING LOGIC ---
 class AIParser {
     static parse(t, id) {
-        // 1. Check Healer First
         const healed = TheHealer.healedData[id];
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null };
-        
         t = (t||"").toUpperCase();
-        
-        // 2. MFG Detection (Dictionary Match)
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) {
             if (new RegExp(`\\b(${v.join('|').toUpperCase()})\\b`).test(t)) { s.mfg = k.toUpperCase(); break; }
         }
-        
-        // 3. Enclosure Detection
         if (!s.enc) {
             for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) {
                 if (v.some(val => t.includes(val))) { s.enc = k; break; }
             }
         }
-        
-        // 4. HP Detection (Regex)
         if (!s.hp) { 
             let m = t.match(/(?:^|[^/])\b(\d+(?:\.\d+)?)\s*[\-_]?\s*HP\b/i); 
             if (!m) m = t.match(/\bHP\s*[:\s\-_.]*\s*(\d+(?:\.\d+)?)(?!\/)/i); 
             if(m) s.hp = parseFloat(m[1]).toString(); 
         }
-        
-        // 5. Voltage Detection
         if (!s.volt) { 
             const m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); 
             if(m) s.volt = m[1]; 
         }
-        
-        // 6. Phase Detection
         if (!s.phase) { 
             if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; 
             else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; 
-            
-            // Contextual Phase Guess
             if(!s.phase && (t.includes("240/1/60") || t.includes("120/240"))) s.phase = "1"; 
             if(!s.phase && (t.includes("480/3/60") || t.includes("277/480"))) s.phase = "3"; 
         }
-        
         return s;
     }
 }
