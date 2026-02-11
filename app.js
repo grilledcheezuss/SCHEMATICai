@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.63 ---
-const APP_VERSION = "v1.63";
+// --- SCHEMATICA ai v1.64 ---
+const APP_VERSION = "v1.64";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -42,7 +42,6 @@ const LAYOUT_RULES = {
     ]
 };
 
-// v1.63: Refined Enclosure Logic - Removed vague "SS", added "NEMA 4X" to FG
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 
         'GORMAN RUPP':['gorman','gr'], 'BARNES':['barnes','sithe','crane'], 'HYDROMATIC':['hydromatic'], 
@@ -52,9 +51,9 @@ const AI_TRAINING_DATA = {
         'INFILTRATOR':['infiltrator'], 'OAK ALLEY':['oak'], 'SHUR-FLO':['shur'], 'DANFOSS':['danfoss']
     }, 
     ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], // Removed "SS" to avoid Selector Switch
-        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], // Added NEMA 4X catch-all
-        'POLY': ['POLY', 'POLYCARBONATE'] 
+        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], // Specific Stainless terms
+        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], // Includes generic catch-all
+        'POLY': ['POLY', 'POLYCARBONATE'] // Specific Poly terms
     },
     ALIASES: {
         'LA': ['LA', 'LIGHTNING ARRESTOR', 'SURGE ARRESTOR', 'TVSS'],
@@ -106,7 +105,7 @@ class NetworkService {
     }
 }
 
-// v1.63: Smart Enclosure Parsing (SS First -> Poly -> FG Catch-all)
+// v1.64: Revised AIParser - Strict Priority (Poly > FG > SS > Generic)
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
@@ -116,36 +115,44 @@ class AIParser {
         // Manufacturer Logic (Unchanged)
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
         
-        // v1.63: Enclosure Logic - Strict Priority Order
+        // v1.64: Enclosure Logic - Strict Priority Order
         if (!s.enc) {
-            // 1. Check Stainless First
-            const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
+            // 1. Check Polycarbonate First (Most specific)
+            const polyMatch = AI_TRAINING_DATA.ENCLOSURES['POLY'].some(val => {
                 const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
                 return regex.test(t);
             });
             
-            if (ssMatch) {
-                s.enc = '4XSS';
+            if (polyMatch) {
+                s.enc = 'POLY';
             } else {
-                // 2. Check Poly Second
-                const polyMatch = AI_TRAINING_DATA.ENCLOSURES['POLY'].some(val => {
-                    const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
+                // 2. Check Fiberglass Second (Includes specific terms like FRP)
+                // Note: We check 'NEMA 4X' later as a generic fallback
+                const specificFgTerms = ['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG']; 
+                const fgMatch = specificFgTerms.some(val => {
+                    const regex = new RegExp(`\\b${val}\\b`, 'i');
                     return regex.test(t);
                 });
                 
-                if (polyMatch) {
-                    s.enc = 'POLY';
+                if (fgMatch) {
+                    s.enc = '4XFG';
                 } else {
-                    // 3. Check Fiberglass (Includes Generic NEMA 4X) Last
-                    const fgMatch = AI_TRAINING_DATA.ENCLOSURES['4XFG'].some(val => {
+                    // 3. Check Stainless Third
+                    const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
                         const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                         const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
                         return regex.test(t);
                     });
                     
-                    if (fgMatch) s.enc = '4XFG';
+                    if (ssMatch) {
+                        s.enc = '4XSS';
+                    } else {
+                        // 4. Generic Fallback: "NEMA 4X" implies Fiberglass if nothing else matched
+                        if (t.includes('NEMA 4X')) {
+                            s.enc = '4XFG';
+                        }
+                    }
                 }
             }
         }
@@ -211,7 +218,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.63 Update: Purging Cache...`);
+            console.warn(`⚡ v1.64 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
