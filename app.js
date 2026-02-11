@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.74 ---
-const APP_VERSION = "v1.74";
+// --- SCHEMATICA ai v1.75 ---
+const APP_VERSION = "v1.75";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -61,7 +61,7 @@ const AI_TRAINING_DATA = {
         '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], 
         'POLY': ['POLY', 'POLYCARBONATE'] 
     },
-    // v1.74: Enhanced Acronyms with Plurals & Synonyms
+    // v1.75: Refined VFD alias to avoid false positives (handled in parsing logic)
     ALIASES: {
         'LA': ['LA', 'SA', 'LIGHTNING ARRESTOR', 'SURGE ARRESTOR', 'SURGE SUPPRESSOR', 'TVSS', 'SPD', 'SURGE PROTECTOR', 'LIGHTNING ARRESTORS', 'SURGE ARRESTORS'],
         'PM': ['PM', 'PHASE MONITOR', 'PHASE FAIL', 'PHASE RELAY', 'MONITOR RELAY', 'PHASE MONITORS'],
@@ -76,6 +76,7 @@ const AI_TRAINING_DATA = {
     } 
 };
 
+// ... [DB, CacheService, AuthService, NetworkService classes remain the same] ...
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -117,90 +118,74 @@ class AIParser {
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null, category: healed?.category||null };
         t = (t||"").toUpperCase();
         
+        // Manufacturer Logic
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
         
+        // Enclosure Logic
         if (!s.enc) {
-            // 1. Check Polycarbonate (High Priority)
-            const polyMatch = AI_TRAINING_DATA.ENCLOSURES['POLY'].some(val => {
-                const regex = new RegExp(`\\b${val}\\b`, 'i'); // \b ensures whole word
-                return regex.test(t);
-            });
-            
-            if (polyMatch) {
-                s.enc = 'POLY';
-            } else {
-                // 2. Check Fiberglass (Mid Priority)
-                const specificFgTerms = ['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG']; 
-                const fgMatch = specificFgTerms.some(val => {
-                    const regex = new RegExp(`\\b${val}\\b`, 'i');
-                    return regex.test(t);
-                });
-                
-                if (fgMatch) {
-                    s.enc = '4XFG';
-                } else {
-                    // 3. Check Stainless (Smart Check with Word Boundaries)
-                    const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
-                        const regex = new RegExp(`\\b${val}\\b`, 'i');
-                        if (!regex.test(t)) return false;
-
-                        const idx = t.indexOf(val);
-                        if (idx > -1) {
-                            // Check previous context (e.g. "3 Pos SS")
-                            const prevContext = t.substring(Math.max(0, idx - 10), idx);
-                            if (/POS|POSITION|SELECTOR/.test(prevContext)) return false;
-
-                            // Check next context
-                            const context = t.substring(idx, idx + 50); 
-                            if (/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET|SWITCH/.test(context)) {
-                                return false; 
-                            }
-                            return true;
-                        }
-                        return false;
-                    });
-                    
-                    if (ssMatch) {
-                        s.enc = '4XSS';
-                    } else {
-                        // 4. Generic Fallback
-                        if (t.includes('NEMA 4X')) {
-                            s.enc = '4XFG';
-                        }
-                    }
+            if (AI_DATA.ENC['POLY'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = 'POLY';
+            else if (['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = '4XFG';
+            else if (AI_DATA.ENC['4XSS'].some(v => {
+                const regex = new RegExp(`\\b${v}\\b`, 'i');
+                if (!regex.test(t)) return false;
+                const idx = t.indexOf(v);
+                if (idx > -1) {
+                    const context = t.substring(idx, idx + 50); 
+                    if (/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET|SWITCH|SELECTOR|POS/.test(context)) return false;
+                    return true;
                 }
-            }
+                return false;
+            })) s.enc = '4XSS';
+            else if (t.includes('NEMA 4X')) s.enc = '4XFG';
         }
         
+        // HP Logic
         if (!s.hp) {
             let maxHP = 0;
             const compoundRegex = /(\d+)\s+(\d+\/\d+)\s*(?:HP|H\.P\.|HORSEPOWER)\b/gi;
             [...t.matchAll(compoundRegex)].forEach(m => {
                 const whole = parseFloat(m[1]); const [num, den] = m[2].split('/'); const val = whole + (parseFloat(num) / parseFloat(den)); if (val > maxHP) maxHP = val;
             });
-            const standardRegex = /(?:^|[^0-9\/\-])(\d+(?:[\.\-]\d+)?(?:\/\d+)?)\s*(?:HP|H\.P\.|HORSEPOWER|H)\b/gi;
+            const standardRegex = /(?:^|[^0-9\/\.-])((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\s*(?:HP|H\.P\.|HORSEPOWER|H|KW)\b/gi;
             [...t.matchAll(standardRegex)].forEach(m => {
                 let val = 0; const raw = m[1];
-                if(raw.includes('-') && raw.includes('/')) { const p = raw.split('-'); const f = p[1].split('/'); val = parseFloat(p[0]) + (parseFloat(f[0]) / parseFloat(f[1])); } 
-                else if(raw.includes('/')) { const [n,d] = raw.split('/'); val = parseFloat(n) / parseFloat(d); } 
-                else { val = parseFloat(raw); }
+                if(raw.includes('/')) {
+                    if (raw.includes('-')) { const parts = raw.split('-'); const frac = parts[1].split('/'); val = parseFloat(parts[0]) + (parseFloat(frac[0]) / parseFloat(frac[1])); } 
+                    else { const [n,d] = raw.split('/'); val = parseFloat(n) / parseFloat(d); }
+                } else { val = parseFloat(raw); }
+                if (m[0].toUpperCase().includes('KW')) val = val * 1.341;
                 if (val >= 0.1 && val <= 300 && val > maxHP) maxHP = val;
             });
-            const kwRegex = /(?:^|[^a-zA-Z0-9.])(\d+(?:\.\d+)?)\s*(?:KW|KILOWATT)\b/gi;
-            [...t.matchAll(kwRegex)].forEach(m => { const val = parseFloat(m[1]) * 1.341; if (val > maxHP) maxHP = val; });
             if (maxHP > 0) { if (Math.abs(maxHP - Math.round(maxHP)) < 0.1) maxHP = Math.round(maxHP); s.hp = maxHP.toString(); }
         }
 
-        if (!s.volt) { let m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
-        if (!s.phase) { 
-            if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60") || t.includes("THREE PHASE")) s.phase = "3"; 
-            else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60") || t.includes("SINGLE PHASE") || t.includes("SGL PH")) s.phase = "1"; 
+        // Voltage Logic
+        if (!s.volt) {
+            const voltPriority = [{ id: '575', match: ['575', '600'] }, { id: '480', match: ['480', '460', '440'] }, { id: '415', match: ['415', '380'] }, { id: '277', match: ['277'] }, { id: '240', match: ['240', '230', '220'] }, { id: '208', match: ['208'] }, { id: '120', match: ['120', '115', '110'] }];
+            for (const vGroup of voltPriority) {
+                const regex = new RegExp(`\\b(${vGroup.match.join('|')})\\s*(?:V|VAC|VOLT|PH)`, 'i');
+                if (regex.test(t)) { s.volt = vGroup.id; break; }
+            }
         }
+
+        if (!s.phase) { if (text.includes("3 PHASE") || text.includes("3PH") || text.includes("3Ø") || text.includes("3/60")) s.phase = "3"; else if (text.includes("1 PHASE") || text.includes("1PH") || text.includes("1Ø") || text.includes("1/60")) s.phase = "1"; }
+        
+        // v1.75: Panel Category Segregation Logic
+        if (!s.category) {
+            if (/(?:BLOWER|AERATION|CLARIFIER|DIGESTER|UV|ULTRAVIOLET|SCREEN|PRESS|DEWATERING|MIXER|2\+2|4\s+MOTOR)/i.test(t)) {
+                s.category = 'treatment';
+            } else if (/(?:RESIDENTIAL|GRINDER\s+STATION|SIMPLEX\s+GRINDER)/i.test(t)) {
+                s.category = 'residential';
+            } else if (t.includes('LOW VOLTAGE') || t.includes('CONTROL BOX') || t.includes('JB') || t.includes('JUNCTION BOX')) {
+                s.category = 'low_voltage';
+            }
+        }
+
         return s;
     }
 }
 
-// ... [TheHealer, DataLoader, DragManager, DemoManager, ProfileManager, ConfigExporter, RedactionManager, PageClassifier, LayoutScanner, FeedbackService, SearchEngine, PdfExporter, PdfViewer, UI classes remain identical to v1.72] ...
+// ... [TheHealer, DataLoader, DragManager, DemoManager, ProfileManager, ConfigExporter, RedactionManager, PageClassifier, LayoutScanner, FeedbackService classes remain the same] ...
 class TheHealer {
     static healedData = {}; 
     static async fetchAndTally() { 
@@ -233,7 +218,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.74 Update: Purging Cache...`);
+            console.warn(`⚡ v1.75 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -936,6 +921,7 @@ class FeedbackService {
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
 }
 
+// v1.75: Panel Category Segmentation
 class SearchEngine {
     static currentResults = [];
     static currentPage = 1;
@@ -952,26 +938,47 @@ class SearchEngine {
             return [k]; 
         });
 
+        // v1.75: Category Handling
         const cat = document.getElementById('catInput').value; 
+        
         const crit = { kw: rawKeywords, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value, enc: document.getElementById('encInput').value };
         let res = [];
         window.LOCAL_DB.forEach(r => {
-            let w = 0, p = true, hpV = false, miss = 0;
-            if (cat === 'Standard') { if (r.category === 'low_voltage') return; } 
-            else if (cat === 'LowVoltage') { if (r.category !== 'low_voltage') return; }
+            // v1.75: Category Segmentation Logic
+            if (cat === 'Standard') { 
+                // Exclude all specialized categories
+                if (r.category === 'treatment' || r.category === 'residential' || r.category === 'low_voltage') return; 
+            } else if (cat === 'Treatment') {
+                if (r.category !== 'treatment') return;
+            } else if (cat === 'Residential') {
+                if (r.category !== 'residential') return;
+            } else if (cat === 'LowVoltage') {
+                if (r.category !== 'low_voltage') return;
+            }
             
-            if(crit.mfg !== "Any") { if (r.mfg === crit.mfg) { w += 10000; } else if (r.desc.includes(crit.mfg)) { w += 1000; } else { return; } }
-            if(crit.hp !== "Any") { const strictMatch = (r.hp && parseFloat(r.hp) === parseFloat(crit.hp)); const safetyRegex = new RegExp(`\\b${crit.hp}\\s*(?:HP|H\\.P|H|KW)\\b`, 'i'); const safetyMatch = safetyRegex.test(r.desc); if (strictMatch) { w += 5000; } else if (safetyMatch) { w += 2000; } else { return; } }
-            if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; w += 500; }
-            if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; w += 500; }
-            if(crit.enc!=="Any") { if(r.enc!==crit.enc) return; w += 500; }
+            // Filters
+            if(crit.mfg !== "Any") { if (r.mfg === crit.mfg) { /* weight++ */ } else if (r.desc.includes(crit.mfg)) { /* weight+ */ } else { return; } }
+            if(crit.hp !== "Any") { const strictMatch = (r.hp && parseFloat(r.hp) === parseFloat(crit.hp)); const safetyRegex = new RegExp(`\\b${crit.hp}\\s*(?:HP|H\\.P|H|KW)\\b`, 'i'); const safetyMatch = safetyRegex.test(r.desc); if (!strictMatch && !safetyMatch) return; }
+            if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; }
+            if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; }
+            if(crit.enc!=="Any") { if(r.enc!==crit.enc) return; }
+            
+            let w = 100;
+            if (r.mfg === crit.mfg) w += 10000;
             
             if(expandedKeywords.length) { 
                 const text = (r.id + " " + r.desc).toUpperCase();
                 const allGroupsMatch = expandedKeywords.every(group => {
                     return group.some(alias => {
                         const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-                        const regex = new RegExp(`\\b${cleanAlias}S?\\b`, 'i'); // v1.74: Allow plural 'S'
+                        // v1.75: VFD Context-Aware Check inside Search
+                        if (alias === 'VFD') {
+                            // Negative lookbehind for NON/NO VFD
+                            // JS RegExp lookbehind support is good now
+                            const vfdRegex = /(?<!NON\s*|NO\s*|WITHOUT\s*)\bVFD\b(?!\s*RATED)/i;
+                            return vfdRegex.test(text);
+                        }
+                        const regex = new RegExp(`\\b${cleanAlias}S?\\b`, 'i');
                         return regex.test(text);
                     });
                 });
@@ -981,7 +988,7 @@ class SearchEngine {
             }
 
             if(!r.pdfUrl) w -= 1000000; 
-            r.w=w; r.p=p; r.hpV=hpV; res.push(r);
+            r.w=w; res.push(r);
         });
         res.sort((a,b) => { if(a.w !== b.w) return b.w - a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
         
