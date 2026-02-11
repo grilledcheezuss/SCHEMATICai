@@ -200,11 +200,12 @@ header {
 #app-container { display: none; flex-direction: row; width: 100%; height: calc(100vh - var(--header-base-height)); overflow: hidden; position: relative; } 
 html.logged-in #app-container { display: flex !important; }
 
+/* v1.66: Added border-right for clearer separation */
 #sidebar-left { 
     width: var(--sidebar-width); 
     min-width: 250px; 
     background: var(--bg-sidebar); 
-    border-right: 2px solid var(--border-color); 
+    border-right: 2px solid var(--border-color); /* Thicker/Darker border */
     display: flex; flex-direction: column; z-index: 20; 
     transition: all 0.3s ease; 
     overflow: hidden; flex-shrink: 0; height: 100%; 
@@ -224,13 +225,14 @@ html.logged-in #app-container { display: flex !important; }
 
 .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .input-group.full-width { grid-column: span 2; } .input-group { display: flex; flex-direction: column; gap: 1px; } .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--app-primary); margin-left: 2px; letter-spacing: 0.5px; } body.dark-mode .input-label { color: var(--text-secondary); }
 
+/* v1.64: Clearer Input Styles */
 .cox-input { 
     width: 100%; height: var(--input-height); padding: 0 8px; 
-    border: 1px solid var(--border-color); 
+    border: 1px solid var(--border-color); /* Darker border */
     border-radius: 4px; font-size: 12px; 
     background: var(--bg-input); color: var(--text-primary); 
     outline: none; transition: border-color 0.2s; 
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Subtle shadow for depth */
 }
 .cox-input:focus { border-color: var(--app-primary); box-shadow: 0 0 0 1px var(--app-primary); } .cox-input:disabled { background: #e5e7eb; cursor: not-allowed; opacity: 0.7; }
 
@@ -270,9 +272,16 @@ input[type=range] { accent-color: var(--lsu-purple); cursor: pointer; }
 .page-btn:disabled { opacity: 0.5; cursor: default; }
 .page-info { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
 
+/* v1.74: Bolder Active Result Card */
 .record-card { background: var(--bg-card); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px; } 
 .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); } 
-.record-card.active-view { background: rgba(70, 29, 124, 0.1); border-color: var(--app-primary); }
+.record-card.active-view { 
+    background: rgba(70, 29, 124, 0.15); 
+    border: 2px solid var(--lsu-purple); 
+    border-left-width: 6px; /* Extra thick accent */
+    box-shadow: 0 4px 12px rgba(70, 29, 124, 0.2); 
+}
+
 .panel-name { font-size: 14px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.1; } 
 .badge-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; }
 
