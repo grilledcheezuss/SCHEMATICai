@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.58 ---
-const APP_VERSION = "v1.58";
+// --- SCHEMATICA ai v1.59 ---
+const APP_VERSION = "v1.59";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -182,7 +182,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.58 Update: Purging Cache...`);
+            console.warn(`⚡ v1.59 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -260,7 +260,7 @@ class DataLoader {
     static harvestCSV() { alert('Harvesting...'); }
 }
 
-// v1.53: Fix Drag Jump by calculating offset from element visual position
+// v1.59: Absolute Coordinate Dragging (Fixes Drag Jump)
 class DragManager {
     static init() {
         const handle = document.getElementById('gen-drag-handle');
@@ -274,21 +274,22 @@ class DragManager {
             if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
             isDragging = true;
             
-            // Get current visual rect (includes CSS 'right', 'top', transforms)
+            // 1. Get the current visual rectangle of the panel
             const rect = panel.getBoundingClientRect();
             
-            // Calculate mouse offset from the top-left corner of the element
+            // 2. Calculate the "Shift": Distance from Mouse Cursor to Panel Top-Left
             shiftX = e.clientX - rect.left;
             shiftY = e.clientY - rect.top;
             
-            // Lock the element to its current computed pixel position relative to the document
-            // This prevents the "jump" when switching from 'right' to 'left' positioning
+            // 3. Immediately switch to absolute coordinates relative to the document (including scroll)
+            // This prevents the jump by locking the panel exactly where it visually IS right now.
             const absLeft = rect.left + window.scrollX;
             const absTop = rect.top + window.scrollY;
 
             panel.style.transition = 'none'; 
-            panel.style.right = 'auto'; // Unset right
+            panel.style.right = 'auto'; // Break the CSS 'right' anchor
             panel.style.bottom = 'auto';
+            
             panel.style.left = `${absLeft}px`;
             panel.style.top = `${absTop}px`;
             
@@ -298,7 +299,9 @@ class DragManager {
 
         document.onmousemove = (e) => {
             if(!isDragging) return;
-            // Standard drag logic: Mouse Page Pos - Initial Offset
+            
+            // 4. Move panel to (Mouse Page Position - Shift)
+            // e.pageX is absolute document coordinate (handles scroll)
             const newLeft = e.pageX - shiftX;
             const newTop = e.pageY - shiftY;
             
