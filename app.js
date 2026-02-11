@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.57 ---
-const APP_VERSION = "v1.57";
+// --- SCHEMATICA ai v1.58 ---
+const APP_VERSION = "v1.58";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -7,7 +7,6 @@ window.TEMPLATE_BYTES = null;
 window.BORDER_INFO_BYTES = null;
 window.BORDER_STD_BYTES = null;
 
-// v1.49: Added textAlign defaults
 const LAYOUT_RULES = {
     TITLE: [
         { map: "cust", x: 0.15, y: 0.42, w: 0.7, h: 0.04, fontSize: 24, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
@@ -183,7 +182,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.57 Update: Purging Cache...`);
+            console.warn(`⚡ v1.58 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -722,6 +721,8 @@ class LayoutScanner {
         
         selects.forEach(select => {
             const currentVal = select.value;
+            // Clear current options except built-ins
+            // Re-build standard options
             let html = `
                 <option value="AUTO">✨ Auto (Detected)</option>
                 <option value="TITLE">🏷️ Title Sheet</option>
@@ -730,6 +731,7 @@ class LayoutScanner {
                 <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Land)</option>
                 <option value="GENERAL">📐 General</option>
             `;
+            // Add customs
             for (const [name, _] of Object.entries(customProfiles)) {
                 html += `<option value="CUSTOM:${name}">⭐ ${name}</option>`;
             }
@@ -1071,6 +1073,16 @@ class PdfViewer {
         this.currentBlobUrl = URL.createObjectURL(blob);
         const task = pdfjsLib.getDocument(this.currentBlobUrl);
         this.doc = await task.promise; 
+
+        // v1.58: Check mobile on load
+        if (window.innerWidth < 768) {
+             this.currentScale = 0.8;
+             // Also auto-collapse the search panel on mobile for better view
+             UI.toggleSearch(true); // true = collapsed
+        } else {
+             this.currentScale = 1.1;
+        }
+
         this.renderStack(); 
     }
     static print() {
@@ -1171,7 +1183,17 @@ class PdfController {
 }
 
 class UI {
-    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
+    static init() { 
+        if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } 
+        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
+        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
+        document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } });
+        
+        // v1.58: Check mobile on init
+        if (window.innerWidth < 768) {
+            UI.toggleSearch(true); // Start collapsed on mobile
+        }
+    }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }

@@ -543,11 +543,76 @@ body.editor-active .redaction-resize-handle {
 }
 .align-btn:hover { background: var(--bg-sidebar); }
 
-/* v1.55: Mobile Responsiveness */
+/* v1.58: MOBILE REDESIGN - CLEAN STACK */
 @media (max-width: 767px) {
+    /* Main container becomes a vertical column */
+    #app-container {
+        flex-direction: column;
+    }
+    
+    /* "Dissolve" the sidebar wrapper so its children become direct flex items of app-container */
+    #sidebar-left {
+        display: contents; 
+    }
+    
+    /* 1. TOP: Search Controls */
+    #search-controls {
+        order: 1;
+        width: 100%;
+        border-bottom: 2px solid var(--border-color);
+        border-right: none;
+        z-index: 30;
+        background: var(--bg-card);
+        flex-shrink: 0;
+        /* Default state is handled by JS (collapsed), but CSS ensures it sits top */
+    }
+    
+    /* Ensure the "Refine Search" button stays with the controls at the top */
+    #refine-btn-area {
+        order: 1; 
+        width: 100%;
+        z-index: 31;
+    }
+
+    /* 2. MIDDLE: PDF Preview (Takes all remaining space) */
+    #preview-pane {
+        order: 2;
+        flex: 1;
+        width: 100%;
+        height: auto;
+        border-left: none;
+    }
+
+    /* 3. BOTTOM: Results List + Pagination */
+    #results-scroll-area {
+        order: 3;
+        width: 100%;
+        height: 35vh; /* Fixed height for results */
+        min-height: 150px;
+        border-top: 2px solid var(--lsu-purple);
+        border-right: none;
+        background: var(--bg-sidebar);
+        z-index: 20;
+        box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+        flex-shrink: 0;
+    }
+    
+    #pagination-footer {
+        order: 4;
+        width: 100%;
+        border-top: 1px solid var(--border-color);
+        background: var(--bg-card);
+        flex-shrink: 0;
+    }
+    
+    /* Hide the sidebar toggle button on mobile */
+    #toggle-left { display: none; }
+    
+    /* Hide Generator on Phones */
     #menu-demo { display: none !important; }
     #generator-panel { display: none !important; }
     
+    /* Header Scaling */
     .app-title-group {
         position: static;
         transform: none;
