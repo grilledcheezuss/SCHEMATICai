@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.64 ---
-const APP_VERSION = "v1.64";
+// --- SCHEMATICA ai v1.65 ---
+const APP_VERSION = "v1.65";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -42,6 +42,7 @@ const LAYOUT_RULES = {
     ]
 };
 
+// v1.63: Refined Enclosure Logic - Removed vague "SS", added "NEMA 4X" to FG
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 
         'GORMAN RUPP':['gorman','gr'], 'BARNES':['barnes','sithe','crane'], 'HYDROMATIC':['hydromatic'], 
@@ -51,9 +52,9 @@ const AI_TRAINING_DATA = {
         'INFILTRATOR':['infiltrator'], 'OAK ALLEY':['oak'], 'SHUR-FLO':['shur'], 'DANFOSS':['danfoss']
     }, 
     ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], // Specific Stainless terms
-        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], // Includes generic catch-all
-        'POLY': ['POLY', 'POLYCARBONATE'] // Specific Poly terms
+        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], // Removed "SS" to avoid Selector Switch
+        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], // Added NEMA 4X catch-all
+        'POLY': ['POLY', 'POLYCARBONATE'] 
     },
     ALIASES: {
         'LA': ['LA', 'LIGHTNING ARRESTOR', 'SURGE ARRESTOR', 'TVSS'],
@@ -69,7 +70,6 @@ const AI_TRAINING_DATA = {
     } 
 };
 
-// ... [DB, CacheService, AuthService, NetworkService classes remain identical to v1.62] ...
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -218,7 +218,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.64 Update: Purging Cache...`);
+            console.warn(`⚡ v1.65 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
