@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.65 ---
-const APP_VERSION = "v1.65";
+// --- SCHEMATICA ai v1.66 ---
+const APP_VERSION = "v1.66";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -52,8 +52,8 @@ const AI_TRAINING_DATA = {
         'INFILTRATOR':['infiltrator'], 'OAK ALLEY':['oak'], 'SHUR-FLO':['shur'], 'DANFOSS':['danfoss']
     }, 
     ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], // Removed "SS" to avoid Selector Switch
-        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], // Added NEMA 4X catch-all
+        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], 
+        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], 
         'POLY': ['POLY', 'POLYCARBONATE'] 
     },
     ALIASES: {
@@ -70,6 +70,7 @@ const AI_TRAINING_DATA = {
     } 
 };
 
+// ... [DB, CacheService, AuthService, NetworkService classes remain identical to v1.62] ...
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -105,44 +106,55 @@ class NetworkService {
     }
 }
 
-// v1.64: Revised AIParser - Strict Priority (Poly > FG > SS > Generic)
+// v1.66: Context-Aware Enclosure Parsing
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null, category: healed?.category||null };
         t = (t||"").toUpperCase();
         
-        // Manufacturer Logic (Unchanged)
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
         
-        // v1.64: Enclosure Logic - Strict Priority Order
+        // v1.66: Context-Aware Enclosure Logic
         if (!s.enc) {
-            // 1. Check Polycarbonate First (Most specific)
+            // 1. Check Polycarbonate (High Priority)
             const polyMatch = AI_TRAINING_DATA.ENCLOSURES['POLY'].some(val => {
-                const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
+                const regex = new RegExp(val, 'i'); // Simple check first
                 return regex.test(t);
             });
             
             if (polyMatch) {
                 s.enc = 'POLY';
             } else {
-                // 2. Check Fiberglass Second (Includes specific terms like FRP)
-                // Note: We check 'NEMA 4X' later as a generic fallback
+                // 2. Check Fiberglass (Mid Priority)
                 const specificFgTerms = ['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG']; 
                 const fgMatch = specificFgTerms.some(val => {
-                    const regex = new RegExp(`\\b${val}\\b`, 'i');
+                    const regex = new RegExp(val, 'i');
                     return regex.test(t);
                 });
                 
                 if (fgMatch) {
                     s.enc = '4XFG';
                 } else {
-                    // 3. Check Stainless Third
+                    // 3. Check Stainless (Smart Check)
+                    // Only match if NOT followed by specific hardware terms
                     const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
-                        const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
-                        return regex.test(t);
+                        // Look for "Stainless" but ensure it's NOT followed by "Screw", "Latch", "Hardware", "Nameplate", "Hinge", "Mount"
+                        // Negative lookahead regex
+                        const regex = new RegExp(`\\b${val}\\b(?!.*(?:SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT))`, 'i');
+                        
+                        // Fallback: If complex regex fails, check simplistic logic
+                        if (regex.test(t)) return true;
+
+                        // Strict manual check if regex is tricky in some browsers
+                        const idx = t.indexOf(val);
+                        if (idx > -1) {
+                            const context = t.substring(idx, idx + 50); // check next 50 chars
+                            if (!/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT/.test(context)) {
+                                return true;
+                            }
+                        }
+                        return false;
                     });
                     
                     if (ssMatch) {
@@ -218,7 +230,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.65 Update: Purging Cache...`);
+            console.warn(`⚡ v1.66 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');

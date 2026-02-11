@@ -18,7 +18,7 @@
     --text-primary: #1e293b; 
     --text-secondary: #64748b; 
     
-    /* v1.64: Darker border for visibility */
+    /* v1.66: High Contrast Borders */
     --border-color: #94a3b8; 
 
     /* BADGES */
@@ -193,13 +193,21 @@ header {
 #app-container { display: none; flex-direction: row; width: 100%; height: calc(100vh - var(--header-base-height)); overflow: hidden; position: relative; } 
 html.logged-in #app-container { display: flex !important; }
 
-#sidebar-left { width: var(--sidebar-width); min-width: 250px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; transition: all 0.3s ease; overflow: hidden; flex-shrink: 0; height: 100%; } 
+/* v1.66: Added border-right for clearer separation */
+#sidebar-left { 
+    width: var(--sidebar-width); 
+    min-width: 250px; 
+    background: var(--bg-sidebar); 
+    border-right: 2px solid var(--border-color); /* Thicker/Darker border */
+    display: flex; flex-direction: column; z-index: 20; 
+    transition: all 0.3s ease; 
+    overflow: hidden; flex-shrink: 0; height: 100%; 
+} 
 #sidebar-left.collapsed { width: 0; min-width: 0; border: none; }
 
 .collapse-btn { width: 20px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 100; font-weight: bold; color: var(--text-secondary); transition: 0.3s; flex-shrink: 0; } .collapse-btn:hover { background: var(--bg-app); color: var(--app-primary); }
 #toggle-left { border-left: none; border-radius: 0 4px 4px 0; margin-right: 0; }
 
-/* v1.64: Enhanced Input Visibility */
 .sidebar-controls { padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; flex-shrink: 0; } 
 .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
 #refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; flex-shrink: 0; } 
