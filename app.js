@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.70 ---
-const APP_VERSION = "v1.70";
+// --- SCHEMATICA ai v1.71 ---
+const APP_VERSION = "v1.71";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -51,7 +51,7 @@ const AI_TRAINING_DATA = {
         'INFILTRATOR':['infiltrator'], 'OAK ALLEY':['oak'], 'SHUR-FLO':['shur'], 'DANFOSS':['danfoss']
     }, 
     ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS', 'SS'], 
+        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS', 'SS'], // Added SS back but controlled
         '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], 
         'POLY': ['POLY', 'POLYCARBONATE'] 
     },
@@ -251,7 +251,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.70 Update: Purging Cache...`);
+            console.warn(`⚡ v1.71 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -1274,7 +1274,17 @@ class PdfController {
 }
 
 class UI {
-    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
+    static init() { 
+        if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } 
+        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
+        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
+        document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } });
+        
+        // v1.58: Check mobile on init
+        if (window.innerWidth < 768) {
+            UI.toggleSearch(true); // Start collapsed on mobile
+        }
+    }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
