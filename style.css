@@ -499,8 +499,24 @@ body.editor-active .redaction-resize-handle {
 #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; } 
 #pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; } 
 
-/* v1.51: Global No-Select Rule for UI Polish */
-#pdf-placeholder-text, 
+/* v1.57: Placeholder Text Centering Fix + Cursor Fix */
+#pdf-placeholder-text { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    height: 100%; 
+    width: 100%; 
+    color: rgba(255,255,255,0.5); 
+    font-weight: 700; 
+    text-transform: uppercase; 
+    letter-spacing: 1px; 
+    font-size: 1.2em; 
+    user-select: none; 
+    -webkit-user-select: none; 
+    cursor: default;
+}
+
+/* Global No-Select for other UI elements */
 .panel-name, 
 .hud-badge,
 .input-label,
@@ -529,11 +545,9 @@ body.editor-active .redaction-resize-handle {
 
 /* v1.55: Mobile Responsiveness */
 @media (max-width: 767px) {
-    /* Hide Generator on Phones */
     #menu-demo { display: none !important; }
     #generator-panel { display: none !important; }
     
-    /* Header Scaling */
     .app-title-group {
         position: static;
         transform: none;
@@ -543,7 +557,7 @@ body.editor-active .redaction-resize-handle {
         box-shadow: none;
         backdrop-filter: none;
     }
-    .app-title-main { display: none; } /* Hide Title Text */
+    .app-title-main { display: none; } 
     .app-title-version { 
         color: rgba(255,255,255,0.9); 
         background: rgba(255,255,255,0.2); 
@@ -551,11 +565,10 @@ body.editor-active .redaction-resize-handle {
         border-radius: 4px; 
         font-size: 12px;
     }
-    .logo-main { font-size: 1.5rem; } /* Smaller Logo */
+    .logo-main { font-size: 1.5rem; } 
     .logo-sub { font-size: 0.6rem; letter-spacing: 2px; }
 }
 
 @media (min-width: 768px) {
-    /* Ensure Generator is visible on tablets (even portrait) */
     #menu-demo { display: flex; }
 }

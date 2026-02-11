@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.55 ---
-const APP_VERSION = "v1.55";
+// --- SCHEMATICA ai v1.57 ---
+const APP_VERSION = "v1.57";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -7,6 +7,7 @@ window.TEMPLATE_BYTES = null;
 window.BORDER_INFO_BYTES = null;
 window.BORDER_STD_BYTES = null;
 
+// v1.49: Added textAlign defaults
 const LAYOUT_RULES = {
     TITLE: [
         { map: "cust", x: 0.15, y: 0.42, w: 0.7, h: 0.04, fontSize: 24, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
@@ -182,7 +183,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.55 Update: Purging Cache...`);
+            console.warn(`⚡ v1.57 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
