@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.67 ---
-const APP_VERSION = "v1.67";
+// --- SCHEMATICA ai v1.68 ---
+const APP_VERSION = "v1.68";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -20,7 +20,7 @@ const LAYOUT_RULES = {
     ],
     INFO: [
         { map: "cust", x: 0.119, y: 0.085, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
-        { map: "job", x: 0.058, y: 0.108, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { map: "job", x: 0.058, y: 0.108, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
         { map: "date", x: 0.064, y: 0.858, w: 0.08, h: 0.02, fontSize: 8, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "type", x: 0.149, y: 0.889, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "cpid", x: 0.909, y: 0.94, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -42,7 +42,7 @@ const LAYOUT_RULES = {
     ]
 };
 
-// v1.63: Refined Enclosure Logic - Removed vague "SS", added "NEMA 4X" to FG
+// v1.68: Re-added "SS" but strictly for parsing logic use
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 
         'GORMAN RUPP':['gorman','gr'], 'BARNES':['barnes','sithe','crane'], 'HYDROMATIC':['hydromatic'], 
@@ -52,7 +52,7 @@ const AI_TRAINING_DATA = {
         'INFILTRATOR':['infiltrator'], 'OAK ALLEY':['oak'], 'SHUR-FLO':['shur'], 'DANFOSS':['danfoss']
     }, 
     ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], 
+        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS', 'SS'], // Added SS back but controlled
         '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], 
         'POLY': ['POLY', 'POLYCARBONATE'] 
     },
@@ -70,7 +70,7 @@ const AI_TRAINING_DATA = {
     } 
 };
 
-// ... [DB, CacheService, AuthService, NetworkService classes remain identical to v1.62] ...
+// ... [DB, CacheService, AuthService, NetworkService classes unchanged] ...
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -106,7 +106,7 @@ class NetworkService {
     }
 }
 
-// v1.67: Smart Enclosure Parsing (Stop on First Match + Context)
+// v1.68: Strict Word Boundary for "SS"
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
@@ -115,11 +115,10 @@ class AIParser {
         
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
         
-        // v1.67: Revised Hierarchy (Poly -> FG -> SS -> Generic)
         if (!s.enc) {
             // 1. Check Polycarbonate (High Priority)
             const polyMatch = AI_TRAINING_DATA.ENCLOSURES['POLY'].some(val => {
-                const regex = new RegExp(val, 'i');
+                const regex = new RegExp(`\\b${val}\\b`, 'i'); // \b ensures whole word
                 return regex.test(t);
             });
             
@@ -129,24 +128,28 @@ class AIParser {
                 // 2. Check Fiberglass (Mid Priority)
                 const specificFgTerms = ['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG']; 
                 const fgMatch = specificFgTerms.some(val => {
-                    const regex = new RegExp(val, 'i');
+                    const regex = new RegExp(`\\b${val}\\b`, 'i');
                     return regex.test(t);
                 });
                 
                 if (fgMatch) {
                     s.enc = '4XFG';
                 } else {
-                    // 3. Check Stainless (Smart Check)
-                    // Only match if NOT followed by specific hardware terms (screw, latch, hinge, etc.)
+                    // 3. Check Stainless (Smart Check with Word Boundaries)
                     const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
+                        // v1.68: Key fix here: \b ensures "SS" doesn't match "C3SS110B"
+                        const regex = new RegExp(`\\b${val}\\b`, 'i');
+                        if (!regex.test(t)) return false;
+
+                        // Context Check (Negative Lookahead simulation)
                         const idx = t.indexOf(val);
                         if (idx > -1) {
-                            // Look ahead 50 chars for disqualifying hardware terms
                             const context = t.substring(idx, idx + 50); 
-                            if (/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET/.test(context)) {
-                                return false; // It's hardware, not the box
+                            // If followed by hardware terms, ignore it
+                            if (/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET|SWITCH/.test(context)) {
+                                return false; 
                             }
-                            return true; // It's the box
+                            return true;
                         }
                         return false;
                     });
@@ -154,7 +157,7 @@ class AIParser {
                     if (ssMatch) {
                         s.enc = '4XSS';
                     } else {
-                        // 4. Generic Fallback: "NEMA 4X" alone implies Fiberglass in this context
+                        // 4. Generic Fallback
                         if (t.includes('NEMA 4X')) {
                             s.enc = '4XFG';
                         }
@@ -224,7 +227,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.67 Update: Purging Cache...`);
+            console.warn(`⚡ v1.68 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -1247,7 +1250,17 @@ class PdfController {
 }
 
 class UI {
-    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
+    static init() { 
+        if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } 
+        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
+        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
+        document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } });
+        
+        // v1.58: Check mobile on init
+        if (window.innerWidth <768) {
+            UI.toggleSearch(true); // Start collapsed on mobile
+        }
+    }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
