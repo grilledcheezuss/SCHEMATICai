@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.66 ---
-const APP_VERSION = "v1.66";
+// --- SCHEMATICA ai v1.67 ---
+const APP_VERSION = "v1.67";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -106,7 +106,7 @@ class NetworkService {
     }
 }
 
-// v1.66: Context-Aware Enclosure Parsing
+// v1.67: Smart Enclosure Parsing (Stop on First Match + Context)
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
@@ -115,11 +115,11 @@ class AIParser {
         
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
         
-        // v1.66: Context-Aware Enclosure Logic
+        // v1.67: Revised Hierarchy (Poly -> FG -> SS -> Generic)
         if (!s.enc) {
             // 1. Check Polycarbonate (High Priority)
             const polyMatch = AI_TRAINING_DATA.ENCLOSURES['POLY'].some(val => {
-                const regex = new RegExp(val, 'i'); // Simple check first
+                const regex = new RegExp(val, 'i');
                 return regex.test(t);
             });
             
@@ -137,22 +137,16 @@ class AIParser {
                     s.enc = '4XFG';
                 } else {
                     // 3. Check Stainless (Smart Check)
-                    // Only match if NOT followed by specific hardware terms
+                    // Only match if NOT followed by specific hardware terms (screw, latch, hinge, etc.)
                     const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
-                        // Look for "Stainless" but ensure it's NOT followed by "Screw", "Latch", "Hardware", "Nameplate", "Hinge", "Mount"
-                        // Negative lookahead regex
-                        const regex = new RegExp(`\\b${val}\\b(?!.*(?:SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT))`, 'i');
-                        
-                        // Fallback: If complex regex fails, check simplistic logic
-                        if (regex.test(t)) return true;
-
-                        // Strict manual check if regex is tricky in some browsers
                         const idx = t.indexOf(val);
                         if (idx > -1) {
-                            const context = t.substring(idx, idx + 50); // check next 50 chars
-                            if (!/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT/.test(context)) {
-                                return true;
+                            // Look ahead 50 chars for disqualifying hardware terms
+                            const context = t.substring(idx, idx + 50); 
+                            if (/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET/.test(context)) {
+                                return false; // It's hardware, not the box
                             }
+                            return true; // It's the box
                         }
                         return false;
                     });
@@ -160,7 +154,7 @@ class AIParser {
                     if (ssMatch) {
                         s.enc = '4XSS';
                     } else {
-                        // 4. Generic Fallback: "NEMA 4X" implies Fiberglass if nothing else matched
+                        // 4. Generic Fallback: "NEMA 4X" alone implies Fiberglass in this context
                         if (t.includes('NEMA 4X')) {
                             s.enc = '4XFG';
                         }
@@ -230,7 +224,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.66 Update: Purging Cache...`);
+            console.warn(`⚡ v1.67 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
