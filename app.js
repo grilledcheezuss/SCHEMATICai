@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.68 ---
-const APP_VERSION = "v1.68";
+// --- SCHEMATICA ai v1.69 ---
+const APP_VERSION = "v1.69";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -70,7 +70,6 @@ const AI_TRAINING_DATA = {
     } 
 };
 
-// ... [DB, CacheService, AuthService, NetworkService classes unchanged] ...
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -106,7 +105,7 @@ class NetworkService {
     }
 }
 
-// v1.68: Strict Word Boundary for "SS"
+// v1.69: Strict Word Boundary for "SS" + Cache Reset
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
@@ -137,15 +136,17 @@ class AIParser {
                 } else {
                     // 3. Check Stainless (Smart Check with Word Boundaries)
                     const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
-                        // v1.68: Key fix here: \b ensures "SS" doesn't match "C3SS110B"
                         const regex = new RegExp(`\\b${val}\\b`, 'i');
                         if (!regex.test(t)) return false;
 
-                        // Context Check (Negative Lookahead simulation)
                         const idx = t.indexOf(val);
                         if (idx > -1) {
+                            // Check previous context (e.g. "3 Pos SS")
+                            const prevContext = t.substring(Math.max(0, idx - 10), idx);
+                            if (/POS|POSITION|SELECTOR/.test(prevContext)) return false;
+
+                            // Check next context
                             const context = t.substring(idx, idx + 50); 
-                            // If followed by hardware terms, ignore it
                             if (/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET|SWITCH/.test(context)) {
                                 return false; 
                             }
@@ -227,7 +228,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.68 Update: Purging Cache...`);
+            console.warn(`⚡ v1.69 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
