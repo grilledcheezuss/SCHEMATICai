@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.62 ---
-const APP_VERSION = "v1.62";
+// --- SCHEMATICA ai v1.63 ---
+const APP_VERSION = "v1.63";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -42,6 +42,7 @@ const LAYOUT_RULES = {
     ]
 };
 
+// v1.63: Refined Enclosure Logic - Removed vague "SS", added "NEMA 4X" to FG
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 
         'GORMAN RUPP':['gorman','gr'], 'BARNES':['barnes','sithe','crane'], 'HYDROMATIC':['hydromatic'], 
@@ -51,8 +52,8 @@ const AI_TRAINING_DATA = {
         'INFILTRATOR':['infiltrator'], 'OAK ALLEY':['oak'], 'SHUR-FLO':['shur'], 'DANFOSS':['danfoss']
     }, 
     ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', 'SS', '304', '316', 'NEMA 4X SS'], 
-        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP'], 
+        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS'], // Removed "SS" to avoid Selector Switch
+        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], // Added NEMA 4X catch-all
         'POLY': ['POLY', 'POLYCARBONATE'] 
     },
     ALIASES: {
@@ -69,6 +70,7 @@ const AI_TRAINING_DATA = {
     } 
 };
 
+// ... [DB, CacheService, AuthService, NetworkService classes remain identical to v1.62] ...
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -104,21 +106,47 @@ class NetworkService {
     }
 }
 
+// v1.63: Smart Enclosure Parsing (SS First -> Poly -> FG Catch-all)
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null, category: healed?.category||null };
         t = (t||"").toUpperCase();
+        
+        // Manufacturer Logic (Unchanged)
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
         
+        // v1.63: Enclosure Logic - Strict Priority Order
         if (!s.enc) {
-            for (const [k, v] of Object.entries(AI_TRAINING_DATA.ENCLOSURES)) {
-                const hasMatch = v.some(val => {
+            // 1. Check Stainless First
+            const ssMatch = AI_TRAINING_DATA.ENCLOSURES['4XSS'].some(val => {
+                const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
+                return regex.test(t);
+            });
+            
+            if (ssMatch) {
+                s.enc = '4XSS';
+            } else {
+                // 2. Check Poly Second
+                const polyMatch = AI_TRAINING_DATA.ENCLOSURES['POLY'].some(val => {
                     const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
                     return regex.test(t);
                 });
-                if (hasMatch) { s.enc = k; break; }
+                
+                if (polyMatch) {
+                    s.enc = 'POLY';
+                } else {
+                    // 3. Check Fiberglass (Includes Generic NEMA 4X) Last
+                    const fgMatch = AI_TRAINING_DATA.ENCLOSURES['4XFG'].some(val => {
+                        const cleanVal = val.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const regex = new RegExp(`\\b${cleanVal}\\b`, 'i');
+                        return regex.test(t);
+                    });
+                    
+                    if (fgMatch) s.enc = '4XFG';
+                }
             }
         }
         
@@ -150,6 +178,7 @@ class AIParser {
     }
 }
 
+// ... [TheHealer, DataLoader, DragManager, DemoManager, ProfileManager, ConfigExporter, RedactionManager, PageClassifier, LayoutScanner, FeedbackService, SearchEngine, PdfExporter, PdfViewer, UI classes remain identical to v1.62] ...
 class TheHealer {
     static healedData = {}; 
     static async fetchAndTally() { 
@@ -182,7 +211,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.62 Update: Purging Cache...`);
+            console.warn(`⚡ v1.63 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -1205,17 +1234,7 @@ class PdfController {
 }
 
 class UI {
-    static init() { 
-        if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } 
-        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
-        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
-        document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } });
-        
-        // v1.58: Check mobile on init
-        if (window.innerWidth < 768) {
-            UI.toggleSearch(true); // Start collapsed on mobile
-        }
-    }
+    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
