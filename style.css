@@ -386,8 +386,9 @@ body.editor-active .redaction-resize-handle {
     cursor: nwse-resize; pointer-events: auto; 
 }
 
+/* v1.62: FIXED POSITIONING (Cures Jump) */
 #generator-panel {
-    position: absolute;
+    position: fixed; /* Changed from absolute */
     top: 90px; 
     right: 20px;
     width: 340px;

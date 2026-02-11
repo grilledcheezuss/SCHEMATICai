@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.61 ---
-const APP_VERSION = "v1.61";
+// --- SCHEMATICA ai v1.62 ---
+const APP_VERSION = "v1.62";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -182,7 +182,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.61 Update: Purging Cache...`);
+            console.warn(`⚡ v1.62 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -260,7 +260,7 @@ class DataLoader {
     static harvestCSV() { alert('Harvesting...'); }
 }
 
-// v1.60: Unified Touch/Mouse Drag Manager with Offset Fix
+// v1.62: Drag Logic using FIXED positioning (pure viewport math)
 class DragManager {
     static init() {
         const handle = document.getElementById('gen-drag-handle');
@@ -270,16 +270,20 @@ class DragManager {
         let isDragging = false;
         let shiftX, shiftY;
 
-        // Unified Handler for Start
         const startDrag = (clientX, clientY) => {
             isDragging = true;
+            
+            // Get current visual rect
             const rect = panel.getBoundingClientRect();
+            
+            // Calculate mouse offset from panel corner
             shiftX = clientX - rect.left;
             shiftY = clientY - rect.top;
 
-            // Lock to absolute document coordinates
-            const absLeft = rect.left + window.scrollX;
-            const absTop = rect.top + window.scrollY;
+            // Lock to fixed position based on current visual location
+            // Since it is fixed, we use rect.left/top directly (no scroll addition needed)
+            const absLeft = rect.left;
+            const absTop = rect.top;
 
             panel.style.transition = 'none'; 
             panel.style.right = 'auto'; 
@@ -290,16 +294,17 @@ class DragManager {
             handle.style.cursor = 'grabbing';
         };
 
-        // Unified Handler for Move
         const moveDrag = (clientX, clientY) => {
             if(!isDragging) return;
-            const newLeft = clientX - shiftX + window.scrollX;
-            const newTop = clientY - shiftY + window.scrollY;
+            
+            // Pure viewport math: Mouse Position - Initial Offset
+            const newLeft = clientX - shiftX;
+            const newTop = clientY - shiftY;
+            
             panel.style.left = `${newLeft}px`;
             panel.style.top = `${newTop}px`;
         };
 
-        // Unified Handler for End
         const endDrag = () => {
             if(isDragging) { 
                 isDragging = false; 
@@ -317,12 +322,12 @@ class DragManager {
         document.onmousemove = (e) => moveDrag(e.clientX, e.clientY);
         document.onmouseup = endDrag;
 
-        // TOUCH EVENTS (Tablets)
+        // TOUCH EVENTS
         handle.ontouchstart = (e) => {
             if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
             const touch = e.touches[0];
             startDrag(touch.clientX, touch.clientY);
-            e.preventDefault(); // Prevent scrolling while dragging panel
+            e.preventDefault();
         };
         document.ontouchmove = (e) => {
             if(!isDragging) return;
