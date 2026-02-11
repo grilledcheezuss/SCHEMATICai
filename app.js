@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.60 ---
-const APP_VERSION = "v1.60";
+// --- SCHEMATICA ai v1.61 ---
+const APP_VERSION = "v1.61";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -182,7 +182,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.60 Update: Purging Cache...`);
+            console.warn(`⚡ v1.61 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -522,6 +522,7 @@ class RedactionManager {
         
         box.dataset.transparent = transparent.toString(); 
         
+        // v1.47: Smart Default Font Logic
         let styleFont = fontFamily;
         if (!styleFont) {
              styleFont = (mapKey === 'cust') ? "'Times New Roman', serif" : "'Courier New', monospace";
@@ -1178,7 +1179,6 @@ class PdfViewer {
 
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
         }
-        // v1.46: Refresh dropdowns after render
         if(DemoManager.isGeneratorActive) { 
             setTimeout(() => {
                 LayoutScanner.refreshProfileOptions();
