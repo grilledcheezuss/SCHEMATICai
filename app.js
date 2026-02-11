@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.69 ---
-const APP_VERSION = "v1.69";
+// --- SCHEMATICA ai v1.70 ---
+const APP_VERSION = "v1.70";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -42,7 +42,6 @@ const LAYOUT_RULES = {
     ]
 };
 
-// v1.68: Re-added "SS" but strictly for parsing logic use
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 
         'GORMAN RUPP':['gorman','gr'], 'BARNES':['barnes','sithe','crane'], 'HYDROMATIC':['hydromatic'], 
@@ -52,7 +51,7 @@ const AI_TRAINING_DATA = {
         'INFILTRATOR':['infiltrator'], 'OAK ALLEY':['oak'], 'SHUR-FLO':['shur'], 'DANFOSS':['danfoss']
     }, 
     ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS', 'SS'], // Added SS back but controlled
+        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS', 'SS'], 
         '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], 
         'POLY': ['POLY', 'POLYCARBONATE'] 
     },
@@ -105,7 +104,7 @@ class NetworkService {
     }
 }
 
-// v1.69: Strict Word Boundary for "SS" + Cache Reset
+// v1.70: Fixed HP Regex for Decimals
 class AIParser {
     static parse(t, id) {
         const healed = TheHealer.healedData[id];
@@ -167,23 +166,47 @@ class AIParser {
             }
         }
         
+        // v1.70 HP FIX: regex now accepts leading dots or full fractions
         if (!s.hp) {
             let maxHP = 0;
+
+            // 1. Compound Fractions
             const compoundRegex = /(\d+)\s+(\d+\/\d+)\s*(?:HP|H\.P\.|HORSEPOWER)\b/gi;
             [...t.matchAll(compoundRegex)].forEach(m => {
-                const whole = parseFloat(m[1]); const [num, den] = m[2].split('/'); const val = whole + (parseFloat(num) / parseFloat(den)); if (val > maxHP) maxHP = val;
+                const whole = parseFloat(m[1]);
+                const [num, den] = m[2].split('/');
+                const val = whole + (parseFloat(num) / parseFloat(den));
+                if (val > maxHP) maxHP = val;
             });
-            const standardRegex = /(?:^|[^0-9\/\-])(\d+(?:[\.\-]\d+)?(?:\/\d+)?)\s*(?:HP|H\.P\.|HORSEPOWER|H)\b/gi;
+
+            // 2. Standard Decimals (.5, 0.5) & Fractions (1/2)
+            const standardRegex = /(?:^|[^0-9\/\.-])((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\s*(?:HP|H\.P\.|HORSEPOWER|H|KW)\b/gi;
             [...t.matchAll(standardRegex)].forEach(m => {
-                let val = 0; const raw = m[1];
-                if(raw.includes('-') && raw.includes('/')) { const p = raw.split('-'); const f = p[1].split('/'); val = parseFloat(p[0]) + (parseFloat(f[0]) / parseFloat(f[1])); } 
-                else if(raw.includes('/')) { const [n,d] = raw.split('/'); val = parseFloat(n) / parseFloat(d); } 
-                else { val = parseFloat(raw); }
+                let val = 0;
+                const raw = m[1];
+                if(raw.includes('/')) {
+                    if (raw.includes('-')) {
+                        const parts = raw.split('-');
+                        const frac = parts[1].split('/');
+                        val = parseFloat(parts[0]) + (parseFloat(frac[0]) / parseFloat(frac[1]));
+                    } else {
+                        const [n,d] = raw.split('/');
+                        val = parseFloat(n) / parseFloat(d);
+                    }
+                } else {
+                    val = parseFloat(raw); // Handles .5 and 0.5 correctly
+                }
+
+                // KW Conversion
+                if (m[0].toUpperCase().includes('KW')) val = val * 1.341;
+
                 if (val >= 0.1 && val <= 300 && val > maxHP) maxHP = val;
             });
-            const kwRegex = /(?:^|[^a-zA-Z0-9.])(\d+(?:\.\d+)?)\s*(?:KW|KILOWATT)\b/gi;
-            [...t.matchAll(kwRegex)].forEach(m => { const val = parseFloat(m[1]) * 1.341; if (val > maxHP) maxHP = val; });
-            if (maxHP > 0) { if (Math.abs(maxHP - Math.round(maxHP)) < 0.1) maxHP = Math.round(maxHP); s.hp = maxHP.toString(); }
+
+            if (maxHP > 0) {
+                if (Math.abs(maxHP - Math.round(maxHP)) < 0.1) maxHP = Math.round(maxHP);
+                s.hp = maxHP.toString();
+            }
         }
 
         if (!s.volt) { let m = t.match(/\b(115|120|208|230|240|277|460|480|575)\s*V(?:olt)?(?:age)?\b/i); if(m) s.volt = m[1]; }
@@ -228,7 +251,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.69 Update: Purging Cache...`);
+            console.warn(`⚡ v1.70 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
