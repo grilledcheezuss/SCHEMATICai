@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.59 ---
-const APP_VERSION = "v1.59";
+// --- SCHEMATICA ai v1.60 ---
+const APP_VERSION = "v1.60";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -182,7 +182,7 @@ class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.59 Update: Purging Cache...`);
+            console.warn(`⚡ v1.60 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -260,7 +260,7 @@ class DataLoader {
     static harvestCSV() { alert('Harvesting...'); }
 }
 
-// v1.59: Absolute Coordinate Dragging (Fixes Drag Jump)
+// v1.60: Unified Touch/Mouse Drag Manager with Offset Fix
 class DragManager {
     static init() {
         const handle = document.getElementById('gen-drag-handle');
@@ -270,52 +270,66 @@ class DragManager {
         let isDragging = false;
         let shiftX, shiftY;
 
-        handle.onmousedown = (e) => {
-            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+        // Unified Handler for Start
+        const startDrag = (clientX, clientY) => {
             isDragging = true;
-            
-            // 1. Get the current visual rectangle of the panel
             const rect = panel.getBoundingClientRect();
-            
-            // 2. Calculate the "Shift": Distance from Mouse Cursor to Panel Top-Left
-            shiftX = e.clientX - rect.left;
-            shiftY = e.clientY - rect.top;
-            
-            // 3. Immediately switch to absolute coordinates relative to the document (including scroll)
-            // This prevents the jump by locking the panel exactly where it visually IS right now.
+            shiftX = clientX - rect.left;
+            shiftY = clientY - rect.top;
+
+            // Lock to absolute document coordinates
             const absLeft = rect.left + window.scrollX;
             const absTop = rect.top + window.scrollY;
 
             panel.style.transition = 'none'; 
-            panel.style.right = 'auto'; // Break the CSS 'right' anchor
+            panel.style.right = 'auto'; 
             panel.style.bottom = 'auto';
-            
             panel.style.left = `${absLeft}px`;
             panel.style.top = `${absTop}px`;
             
             handle.style.cursor = 'grabbing';
-            e.preventDefault();
         };
 
-        document.onmousemove = (e) => {
+        // Unified Handler for Move
+        const moveDrag = (clientX, clientY) => {
             if(!isDragging) return;
-            
-            // 4. Move panel to (Mouse Page Position - Shift)
-            // e.pageX is absolute document coordinate (handles scroll)
-            const newLeft = e.pageX - shiftX;
-            const newTop = e.pageY - shiftY;
-            
+            const newLeft = clientX - shiftX + window.scrollX;
+            const newTop = clientY - shiftY + window.scrollY;
             panel.style.left = `${newLeft}px`;
             panel.style.top = `${newTop}px`;
         };
 
-        document.onmouseup = () => {
+        // Unified Handler for End
+        const endDrag = () => {
             if(isDragging) { 
                 isDragging = false; 
                 panel.style.transition = ''; 
                 handle.style.cursor = 'move'; 
             }
         };
+
+        // MOUSE EVENTS
+        handle.onmousedown = (e) => {
+            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            startDrag(e.clientX, e.clientY);
+            e.preventDefault();
+        };
+        document.onmousemove = (e) => moveDrag(e.clientX, e.clientY);
+        document.onmouseup = endDrag;
+
+        // TOUCH EVENTS (Tablets)
+        handle.ontouchstart = (e) => {
+            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+            const touch = e.touches[0];
+            startDrag(touch.clientX, touch.clientY);
+            e.preventDefault(); // Prevent scrolling while dragging panel
+        };
+        document.ontouchmove = (e) => {
+            if(!isDragging) return;
+            const touch = e.touches[0];
+            moveDrag(touch.clientX, touch.clientY);
+        };
+        document.ontouchend = endDrag;
     }
 }
 
@@ -508,7 +522,6 @@ class RedactionManager {
         
         box.dataset.transparent = transparent.toString(); 
         
-        // v1.47: Smart Default Font Logic
         let styleFont = fontFamily;
         if (!styleFont) {
              styleFont = (mapKey === 'cust') ? "'Times New Roman', serif" : "'Courier New', monospace";
@@ -1165,6 +1178,7 @@ class PdfViewer {
 
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
         }
+        // v1.46: Refresh dropdowns after render
         if(DemoManager.isGeneratorActive) { 
             setTimeout(() => {
                 LayoutScanner.refreshProfileOptions();
