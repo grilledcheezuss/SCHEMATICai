@@ -1250,17 +1250,7 @@ class PdfController {
 }
 
 class UI {
-    static init() { 
-        if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } 
-        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
-        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
-        document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } });
-        
-        // v1.58: Check mobile on init
-        if (window.innerWidth <768) {
-            UI.toggleSearch(true); // Start collapsed on mobile
-        }
-    }
+    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
