@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.73 ---
-const APP_VERSION = "v1.73";
+// --- SCHEMATICA ai v2.0 (Thin Client) ---
+const APP_VERSION = "v2.0";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -43,24 +43,6 @@ const LAYOUT_RULES = {
 };
 
 const AI_TRAINING_DATA = { 
-    MANUFACTURERS: { 
-        'GORMAN RUPP':['gorman','gr'], 
-        'BARNES':['barnes','sithe','crane'], 
-        'HYDROMATIC':['hydromatic'], 
-        'FLYGT':['flygt'], 
-        'MYERS':['myers'], 
-        'GOULDS':['goulds'], 
-        'ZOELLER':['zoeller'], 
-        'LIBERTY':['liberty'], 
-        'WILO':['wilo'], 
-        'PENTAIR':['pentair'], 
-        'ABS':['abs']
-    },
-    ENCLOSURES: { 
-        '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS', 'SS'], 
-        '4XFG': ['4XFG', 'FIBERGLASS', 'FG', 'NON-METALLIC', 'NEMA 4X FG', 'FRP', 'NEMA 4X'], 
-        'POLY': ['POLY', 'POLYCARBONATE'] 
-    },
     ALIASES: {
         'LA': ['LA', 'LIGHTNING ARRESTOR', 'SURGE ARRESTOR', 'TVSS'],
         'PM': ['PM', 'PHASE MONITOR', 'PHASE FAIL', 'PHASE RELAY'],
@@ -89,7 +71,31 @@ class CacheService {
     static activeKey = null;
     static async prepareKey(p) { if(!p) return null; const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); this.activeKey = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); return this.activeKey; }
     static async saveShard(id, data) { if(!this.activeKey) return; const j = JSON.stringify(data); const e = await this.enc(j); await DB.putChunk(id, e); }
-    static async loadAllWithProgress(progressCallback) { if(!this.activeKey) return null; const keys = await DB.getChunkKeys(); if(!keys || keys.length === 0) return null; for(let i = 0; i < keys.length; i++) { if(i % 5 === 0) await new Promise(r => setTimeout(r, 5)); const chunk = await DB.getChunk(keys[i]); if(chunk) { try { const dec = await this.dec(chunk); if(dec) { const data = JSON.parse(dec); data.forEach(r => { window.LOCAL_DB.push(r); window.ID_MAP.set(r.id, r); if(r.mfg) window.FOUND_MFGS.add(r.mfg); }); } } catch(e) {} } if(progressCallback) progressCallback(Math.round(((i + 1) / keys.length) * 100)); } return true; }
+    static async loadAllWithProgress(progressCallback) { 
+        if(!this.activeKey) return null; 
+        const keys = await DB.getChunkKeys(); 
+        if(!keys || keys.length === 0) return null; 
+        for(let i = 0; i < keys.length; i++) { 
+            if(i % 5 === 0) await new Promise(r => setTimeout(r, 5)); 
+            const chunk = await DB.getChunk(keys[i]); 
+            if(chunk) { 
+                try { 
+                    const dec = await this.dec(chunk); 
+                    if(dec) { 
+                        const data = JSON.parse(dec); 
+                        data.forEach(r => { 
+                            window.LOCAL_DB.push(r); 
+                            window.ID_MAP.set(r.id, r); 
+                            if(r.mfg) window.FOUND_MFGS.add(r.mfg); 
+                            if(r.enc) window.FOUND_ENCS.add(r.enc);
+                        }); 
+                    } 
+                } catch(e) {} 
+            } 
+            if(progressCallback) progressCallback(Math.round(((i + 1) / keys.length) * 100)); 
+        } 
+        return true; 
+    }
     static async enc(t) { const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, this.activeKey, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
     static async dec(t) { const [i, d] = t.split(':'); const iv = new Uint8Array(i.match(/.{1,2}/g).map(b=>parseInt(b,16))); const da = new Uint8Array(d.match(/.{1,2}/g).map(b=>parseInt(b,16))); try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, this.activeKey, da)); } catch { return null; } }
 }
@@ -110,115 +116,11 @@ class NetworkService {
     }
 }
 
-class AIParser {
-    static parse(t, id) {
-        const healed = TheHealer.healedData[id];
-        const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null, category: healed?.category||null };
-        t = (t||"").toUpperCase();
-        
-        for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
-        
-        // ENC
-        if (!s.enc) {
-            if (AI_DATA.ENC['POLY'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = 'POLY';
-            else if (['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = '4XFG';
-            else if (AI_DATA.ENC['4XSS'].some(v => {
-                const regex = new RegExp(`\\b${v}\\b`, 'i');
-                if (!regex.test(t)) return false;
-                const idx = t.indexOf(v);
-                if (idx > -1) {
-                    const context = t.substring(idx, idx + 50); 
-                    if (/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET|SWITCH|SELECTOR|POS/.test(context)) return false;
-                    return true;
-                }
-                return false;
-            })) s.enc = '4XSS';
-            else if (t.includes('NEMA 4X')) s.enc = '4XFG';
-        }
-        
-        // HP
-        if (!s.hp) {
-            let maxHP = 0;
-            const compoundRegex = /(\d+)\s+(\d+\/\d+)\s*(?:HP|H\.P\.|HORSEPOWER)\b/gi;
-            [...t.matchAll(compoundRegex)].forEach(m => {
-                const whole = parseFloat(m[1]); const [num, den] = m[2].split('/'); const val = whole + (parseFloat(num) / parseFloat(den)); if (val > maxHP) maxHP = val;
-            });
-            const standardRegex = /(?:^|[^0-9\/\.-])((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\s*(?:HP|H\.P\.|HORSEPOWER|H|KW)\b/gi;
-            [...t.matchAll(standardRegex)].forEach(m => {
-                let val = 0; const raw = m[1];
-                if(raw.includes('/')) {
-                    if (raw.includes('-')) { const parts = raw.split('-'); const frac = parts[1].split('/'); val = parseFloat(parts[0]) + (parseFloat(frac[0]) / parseFloat(frac[1])); } 
-                    else { const [n,d] = raw.split('/'); val = parseFloat(n) / parseFloat(d); }
-                } else { val = parseFloat(raw); }
-                if (m[0].toUpperCase().includes('KW')) val = val * 1.341;
-                if (val >= 0.1 && val <= 300 && val > maxHP) maxHP = val;
-            });
-            if (maxHP > 0) { if (Math.abs(maxHP - Math.round(maxHP)) < 0.1) maxHP = Math.round(maxHP); s.hp = maxHP.toString(); }
-        }
-
-        // v1.73: VOLTAGE PRIORITY
-        if (!s.volt) {
-            const voltPriority = [
-                { id: '575', match: ['575', '600'] },
-                { id: '480', match: ['480', '460', '440'] },
-                { id: '415', match: ['415', '380'] },
-                { id: '277', match: ['277'] },
-                { id: '240', match: ['240', '230', '220'] },
-                { id: '208', match: ['208'] },
-                { id: '120', match: ['120', '115', '110'] }
-            ];
-
-            for (const vGroup of voltPriority) {
-                const regex = new RegExp(`\\b(${vGroup.match.join('|')})\\s*(?:V|VAC|VOLT|PH)`, 'i');
-                if (regex.test(t)) {
-                    s.volt = vGroup.id;
-                    break;
-                }
-            }
-        }
-
-        if (!s.phase) { 
-            if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; 
-            else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; 
-        }
-        return s;
-    }
-}
-
-// ... [TheHealer, DataLoader, DragManager, DemoManager, ProfileManager, ConfigExporter, RedactionManager, PageClassifier, LayoutScanner, FeedbackService, SearchEngine, PdfExporter, PdfViewer, UI classes remain identical to v1.72] ...
-class TheHealer {
-    static healedData = {}; 
-    static async fetchAndTally() { 
-        try { 
-            const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); 
-            if(resp.status === 401) { AuthService.logout(); return; } 
-            const data = await resp.json(); 
-            if(data.records) { 
-                const tallies = {}; 
-                data.records.forEach(r => { 
-                    const rawJson = r.fields['Corrections']; 
-                    const id = r.fields['Panel ID']; 
-                    if (rawJson && id) { 
-                        try { const corrections = JSON.parse(rawJson); Object.entries(corrections).forEach(([param, value]) => { const key = `${id}|${param}|${value}`; tallies[key] = (tallies[key] || 0) + 1; }); } catch(e) { } 
-                    } 
-                }); 
-                for (const [key, count] of Object.entries(tallies)) { 
-                    if (count >= CONFIG.voteThreshold) { 
-                        const [id, param, value] = key.split('|'); 
-                        if (!this.healedData[id]) this.healedData[id] = {}; 
-                        this.healedData[id][param] = value; 
-                    } 
-                } 
-            } 
-        } catch(e) { console.error("Healing Failed", e); } 
-    }
-}
-
 class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.73 Update: Purging Cache...`);
+            console.warn(`⚡ ${APP_VERSION} Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -245,6 +147,7 @@ class DataLoader {
             if(window.LOCAL_DB.length > 7000) { localStorage.setItem('cox_db_complete', 'true'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; }
             if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; } else { btn.innerText = "⬇️ RESUMING..."; } 
         } else { btn.innerText = "⬇️ SYNCING..."; }
+        
         await this.fetchPartition('desc', btn);
         if(!btn.classList.contains('error')) { 
             btn.innerText = "✅ FINALIZING..."; 
@@ -253,7 +156,9 @@ class DataLoader {
             btn.innerText = "SEARCH"; btn.disabled = false;
         }
     }
+    
     static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }
+    
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0; let buffer = []; let shardCount = 0;
         let fetchedCount = 0;
@@ -261,42 +166,48 @@ class DataLoader {
             do {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
                 console.group(`📥 Sync Batch ${loop}`); await new Promise(r => setTimeout(r, 10)); 
-                if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); btn.innerText = `⬇️ UPDATING ${pct}%`; }
-                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
+                if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
+                    const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); 
+                    btn.innerText = `⬇️ UPDATING ${pct}%`; 
+                }
+                
+                // Fetch directly from Edge API - Offset handles pagination
+                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
                 if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
                 if(r.status!==200) { console.error("Sync Failed", r.status); break; }
-                const d = await r.json(); if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
+                
+                const d = await r.json(); 
+                if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
                 fetchedCount += d.records.length;
-                d.records.forEach(r => {
+                
+                d.records.forEach(rec => {
                     try {
-                        let rec = {};
-                        if(r.mfg !== undefined && r.id !== undefined) {
-                            rec = { id: r.id, displayId: r.displayId, desc: r.desc, pdfUrl: r.pdfUrl, mfg: r.mfg, hp: r.hp, volt: r.volt, phase: r.phase, enc: r.enc, category: r.category };
-                        } else {
-                            const rawId = (r.fields['Control Panel Name']||"");
-                            const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                            const displayId = "CP-" + cleanId;
-                            const desc = (r.fields['Items']||"").toUpperCase();
-                            const parsed = AIParser.parse(desc + " " + cleanId);
-                            let cleanMfg = parsed.mfg;
-                            if(cleanMfg) { let isValid = false; for(const validMfg in AI_TRAINING_DATA.MANUFACTURERS) { if(cleanMfg === validMfg) { isValid=true; break; } } if(!isValid) cleanMfg = null; }
-                            rec = { id: cleanId, displayId: displayId, desc: desc, pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, mfg: cleanMfg, hp: parsed.hp, volt: parsed.volt, phase: parsed.phase, enc: parsed.enc, category: parsed.category };
+                        // The worker already formatted the record perfectly!
+                        if(!window.ID_MAP.has(rec.id)) { 
+                            window.LOCAL_DB.push(rec); 
+                            window.ID_MAP.set(rec.id, rec); 
+                            
+                            // Log valid Manufacturers/Enclosures to populate UI Dropdowns
+                            if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); 
+                            if(rec.enc) window.FOUND_ENCS.add(rec.enc); 
                         }
-                        if(window.ID_MAP.has(rec.id)) { } else { window.LOCAL_DB.push(rec); window.ID_MAP.set(rec.id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); }
                         buffer.push(rec);
                     } catch(e) { console.warn("Record Skip", e); }
                 });
+                
                 console.groupEnd();
                 if(buffer.length >= 50) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
-                offset = d.offset;
+                offset = d.offset; 
             } while(offset);
-            localStorage.setItem('cox_db_complete', 'true'); if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
+            
+            localStorage.setItem('cox_db_complete', 'true'); 
+            if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
         } catch(e) { console.error("Sync Critical Error", e); } 
     }
+
     static harvestCSV() { alert('Harvesting...'); }
 }
 
-// v1.62: Drag Logic using FIXED positioning (pure viewport math)
 class DragManager {
     static init() {
         const handle = document.getElementById('gen-drag-handle');
@@ -309,15 +220,11 @@ class DragManager {
         const startDrag = (clientX, clientY) => {
             isDragging = true;
             
-            // Get current visual rect
             const rect = panel.getBoundingClientRect();
             
-            // Calculate mouse offset from panel corner
             shiftX = clientX - rect.left;
             shiftY = clientY - rect.top;
 
-            // Lock to fixed position based on current visual location
-            // Since it is fixed, we use rect.left/top directly (no scroll addition needed)
             const absLeft = rect.left;
             const absTop = rect.top;
 
@@ -333,7 +240,6 @@ class DragManager {
         const moveDrag = (clientX, clientY) => {
             if(!isDragging) return;
             
-            // Pure viewport math: Mouse Position - Initial Offset
             const newLeft = clientX - shiftX;
             const newTop = clientY - shiftY;
             
@@ -349,7 +255,6 @@ class DragManager {
             }
         };
 
-        // MOUSE EVENTS
         handle.onmousedown = (e) => {
             if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
             startDrag(e.clientX, e.clientY);
@@ -358,7 +263,6 @@ class DragManager {
         document.onmousemove = (e) => moveDrag(e.clientX, e.clientY);
         document.onmouseup = endDrag;
 
-        // TOUCH EVENTS
         handle.ontouchstart = (e) => {
             if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
             const touch = e.touches[0];
@@ -403,12 +307,11 @@ class DemoManager {
         }
     }
 
-    // v1.50: Add 'gen-minimized' class to body
     static minimizePanel() {
         document.getElementById('generator-panel').classList.add('minimized');
         document.getElementById('generator-restore-btn').style.display = 'flex';
         document.body.classList.remove('editor-active');
-        document.body.classList.add('gen-minimized'); // Hide editing UI
+        document.body.classList.add('gen-minimized'); 
     }
 
     static restorePanel() {
@@ -417,7 +320,7 @@ class DemoManager {
         panel.classList.remove('minimized');
         document.getElementById('generator-restore-btn').style.display = 'none';
         document.body.classList.add('editor-active');
-        document.body.classList.remove('gen-minimized'); // Show editing UI
+        document.body.classList.remove('gen-minimized'); 
     }
 
     static toggleContext() {
@@ -548,7 +451,6 @@ class ConfigExporter {
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; static startX = 0; static startY = 0; static startLeft = 0; static startTop = 0;
     
-    // v1.49: Added textAlign arg
     static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14, text = null, decoration = null, type = null, fontWeight = 'normal', transparent = false, rotation = 0, fontFamily = null, textAlign = 'center') {
         let container = wrapper.querySelector('.pdf-content-container');
         if (!container && wrapper.classList.contains('pdf-content-container')) container = wrapper;
@@ -563,7 +465,6 @@ class RedactionManager {
         
         box.dataset.transparent = transparent.toString(); 
         
-        // v1.47: Smart Default Font Logic
         let styleFont = fontFamily;
         if (!styleFont) {
              styleFont = (mapKey === 'cust') ? "'Times New Roman', serif" : "'Courier New', monospace";
@@ -572,7 +473,7 @@ class RedactionManager {
         box.style.fontFamily = styleFont;
         box.style.fontSize = fontSize + 'px'; 
         box.style.fontWeight = fontWeight;
-        box.style.textAlign = textAlign; // v1.49 Apply Alignment
+        box.style.textAlign = textAlign; 
         
         if (rotation) {
             box.dataset.rotation = rotation;
@@ -603,11 +504,10 @@ class RedactionManager {
         const h = container.offsetHeight;
         
         const fontSize = document.getElementById('redact-size').value;
-        const currentFontFamily = document.getElementById('redact-font').value; // Use currently selected font
+        const currentFontFamily = document.getElementById('redact-font').value; 
         const isWhiteout = type === 'blocker';
         const transparent = !isWhiteout;
 
-        // Pass currentFontFamily to create function
         this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize, isWhiteout ? '' : 'New Text', null, null, 'bold', transparent, 0, currentFontFamily, 'center');
         this.refreshContent();
     }
@@ -633,7 +533,6 @@ class RedactionManager {
         
         document.getElementById('zone-map-select').value = box.dataset.map; 
         
-        // v1.49: Show/Hide Custom Text Input
         const customInputWrapper = document.getElementById('custom-text-wrapper');
         const customInput = document.getElementById('custom-zone-text');
         
@@ -667,19 +566,16 @@ class RedactionManager {
         this.activeBox.style.fontSize = fs + 'px'; 
     }
     
-    // v1.49: Update Alignment
     static updateActiveAlignment(align) {
         if(!this.activeBox) return;
         this.activeBox.style.textAlign = align;
     }
 
-    // v1.49: Update Custom Text Logic
     static mapSelectedZone() { 
         if(!this.activeBox) return; 
         const val = document.getElementById('zone-map-select').value;
         this.activeBox.dataset.map = val;
         
-        // Toggle input visibility
         if (val === 'custom') {
             document.getElementById('custom-text-wrapper').style.display = 'block';
             document.getElementById('custom-zone-text').value = this.activeBox.dataset.customText || '';
@@ -690,7 +586,6 @@ class RedactionManager {
         this.refreshContent(); 
     }
     
-    // v1.49: Update Text on Input
     static updateCustomText(text) {
         if(!this.activeBox) return;
         this.activeBox.dataset.customText = text;
@@ -702,10 +597,9 @@ class RedactionManager {
     static refreshContent() { 
         const ctx = DemoManager.getContext(); 
         
-        // v1.45: Format Date (YYYY-MM-DD -> MM/DD/YY)
         let displayDate = ctx.date;
         if (displayDate && displayDate.includes('-')) {
-             const parts = displayDate.split('-'); // 2026-02-11
+             const parts = displayDate.split('-'); 
              if (parts.length === 3) {
                  displayDate = `${parts[1]}/${parts[2]}/${parts[0].slice(2)}`;
              }
@@ -718,7 +612,7 @@ class RedactionManager {
             else if(map === 'job') text = ctx.job; 
             else if(map === 'type') text = ctx.type; 
             else if(map === 'cpid') text = ctx.cpid; 
-            else if(map === 'date') text = displayDate; // Use formatted date
+            else if(map === 'date') text = displayDate; 
             else if(map === 'stage') text = ctx.stage; 
             else if(map === 'logo') text = ""; 
             
@@ -779,8 +673,6 @@ class LayoutScanner {
         
         selects.forEach(select => {
             const currentVal = select.value;
-            // Clear current options except built-ins
-            // Re-build standard options
             let html = `
                 <option value="AUTO">✨ Auto (Detected)</option>
                 <option value="TITLE">🏷️ Title Sheet</option>
@@ -789,7 +681,6 @@ class LayoutScanner {
                 <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Land)</option>
                 <option value="GENERAL">📐 General</option>
             `;
-            // Add customs
             for (const [name, _] of Object.entries(customProfiles)) {
                 html += `<option value="CUSTOM:${name}">⭐ ${name}</option>`;
             }
@@ -828,7 +719,6 @@ class LayoutScanner {
         RedactionManager.refreshContent();
     }
 
-    // v1.49: Apply textAlign
     static applyRuleToWrapper(wrapper, ruleSet) { 
         if(!wrapper || !ruleSet) return; 
         const container = wrapper.querySelector('.pdf-content-container');
@@ -843,17 +733,19 @@ class LayoutScanner {
     }
 }
 
-// v1.52: Update Feedback Service for Enclosure and Keywords
 class FeedbackService {
     static currentId = null; static lockout = new Set();
     static async up(id, btn, crit) { if(btn.classList.contains('voted-up')) return; btn.classList.add('voted-up'); const implicit = {}; if(crit && crit.mfg !== 'Any') implicit.mfg = crit.mfg; if(crit && crit.hp !== 'Any') implicit.hp = crit.hp; if(crit && crit.volt !== 'Any') implicit.volt = crit.volt; if(crit && crit.phase !== 'Any') implicit.phase = crit.phase; if(crit && crit.enc !== 'Any') implicit.enc = crit.enc; const payload = { records: [{ fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(implicit) } }] }; await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
+    
     static down(id) { 
         this.currentId = id; 
-        this.setupInput('fb-mfg', Object.keys(AI_TRAINING_DATA.MANUFACTURERS).sort(), 'mfg'); 
+        
+        // Dynamically pull arrays based on the data the Edge Worker processed
+        this.setupInput('fb-mfg', Array.from(window.FOUND_MFGS).sort(), 'mfg'); 
         this.setupInput('fb-hp', AI_TRAINING_DATA.DATA.HP, 'hp'); 
         this.setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt'); 
         this.setupInput('fb-phase', AI_TRAINING_DATA.DATA.PHASE, 'phase'); 
-        this.setupInput('fb-enc', Object.keys(AI_TRAINING_DATA.ENCLOSURES).sort(), 'enc'); // v1.52
+        this.setupInput('fb-enc', Array.from(window.FOUND_ENCS).sort(), 'enc');
 
         const lvBtn = document.getElementById('fb-low-volt-btn'); 
         if (this.lockout.has(`${id}:cat_low`)) { lvBtn.className = 'keyword-toggle disabled-overlay'; lvBtn.innerText = "✓ Reported as Low Voltage"; lvBtn.onclick = null; } 
@@ -865,19 +757,17 @@ class FeedbackService {
 
     static setupInput(elId, data, paramKey) { 
         const el = document.getElementById(elId); 
-        el.innerHTML = '<option value="" disabled selected>Select Correct...</option><option value="Varied">Varied / Multiple</option>'; // v1.52: Added Varied
+        el.innerHTML = '<option value="" disabled selected>Select Correct...</option><option value="Varied">Varied / Multiple</option>'; 
         data.forEach(d => el.add(new Option(d, d))); 
         if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } 
     }
 
     static generateKeywordButtons() { 
-        // v1.52: Dynamic Keyword Logic (Match badges)
         const input = document.getElementById('keywordInput').value; 
         const container = document.getElementById('keyword-cluster'); 
         const wrapper = document.getElementById('keyword-feedback-area'); 
         container.innerHTML = ''; 
         
-        // Parse current keywords just like SearchEngine does
         const keywords = input.split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length > 0); 
         
         if (keywords.length === 0) { 
@@ -902,7 +792,7 @@ class FeedbackService {
         const hp = document.getElementById('fb-hp').value; if(hp) { corrections.hp = hp; this.lockout.add(`${this.currentId}:p_hp`); } 
         const volt = document.getElementById('fb-volt').value; if(volt) { corrections.volt = volt; this.lockout.add(`${this.currentId}:p_volt`); } 
         const phase = document.getElementById('fb-phase').value; if(phase) { corrections.phase = phase; this.lockout.add(`${this.currentId}:p_phase`); } 
-        const enc = document.getElementById('fb-enc').value; if(enc) { corrections.enc = enc; this.lockout.add(`${this.currentId}:p_enc`); } // v1.52
+        const enc = document.getElementById('fb-enc').value; if(enc) { corrections.enc = enc; this.lockout.add(`${this.currentId}:p_enc`); } 
 
         if(document.getElementById('fb-low-volt-btn').classList.contains('selected')) { corrections.category = 'low_voltage'; this.lockout.add(`${this.currentId}:cat_low`); } 
         
@@ -945,14 +835,14 @@ class SearchEngine {
             if (cat === 'Standard') { if (r.category === 'low_voltage') return; } 
             else if (cat === 'LowVoltage') { if (r.category !== 'low_voltage') return; }
             
-            if(crit.mfg !== "Any") { if (r.mfg === crit.mfg) { w += 10000; } else if (r.desc.includes(crit.mfg)) { w += 1000; } else { return; } }
-            if(crit.hp !== "Any") { const strictMatch = (r.hp && parseFloat(r.hp) === parseFloat(crit.hp)); const safetyRegex = new RegExp(`\\b${crit.hp}\\s*(?:HP|H\\.P|H|KW)\\b`, 'i'); const safetyMatch = safetyRegex.test(r.desc); if (strictMatch) { w += 5000; } else if (safetyMatch) { w += 2000; } else { return; } }
+            if(crit.mfg !== "Any") { if (r.mfg === crit.mfg) { w += 10000; } else if (r.desc && r.desc.includes(crit.mfg)) { w += 1000; } else { return; } }
+            if(crit.hp !== "Any") { const strictMatch = (r.hp && parseFloat(r.hp) === parseFloat(crit.hp)); const safetyRegex = new RegExp(`\\b${crit.hp}\\s*(?:HP|H\\.P|H|KW)\\b`, 'i'); const safetyMatch = r.desc && safetyRegex.test(r.desc); if (strictMatch) { w += 5000; } else if (safetyMatch) { w += 2000; } else { return; } }
             if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; w += 500; }
             if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; w += 500; }
             if(crit.enc!=="Any") { if(r.enc!==crit.enc) return; w += 500; }
             
             if(expandedKeywords.length) { 
-                const text = (r.id + " " + r.desc).toUpperCase();
+                const text = (r.id + " " + (r.desc || "")).toUpperCase();
                 const allGroupsMatch = expandedKeywords.every(group => {
                     return group.some(alias => {
                         const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
@@ -1091,7 +981,6 @@ class PdfExporter {
                             const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
                             const textWidth = fontTimes.widthOfTextAtSize(text, fontSize); 
                             
-                            // v1.49: Use Visual Alignment for PDF drawing
                             let textX = drawX;
                             if (box.style.textAlign === 'center') textX = drawX + (drawW/2) - (textWidth/2);
                             else if (box.style.textAlign === 'right') textX = drawX + drawW - textWidth;
@@ -1132,11 +1021,9 @@ class PdfViewer {
         const task = pdfjsLib.getDocument(this.currentBlobUrl);
         this.doc = await task.promise; 
 
-        // v1.58: Check mobile on load
         if (window.innerWidth < 768) {
              this.currentScale = 0.8;
-             // Also auto-collapse the search panel on mobile for better view
-             UI.toggleSearch(true); // true = collapsed
+             UI.toggleSearch(true); 
         } else {
              this.currentScale = 1.1;
         }
@@ -1175,11 +1062,9 @@ class PdfViewer {
 
             const viewport = page.getViewport({ scale: this.currentScale });
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
-            // v1.44 FIX: Wrapper width fits content, but height is now flexible (toolbar + content)
             wrapper.style.width = Math.floor(viewport.width) + "px"; 
             wrapper.dataset.pageNumber = i; 
             
-            // 1. Inject Toolbar (Stacked on top via Flexbox in CSS)
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
             toolbar.innerHTML = `
@@ -1195,7 +1080,6 @@ class PdfViewer {
             `;
             wrapper.appendChild(toolbar);
 
-            // 2. Inject Content Container (Holds Canvas + Redaction Layer)
             const contentContainer = document.createElement('div');
             contentContainer.className = 'pdf-content-container';
             contentContainer.style.width = Math.floor(viewport.width) + "px";
@@ -1250,13 +1134,88 @@ class UI {
     static toggleRightSidebar() { const el = document.getElementById('sidebar-right'); el.classList.toggle('collapsed'); document.getElementById('toggle-right').innerText = el.classList.contains('collapsed') ? '⚙️' : '›'; }
     static toggleSearch(e) { const c = document.getElementById('search-controls'); if(!c) return; if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
     static toggleMenu() { document.getElementById('main-menu').classList.toggle('visible'); }
-    static pop() { const m = document.getElementById('mfgInput'); const cv = m.value; const whitelist = Object.keys(AI_TRAINING_DATA.MANUFACTURERS); const fullList = new Set([...whitelist, ...window.FOUND_MFGS]); const cleanList = Array.from(fullList).filter(mf => whitelist.includes(mf)).sort(); m.innerHTML='<option value="Any">Any</option>'; cleanList.forEach(v=>m.add(new Option(v,v))); m.value=cv; ['hp','volt','phase','enc'].forEach(k=>{ const s=document.getElementById(k+'Input'); if(!s)return; const d=(k==='enc')?Object.keys(AI_TRAINING_DATA.ENCLOSURES):AI_TRAINING_DATA.DATA[k.toUpperCase()]; s.innerHTML='<option value="Any">Any</option>'; d.forEach(v=>s.add(new Option(v,v))); }); }
-    static render(res, crit, totalCount) { const a = document.getElementById('results-area'); a.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${totalCount || res.length} records</div>`; const critJson = JSON.stringify(crit).replace(/"/g, '&quot;'); res.forEach(i => { const h = TheHealer.healedData[i.id]; let b = ''; if(i.category === 'low_voltage') b+=`<span class="hud-badge match-orange">LOW VOLT</span>`; if (crit.mfg !== "Any" && i.mfg) { const isMatch = (i.mfg === crit.mfg); const style = isMatch ? 'match-green' : 'match-orange'; b += `<span class="hud-badge ${style}">${h?.mfg || i.mfg}</span>`; } if(crit.volt !== "Any") { if(i.volt) b+=`<span class="hud-badge match-green">${h?.volt||i.volt}V</span>`; else b+=`<span class="hud-badge match-orange">? V</span>`; } if(crit.phase !== "Any") { if(i.phase) b+=`<span class="hud-badge match-green">${h?.phase||i.phase}PH</span>`; else b+=`<span class="hud-badge match-orange">? PH</span>`; } if(crit.hp !== "Any") { if(i.hp) { if (parseFloat(i.hp) === parseFloat(crit.hp)) b+=`<span class="hud-badge match-green">${h?.hp||i.hp} HP</span>`; else b+=`<span class="hud-badge match-orange">${h?.hp||i.hp} HP</span>`; } else { b+=`<span class="hud-badge match-orange">? HP</span>`; } } if(crit.enc !== "Any" && i.enc) { b+=`<span class="hud-badge match-green">${h?.enc||i.enc}</span>`; } if(crit.kw && crit.kw.length > 0) { crit.kw.forEach(k => { if(crit.mfg !== "Any" && i.mfg === k.toUpperCase()) return; b += `<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`; }); } if(!i.pdfUrl) b += `<span class="hud-badge no-pdf">NO PDF</span>`; const c = document.createElement('div'); c.className = `record-card ${!i.p?'varied-result':''}`; c.innerHTML = `<div class="panel-name">${i.displayId || i.id}</div><div class="badge-row">${b}</div><div class="card-actions"><button class="thumb-btn up" onclick="event.stopPropagation();FeedbackService.up('${i.id}',this, ${critJson})">👍</button><button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${i.id}')">👎</button></div>`; c.onclick = () => { document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); c.classList.add('active-view'); PdfController.load(i.id, i.pdfUrl); }; a.appendChild(c); }); }
+    
+    static pop() { 
+        const m = document.getElementById('mfgInput'); const cv = m.value; 
+        const cleanList = Array.from(window.FOUND_MFGS).sort(); 
+        m.innerHTML='<option value="Any">Any</option>'; 
+        cleanList.forEach(v=>m.add(new Option(v,v))); 
+        m.value=cv; 
+        
+        ['hp','volt','phase','enc'].forEach(k=>{ 
+            const s=document.getElementById(k+'Input'); 
+            if(!s)return; 
+            const d = (k==='enc') ? Array.from(window.FOUND_ENCS).sort() : AI_TRAINING_DATA.DATA[k.toUpperCase()]; 
+            s.innerHTML='<option value="Any">Any</option>'; 
+            d.forEach(v=>s.add(new Option(v,v))); 
+        }); 
+    }
+
+    static render(res, crit, totalCount) { 
+        const a = document.getElementById('results-area'); 
+        a.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${totalCount || res.length} records</div>`; 
+        const critJson = JSON.stringify(crit).replace(/"/g, '&quot;'); 
+        
+        res.forEach(i => { 
+            let b = ''; 
+            if(i.category === 'low_voltage') b+=`<span class="hud-badge match-orange">LOW VOLT</span>`; 
+            
+            if (crit.mfg !== "Any" && i.mfg) { 
+                const isMatch = (i.mfg === crit.mfg); 
+                const style = isMatch ? 'match-green' : 'match-orange'; 
+                b += `<span class="hud-badge ${style}">${i.mfg}</span>`; 
+            } 
+            if(crit.volt !== "Any") { 
+                if(i.volt) b+=`<span class="hud-badge match-green">${i.volt}V</span>`; 
+                else b+=`<span class="hud-badge match-orange">? V</span>`; 
+            } 
+            if(crit.phase !== "Any") { 
+                if(i.phase) b+=`<span class="hud-badge match-green">${i.phase}PH</span>`; 
+                else b+=`<span class="hud-badge match-orange">? PH</span>`; 
+            } 
+            if(crit.hp !== "Any") { 
+                if(i.hp) { 
+                    if (parseFloat(i.hp) === parseFloat(crit.hp)) b+=`<span class="hud-badge match-green">${i.hp} HP</span>`; 
+                    else b+=`<span class="hud-badge match-orange">${i.hp} HP</span>`; 
+                } else { 
+                    b+=`<span class="hud-badge match-orange">? HP</span>`; 
+                } 
+            } 
+            if(crit.enc !== "Any" && i.enc) { 
+                b+=`<span class="hud-badge match-green">${i.enc}</span>`; 
+            } 
+            if(crit.kw && crit.kw.length > 0) { 
+                crit.kw.forEach(k => { 
+                    if(crit.mfg !== "Any" && i.mfg === k.toUpperCase()) return; 
+                    b += `<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`; 
+                }); 
+            } 
+            if(!i.pdfUrl) b += `<span class="hud-badge no-pdf">NO PDF</span>`; 
+            
+            const c = document.createElement('div'); 
+            c.className = `record-card ${!i.p?'varied-result':''}`; 
+            c.innerHTML = `
+                <div class="panel-name">${i.displayId || i.id}</div>
+                <div class="badge-row">${b}</div>
+                <div class="card-actions">
+                    <button class="thumb-btn up" onclick="event.stopPropagation();FeedbackService.up('${i.id}',this, ${critJson})">👍</button>
+                    <button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${i.id}')">👎</button>
+                </div>
+            `; 
+            
+            c.onclick = () => { 
+                document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
+                c.classList.add('active-view'); 
+                PdfController.load(i.id, i.pdfUrl); 
+            }; 
+            a.appendChild(c); 
+        }); 
+    }
 }
 
 window.UI = UI;
 
-window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set();
+window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set(); window.FOUND_ENCS = new Set();
 document.addEventListener('DOMContentLoaded', () => { 
     try {
         UI.init(); 
