@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v2.4.0 (Stable PDF Memory Viewer) ---
-const APP_VERSION = "v2.4.0";
+// --- SCHEMATICA ai v2.4.3 (Strict Keyword Boundaries) ---
+const APP_VERSION = "v2.4.3";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -49,7 +49,9 @@ const AI_TRAINING_DATA = {
         'EBARA', 'HIDROSTAL'
     ],
     ALIASES: {
-        'LA': ['LA', 'LIGHTNING ARRESTOR', 'SURGE ARRESTOR', 'TVSS'],
+        // CRITICAL FIX: Grouped SA, LA, and TVSS perfectly
+        'SA': ['SA', 'SURGE ARRESTOR', 'SURGE SUPPRESSOR', 'TVSS', 'LIGHTNING ARRESTOR', 'SPD', 'LA'],
+        'LA': ['LA', 'LIGHTNING ARRESTOR', 'SURGE ARRESTOR', 'SURGE SUPPRESSOR', 'TVSS', 'SPD', 'SA'],
         'PM': ['PM', 'PHASE MONITOR', 'PHASE FAIL', 'PHASE RELAY'],
         'VFD': ['VFD', 'VARIABLE FREQUENCY DRIVE', 'DRIVE', 'INVERTER'],
         'HOA': ['HOA', 'HAND OFF AUTO', 'HAND-OFF-AUTO'],
@@ -81,7 +83,7 @@ class CacheService {
         const keys = await DB.getChunkKeys(); 
         if(!keys || keys.length === 0) return null; 
         for(let i = 0; i < keys.length; i++) { 
-            if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); // Faster cache startup
+            if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); 
             const chunk = await DB.getChunk(keys[i]); 
             if(chunk) { 
                 try { 
@@ -258,8 +260,6 @@ class DragManager {
             panel.style.bottom = 'auto';
             panel.style.left = `${absLeft}px`;
             panel.style.top = `${absTop}px`;
-            
-            handle.style.cursor = 'grabbing';
         };
 
         const moveDrag = (clientX, clientY) => {
@@ -274,7 +274,6 @@ class DragManager {
             if(isDragging) { 
                 isDragging = false; 
                 panel.style.transition = ''; 
-                handle.style.cursor = 'move'; 
             }
         };
 
@@ -874,8 +873,10 @@ class SearchEngine {
                 const allGroupsMatch = expandedKeywords.every(group => {
                     return group.some(alias => {
                         const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-                        const regex = new RegExp(`(?:^|\\W)${cleanAlias}(?:$|\\W)`, 'i');
-                        return regex.test(text) || text.includes(cleanAlias); 
+                        
+                        // CRITICAL FIX: Safe word-boundary regex to prevent partial acronym matches
+                        const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
+                        return regex.test(text); 
                     });
                 });
 
@@ -943,6 +944,97 @@ class SearchEngine {
     }
 }
 
+class PdfExporter {
+    static async export() {
+        if (!PdfViewer.doc) return alert("No PDF loaded!");
+        const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
+        const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
+        try {
+            const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
+            const mainPdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+            const compositeDoc = await PDFLib.PDFDocument.create();
+            
+            let coverPage;
+            if (window.TEMPLATE_BYTES) {
+                const templateDoc = await PDFLib.PDFDocument.load(window.TEMPLATE_BYTES.slice(0));
+                const [embeddedTemplate] = await compositeDoc.copyPages(templateDoc, [0]);
+                coverPage = compositeDoc.addPage(embeddedTemplate);
+            } else {
+                const [origPage1] = await compositeDoc.copyPages(mainPdfDoc, [0]);
+                coverPage = compositeDoc.addPage(origPage1);
+            }
+
+            if (mainPdfDoc.getPageCount() > 1) {
+                const remainingIndices = Array.from({ length: mainPdfDoc.getPageCount() - 1 }, (_, i) => i + 1);
+                const remainingPages = await compositeDoc.copyPages(mainPdfDoc, remainingIndices);
+                
+                let infoImg, stdImg;
+                if(window.BORDER_INFO_BYTES) infoImg = await compositeDoc.embedPng(window.BORDER_INFO_BYTES.slice(0));
+                if(window.BORDER_STD_BYTES) stdImg = await compositeDoc.embedPng(window.BORDER_STD_BYTES.slice(0));
+
+                remainingPages.forEach((p, idx) => {
+                    const newPage = compositeDoc.addPage(p);
+                    const { width, height } = newPage.getSize();
+                    if (idx === 0 && infoImg) { newPage.drawImage(infoImg, { x: 0, y: 0, width, height }); } 
+                    else if (stdImg) { newPage.drawImage(stdImg, { x: 0, y: 0, width, height }); }
+                });
+            }
+
+            const pages = compositeDoc.getPages();
+            const fontTimes = await compositeDoc.embedFont(PDFLib.StandardFonts.TimesRoman); 
+            const fontCourier = await compositeDoc.embedFont(PDFLib.StandardFonts.Courier);
+
+            pages.forEach((page, index) => {
+                const pdfWidth = page.getWidth(); const pdfHeight = page.getHeight();
+                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
+                if (wrapper) {
+                    const container = wrapper.querySelector('.pdf-content-container');
+                    const zones = container.querySelectorAll('.redaction-box');
+                    zones.forEach(box => {
+                        const relX = box.offsetLeft / container.offsetWidth; 
+                        const relY = box.offsetTop / container.offsetHeight;
+                        const relW = box.offsetWidth / container.offsetWidth; 
+                        const relH = box.offsetHeight / container.offsetHeight;
+                        
+                        const drawX = relX * pdfWidth; const drawH = relH * pdfHeight;
+                        const drawY = pdfHeight - (relY * pdfHeight) - drawH; const drawW = relW * pdfWidth;
+                        
+                        const isTransparent = box.dataset.transparent === "true";
+
+                        if ((!window.TEMPLATE_BYTES || index > 0) && !isTransparent) {
+                             page.drawRectangle({ x: drawX, y: drawY, width: drawW, height: drawH, color: PDFLib.rgb(1,1,1), borderColor: PDFLib.rgb(1,1,1), borderWidth: 0 });
+                        }
+
+                        const text = box.querySelector('span')?.innerText || "";
+                        if (text) { 
+                            const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
+                            const textWidth = fontTimes.widthOfTextAtSize(text, fontSize); 
+                            
+                            let textX = drawX;
+                            if (box.style.textAlign === 'center') textX = drawX + (drawW/2) - (textWidth/2);
+                            else if (box.style.textAlign === 'right') textX = drawX + drawW - textWidth;
+
+                            const textY = drawY + (drawH/2) - (fontSize/4); 
+                            
+                            let fontToUse = fontTimes;
+                            if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
+
+                            page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) }); 
+                            if (box.dataset.decoration === 'underline') {
+                                page.drawLine({ start: { x: textX, y: textY - 2 }, end: { x: textX + textWidth, y: textY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
+                            }
+                        }
+                    });
+                }
+            });
+
+            const pdfBytes = await compositeDoc.save();
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `redacted_${new Date().getTime()}.pdf`; link.click();
+        } catch (e) { console.error(e); alert("Export Failed: " + e.message); } finally { btn.innerText = origText; btn.disabled = false; }
+    }
+}
+
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
@@ -970,12 +1062,10 @@ class PdfViewer {
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
             
-            // Bypass Blob HTTP routing directly with arrayBuffer
             const arrayBuffer = await resp.arrayBuffer();
 
             if (this.currentFetchId !== fetchId) return; 
 
-            // We still create the blob purely so the user can "Print" or "Export" it if they want.
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(blob);
