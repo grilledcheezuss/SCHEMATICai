@@ -1,3 +1,16 @@
+/* ... [Previous CSS Content] ... */
+
+/* v1.76: Smooth PDF Transitions */
+.pdf-fade-container {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+.pdf-fade-container.visible {
+    opacity: 1;
+}
+
+/* ... [Rest of CSS] ... */
+
 :root { 
     /* --- LSU BRAND PALETTE --- */
     --lsu-purple: #461D7C; 
@@ -200,12 +213,11 @@ header {
 #app-container { display: none; flex-direction: row; width: 100%; height: calc(100vh - var(--header-base-height)); overflow: hidden; position: relative; } 
 html.logged-in #app-container { display: flex !important; }
 
-/* v1.66: Added border-right for clearer separation */
 #sidebar-left { 
     width: var(--sidebar-width); 
     min-width: 250px; 
     background: var(--bg-sidebar); 
-    border-right: 2px solid var(--border-color); /* Thicker/Darker border */
+    border-right: 2px solid var(--border-color); 
     display: flex; flex-direction: column; z-index: 20; 
     transition: all 0.3s ease; 
     overflow: hidden; flex-shrink: 0; height: 100%; 
@@ -225,14 +237,13 @@ html.logged-in #app-container { display: flex !important; }
 
 .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .input-group.full-width { grid-column: span 2; } .input-group { display: flex; flex-direction: column; gap: 1px; } .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--app-primary); margin-left: 2px; letter-spacing: 0.5px; } body.dark-mode .input-label { color: var(--text-secondary); }
 
-/* v1.64: Clearer Input Styles */
 .cox-input { 
     width: 100%; height: var(--input-height); padding: 0 8px; 
-    border: 1px solid var(--border-color); /* Darker border */
+    border: 1px solid var(--border-color); 
     border-radius: 4px; font-size: 12px; 
     background: var(--bg-input); color: var(--text-primary); 
     outline: none; transition: border-color 0.2s; 
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Subtle shadow for depth */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
 }
 .cox-input:focus { border-color: var(--app-primary); box-shadow: 0 0 0 1px var(--app-primary); } .cox-input:disabled { background: #e5e7eb; cursor: not-allowed; opacity: 0.7; }
 
@@ -272,13 +283,12 @@ input[type=range] { accent-color: var(--lsu-purple); cursor: pointer; }
 .page-btn:disabled { opacity: 0.5; cursor: default; }
 .page-info { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
 
-/* v1.74: Bolder Active Result Card */
 .record-card { background: var(--bg-card); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px; } 
 .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); } 
 .record-card.active-view { 
     background: rgba(70, 29, 124, 0.15); 
     border: 2px solid var(--lsu-purple); 
-    border-left-width: 6px; /* Extra thick accent */
+    border-left-width: 6px; 
     box-shadow: 0 4px 12px rgba(70, 29, 124, 0.2); 
 }
 
@@ -295,9 +305,8 @@ input[type=range] { accent-color: var(--lsu-purple); cursor: pointer; }
 
 .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; } 
 
-/* v1.71: Pronounced Feedback Buttons */
 .thumb-btn { 
-    background: #f1f5f9; /* Visible background */
+    background: #f1f5f9; 
     border: 1px solid var(--border-color); 
     border-radius: 4px; 
     width: 30px; height: 30px; 
@@ -305,15 +314,14 @@ input[type=range] { accent-color: var(--lsu-purple); cursor: pointer; }
     display: flex; align-items: center; justify-content: center; 
     font-size: 14px; 
     transition: 0.2s; 
-    color: var(--text-primary); /* Darker icon */
-    opacity: 1; /* No transparency */
+    color: var(--text-primary); 
+    opacity: 1; 
 } 
 .thumb-btn:hover { background: #e2e8f0; transform: scale(1.05); }
 .thumb-btn.up:hover { background: #16a34a; border-color: #16a34a; color: white; }
 .thumb-btn.down:hover { background: #dc2626; border-color: #dc2626; color: white; }
 .thumb-btn.voted-up { background: var(--lsu-purple) !important; border-color: var(--lsu-purple) !important; color: white !important; pointer-events: none; cursor: default; }
 
-/* Dark mode adjustment for thumb buttons */
 body.dark-mode .thumb-btn {
     background: #2a2a2a;
     color: #cbd5e1;
@@ -329,13 +337,12 @@ body.dark-mode .thumb-btn:hover {
 #custom-pdf-viewer { flex: 1; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 #pdf-main-view { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; -webkit-overflow-scrolling: touch; }
 
-/* v1.44: Refined PDF Page Structure */
 .pdf-page-wrapper { 
     position: relative; 
     box-shadow: 0 4px 15px rgba(0,0,0,0.5); 
     background: white; 
     margin-bottom: 20px; 
-    display: flex; /* Flexbox for column stacking */
+    display: flex; 
     flex-direction: column;
     flex-shrink: 0; 
 } 
@@ -344,7 +351,7 @@ body.dark-mode .thumb-btn:hover {
     background: #1e293b;
     color: white;
     padding: 6px 12px;
-    display: none; /* Hidden unless demo mode */
+    display: none; 
     justify-content: space-between;
     align-items: center;
     font-size: 11px;
@@ -355,7 +362,6 @@ body.dark-mode .thumb-btn:hover {
 }
 body.demo-mode .page-toolbar { display: flex; }
 
-/* v1.44: New Content Container for absolute positioning context */
 .pdf-content-container {
     position: relative; 
     width: 100%;
@@ -366,7 +372,6 @@ body.demo-mode .page-toolbar { display: flex; }
 
 .pdf-border-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; mix-blend-mode: normal; }
 
-/* v1.50: PRESENTATION MODE (Clean Preview) */
 body.gen-minimized .page-toolbar {
     display: none !important;
 }
@@ -440,9 +445,8 @@ body.editor-active .redaction-resize-handle {
     cursor: nwse-resize; pointer-events: auto; 
 }
 
-/* v1.62: FIXED POSITIONING (Cures Jump) */
 #generator-panel {
-    position: fixed; /* Changed from absolute */
+    position: fixed; 
     top: 90px; 
     right: 20px;
     width: 340px;
@@ -562,7 +566,6 @@ body.editor-active .redaction-resize-handle {
 #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; } 
 #pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; } 
 
-/* v1.57: Placeholder Text Centering Fix + Cursor Fix */
 #pdf-placeholder-text { 
     display: flex; 
     align-items: center; 
@@ -579,7 +582,6 @@ body.editor-active .redaction-resize-handle {
     cursor: default;
 }
 
-/* Global No-Select for other UI elements */
 .panel-name, 
 .hud-badge,
 .input-label,
@@ -592,7 +594,6 @@ body.editor-active .redaction-resize-handle {
     cursor: default;
 }
 
-/* v1.49: Alignment Controls */
 .alignment-toggles { display: flex; gap: 5px; }
 .align-btn {
     flex: 1;
@@ -606,19 +607,15 @@ body.editor-active .redaction-resize-handle {
 }
 .align-btn:hover { background: var(--bg-sidebar); }
 
-/* v1.58: MOBILE REDESIGN - CLEAN STACK */
 @media (max-width: 767px) {
-    /* Main container becomes a vertical column */
     #app-container {
         flex-direction: column;
     }
     
-    /* "Dissolve" the sidebar wrapper so its children become direct flex items of app-container */
     #sidebar-left {
         display: contents; 
     }
     
-    /* 1. TOP: Search Controls */
     #search-controls {
         order: 1;
         width: 100%;
@@ -627,17 +624,14 @@ body.editor-active .redaction-resize-handle {
         z-index: 30;
         background: var(--bg-card);
         flex-shrink: 0;
-        /* Default state is handled by JS (collapsed), but CSS ensures it sits top */
     }
     
-    /* Ensure the "Refine Search" button stays with the controls at the top */
     #refine-btn-area {
         order: 1; 
         width: 100%;
         z-index: 31;
     }
 
-    /* 2. MIDDLE: PDF Preview (Takes all remaining space) */
     #preview-pane {
         order: 2;
         flex: 1;
@@ -646,11 +640,10 @@ body.editor-active .redaction-resize-handle {
         border-left: none;
     }
 
-    /* 3. BOTTOM: Results List + Pagination */
     #results-scroll-area {
         order: 3;
         width: 100%;
-        height: 35vh; /* Fixed height for results */
+        height: 35vh; 
         min-height: 150px;
         border-top: 2px solid var(--lsu-purple);
         border-right: none;
@@ -668,14 +661,11 @@ body.editor-active .redaction-resize-handle {
         flex-shrink: 0;
     }
     
-    /* Hide the sidebar toggle button on mobile */
     #toggle-left { display: none; }
     
-    /* Hide Generator on Phones */
     #menu-demo { display: none !important; }
     #generator-panel { display: none !important; }
     
-    /* Header Scaling */
     .app-title-group {
         position: static;
         transform: none;
