@@ -50,7 +50,6 @@
     color-scheme: light; 
 }
 
-/* v1.78: Dark Mode Lighter Purple Fix */
 body.dark-mode {
     --bg-app: #0f0f0f;        
     --bg-sidebar: #18181b;    
@@ -63,9 +62,8 @@ body.dark-mode {
     --text-secondary: #a1a1aa; 
     --border-color: #3f3f46;
 
-    /* v1.78: Use lighter lavender for better visibility on dark backgrounds */
-    --app-primary: #a78bfa; 
-    --app-accent: #a78bfa;
+    --app-primary: var(--lsu-purple); 
+    --app-accent: var(--lsu-purple);
 
     --match-green-bg: #15803d; 
     --match-green-text: #ffffff; 
@@ -110,10 +108,6 @@ input, textarea, select {
     border-radius: 4px; 
 } 
 ::-webkit-scrollbar-thumb:hover { background: #5a2a99; }
-/* Dark mode scrollbar fix */
-body.dark-mode ::-webkit-scrollbar-thumb {
-    background: #a78bfa;
-}
 
 #auth-overlay, #feedback-modal, #config-modal { 
     display: none; 
