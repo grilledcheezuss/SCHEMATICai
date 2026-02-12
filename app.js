@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v2.3.0 (Strict Search Parity) ---
-const APP_VERSION = "v2.3.0";
+// --- SCHEMATICA ai v2.4.0 (Stable PDF Memory Viewer) ---
+const APP_VERSION = "v2.4.0";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -42,7 +42,6 @@ const LAYOUT_RULES = {
     ]
 };
 
-// FULL LIST RESTORED
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: [
         'GORMAN RUPP', 'BARNES', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 
@@ -82,7 +81,7 @@ class CacheService {
         const keys = await DB.getChunkKeys(); 
         if(!keys || keys.length === 0) return null; 
         for(let i = 0; i < keys.length; i++) { 
-            if(i % 5 === 0) await new Promise(r => setTimeout(r, 5)); 
+            if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); // Faster cache startup
             const chunk = await DB.getChunk(keys[i]); 
             if(chunk) { 
                 try { 
@@ -143,7 +142,7 @@ class DataLoader {
         ];
         await Promise.allSettled(loads);
 
-        await new Promise(r => setTimeout(r, 200)); 
+        await new Promise(r => setTimeout(r, 100)); 
         const p = localStorage.getItem('cox_pass'); await CacheService.prepareKey(p); await DB.deleteLegacy();
         let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
         if(attempts > 5) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
@@ -867,7 +866,6 @@ class SearchEngine {
             if(expandedKeywords.length) { 
                 const text = (r.id + " " + (r.desc || "")).toUpperCase();
                 
-                // User Feedback Reject Keywords processing
                 if (r.reject_keywords && r.reject_keywords.length > 0) {
                     const isRejected = rawKeywords.some(kw => r.reject_keywords.includes(kw));
                     if (isRejected) return; 
@@ -876,8 +874,8 @@ class SearchEngine {
                 const allGroupsMatch = expandedKeywords.every(group => {
                     return group.some(alias => {
                         const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-                        const regex = new RegExp(`\\b${cleanAlias}\\b`, 'i');
-                        return regex.test(text); 
+                        const regex = new RegExp(`(?:^|\\W)${cleanAlias}(?:$|\\W)`, 'i');
+                        return regex.test(text) || text.includes(cleanAlias); 
                     });
                 });
 
@@ -945,120 +943,68 @@ class SearchEngine {
     }
 }
 
-class PdfExporter {
-    static async export() {
-        if (!PdfViewer.doc) return alert("No PDF loaded!");
-        const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
-        const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
-        try {
-            const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
-            const mainPdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
-            const compositeDoc = await PDFLib.PDFDocument.create();
-            
-            let coverPage;
-            if (window.TEMPLATE_BYTES) {
-                const templateDoc = await PDFLib.PDFDocument.load(window.TEMPLATE_BYTES.slice(0));
-                const [embeddedTemplate] = await compositeDoc.copyPages(templateDoc, [0]);
-                coverPage = compositeDoc.addPage(embeddedTemplate);
-            } else {
-                const [origPage1] = await compositeDoc.copyPages(mainPdfDoc, [0]);
-                coverPage = compositeDoc.addPage(origPage1);
-            }
-
-            if (mainPdfDoc.getPageCount() > 1) {
-                const remainingIndices = Array.from({ length: mainPdfDoc.getPageCount() - 1 }, (_, i) => i + 1);
-                const remainingPages = await compositeDoc.copyPages(mainPdfDoc, remainingIndices);
-                
-                let infoImg, stdImg;
-                if(window.BORDER_INFO_BYTES) infoImg = await compositeDoc.embedPng(window.BORDER_INFO_BYTES.slice(0));
-                if(window.BORDER_STD_BYTES) stdImg = await compositeDoc.embedPng(window.BORDER_STD_BYTES.slice(0));
-
-                remainingPages.forEach((p, idx) => {
-                    const newPage = compositeDoc.addPage(p);
-                    const { width, height } = newPage.getSize();
-                    if (idx === 0 && infoImg) { newPage.drawImage(infoImg, { x: 0, y: 0, width, height }); } 
-                    else if (stdImg) { newPage.drawImage(stdImg, { x: 0, y: 0, width, height }); }
-                });
-            }
-
-            const pages = compositeDoc.getPages();
-            const fontTimes = await compositeDoc.embedFont(PDFLib.StandardFonts.TimesRoman); 
-            const fontCourier = await compositeDoc.embedFont(PDFLib.StandardFonts.Courier);
-
-            pages.forEach((page, index) => {
-                const pdfWidth = page.getWidth(); const pdfHeight = page.getHeight();
-                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
-                if (wrapper) {
-                    const container = wrapper.querySelector('.pdf-content-container');
-                    const zones = container.querySelectorAll('.redaction-box');
-                    zones.forEach(box => {
-                        const relX = box.offsetLeft / container.offsetWidth; 
-                        const relY = box.offsetTop / container.offsetHeight;
-                        const relW = box.offsetWidth / container.offsetWidth; 
-                        const relH = box.offsetHeight / container.offsetHeight;
-                        
-                        const drawX = relX * pdfWidth; const drawH = relH * pdfHeight;
-                        const drawY = pdfHeight - (relY * pdfHeight) - drawH; const drawW = relW * pdfWidth;
-                        
-                        const isTransparent = box.dataset.transparent === "true";
-
-                        if ((!window.TEMPLATE_BYTES || index > 0) && !isTransparent) {
-                             page.drawRectangle({ x: drawX, y: drawY, width: drawW, height: drawH, color: PDFLib.rgb(1,1,1), borderColor: PDFLib.rgb(1,1,1), borderWidth: 0 });
-                        }
-
-                        const text = box.querySelector('span')?.innerText || "";
-                        if (text) { 
-                            const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
-                            const textWidth = fontTimes.widthOfTextAtSize(text, fontSize); 
-                            
-                            let textX = drawX;
-                            if (box.style.textAlign === 'center') textX = drawX + (drawW/2) - (textWidth/2);
-                            else if (box.style.textAlign === 'right') textX = drawX + drawW - textWidth;
-
-                            const textY = drawY + (drawH/2) - (fontSize/4); 
-                            
-                            let fontToUse = fontTimes;
-                            if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
-
-                            page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) }); 
-                            if (box.dataset.decoration === 'underline') {
-                                page.drawLine({ start: { x: textX, y: textY - 2 }, end: { x: textX + textWidth, y: textY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
-                            }
-                        }
-                    });
-                }
-            });
-
-            const pdfBytes = await compositeDoc.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `redacted_${new Date().getTime()}.pdf`; link.click();
-        } catch (e) { console.error(e); alert("Export Failed: " + e.message); } finally { btn.innerText = origText; btn.disabled = false; }
-    }
-}
-
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
+    static currentFetchId = 0;
+    static loadingTask = null;
+
     static async load(url) {
         this.url = url;
-        document.getElementById('pdf-fallback').style.display = 'none'; document.getElementById('pdf-toolbar').style.display = 'flex';
-        document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
-        const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
-        const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
-        if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
-        const blob = await resp.blob();
-        if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-        this.currentBlobUrl = URL.createObjectURL(blob);
-        const task = pdfjsLib.getDocument(this.currentBlobUrl);
-        this.doc = await task.promise; 
+        document.getElementById('pdf-fallback').style.display = 'none'; 
+        document.getElementById('pdf-toolbar').style.display = 'none';
+        document.getElementById('custom-pdf-viewer').style.display = 'none'; 
+        document.getElementById('pdf-viewer-frame').style.display = 'none';
+        document.getElementById('pdf-placeholder-text').style.display = 'flex';
+        document.getElementById('pdf-placeholder-text').innerText = "⏳ DOWNLOADING PDF...";
 
-        if (window.innerWidth < 768) {
-             this.currentScale = 0.8;
-             UI.toggleSearch(true); 
-        } else {
-             this.currentScale = 1.1;
+        const fetchId = Date.now();
+        this.currentFetchId = fetchId;
+
+        try {
+            if (this.loadingTask) {
+                await this.loadingTask.destroy().catch(()=>{});
+                this.loadingTask = null;
+            }
+
+            const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
+            const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+            if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
+            
+            // Bypass Blob HTTP routing directly with arrayBuffer
+            const arrayBuffer = await resp.arrayBuffer();
+
+            if (this.currentFetchId !== fetchId) return; 
+
+            // We still create the blob purely so the user can "Print" or "Export" it if they want.
+            const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentBlobUrl = URL.createObjectURL(blob);
+            
+            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+            this.doc = await this.loadingTask.promise; 
+
+            if (window.innerWidth < 768) {
+                 this.currentScale = 0.8;
+                 UI.toggleSearch(true); 
+            } else {
+                 this.currentScale = 1.1;
+            }
+
+            document.getElementById('pdf-placeholder-text').style.display = 'none';
+            document.getElementById('pdf-toolbar').style.display = 'flex';
+            document.getElementById('custom-pdf-viewer').style.display = 'flex';
+
+            await this.renderStack(); 
+        } catch(e) {
+            if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
+                console.log('PDF Load Cancelled (Fast Click)');
+            } else {
+                console.error("PDF Load Error:", e);
+                document.getElementById('pdf-placeholder-text').style.display = 'none';
+                document.getElementById('pdf-fallback').style.display = 'block';
+                document.getElementById('pdf-fallback-link').href = url;
+            }
         }
-
-        this.renderStack(); 
     }
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
@@ -1168,7 +1114,6 @@ class UI {
     static pop() { 
         const m = document.getElementById('mfgInput'); const cv = m.value; 
         
-        // STRICT WHITELIST: Only allow verified EXACT manufacturers to populate the dropdown
         const cleanList = Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort();
         
         m.innerHTML='<option value="Any">Any</option>'; 
