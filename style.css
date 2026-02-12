@@ -50,7 +50,6 @@
     color-scheme: light; 
 }
 
-/* v1.78: Dark Mode Lighter Purple Fix */
 body.dark-mode {
     --bg-app: #0f0f0f;        
     --bg-sidebar: #18181b;    
@@ -63,9 +62,8 @@ body.dark-mode {
     --text-secondary: #a1a1aa; 
     --border-color: #3f3f46;
 
-    /* v1.78: Use lighter lavender for better visibility on dark backgrounds */
-    --app-primary: #a78bfa; 
-    --app-accent: #a78bfa;
+    --app-primary: var(--lsu-purple); 
+    --app-accent: var(--lsu-purple);
 
     --match-green-bg: #15803d; 
     --match-green-text: #ffffff; 
@@ -110,10 +108,6 @@ input, textarea, select {
     border-radius: 4px; 
 } 
 ::-webkit-scrollbar-thumb:hover { background: #5a2a99; }
-/* Dark mode scrollbar fix */
-body.dark-mode ::-webkit-scrollbar-thumb {
-    background: #a78bfa;
-}
 
 #auth-overlay, #feedback-modal, #config-modal { 
     display: none; 
@@ -206,12 +200,11 @@ header {
 #app-container { display: none; flex-direction: row; width: 100%; height: calc(100vh - var(--header-base-height)); overflow: hidden; position: relative; } 
 html.logged-in #app-container { display: flex !important; }
 
-/* v1.66: Added border-right for clearer separation */
 #sidebar-left { 
     width: var(--sidebar-width); 
     min-width: 250px; 
     background: var(--bg-sidebar); 
-    border-right: 2px solid var(--border-color); /* Thicker/Darker border */
+    border-right: 2px solid var(--border-color); 
     display: flex; flex-direction: column; z-index: 20; 
     transition: all 0.3s ease; 
     overflow: hidden; flex-shrink: 0; height: 100%; 
@@ -231,19 +224,17 @@ html.logged-in #app-container { display: flex !important; }
 
 .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .input-group.full-width { grid-column: span 2; } .input-group { display: flex; flex-direction: column; gap: 1px; } .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--app-primary); margin-left: 2px; letter-spacing: 0.5px; } body.dark-mode .input-label { color: var(--text-secondary); }
 
-/* v1.64: Clearer Input Styles */
 .cox-input { 
     width: 100%; height: var(--input-height); padding: 0 8px; 
-    border: 1px solid var(--border-color); /* Darker border */
+    border: 1px solid var(--border-color); 
     border-radius: 4px; font-size: 12px; 
     background: var(--bg-input); color: var(--text-primary); 
     outline: none; transition: border-color 0.2s; 
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05); /* Subtle shadow for depth */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
 }
 .cox-input:focus { border-color: var(--app-primary); box-shadow: 0 0 0 1px var(--app-primary); } .cox-input:disabled { background: #e5e7eb; cursor: not-allowed; opacity: 0.7; }
 
 input[type=range] { accent-color: var(--lsu-purple); cursor: pointer; }
-body.dark-mode input[type=range] { accent-color: #a78bfa; }
 
 .search-btn { flex: 1; height: 34px; background-color: var(--app-primary) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; cursor: pointer; transition: 0.2s; font-size: 12px; letter-spacing: 0.5px; } 
 .search-btn:hover { filter: brightness(1.2); }
@@ -279,21 +270,9 @@ body.dark-mode input[type=range] { accent-color: #a78bfa; }
 .page-btn:disabled { opacity: 0.5; cursor: default; }
 .page-info { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
 
-/* v1.74: Bolder Active Result Card */
 .record-card { background: var(--bg-card); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px; } 
 .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); } 
-.record-card.active-view { 
-    background: rgba(70, 29, 124, 0.15); 
-    border: 2px solid var(--lsu-purple); 
-    border-left-width: 6px; 
-    box-shadow: 0 4px 12px rgba(70, 29, 124, 0.2); 
-}
-/* Dark mode active card adjust */
-body.dark-mode .record-card.active-view {
-    background: rgba(167, 139, 250, 0.1);
-    border-color: #a78bfa;
-}
-
+.record-card.active-view { background: rgba(70, 29, 124, 0.1); border-color: var(--app-primary); }
 .panel-name { font-size: 14px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.1; } 
 .badge-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; }
 
@@ -340,15 +319,6 @@ body.dark-mode .thumb-btn:hover {
 #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; z-index: 1; }
 #custom-pdf-viewer { flex: 1; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 #pdf-main-view { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; -webkit-overflow-scrolling: touch; }
-
-/* v1.76: Smooth PDF Transitions */
-.pdf-fade-container {
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-}
-.pdf-fade-container.visible {
-    opacity: 1;
-}
 
 /* v1.44: Refined PDF Page Structure */
 .pdf-page-wrapper { 
@@ -494,16 +464,6 @@ body.editor-active .redaction-resize-handle {
     border-bottom: 1px solid rgba(255,255,255,0.1);
     display: flex; justify-content: space-between; align-items: center;
 }
-body.dark-mode #generator-panel .editor-header {
-    background: #a78bfa; /* Lighter Purple for Header */
-    color: #000; /* Dark text on light header */
-}
-body.dark-mode #generator-panel .editor-title {
-    color: #000 !important;
-}
-body.dark-mode .panel-btn {
-    color: #000;
-}
 
 #generator-panel .editor-title { color: white !important; }
 
@@ -535,9 +495,6 @@ body.dark-mode .panel-btn {
     transition: transform 0.2s;
 }
 #generator-restore-btn:hover { transform: scale(1.1); }
-body.dark-mode #generator-restore-btn {
-    color: #000; /* Dark icon on light button */
-}
 
 .editor-section { margin-bottom: 15px; } 
 .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; } 
@@ -596,6 +553,7 @@ body.dark-mode #generator-restore-btn {
 #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; } 
 #pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; } 
 
+/* v1.57: Placeholder Text Centering Fix + Cursor Fix */
 #pdf-placeholder-text { 
     display: flex; 
     align-items: center; 
@@ -612,6 +570,7 @@ body.dark-mode #generator-restore-btn {
     cursor: default;
 }
 
+/* Global No-Select for other UI elements */
 .panel-name, 
 .hud-badge,
 .input-label,
@@ -624,6 +583,7 @@ body.dark-mode #generator-restore-btn {
     cursor: default;
 }
 
+/* v1.49: Alignment Controls */
 .alignment-toggles { display: flex; gap: 5px; }
 .align-btn {
     flex: 1;
@@ -637,15 +597,19 @@ body.dark-mode #generator-restore-btn {
 }
 .align-btn:hover { background: var(--bg-sidebar); }
 
+/* v1.58: MOBILE REDESIGN - CLEAN STACK */
 @media (max-width: 767px) {
+    /* Main container becomes a vertical column */
     #app-container {
         flex-direction: column;
     }
     
+    /* "Dissolve" the sidebar wrapper so its children become direct flex items of app-container */
     #sidebar-left {
         display: contents; 
     }
     
+    /* 1. TOP: Search Controls */
     #search-controls {
         order: 1;
         width: 100%;
@@ -654,14 +618,17 @@ body.dark-mode #generator-restore-btn {
         z-index: 30;
         background: var(--bg-card);
         flex-shrink: 0;
+        /* Default state is handled by JS (collapsed), but CSS ensures it sits top */
     }
     
+    /* Ensure the "Refine Search" button stays with the controls at the top */
     #refine-btn-area {
         order: 1; 
         width: 100%;
         z-index: 31;
     }
 
+    /* 2. MIDDLE: PDF Preview (Takes all remaining space) */
     #preview-pane {
         order: 2;
         flex: 1;
@@ -670,10 +637,11 @@ body.dark-mode #generator-restore-btn {
         border-left: none;
     }
 
+    /* 3. BOTTOM: Results List + Pagination */
     #results-scroll-area {
         order: 3;
         width: 100%;
-        height: 35vh; 
+        height: 35vh; /* Fixed height for results */
         min-height: 150px;
         border-top: 2px solid var(--lsu-purple);
         border-right: none;
@@ -691,11 +659,14 @@ body.dark-mode #generator-restore-btn {
         flex-shrink: 0;
     }
     
+    /* Hide the sidebar toggle button on mobile */
     #toggle-left { display: none; }
     
+    /* Hide Generator on Phones */
     #menu-demo { display: none !important; }
     #generator-panel { display: none !important; }
     
+    /* Header Scaling */
     .app-title-group {
         position: static;
         transform: none;
