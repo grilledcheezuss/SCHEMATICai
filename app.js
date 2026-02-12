@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.75 ---
-const APP_VERSION = "v1.75";
+// --- SCHEMATICA ai v1.81 (Restored 1.75 Stable) ---
+const APP_VERSION = "v1.81";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -143,10 +143,7 @@ class AIParser {
         const healed = TheHealer.healedData[id];
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null, category: healed?.category||null };
         t = (t||"").toUpperCase();
-        
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
-        
-        // ENC
         if (!s.enc) {
             if (AI_DATA.ENC['POLY'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = 'POLY';
             else if (['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = '4XFG';
@@ -163,8 +160,6 @@ class AIParser {
             })) s.enc = '4XSS';
             else if (t.includes('NEMA 4X')) s.enc = '4XFG';
         }
-        
-        // HP
         if (!s.hp) {
             let maxHP = 0;
             const compoundRegex = /(\d+)\s+(\d+\/\d+)\s*(?:HP|H\.P\.|HORSEPOWER)\b/gi;
@@ -183,8 +178,6 @@ class AIParser {
             });
             if (maxHP > 0) { if (Math.abs(maxHP - Math.round(maxHP)) < 0.1) maxHP = Math.round(maxHP); s.hp = maxHP.toString(); }
         }
-
-        // VOLT
         if (!s.volt) {
             const voltPriority = [{ id: '575', match: ['575', '600'] }, { id: '480', match: ['480', '460', '440'] }, { id: '415', match: ['415', '380'] }, { id: '277', match: ['277'] }, { id: '240', match: ['240', '230', '220'] }, { id: '208', match: ['208'] }, { id: '120', match: ['120', '115', '110'] }];
             for (const vGroup of voltPriority) {
@@ -192,196 +185,46 @@ class AIParser {
                 if (regex.test(t)) { s.volt = vGroup.id; break; }
             }
         }
-
         if (!s.phase) { if (text.includes("3 PHASE") || text.includes("3PH") || text.includes("3Ø") || text.includes("3/60")) s.phase = "3"; else if (text.includes("1 PHASE") || text.includes("1PH") || text.includes("1Ø") || text.includes("1/60")) s.phase = "1"; }
-        
-        // CAT
         if (!s.category) {
-            if (/(?:BLOWER|AERATION|CLARIFIER|DIGESTER|UV|ULTRAVIOLET|SCREEN|PRESS|DEWATERING|MIXER|2\+2|4\s+MOTOR|TRIPLEX|QUADPLEX|HEADWORKS|OXIDATION|LIFT\s+STATION|3\s+PUMP|4\s+PUMP)/i.test(t)) {
-                s.category = 'treatment';
-            } else if (/(?:RESIDENTIAL|GRINDER\s+STATION|SIMPLEX\s+GRINDER|HOME|RESIDENCE|STEP\s+SYSTEM|SEPTIC)/i.test(t)) {
-                s.category = 'residential';
-            } else if (t.includes('LOW VOLTAGE') || t.includes('CONTROL BOX') || t.includes('JB') || t.includes('JUNCTION BOX')) {
-                s.category = 'low_voltage';
-            }
+            if (/(?:BLOWER|AERATION|CLARIFIER|DIGESTER|UV|ULTRAVIOLET|SCREEN|PRESS|DEWATERING|MIXER|2\+2|4\s+MOTOR|TRIPLEX|QUADPLEX|HEADWORKS|OXIDATION|LIFT\s+STATION|3\s+PUMP|4\s+PUMP)/i.test(t)) { s.category = 'treatment'; } 
+            else if (/(?:RESIDENTIAL|GRINDER\s+STATION|SIMPLEX\s+GRINDER|HOME|RESIDENCE|STEP\s+SYSTEM|SEPTIC)/i.test(t)) { s.category = 'residential'; } 
+            else if (t.includes('LOW VOLTAGE') || t.includes('CONTROL BOX') || t.includes('JB') || t.includes('JUNCTION BOX')) { s.category = 'low_voltage'; }
         }
-
         return s;
     }
 }
 
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; static startX = 0; static startY = 0; static startLeft = 0; static startTop = 0;
-    
     static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14, text = null, decoration = null, type = null, fontWeight = 'normal', transparent = false, rotation = 0, fontFamily = null, textAlign = 'center') {
-        let container = wrapper.querySelector('.pdf-content-container');
-        if (!container && wrapper.classList.contains('pdf-content-container')) container = wrapper;
-        if (!container) return; 
-
+        let container = wrapper.querySelector('.pdf-content-container'); if (!container && wrapper.classList.contains('pdf-content-container')) container = wrapper; if (!container) return; 
         const layer = container.querySelector('.redaction-layer'); if(!layer) return;
-        
-        const box = document.createElement('div'); box.className = 'redaction-box';
-        box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
-        box.dataset.map = mapKey || 'custom';
-        if(text) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration; 
-        
-        box.dataset.transparent = transparent.toString(); 
-        
-        let styleFont = fontFamily;
-        if (!styleFont) {
-             styleFont = (mapKey === 'cust') ? "'Times New Roman', serif" : "'Courier New', monospace";
-        }
-        
-        box.style.fontFamily = styleFont;
-        box.style.fontSize = fontSize + 'px'; 
-        box.style.fontWeight = fontWeight;
-        box.style.textAlign = textAlign; 
-        
-        if (rotation) {
-            box.dataset.rotation = rotation;
-        }
-
-        const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
-        box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box); return box;
+        const box = document.createElement('div'); box.className = 'redaction-box'; box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px'; box.dataset.map = mapKey || 'custom'; if(text) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration; box.dataset.transparent = transparent.toString(); 
+        let styleFont = fontFamily; if (!styleFont) { styleFont = (mapKey === 'cust') ? "'Times New Roman', serif" : "'Courier New', monospace"; } box.style.fontFamily = styleFont; box.style.fontSize = fontSize + 'px'; box.style.fontWeight = fontWeight; box.style.textAlign = textAlign; if (rotation) { box.dataset.rotation = rotation; }
+        const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle); box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box); return box;
     }
-
     static addManualZone() { const pages = document.querySelectorAll('.pdf-page-wrapper'); if(pages.length === 0) return; const wrapper = pages[0]; const container = wrapper.querySelector('.pdf-content-container'); const w = container.offsetWidth; const h = container.offsetHeight; this.createZoneOnWrapper(wrapper, w*0.3, h*0.4, w*0.4, h*0.1, 'custom', 16, null, null, 'blocker'); this.refreshContent(); }
-
     static addZoneToCurrentView(type) {
-        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
-        if (wrappers.length === 0) return;
-        
+        const wrappers = document.querySelectorAll('.pdf-page-wrapper'); if (wrappers.length === 0) return;
         let targetWrapper = wrappers[0];
-        
-        for(const w of wrappers) {
-             const rect = w.getBoundingClientRect();
-             if (rect.top >= -100 && rect.top < window.innerHeight) {
-                 targetWrapper = w;
-                 break;
-             }
-        }
-
-        const container = targetWrapper.querySelector('.pdf-content-container');
-        const w = container.offsetWidth;
-        const h = container.offsetHeight;
-        
-        const fontSize = document.getElementById('redact-size').value;
-        const currentFontFamily = document.getElementById('redact-font').value; 
-        const isWhiteout = type === 'blocker';
-        const transparent = !isWhiteout;
-
-        this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize, isWhiteout ? '' : 'New Text', null, null, 'bold', transparent, 0, currentFontFamily, 'center');
-        this.refreshContent();
+        for(const w of wrappers) { const rect = w.getBoundingClientRect(); if (rect.top >= -100 && rect.top < window.innerHeight) { targetWrapper = w; break; } }
+        const container = targetWrapper.querySelector('.pdf-content-container'); const w = container.offsetWidth; const h = container.offsetHeight;
+        const fontSize = document.getElementById('redact-size').value; const currentFontFamily = document.getElementById('redact-font').value; const isWhiteout = type === 'blocker'; const transparent = !isWhiteout;
+        this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize, isWhiteout ? '' : 'New Text', null, null, 'bold', transparent, 0, currentFontFamily, 'center'); this.refreshContent();
     }
-    
-    static deleteSelected() {
-        if (this.activeBox) {
-            this.activeBox.remove();
-            this.zones = this.zones.filter(z => z !== this.activeBox);
-            this.activeBox = null;
-            document.getElementById('editor-controls').classList.add('disabled-overlay');
-        }
-    }
-
+    static deleteSelected() { if (this.activeBox) { this.activeBox.remove(); this.zones = this.zones.filter(z => z !== this.activeBox); this.activeBox = null; document.getElementById('editor-controls').classList.add('disabled-overlay'); } }
     static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = box.offsetLeft; this.startTop = box.offsetTop; box.style.cursor = 'grabbing'; }
     static handleDrag(e) { if(!this.isDragging || !this.activeBox) return; e.preventDefault(); const deltaX = e.clientX - this.startX; const deltaY = e.clientY - this.startY; this.activeBox.style.left = (this.startLeft + deltaX) + 'px'; this.activeBox.style.top = (this.startTop + deltaY) + 'px'; }
     static endDrag() { if(this.activeBox) this.activeBox.style.cursor = 'grab'; this.isDragging = false; }
-    
-    static selectZone(box) { 
-        if(this.activeBox) this.activeBox.classList.remove('selected'); 
-        this.activeBox = box; 
-        box.classList.add('selected'); 
-        document.getElementById('editor-controls').classList.remove('disabled-overlay'); 
-        
-        document.getElementById('zone-map-select').value = box.dataset.map; 
-        
-        const customInputWrapper = document.getElementById('custom-text-wrapper');
-        const customInput = document.getElementById('custom-zone-text');
-        
-        if (box.dataset.map === 'custom') {
-            customInputWrapper.style.display = 'block';
-            customInput.value = box.dataset.customText || '';
-        } else {
-            customInputWrapper.style.display = 'none';
-        }
-
-        const fs = parseInt(box.style.fontSize) || 14;
-        document.getElementById('redact-size').value = fs; 
-        document.getElementById('font-size-val').innerText = fs; 
-        
-        const ff = box.style.fontFamily.replace(/"/g, "'");
-        const fontSelect = document.getElementById('redact-font');
-        if (ff.includes("Courier")) fontSelect.value = "'Courier New', monospace";
-        else fontSelect.value = "'Times New Roman', serif";
-
-        document.getElementById('zone-bg-toggle').checked = (box.dataset.transparent === "false");
-    }
-
+    static selectZone(box) { if(this.activeBox) this.activeBox.classList.remove('selected'); this.activeBox = box; box.classList.add('selected'); document.getElementById('editor-controls').classList.remove('disabled-overlay'); document.getElementById('zone-map-select').value = box.dataset.map; const customInputWrapper = document.getElementById('custom-text-wrapper'); const customInput = document.getElementById('custom-zone-text'); if (box.dataset.map === 'custom') { customInputWrapper.style.display = 'block'; customInput.value = box.dataset.customText || ''; } else { customInputWrapper.style.display = 'none'; } const fs = parseInt(box.style.fontSize) || 14; document.getElementById('redact-size').value = fs; document.getElementById('font-size-val').innerText = fs; const ff = box.style.fontFamily.replace(/"/g, "'"); const fontSelect = document.getElementById('redact-font'); if (ff.includes("Courier")) fontSelect.value = "'Courier New', monospace"; else fontSelect.value = "'Times New Roman', serif"; document.getElementById('zone-bg-toggle').checked = (box.dataset.transparent === "false"); }
     static deselect() { if(this.activeBox) this.activeBox.classList.remove('selected'); this.activeBox = null; document.getElementById('editor-controls').classList.add('disabled-overlay'); document.getElementById('custom-text-wrapper').style.display = 'none'; }
-    
-    static updateActiveStyle() { 
-        const fs = document.getElementById('redact-size').value;
-        document.getElementById('font-size-val').innerText = fs; 
-        
-        if(!this.activeBox) return; 
-        this.activeBox.style.fontFamily = document.getElementById('redact-font').value; 
-        this.activeBox.style.fontSize = fs + 'px'; 
-    }
-    
-    static updateActiveAlignment(align) {
-        if(!this.activeBox) return;
-        this.activeBox.style.textAlign = align;
-    }
-
-    static mapSelectedZone() { 
-        if(!this.activeBox) return; 
-        const val = document.getElementById('zone-map-select').value;
-        this.activeBox.dataset.map = val;
-        
-        if (val === 'custom') {
-            document.getElementById('custom-text-wrapper').style.display = 'block';
-            document.getElementById('custom-zone-text').value = this.activeBox.dataset.customText || '';
-        } else {
-            document.getElementById('custom-text-wrapper').style.display = 'none';
-        }
-        
-        this.refreshContent(); 
-    }
-    
-    static updateCustomText(text) {
-        if(!this.activeBox) return;
-        this.activeBox.dataset.customText = text;
-        this.activeBox.querySelector('span').innerText = text;
-    }
-
+    static updateActiveStyle() { const fs = document.getElementById('redact-size').value; document.getElementById('font-size-val').innerText = fs; if(!this.activeBox) return; this.activeBox.style.fontFamily = document.getElementById('redact-font').value; this.activeBox.style.fontSize = fs + 'px'; }
+    static updateActiveAlignment(align) { if(!this.activeBox) return; this.activeBox.style.textAlign = align; }
+    static mapSelectedZone() { if(!this.activeBox) return; const val = document.getElementById('zone-map-select').value; this.activeBox.dataset.map = val; if (val === 'custom') { document.getElementById('custom-text-wrapper').style.display = 'block'; document.getElementById('custom-zone-text').value = this.activeBox.dataset.customText || ''; } else { document.getElementById('custom-text-wrapper').style.display = 'none'; } this.refreshContent(); }
+    static updateCustomText(text) { if(!this.activeBox) return; this.activeBox.dataset.customText = text; this.activeBox.querySelector('span').innerText = text; }
     static toggleBoxBackground() { if(!this.activeBox) return; const isOpaque = document.getElementById('zone-bg-toggle').checked; this.activeBox.dataset.transparent = isOpaque ? "false" : "true"; }
-    
-    static refreshContent() { 
-        const ctx = DemoManager.getContext(); 
-        
-        let displayDate = ctx.date;
-        if (displayDate && displayDate.includes('-')) {
-             const parts = displayDate.split('-'); 
-             if (parts.length === 3) {
-                 displayDate = `${parts[1]}/${parts[2]}/${parts[0].slice(2)}`;
-             }
-        }
-
-        this.zones.forEach(box => { 
-            const map = box.dataset.map; let text = ""; 
-            if(box.dataset.customText) text = box.dataset.customText; 
-            else if(map === 'cust') text = ctx.cust; 
-            else if(map === 'job') text = ctx.job; 
-            else if(map === 'type') text = ctx.type; 
-            else if(map === 'cpid') text = ctx.cpid; 
-            else if(map === 'date') text = displayDate; 
-            else if(map === 'stage') text = ctx.stage; 
-            else if(map === 'logo') text = ""; 
-            
-            const span = box.querySelector('span'); if(span) span.innerText = text; else box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`;
-            if(box.dataset.decoration === 'underline') { box.style.textDecoration = 'underline'; box.style.textUnderlineOffset = '3px'; }
-        }); 
-    }
+    static refreshContent() { const ctx = DemoManager.getContext(); let displayDate = ctx.date; if (displayDate && displayDate.includes('-')) { const parts = displayDate.split('-'); if (parts.length === 3) { displayDate = `${parts[1]}/${parts[2]}/${parts[0].slice(2)}`; } } this.zones.forEach(box => { const map = box.dataset.map; let text = ""; if(box.dataset.customText) text = box.dataset.customText; else if(map === 'cust') text = ctx.cust; else if(map === 'job') text = ctx.job; else if(map === 'type') text = ctx.type; else if(map === 'cpid') text = ctx.cpid; else if(map === 'date') text = displayDate; else if(map === 'stage') text = ctx.stage; else if(map === 'logo') text = ""; const span = box.querySelector('span'); if(span) span.innerText = text; else box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`; if(box.dataset.decoration === 'underline') { box.style.textDecoration = 'underline'; box.style.textUnderlineOffset = '3px'; } }); }
     static clearAll() { document.querySelectorAll('.redaction-layer').forEach(l => l.innerHTML = ''); this.zones = []; this.deselect(); }
 }
 
@@ -738,13 +581,22 @@ class PdfViewer {
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
 
+            // v1.78: INSTANT OVERLAY APPLICATION
+            if (DemoManager.isGeneratorActive) {
+                let profileKey = "AUTO"; 
+                if (i === 1) profileKey = 'TITLE';
+                else if (i === 2) profileKey = 'INFO';
+                else {
+                    const w = viewport.width; const h = viewport.height;
+                    profileKey = (w > h) ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
+                }
+                const select = toolbar.querySelector('.page-profile-select');
+                if(select) select.value = profileKey;
+                LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
+                RedactionManager.refreshContent();
+            }
+
             page.render({ canvasContext: canvas.getContext('2d'), viewport });
-        }
-        if(DemoManager.isGeneratorActive) { 
-            setTimeout(() => {
-                LayoutScanner.refreshProfileOptions();
-                LayoutScanner.scanAllPages();
-            }, 500); 
         }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
