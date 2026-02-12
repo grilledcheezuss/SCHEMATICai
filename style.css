@@ -50,6 +50,7 @@
     color-scheme: light; 
 }
 
+/* v1.78: Dark Mode Lighter Purple Fix */
 body.dark-mode {
     --bg-app: #0f0f0f;        
     --bg-sidebar: #18181b;    
@@ -62,8 +63,9 @@ body.dark-mode {
     --text-secondary: #a1a1aa; 
     --border-color: #3f3f46;
 
-    --app-primary: var(--lsu-purple); 
-    --app-accent: var(--lsu-purple);
+    /* v1.78: Use lighter lavender for better visibility on dark backgrounds */
+    --app-primary: #a78bfa; 
+    --app-accent: #a78bfa;
 
     --match-green-bg: #15803d; 
     --match-green-text: #ffffff; 
@@ -108,6 +110,10 @@ input, textarea, select {
     border-radius: 4px; 
 } 
 ::-webkit-scrollbar-thumb:hover { background: #5a2a99; }
+/* Dark mode scrollbar fix */
+body.dark-mode ::-webkit-scrollbar-thumb {
+    background: #a78bfa;
+}
 
 #auth-overlay, #feedback-modal, #config-modal { 
     display: none; 
@@ -333,6 +339,15 @@ body.dark-mode .thumb-btn:hover {
 #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; z-index: 1; }
 #custom-pdf-viewer { flex: 1; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 #pdf-main-view { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; -webkit-overflow-scrolling: touch; }
+
+/* v1.76: Smooth PDF Transitions */
+.pdf-fade-container {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+.pdf-fade-container.visible {
+    opacity: 1;
+}
 
 /* v1.44: Refined PDF Page Structure */
 .pdf-page-wrapper { 

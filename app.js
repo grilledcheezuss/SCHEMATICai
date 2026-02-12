@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.77 ---
-const APP_VERSION = "v1.77";
+// --- SCHEMATICA ai v1.78 ---
+const APP_VERSION = "v1.78";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -44,17 +44,9 @@ const LAYOUT_RULES = {
 
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: { 
-        'GORMAN RUPP':['gorman','gr'], 
-        'BARNES':['barnes','sithe','crane'], 
-        'HYDROMATIC':['hydromatic'], 
-        'FLYGT':['flygt'], 
-        'MYERS':['myers'], 
-        'GOULDS':['goulds'], 
-        'ZOELLER':['zoeller'], 
-        'LIBERTY':['liberty'], 
-        'WILO':['wilo'], 
-        'PENTAIR':['pentair'], 
-        'ABS':['abs']
+        'GORMAN RUPP':['gorman','gr'], 'BARNES':['barnes','sithe','crane'], 'HYDROMATIC':['hydromatic'], 
+        'FLYGT':['flygt'], 'MYERS':['myers'], 'GOULDS':['goulds'], 'ZOELLER':['zoeller'], 
+        'LIBERTY':['liberty'], 'WILO':['wilo'], 'PENTAIR':['pentair'], 'ABS':['abs']
     },
     ENCLOSURES: { 
         '4XSS': ['4XSS', 'STAINLESS', '304', '316', 'NEMA 4X SS', 'SS'], 
@@ -74,6 +66,10 @@ const AI_TRAINING_DATA = {
         PHASE: [1, 3] 
     } 
 };
+
+// --------------------------------------------------------
+// CORE CLASSES (Re-Ordered for Dependency Safety)
+// --------------------------------------------------------
 
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
@@ -107,6 +103,34 @@ class NetworkService {
         const h = AuthService.headers();
         console.log(`🌐 Fetching ${t}...`);
         return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: h }); 
+    }
+}
+
+class TheHealer {
+    static healedData = {}; 
+    static async fetchAndTally() { 
+        try { 
+            const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); 
+            if(resp.status === 401) { AuthService.logout(); return; } 
+            const data = await resp.json(); 
+            if(data.records) { 
+                const tallies = {}; 
+                data.records.forEach(r => { 
+                    const rawJson = r.fields['Corrections']; 
+                    const id = r.fields['Panel ID']; 
+                    if (rawJson && id) { 
+                        try { const corrections = JSON.parse(rawJson); Object.entries(corrections).forEach(([param, value]) => { const key = `${id}|${param}|${value}`; tallies[key] = (tallies[key] || 0) + 1; }); } catch(e) { } 
+                    } 
+                }); 
+                for (const [key, count] of Object.entries(tallies)) { 
+                    if (count >= CONFIG.voteThreshold) { 
+                        const [id, param, value] = key.split('|'); 
+                        if (!this.healedData[id]) this.healedData[id] = {}; 
+                        this.healedData[id][param] = value; 
+                    } 
+                } 
+            } 
+        } catch(e) { console.error("Healing Failed", e); } 
     }
 }
 
@@ -185,348 +209,7 @@ class AIParser {
     }
 }
 
-class TheHealer {
-    static healedData = {}; 
-    static async fetchAndTally() { 
-        try { 
-            const resp = await NetworkService.fetch(CONFIG.feedbackTable, '?pageSize=100'); 
-            if(resp.status === 401) { AuthService.logout(); return; } 
-            const data = await resp.json(); 
-            if(data.records) { 
-                const tallies = {}; 
-                data.records.forEach(r => { 
-                    const rawJson = r.fields['Corrections']; 
-                    const id = r.fields['Panel ID']; 
-                    if (rawJson && id) { 
-                        try { const corrections = JSON.parse(rawJson); Object.entries(corrections).forEach(([param, value]) => { const key = `${id}|${param}|${value}`; tallies[key] = (tallies[key] || 0) + 1; }); } catch(e) { } 
-                    } 
-                }); 
-                for (const [key, count] of Object.entries(tallies)) { 
-                    if (count >= CONFIG.voteThreshold) { 
-                        const [id, param, value] = key.split('|'); 
-                        if (!this.healedData[id]) this.healedData[id] = {}; 
-                        this.healedData[id][param] = value; 
-                    } 
-                } 
-            } 
-        } catch(e) { console.error("Healing Failed", e); } 
-    }
-}
-
-class DataLoader {
-    static async preload() {
-        const lastVer = localStorage.getItem('cox_version');
-        if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.77 Update: Purging Cache...`);
-            await DB.deleteDatabase();
-            localStorage.removeItem('cox_db_complete');
-            localStorage.removeItem('cox_sync_attempts');
-            localStorage.setItem('cox_version', APP_VERSION);
-        }
-
-        console.log("🚀 Starting Preload...");
-        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 PREPARING...";
-        
-        const loads = [
-            fetch('cover_sheet_template.pdf').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.TEMPLATE_BYTES=b; console.log("✅ PDF Template Loaded");}).catch(e=>console.warn("⚠️ PDF Template Missing")),
-            fetch('border_info.png').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.BORDER_INFO_BYTES=b; console.log("✅ Info Border Loaded");}).catch(e=>console.warn("⚠️ Info Border Missing")),
-            fetch('border_standard.png').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.BORDER_STD_BYTES=b; console.log("✅ Std Border Loaded");}).catch(e=>console.warn("⚠️ Std Border Missing"))
-        ];
-        await Promise.allSettled(loads);
-
-        await new Promise(r => setTimeout(r, 200)); 
-        const p = localStorage.getItem('cox_pass'); await CacheService.prepareKey(p); await DB.deleteLegacy();
-        let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
-        if(attempts > 5) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
-        localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
-        const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
-        if(hasData) { 
-            if(window.LOCAL_DB.length > 7000) { localStorage.setItem('cox_db_complete', 'true'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; }
-            if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; } else { btn.innerText = "⬇️ RESUMING..."; } 
-        } else { btn.innerText = "⬇️ SYNCING..."; }
-        await this.fetchPartition('desc', btn);
-        if(!btn.classList.contains('error')) { 
-            btn.innerText = "✅ FINALIZING..."; 
-            localStorage.setItem('cox_sync_attempts', '0'); 
-            UI.pop(); 
-            btn.innerText = "SEARCH"; btn.disabled = false;
-        }
-    }
-    static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }
-    static async fetchPartition(dir, btn) {
-        let offset = null, loop = 0; let buffer = []; let shardCount = 0;
-        let fetchedCount = 0;
-        try {
-            do {
-                loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
-                console.group(`📥 Sync Batch ${loop}`); await new Promise(r => setTimeout(r, 10)); 
-                if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); btn.innerText = `⬇️ UPDATING ${pct}%`; }
-                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
-                if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
-                if(r.status!==200) { console.error("Sync Failed", r.status); break; }
-                const d = await r.json(); if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
-                fetchedCount += d.records.length;
-                d.records.forEach(r => {
-                    try {
-                        let rec = {};
-                        if(r.mfg !== undefined && r.id !== undefined) {
-                            rec = { id: r.id, displayId: r.displayId, desc: r.desc, pdfUrl: r.pdfUrl, mfg: r.mfg, hp: r.hp, volt: r.volt, phase: r.phase, enc: r.enc, category: r.category };
-                        } else {
-                            const rawId = (r.fields['Control Panel Name']||"");
-                            const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                            const displayId = "CP-" + cleanId;
-                            const desc = (r.fields['Items']||"").toUpperCase();
-                            const parsed = AIParser.parse(desc + " " + cleanId);
-                            let cleanMfg = parsed.mfg;
-                            if(cleanMfg) { let isValid = false; for(const validMfg in AI_TRAINING_DATA.MANUFACTURERS) { if(cleanMfg === validMfg) { isValid=true; break; } } if(!isValid) cleanMfg = null; }
-                            rec = { id: cleanId, displayId: displayId, desc: desc, pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, mfg: cleanMfg, hp: parsed.hp, volt: parsed.volt, phase: parsed.phase, enc: parsed.enc, category: parsed.category };
-                        }
-                        if(window.ID_MAP.has(rec.id)) { } else { window.LOCAL_DB.push(rec); window.ID_MAP.set(rec.id, rec); if(window.FOUND_MFGS) window.FOUND_MFGS.add(rec.mfg); }
-                        buffer.push(rec);
-                    } catch(e) { console.warn("Record Skip", e); }
-                });
-                console.groupEnd();
-                if(buffer.length >= 50) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
-                offset = d.offset;
-            } while(offset);
-            localStorage.setItem('cox_db_complete', 'true'); if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
-        } catch(e) { console.error("Sync Critical Error", e); } 
-    }
-    static harvestCSV() { alert('Harvesting...'); }
-}
-
-class DragManager {
-    static init() {
-        const handle = document.getElementById('gen-drag-handle');
-        const panel = document.getElementById('generator-panel');
-        if(!handle || !panel) return;
-
-        let isDragging = false;
-        let shiftX, shiftY;
-
-        const startDrag = (clientX, clientY) => {
-            isDragging = true;
-            const rect = panel.getBoundingClientRect();
-            shiftX = clientX - rect.left;
-            shiftY = clientY - rect.top;
-            const absLeft = rect.left;
-            const absTop = rect.top;
-            panel.style.transition = 'none'; 
-            panel.style.right = 'auto'; 
-            panel.style.bottom = 'auto';
-            panel.style.left = `${absLeft}px`;
-            panel.style.top = `${absTop}px`;
-            handle.style.cursor = 'grabbing';
-        };
-
-        const moveDrag = (clientX, clientY) => {
-            if(!isDragging) return;
-            const newLeft = clientX - shiftX;
-            const newTop = clientY - shiftY;
-            panel.style.left = `${newLeft}px`;
-            panel.style.top = `${newTop}px`;
-        };
-
-        const endDrag = () => {
-            if(isDragging) { 
-                isDragging = false; 
-                panel.style.transition = ''; 
-                handle.style.cursor = 'move'; 
-            }
-        };
-
-        handle.onmousedown = (e) => {
-            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-            startDrag(e.clientX, e.clientY);
-            e.preventDefault();
-        };
-        document.onmousemove = (e) => moveDrag(e.clientX, e.clientY);
-        document.onmouseup = endDrag;
-
-        handle.ontouchstart = (e) => {
-            if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-            const touch = e.touches[0];
-            startDrag(touch.clientX, touch.clientY);
-            e.preventDefault();
-        };
-        document.ontouchmove = (e) => {
-            if(!isDragging) return;
-            const touch = e.touches[0];
-            moveDrag(touch.clientX, touch.clientY);
-        };
-        document.ontouchend = endDrag;
-    }
-}
-
-class DemoManager {
-    static isGeneratorActive = false;
-
-    static toggleGenerator() {
-        this.isGeneratorActive = !this.isGeneratorActive;
-        const btn = document.getElementById('menu-demo');
-        const indicator = document.getElementById('gen-status');
-        const panel = document.getElementById('generator-panel');
-        const restoreBtn = document.getElementById('generator-restore-btn');
-        
-        if(this.isGeneratorActive) { 
-            document.body.classList.add('demo-mode'); 
-            this.restorePanel(); 
-            if(indicator) indicator.style.display = 'inline-block';
-            if(btn) btn.style.color = 'var(--app-primary)';
-            if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
-            if(PdfViewer.doc) PdfViewer.renderStack();
-            DragManager.init();
-        } else { 
-            document.body.classList.remove('demo-mode'); 
-            document.body.classList.remove('editor-active'); 
-            panel.style.display = 'none';
-            restoreBtn.style.display = 'none';
-            if(indicator) indicator.style.display = 'none';
-            if(btn) btn.style.color = ''; 
-            if(PdfViewer.doc) PdfViewer.renderStack();
-        }
-    }
-
-    static minimizePanel() {
-        document.getElementById('generator-panel').classList.add('minimized');
-        document.getElementById('generator-restore-btn').style.display = 'flex';
-        document.body.classList.remove('editor-active');
-        document.body.classList.add('gen-minimized');
-    }
-
-    static restorePanel() {
-        const panel = document.getElementById('generator-panel');
-        panel.style.display = 'flex';
-        panel.classList.remove('minimized');
-        document.getElementById('generator-restore-btn').style.display = 'none';
-        document.body.classList.add('editor-active');
-        document.body.classList.remove('gen-minimized');
-    }
-
-    static toggleContext() {
-        const panel = document.getElementById('demo-context-panel');
-        const content = document.getElementById('demo-context-content');
-        if (content.classList.contains('collapsed')) {
-            content.classList.remove('collapsed');
-            panel.classList.remove('collapsed-state');
-        } else {
-            content.classList.add('collapsed');
-            panel.classList.add('collapsed-state');
-        }
-    }
-
-    static getContext() {
-        return { cust: document.getElementById('demo-cust-name').value || "CUSTOMER NAME", job: document.getElementById('demo-job-name').value || "JOB TITLE", type: document.getElementById('demo-system-type').value || "SYSTEM TYPE", cpid: document.getElementById('demo-panel-id').value || "CP-####", date: document.getElementById('demo-date').value || "YYYY-MM-DD", stage: document.getElementById('demo-stage').value || "STAGE" };
-    }
-}
-
-class ProfileManager {
-    static getCustomProfiles() {
-        const stored = localStorage.getItem('cox_custom_profiles');
-        return stored ? JSON.parse(stored) : {};
-    }
-
-    static saveProfile(name, rules) {
-        const profiles = this.getCustomProfiles();
-        profiles[name] = rules;
-        localStorage.setItem('cox_custom_profiles', JSON.stringify(profiles));
-        LayoutScanner.refreshProfileOptions(); 
-        alert(`Profile "${name}" saved!`);
-    }
-
-    static deleteProfile(name) {
-        const profiles = this.getCustomProfiles();
-        if (profiles[name]) {
-            delete profiles[name];
-            localStorage.setItem('cox_custom_profiles', JSON.stringify(profiles));
-            LayoutScanner.refreshProfileOptions();
-        }
-    }
-
-    static saveCurrentPageAsProfile() {
-        const name = document.getElementById('new-profile-name').value.trim();
-        if (!name) return alert("Please enter a profile name.");
-        
-        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
-        let targetContainer = null;
-        for(const w of wrappers) {
-             const rect = w.getBoundingClientRect();
-             if (rect.top >= -100 && rect.top < window.innerHeight) {
-                 targetContainer = w.querySelector('.pdf-content-container');
-                 break;
-             }
-        }
-
-        if (!targetContainer) return alert("No visible page found.");
-
-        const w = targetContainer.offsetWidth;
-        const h = targetContainer.offsetHeight;
-        const boxes = [];
-
-        targetContainer.querySelectorAll('.redaction-box').forEach(box => {
-            boxes.push({
-                map: box.dataset.map,
-                x: parseFloat((box.offsetLeft / w).toFixed(4)),
-                y: parseFloat((box.offsetTop / h).toFixed(4)),
-                w: parseFloat((box.offsetWidth / w).toFixed(4)),
-                h: parseFloat((box.offsetHeight / h).toFixed(4)),
-                text: box.dataset.customText || null,
-                fontSize: parseInt(box.style.fontSize),
-                fontFamily: box.style.fontFamily, 
-                rotation: parseFloat(box.dataset.rotation || 0),
-                textAlign: box.style.textAlign || 'center', 
-                transparent: box.dataset.transparent === "true"
-            });
-        });
-
-        if (boxes.length === 0) return alert("Add some boxes first!");
-        
-        this.saveProfile(name, boxes);
-        document.getElementById('new-profile-name').value = '';
-    }
-}
-
-class ConfigExporter {
-    static export() {
-        const pages = [];
-        document.querySelectorAll('.pdf-page-wrapper').forEach((wrapper, index) => {
-            const pageNum = index + 1;
-            const select = wrapper.querySelector('.page-profile-select');
-            const profile = select ? select.value : 'UNKNOWN';
-            
-            const container = wrapper.querySelector('.pdf-content-container');
-            const w = container.offsetWidth;
-            const h = container.offsetHeight;
-
-            const boxes = [];
-            container.querySelectorAll('.redaction-box').forEach(box => {
-                boxes.push({
-                    map: box.dataset.map,
-                    x: parseFloat((box.offsetLeft / w).toFixed(3)),
-                    y: parseFloat((box.offsetTop / h).toFixed(3)),
-                    w: parseFloat((box.offsetWidth / w).toFixed(3)),
-                    h: parseFloat((box.offsetHeight / h).toFixed(3)),
-                    text: box.dataset.customText || null,
-                    fontSize: parseInt(box.style.fontSize),
-                    fontFamily: box.style.fontFamily, 
-                    rotation: parseFloat(box.dataset.rotation || 0),
-                    textAlign: box.style.textAlign || 'center', 
-                    transparent: box.dataset.transparent === "true"
-                });
-            });
-            pages.push({ page: pageNum, profile: profile, boxes: boxes });
-        });
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pages, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `layout_config_${new Date().getTime()}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-    }
-}
-
-// v1.77: Re-Added RedactionManager class
+// v1.77: CRITICAL FIX - RedactionManager defined BEFORE classes that use it
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; static startX = 0; static startY = 0; static startLeft = 0; static startTop = 0;
     
@@ -812,18 +495,233 @@ class LayoutScanner {
     }
 }
 
+// v1.77: Reverted Buffer Size to 50
+class DataLoader {
+    static async preload() {
+        const lastVer = localStorage.getItem('cox_version');
+        if (lastVer !== APP_VERSION) {
+            console.warn(`⚡ v1.77 Update: Purging Cache...`);
+            await DB.deleteDatabase();
+            localStorage.removeItem('cox_db_complete');
+            localStorage.removeItem('cox_sync_attempts');
+            localStorage.setItem('cox_version', APP_VERSION);
+        }
+
+        console.log("🚀 Starting Preload...");
+        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 PREPARING...";
+        
+        const loads = [
+            fetch('cover_sheet_template.pdf').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.TEMPLATE_BYTES=b; console.log("✅ PDF Template Loaded");}).catch(e=>console.warn("⚠️ PDF Template Missing")),
+            fetch('border_info.png').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.BORDER_INFO_BYTES=b; console.log("✅ Info Border Loaded");}).catch(e=>console.warn("⚠️ Info Border Missing")),
+            fetch('border_standard.png').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.BORDER_STD_BYTES=b; console.log("✅ Std Border Loaded");}).catch(e=>console.warn("⚠️ Std Border Missing"))
+        ];
+        await Promise.allSettled(loads);
+
+        await new Promise(r => setTimeout(r, 200)); 
+        const p = localStorage.getItem('cox_pass'); await CacheService.prepareKey(p); await DB.deleteLegacy();
+        let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
+        if(attempts > 5) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
+        localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
+        const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
+        if(hasData) { 
+            if(window.LOCAL_DB.length > 7000) { localStorage.setItem('cox_db_complete', 'true'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; }
+            if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; } else { btn.innerText = "⬇️ RESUMING..."; } 
+        } else { btn.innerText = "⬇️ SYNCING..."; }
+        await this.fetchPartition('desc', btn);
+        if(!btn.classList.contains('error')) { 
+            btn.innerText = "✅ FINALIZING..."; 
+            localStorage.setItem('cox_sync_attempts', '0'); 
+            UI.pop(); 
+            btn.innerText = "SEARCH"; btn.disabled = false;
+        }
+    }
+    static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }
+    static async fetchPartition(dir, btn) {
+        let offset = null, loop = 0; let buffer = []; let shardCount = 0;
+        let fetchedCount = 0;
+        try {
+            do {
+                loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
+                console.group(`📥 Sync Batch ${loop}`); await new Promise(r => setTimeout(r, 10)); 
+                if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); btn.innerText = `⬇️ UPDATING ${pct}%`; }
+                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100&fields[]=Control Panel Name&fields[]=Items&fields[]=Control Panel PDF${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
+                if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
+                if(r.status!==200) { console.error("Sync Failed", r.status); break; }
+                const d = await r.json(); if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
+                fetchedCount += d.records.length;
+                d.records.forEach(r => {
+                    try {
+                        let rec = {};
+                        if(r.mfg !== undefined && r.id !== undefined) {
+                            rec = { id: r.id, displayId: r.displayId, desc: r.desc, pdfUrl: r.pdfUrl, mfg: r.mfg, hp: r.hp, volt: r.volt, phase: r.phase, enc: r.enc, category: r.category };
+                        } else {
+                            const rawId = (r.fields['Control Panel Name']||"");
+                            const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+                            const displayId = "CP-" + cleanId;
+                            const desc = (r.fields['Items']||"").toUpperCase();
+                            const parsed = AIParser.parse(desc + " " + cleanId);
+                            let cleanMfg = parsed.mfg;
+                            if(cleanMfg) { let isValid = false; for(const validMfg in AI_TRAINING_DATA.MANUFACTURERS) { if(cleanMfg === validMfg) { isValid=true; break; } } if(!isValid) cleanMfg = null; }
+                            rec = { id: cleanId, displayId: displayId, desc: desc, pdfUrl: r.fields['Control Panel PDF']?.[0]?.url, mfg: cleanMfg, hp: parsed.hp, volt: parsed.volt, phase: parsed.phase, enc: parsed.enc, category: parsed.category };
+                        }
+                        if(window.ID_MAP.has(rec.id)) { } else { window.LOCAL_DB.push(rec); window.ID_MAP.set(rec.id, rec); if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); }
+                        buffer.push(rec);
+                    } catch(e) { console.warn("Record Skip", e); }
+                });
+                console.groupEnd();
+                // v1.77: Revert Buffer to 50
+                if(buffer.length >= 50) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
+                offset = d.offset;
+            } while(offset);
+            localStorage.setItem('cox_db_complete', 'true'); if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
+        } catch(e) { console.error("Sync Critical Error", e); } 
+    }
+    static harvestCSV() { alert('Harvesting...'); }
+}
+
+// v1.77: Re-Added SearchEngine class
+class SearchEngine {
+    static currentResults = [];
+    static currentPage = 1;
+    static pageSize = 50;
+
+    static perform() {
+        FeedbackService.resetLockout();
+
+        const rawKeywords = document.getElementById('keywordInput').value.split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length);
+        const expandedKeywords = rawKeywords.map(k => {
+            for (const [key, group] of Object.entries(AI_TRAINING_DATA.ALIASES)) {
+                if (group.includes(k)) return group; 
+            }
+            return [k]; 
+        });
+
+        // v1.75: Category Handling
+        const cat = document.getElementById('catInput').value; 
+        
+        const crit = { kw: rawKeywords, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value, enc: document.getElementById('encInput').value };
+        let res = [];
+        window.LOCAL_DB.forEach(r => {
+            if (cat === 'Standard') { 
+                if (r.category === 'treatment' || r.category === 'residential' || r.category === 'low_voltage') return; 
+            } else if (cat === 'Treatment') {
+                if (r.category !== 'treatment') return;
+            } else if (cat === 'Residential') {
+                if (r.category !== 'residential') return;
+            } else if (cat === 'LowVoltage') {
+                if (r.category !== 'low_voltage') return;
+            }
+            
+            if(crit.mfg !== "Any") { if (r.mfg === crit.mfg) { /* weight++ */ } else if (r.desc.includes(crit.mfg)) { /* weight+ */ } else { return; } }
+            if(crit.hp !== "Any") { const strictMatch = (r.hp && parseFloat(r.hp) === parseFloat(crit.hp)); const safetyRegex = new RegExp(`\\b${crit.hp}\\s*(?:HP|H\\.P|H|KW)\\b`, 'i'); const safetyMatch = safetyRegex.test(r.desc); if (!strictMatch && !safetyMatch) return; }
+            if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; }
+            if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; }
+            if(crit.enc!=="Any") { if(r.enc!==crit.enc) return; }
+            
+            let w = 100;
+            if (r.mfg === crit.mfg) w += 10000;
+            
+            if(expandedKeywords.length) { 
+                const text = (r.id + " " + r.desc).toUpperCase();
+                const allGroupsMatch = expandedKeywords.every(group => {
+                    return group.some(alias => {
+                        const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+                        if (alias === 'VFD') {
+                            const vfdRegex = /(?<!NON\s*|NO\s*|WITHOUT\s*)\bVFD\b(?!\s*RATED)/i;
+                            return vfdRegex.test(text);
+                        }
+                        const regex = new RegExp(`\\b${cleanAlias}S?\\b`, 'i');
+                        return regex.test(text);
+                    });
+                });
+
+                if(!allGroupsMatch) return; 
+                w+=10; 
+            }
+
+            if(!r.pdfUrl) w -= 1000000; 
+            r.w=w; res.push(r);
+        });
+        res.sort((a,b) => { if(a.w !== b.w) return b.w - a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
+        
+        this.currentResults = res;
+        this.currentPage = 1;
+        this.renderCurrentPage(crit);
+        
+        document.getElementById('pagination-footer').style.display = res.length > 0 ? 'flex' : 'none';
+        
+        UI.toggleSearch(false);
+    }
+
+    static renderCurrentPage(crit) {
+        const start = (this.currentPage - 1) * this.pageSize;
+        const end = start + this.pageSize;
+        const pageData = this.currentResults.slice(start, end);
+        
+        const area = document.getElementById('results-area');
+        area.style.opacity = '0';
+        
+        setTimeout(() => {
+            UI.render(pageData, crit || {}, this.currentResults.length);
+            this.updateControls();
+            area.style.opacity = '1';
+            document.getElementById('results-scroll-area').scrollTop = 0;
+        }, 150);
+    }
+
+    static updateControls() {
+        const total = this.currentResults.length;
+        const totalPages = Math.ceil(total / this.pageSize);
+        
+        document.getElementById('page-prev').disabled = (this.currentPage === 1);
+        document.getElementById('page-next').disabled = (this.currentPage === totalPages || total === 0);
+        
+        const start = (this.currentPage - 1) * this.pageSize + 1;
+        const end = Math.min(start + this.pageSize - 1, total);
+        
+        document.getElementById('page-info').innerText = total > 0 
+            ? `${start}-${end} of ${total}` 
+            : 'No Results';
+    }
+
+    static nextPage() {
+        if ((this.currentPage * this.pageSize) < this.currentResults.length) {
+            this.currentPage++;
+            this.renderCurrentPage();
+        }
+    }
+
+    static prevPage() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.renderCurrentPage();
+        }
+    }
+}
+
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
+    
     static async load(url) {
         this.url = url;
-        document.getElementById('pdf-fallback').style.display = 'none'; document.getElementById('pdf-toolbar').style.display = 'flex';
-        document.getElementById('custom-pdf-viewer').style.display = 'flex'; document.getElementById('pdf-viewer-frame').style.display = 'none';
+        document.getElementById('pdf-fallback').style.display = 'none'; 
+        document.getElementById('pdf-toolbar').style.display = 'flex';
+        
+        const viewer = document.getElementById('custom-pdf-viewer');
+        viewer.style.display = 'flex'; 
+        document.getElementById('pdf-viewer-frame').style.display = 'none';
+        
+        // Remove old fade logic to ensure stability
+        viewer.classList.remove('visible');
+
         const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
         const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
         if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
         const blob = await resp.blob();
+        
         if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
         this.currentBlobUrl = URL.createObjectURL(blob);
+        
         const task = pdfjsLib.getDocument(this.currentBlobUrl);
         this.doc = await task.promise; 
 
@@ -834,15 +732,19 @@ class PdfViewer {
              this.currentScale = 1.1;
         }
 
-        this.renderStack(); 
+        await this.renderStack();
+        viewer.classList.add('visible'); // Simple fade in
     }
+
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = this.currentBlobUrl; document.body.appendChild(iframe);
         iframe.onload = () => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => { document.body.removeChild(iframe); }, 2000); };
     }
+
     static async renderStack() {
-        const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
+        const container = document.getElementById('pdf-main-view'); 
+        container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
         
         let coverDoc = this.doc;
@@ -861,8 +763,10 @@ class PdfViewer {
             stdImgUrl = URL.createObjectURL(blob);
         }
 
+        // v1.78: Instant Overlay Logic (Render Page 1 + Apply Overlays immediately)
         for (let i = 1; i <= this.doc.numPages; i++) {
-            await new Promise(r => setTimeout(r, 10)); 
+            await new Promise(r => setTimeout(r, 10)); // Tiny yield to keep UI responsive
+            
             let page; let isTemplate = false;
             if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) { page = await coverDoc.getPage(1); isTemplate = true; } else { page = await this.doc.getPage(i); }
 
@@ -908,8 +812,10 @@ class PdfViewer {
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
 
-            // Instant Overlays (Restored from v1.78 logic)
+            // v1.78: INSTANT OVERLAY APPLICATION
+            // We apply the rule *before* the render promise completes so the boxes are there instantly
             if (DemoManager.isGeneratorActive) {
+                // Determine profile immediately
                 let profileKey = "AUTO"; 
                 if (i === 1) profileKey = 'TITLE';
                 else if (i === 2) profileKey = 'INFO';
@@ -917,9 +823,14 @@ class PdfViewer {
                     const w = viewport.width; const h = viewport.height;
                     profileKey = (w > h) ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
                 }
+                
+                // Set the dropdown
                 const select = toolbar.querySelector('.page-profile-select');
                 if(select) select.value = profileKey;
+
+                // Apply the rule
                 LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
+                // Refresh text content
                 RedactionManager.refreshContent();
             }
 
@@ -940,7 +851,18 @@ class PdfController {
 }
 
 class UI {
-    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
+    static init() { 
+        if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } 
+        // Re-added listeners here (now safe because RedactionManager is defined above)
+        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
+        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
+        document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } });
+        
+        // v1.58: Check mobile on init
+        if (window.innerWidth < 768) {
+            UI.toggleSearch(true); // Start collapsed on mobile
+        }
+    }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
