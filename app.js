@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v2.0 (Thin Client) ---
-const APP_VERSION = "v2.0";
+// --- SCHEMATICA ai v2.0.4 (Thin Client + Rate Limit Safety) ---
+const APP_VERSION = "v2.0.4";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -112,7 +112,7 @@ class NetworkService {
         const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
         const h = AuthService.headers();
         console.log(`🌐 Fetching ${t}...`);
-        return fetch(`${b}?target=${encodeURIComponent(t)}${p.replace('?', '&')}`, { headers: h }); 
+        return fetch(`${b}?target=${encodeURIComponent(t)}${p}`, { headers: h }); 
     }
 }
 
@@ -142,7 +142,9 @@ class DataLoader {
         let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
         if(attempts > 5) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
         localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
+        
         const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
+        
         if(hasData) { 
             if(window.LOCAL_DB.length > 7000) { localStorage.setItem('cox_db_complete', 'true'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; }
             if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; } else { btn.innerText = "⬇️ RESUMING..."; } 
@@ -161,33 +163,60 @@ class DataLoader {
     
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0; let buffer = []; let shardCount = 0;
-        let fetchedCount = 0;
+        let fetchedCount = 0; let retryCount = 0;
         try {
             do {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
-                console.group(`📥 Sync Batch ${loop}`); await new Promise(r => setTimeout(r, 10)); 
+                console.group(`📥 Sync Batch ${loop}`); 
+                
+                // SAFETY THROTTLE: Sleep 300ms to stay below Airtable 5 Req/Sec Limit
+                await new Promise(r => setTimeout(r, 300)); 
+                
                 if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
                     const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); 
                     btn.innerText = `⬇️ UPDATING ${pct}%`; 
                 }
                 
-                // Fetch directly from Edge API - Offset handles pagination
-                const r = await NetworkService.fetch(CONFIG.mainTable, `?pageSize=100${offset ? '&offset='+offset : ''}&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name&sort%5B0%5D%5Bdirection%5D=${dir}`);
-                if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
-                if(r.status!==200) { console.error("Sync Failed", r.status); break; }
+                const urlParams = `&pageSize=100${offset ? '&offset='+encodeURIComponent(offset) : ''}&sort%5B0%5D%5Bdirection%5D=${dir}`;
                 
+                let r;
+                try {
+                    r = await NetworkService.fetch(CONFIG.mainTable, urlParams);
+                } catch(e) {
+                    console.warn(`Fetch Disconnect. Retrying ${retryCount}/3...`);
+                    retryCount++;
+                    if (retryCount <= 3) { await new Promise(res => setTimeout(res, 1000)); continue; }
+                    throw e; 
+                }
+
+                if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
+                
+                if(r.status!==200) { 
+                    console.error(`🔥 Sync Failed ${r.status}. Waiting and retrying...`); 
+                    retryCount++;
+                    if (retryCount <= 3) { await new Promise(res => setTimeout(res, 2000)); continue; }
+                    
+                    try {
+                        const errPayload = await r.json();
+                        console.error("Worker output:", errPayload); 
+                    } catch (err) {
+                        const errTxt = await r.text();
+                        console.error("Raw output:", errTxt); 
+                    }
+                    btn.classList.add('error'); btn.innerText="API ERROR (Check Console)"; 
+                    break; 
+                }
+                
+                retryCount = 0; // reset on success
                 const d = await r.json(); 
                 if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
                 fetchedCount += d.records.length;
                 
                 d.records.forEach(rec => {
                     try {
-                        // The worker already formatted the record perfectly!
                         if(!window.ID_MAP.has(rec.id)) { 
                             window.LOCAL_DB.push(rec); 
                             window.ID_MAP.set(rec.id, rec); 
-                            
-                            // Log valid Manufacturers/Enclosures to populate UI Dropdowns
                             if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); 
                             if(rec.enc) window.FOUND_ENCS.add(rec.enc); 
                         }
@@ -219,9 +248,7 @@ class DragManager {
 
         const startDrag = (clientX, clientY) => {
             isDragging = true;
-            
             const rect = panel.getBoundingClientRect();
-            
             shiftX = clientX - rect.left;
             shiftY = clientY - rect.top;
 
@@ -239,10 +266,8 @@ class DragManager {
 
         const moveDrag = (clientX, clientY) => {
             if(!isDragging) return;
-            
             const newLeft = clientX - shiftX;
             const newTop = clientY - shiftY;
-            
             panel.style.left = `${newLeft}px`;
             panel.style.top = `${newTop}px`;
         };
@@ -740,7 +765,6 @@ class FeedbackService {
     static down(id) { 
         this.currentId = id; 
         
-        // Dynamically pull arrays based on the data the Edge Worker processed
         this.setupInput('fb-mfg', Array.from(window.FOUND_MFGS).sort(), 'mfg'); 
         this.setupInput('fb-hp', AI_TRAINING_DATA.DATA.HP, 'hp'); 
         this.setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt'); 
