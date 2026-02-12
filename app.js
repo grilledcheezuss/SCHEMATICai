@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v2.0.4 (Thin Client + Rate Limit Safety) ---
-const APP_VERSION = "v2.0.4";
+// --- SCHEMATICA ai v2.2.1 (Strict Parity Client) ---
+const APP_VERSION = "v2.2.1";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -42,7 +42,13 @@ const LAYOUT_RULES = {
     ]
 };
 
+// CRITICAL FIX: Restored exact keys so UI drop down trims garbage
 const AI_TRAINING_DATA = { 
+    MANUFACTURERS: [
+        'GORMAN RUPP', 'BARNES', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 
+        'ZOELLER', 'LIBERTY', 'WILO', 'PENTAIR', 'ABS', 'GODWIN', 'FRANKLIN', 
+        'EBARA', 'HIDROSTAL'
+    ],
     ALIASES: {
         'LA': ['LA', 'LIGHTNING ARRESTOR', 'SURGE ARRESTOR', 'TVSS'],
         'PM': ['PM', 'PHASE MONITOR', 'PHASE FAIL', 'PHASE RELAY'],
@@ -169,9 +175,6 @@ class DataLoader {
                 loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
                 console.group(`📥 Sync Batch ${loop}`); 
                 
-                // SAFETY THROTTLE: Sleep 300ms to stay below Airtable 5 Req/Sec Limit
-                await new Promise(r => setTimeout(r, 300)); 
-                
                 if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
                     const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); 
                     btn.innerText = `⬇️ UPDATING ${pct}%`; 
@@ -183,31 +186,26 @@ class DataLoader {
                 try {
                     r = await NetworkService.fetch(CONFIG.mainTable, urlParams);
                 } catch(e) {
-                    console.warn(`Fetch Disconnect. Retrying ${retryCount}/3...`);
+                    console.warn(`Fetch Disconnect. Retrying ${retryCount}/5...`);
                     retryCount++;
-                    if (retryCount <= 3) { await new Promise(res => setTimeout(res, 1000)); continue; }
+                    if (retryCount <= 5) { await new Promise(res => setTimeout(res, 2000 * retryCount)); continue; }
                     throw e; 
                 }
 
                 if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
                 
                 if(r.status!==200) { 
-                    console.error(`🔥 Sync Failed ${r.status}. Waiting and retrying...`); 
+                    console.warn(`🔥 Server returned ${r.status}. Pausing to let network breathe...`);
                     retryCount++;
-                    if (retryCount <= 3) { await new Promise(res => setTimeout(res, 2000)); continue; }
-                    
-                    try {
-                        const errPayload = await r.json();
-                        console.error("Worker output:", errPayload); 
-                    } catch (err) {
-                        const errTxt = await r.text();
-                        console.error("Raw output:", errTxt); 
+                    if (retryCount <= 5) { 
+                        await new Promise(res => setTimeout(res, 2000 * retryCount)); 
+                        continue; 
                     }
-                    btn.classList.add('error'); btn.innerText="API ERROR (Check Console)"; 
+                    btn.classList.add('error'); btn.innerText=`API ERROR (${r.status})`; 
                     break; 
                 }
                 
-                retryCount = 0; // reset on success
+                retryCount = 0; 
                 const d = await r.json(); 
                 if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
                 fetchedCount += d.records.length;
@@ -227,6 +225,7 @@ class DataLoader {
                 console.groupEnd();
                 if(buffer.length >= 50) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset; 
+                
             } while(offset);
             
             localStorage.setItem('cox_db_complete', 'true'); 
@@ -765,11 +764,11 @@ class FeedbackService {
     static down(id) { 
         this.currentId = id; 
         
-        this.setupInput('fb-mfg', Array.from(window.FOUND_MFGS).sort(), 'mfg'); 
+        this.setupInput('fb-mfg', [...AI_TRAINING_DATA.MANUFACTURERS].sort(), 'mfg'); 
         this.setupInput('fb-hp', AI_TRAINING_DATA.DATA.HP, 'hp'); 
         this.setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt'); 
         this.setupInput('fb-phase', AI_TRAINING_DATA.DATA.PHASE, 'phase'); 
-        this.setupInput('fb-enc', Array.from(window.FOUND_ENCS).sort(), 'enc');
+        this.setupInput('fb-enc', ['4XSS', '4XFG', 'POLY'], 'enc');
 
         const lvBtn = document.getElementById('fb-low-volt-btn'); 
         if (this.lockout.has(`${id}:cat_low`)) { lvBtn.className = 'keyword-toggle disabled-overlay'; lvBtn.innerText = "✓ Reported as Low Voltage"; lvBtn.onclick = null; } 
@@ -871,7 +870,7 @@ class SearchEngine {
                     return group.some(alias => {
                         const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
                         const regex = new RegExp(`\\b${cleanAlias}\\b`, 'i');
-                        return regex.test(text);
+                        return regex.test(text) || text.includes(cleanAlias); 
                     });
                 });
 
@@ -1161,7 +1160,10 @@ class UI {
     
     static pop() { 
         const m = document.getElementById('mfgInput'); const cv = m.value; 
-        const cleanList = Array.from(window.FOUND_MFGS).sort(); 
+        
+        // STRICT WHITELIST: Only allow canonical manufacturers
+        const cleanList = Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort();
+        
         m.innerHTML='<option value="Any">Any</option>'; 
         cleanList.forEach(v=>m.add(new Option(v,v))); 
         m.value=cv; 
@@ -1169,7 +1171,7 @@ class UI {
         ['hp','volt','phase','enc'].forEach(k=>{ 
             const s=document.getElementById(k+'Input'); 
             if(!s)return; 
-            const d = (k==='enc') ? Array.from(window.FOUND_ENCS).sort() : AI_TRAINING_DATA.DATA[k.toUpperCase()]; 
+            const d = (k==='enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()]; 
             s.innerHTML='<option value="Any">Any</option>'; 
             d.forEach(v=>s.add(new Option(v,v))); 
         }); 
@@ -1240,6 +1242,7 @@ class UI {
 window.UI = UI;
 
 window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set(); window.FOUND_ENCS = new Set();
+
 document.addEventListener('DOMContentLoaded', () => { 
     try {
         UI.init(); 
