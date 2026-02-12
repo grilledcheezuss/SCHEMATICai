@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v2.2.1 (Strict Parity Client) ---
-const APP_VERSION = "v2.2.1";
+// --- SCHEMATICA ai v2.3.0 (Strict Search Parity) ---
+const APP_VERSION = "v2.3.0";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -42,7 +42,7 @@ const LAYOUT_RULES = {
     ]
 };
 
-// CRITICAL FIX: Restored exact keys so UI drop down trims garbage
+// FULL LIST RESTORED
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: [
         'GORMAN RUPP', 'BARNES', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 
@@ -866,11 +866,18 @@ class SearchEngine {
             
             if(expandedKeywords.length) { 
                 const text = (r.id + " " + (r.desc || "")).toUpperCase();
+                
+                // User Feedback Reject Keywords processing
+                if (r.reject_keywords && r.reject_keywords.length > 0) {
+                    const isRejected = rawKeywords.some(kw => r.reject_keywords.includes(kw));
+                    if (isRejected) return; 
+                }
+
                 const allGroupsMatch = expandedKeywords.every(group => {
                     return group.some(alias => {
                         const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
                         const regex = new RegExp(`\\b${cleanAlias}\\b`, 'i');
-                        return regex.test(text) || text.includes(cleanAlias); 
+                        return regex.test(text); 
                     });
                 });
 
@@ -1161,7 +1168,7 @@ class UI {
     static pop() { 
         const m = document.getElementById('mfgInput'); const cv = m.value; 
         
-        // STRICT WHITELIST: Only allow canonical manufacturers
+        // STRICT WHITELIST: Only allow verified EXACT manufacturers to populate the dropdown
         const cleanList = Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort();
         
         m.innerHTML='<option value="Any">Any</option>'; 
