@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v1.79 ---
-const APP_VERSION = "v1.79";
+// --- SCHEMATICA ai v1.75 ---
+const APP_VERSION = "v1.75";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -20,7 +20,7 @@ const LAYOUT_RULES = {
     ],
     INFO: [
         { map: "cust", x: 0.119, y: 0.085, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
-        { map: "job", x: 0.058, y: 0.108, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
+        { map: "job", x: 0.058, y: 0.108, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'left' },
         { map: "date", x: 0.064, y: 0.858, w: 0.08, h: 0.02, fontSize: 8, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "type", x: 0.149, y: 0.889, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "cpid", x: 0.909, y: 0.94, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -75,10 +75,6 @@ const AI_TRAINING_DATA = {
     } 
 };
 
-// --------------------------------------------------------
-// CORE CLASSES
-// --------------------------------------------------------
-
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
@@ -115,7 +111,7 @@ class NetworkService {
 }
 
 // --------------------------------------------------------
-// LOGIC / HELPER CLASSES (Moved UP to prevent ReferenceErrors)
+// LOGIC & HELPER CLASSES (Defined FIRST)
 // --------------------------------------------------------
 
 class TheHealer {
@@ -151,7 +147,10 @@ class AIParser {
         const healed = TheHealer.healedData[id];
         const s = { mfg: healed?.mfg||null, hp: healed?.hp||null, enc: healed?.enc||null, volt: healed?.volt||null, phase: healed?.phase||null, category: healed?.category||null };
         t = (t||"").toUpperCase();
+        
         for (const [k, v] of Object.entries(AI_TRAINING_DATA.MANUFACTURERS)) { const regex = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b(${v.join('|').toUpperCase()})\\b`, 'i'); if (regex.test(t)) s.mfg = k.toUpperCase(); }
+        
+        // ENC
         if (!s.enc) {
             if (AI_DATA.ENC['POLY'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = 'POLY';
             else if (['FIBERGLASS', 'FRP', 'NON-METALLIC', '4XFG'].some(v => new RegExp(`\\b${v}\\b`, 'i').test(t))) s.enc = '4XFG';
@@ -168,6 +167,8 @@ class AIParser {
             })) s.enc = '4XSS';
             else if (t.includes('NEMA 4X')) s.enc = '4XFG';
         }
+        
+        // HP
         if (!s.hp) {
             let maxHP = 0;
             const compoundRegex = /(\d+)\s+(\d+\/\d+)\s*(?:HP|H\.P\.|HORSEPOWER)\b/gi;
@@ -186,6 +187,8 @@ class AIParser {
             });
             if (maxHP > 0) { if (Math.abs(maxHP - Math.round(maxHP)) < 0.1) maxHP = Math.round(maxHP); s.hp = maxHP.toString(); }
         }
+
+        // VOLT
         if (!s.volt) {
             const voltPriority = [{ id: '575', match: ['575', '600'] }, { id: '480', match: ['480', '460', '440'] }, { id: '415', match: ['415', '380'] }, { id: '277', match: ['277'] }, { id: '240', match: ['240', '230', '220'] }, { id: '208', match: ['208'] }, { id: '120', match: ['120', '115', '110'] }];
             for (const vGroup of voltPriority) {
@@ -193,19 +196,29 @@ class AIParser {
                 if (regex.test(t)) { s.volt = vGroup.id; break; }
             }
         }
-        if (!s.phase) { if (text.includes("3 PHASE") || text.includes("3PH") || text.includes("3Ø") || text.includes("3/60")) s.phase = "3"; else if (text.includes("1 PHASE") || text.includes("1PH") || text.includes("1Ø") || text.includes("1/60")) s.phase = "1"; }
-        if (!s.category) {
-            if (/(?:BLOWER|AERATION|CLARIFIER|DIGESTER|UV|ULTRAVIOLET|SCREEN|PRESS|DEWATERING|MIXER|2\+2|4\s+MOTOR|TRIPLEX|QUADPLEX|HEADWORKS|OXIDATION|LIFT\s+STATION|3\s+PUMP|4\s+PUMP)/i.test(t)) { s.category = 'treatment'; } 
-            else if (/(?:RESIDENTIAL|GRINDER\s+STATION|SIMPLEX\s+GRINDER|HOME|RESIDENCE|STEP\s+SYSTEM|SEPTIC)/i.test(t)) { s.category = 'residential'; } 
-            else if (t.includes('LOW VOLTAGE') || t.includes('CONTROL BOX') || t.includes('JB') || t.includes('JUNCTION BOX')) { s.category = 'low_voltage'; }
+
+        if (!s.phase) { 
+            if (t.includes("3 PHASE") || t.includes("3PH") || t.includes("3Ø") || t.includes("3/60")) s.phase = "3"; 
+            else if (t.includes("1 PHASE") || t.includes("1PH") || t.includes("1Ø") || t.includes("1/60")) s.phase = "1"; 
         }
+        
+        // CAT
+        if (!s.category) {
+            if (/(?:BLOWER|AERATION|CLARIFIER|DIGESTER|UV|ULTRAVIOLET|SCREEN|PRESS|DEWATERING|MIXER|2\+2|4\s+MOTOR|TRIPLEX|QUADPLEX|HEADWORKS|OXIDATION|LIFT\s+STATION|3\s+PUMP|4\s+PUMP)/i.test(t)) {
+                s.category = 'treatment';
+            } else if (/(?:RESIDENTIAL|GRINDER\s+STATION|SIMPLEX\s+GRINDER|HOME|RESIDENCE|STEP\s+SYSTEM|SEPTIC)/i.test(t)) {
+                s.category = 'residential';
+            } else if (t.includes('LOW VOLTAGE') || t.includes('CONTROL BOX') || t.includes('JB') || t.includes('JUNCTION BOX')) {
+                s.category = 'low_voltage';
+            }
+        }
+
         return s;
     }
 }
 
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; static startX = 0; static startY = 0; static startLeft = 0; static startTop = 0;
-    
     static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14, text = null, decoration = null, type = null, fontWeight = 'normal', transparent = false, rotation = 0, fontFamily = null, textAlign = 'center') {
         let container = wrapper.querySelector('.pdf-content-container');
         if (!container && wrapper.classList.contains('pdf-content-container')) container = wrapper;
@@ -237,9 +250,7 @@ class RedactionManager {
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
         box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box); return box;
     }
-
     static addManualZone() { const pages = document.querySelectorAll('.pdf-page-wrapper'); if(pages.length === 0) return; const wrapper = pages[0]; const container = wrapper.querySelector('.pdf-content-container'); const w = container.offsetWidth; const h = container.offsetHeight; this.createZoneOnWrapper(wrapper, w*0.3, h*0.4, w*0.4, h*0.1, 'custom', 16, null, null, 'blocker'); this.refreshContent(); }
-
     static addZoneToCurrentView(type) {
         const wrappers = document.querySelectorAll('.pdf-page-wrapper');
         if (wrappers.length === 0) return;
@@ -279,31 +290,14 @@ class FeedbackService {
         this.setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt'); 
         this.setupInput('fb-phase', AI_TRAINING_DATA.DATA.PHASE, 'phase'); 
         this.setupInput('fb-enc', Object.keys(AI_TRAINING_DATA.ENCLOSURES).sort(), 'enc'); 
-
         const lvBtn = document.getElementById('fb-low-volt-btn'); 
         if (this.lockout.has(`${id}:cat_low`)) { lvBtn.className = 'keyword-toggle disabled-overlay'; lvBtn.innerText = "✓ Reported as Low Voltage"; lvBtn.onclick = null; } 
         else { lvBtn.className = 'keyword-toggle'; lvBtn.innerText = "⚡ Report as Low Voltage / Control Only"; lvBtn.onclick = () => lvBtn.classList.toggle('selected'); } 
-        
         this.generateKeywordButtons(); 
         document.getElementById('feedback-modal').classList.add('active-modal'); 
     }
-
-    static setupInput(elId, data, paramKey) { 
-        const el = document.getElementById(elId); 
-        el.innerHTML = '<option value="" disabled selected>Select Correct...</option><option value="Varied">Varied / Multiple</option>'; 
-        data.forEach(d => el.add(new Option(d, d))); 
-        if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } 
-    }
-
-    static generateKeywordButtons() { 
-        const input = document.getElementById('keywordInput').value; 
-        const container = document.getElementById('keyword-cluster'); 
-        const wrapper = document.getElementById('keyword-feedback-area'); 
-        container.innerHTML = ''; 
-        const keywords = input.split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length > 0); 
-        if (keywords.length === 0) { wrapper.style.display = 'none'; } else { wrapper.style.display = 'block'; keywords.forEach(k => { if (this.lockout.has(`${this.currentId}:kw_${k}`)) return; const btn = document.createElement('button'); btn.className = 'keyword-toggle'; btn.innerText = `NOT "${k}"`; btn.onclick = () => btn.classList.toggle('selected'); btn.dataset.kw = k; container.appendChild(btn); }); } 
-    }
-
+    static setupInput(elId, data, paramKey) { const el = document.getElementById(elId); el.innerHTML = '<option value="" disabled selected>Select Correct...</option><option value="Varied">Varied / Multiple</option>'; data.forEach(d => el.add(new Option(d, d))); if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } }
+    static generateKeywordButtons() { const input = document.getElementById('keywordInput').value; const container = document.getElementById('keyword-cluster'); const wrapper = document.getElementById('keyword-feedback-area'); container.innerHTML = ''; const keywords = input.split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length > 0); if (keywords.length === 0) { wrapper.style.display = 'none'; } else { wrapper.style.display = 'block'; keywords.forEach(k => { if (this.lockout.has(`${this.currentId}:kw_${k}`)) return; const btn = document.createElement('button'); btn.className = 'keyword-toggle'; btn.innerText = `NOT "${k}"`; btn.onclick = () => btn.classList.toggle('selected'); btn.dataset.kw = k; container.appendChild(btn); }); } }
     static async submit() { 
         const corrections = {}; 
         const mfg = document.getElementById('fb-mfg').value; if(mfg) { corrections.mfg = mfg; this.lockout.add(`${this.currentId}:p_mfg`); } 
@@ -311,19 +305,12 @@ class FeedbackService {
         const volt = document.getElementById('fb-volt').value; if(volt) { corrections.volt = volt; this.lockout.add(`${this.currentId}:p_volt`); } 
         const phase = document.getElementById('fb-phase').value; if(phase) { corrections.phase = phase; this.lockout.add(`${this.currentId}:p_phase`); } 
         const enc = document.getElementById('fb-enc').value; if(enc) { corrections.enc = enc; this.lockout.add(`${this.currentId}:p_enc`); } 
-
         if(document.getElementById('fb-low-volt-btn').classList.contains('selected')) { corrections.category = 'low_voltage'; this.lockout.add(`${this.currentId}:cat_low`); } 
-        
-        const badKeywords = []; 
-        document.querySelectorAll('.keyword-toggle.selected').forEach(btn => { badKeywords.push(btn.dataset.kw); this.lockout.add(`${this.currentId}:kw_${btn.dataset.kw}`); }); 
-        if (badKeywords.length > 0) corrections.reject_keywords = badKeywords; 
-        
+        const badKeywords = []; document.querySelectorAll('.keyword-toggle.selected').forEach(btn => { badKeywords.push(btn.dataset.kw); this.lockout.add(`${this.currentId}:kw_${btn.dataset.kw}`); }); if (badKeywords.length > 0) corrections.reject_keywords = badKeywords; 
         if (Object.keys(corrections).length === 0) return alert("Please select a correction."); 
-        
         const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections) } }] }; 
         await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
-        this.close(); 
-        alert("Thank you! System will learn from this."); 
+        this.close(); alert("Thank you! System will learn from this."); 
     }
     static resetLockout() { this.lockout.clear(); }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
@@ -339,11 +326,15 @@ class PageClassifier {
     } 
 }
 
+// --------------------------------------------------------
+// 3. MAIN APP LOGIC (Uses above classes)
+// --------------------------------------------------------
+
 class DataLoader {
     static async preload() {
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ v1.79 Update: Purging Cache...`);
+            console.warn(`⚡ v1.75 Update: Purging Cache...`);
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
@@ -412,7 +403,7 @@ class DataLoader {
                     } catch(e) { console.warn("Record Skip", e); }
                 });
                 console.groupEnd();
-                // v1.79: Revert Buffer to 50
+                // v1.79: Keep buffer at 50 for stability
                 if(buffer.length >= 50) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset;
             } while(offset);
@@ -438,7 +429,6 @@ class SearchEngine {
             return [k]; 
         });
 
-        // v1.75: Category Handling
         const cat = document.getElementById('catInput').value; 
         
         const crit = { kw: rawKeywords, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value, enc: document.getElementById('encInput').value };
@@ -543,7 +533,6 @@ class SearchEngine {
 
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
-    
     static async load(url) {
         this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; 
@@ -552,18 +541,14 @@ class PdfViewer {
         const viewer = document.getElementById('custom-pdf-viewer');
         viewer.style.display = 'flex'; 
         document.getElementById('pdf-viewer-frame').style.display = 'none';
-        
-        // Remove old fade logic to ensure stability
-        viewer.classList.remove('visible');
+        viewer.classList.remove('visible'); // v1.76 Fade
 
         const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
         const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
         if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
         const blob = await resp.blob();
-        
         if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
         this.currentBlobUrl = URL.createObjectURL(blob);
-        
         const task = pdfjsLib.getDocument(this.currentBlobUrl);
         this.doc = await task.promise; 
 
@@ -575,18 +560,15 @@ class PdfViewer {
         }
 
         await this.renderStack();
-        viewer.classList.add('visible'); // Simple fade in
+        viewer.classList.add('visible'); 
     }
-
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
         const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = this.currentBlobUrl; document.body.appendChild(iframe);
         iframe.onload = () => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => { document.body.removeChild(iframe); }, 2000); };
     }
-
     static async renderStack() {
-        const container = document.getElementById('pdf-main-view'); 
-        container.innerHTML = ''; 
+        const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
         
         let coverDoc = this.doc;
@@ -605,10 +587,8 @@ class PdfViewer {
             stdImgUrl = URL.createObjectURL(blob);
         }
 
-        // v1.78: Instant Overlay Logic (Render Page 1 + Apply Overlays immediately)
         for (let i = 1; i <= this.doc.numPages; i++) {
-            await new Promise(r => setTimeout(r, 10)); // Tiny yield to keep UI responsive
-            
+            await new Promise(r => setTimeout(r, 10)); 
             let page; let isTemplate = false;
             if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) { page = await coverDoc.getPage(1); isTemplate = true; } else { page = await this.doc.getPage(i); }
 
@@ -654,10 +634,8 @@ class PdfViewer {
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
 
-            // v1.78: INSTANT OVERLAY APPLICATION
-            // We apply the rule *before* the render promise completes so the boxes are there instantly
+            // v1.78: Instant Overlays
             if (DemoManager.isGeneratorActive) {
-                // Determine profile immediately
                 let profileKey = "AUTO"; 
                 if (i === 1) profileKey = 'TITLE';
                 else if (i === 2) profileKey = 'INFO';
@@ -665,14 +643,9 @@ class PdfViewer {
                     const w = viewport.width; const h = viewport.height;
                     profileKey = (w > h) ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
                 }
-                
-                // Set the dropdown
                 const select = toolbar.querySelector('.page-profile-select');
                 if(select) select.value = profileKey;
-
-                // Apply the rule
                 LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
-                // Refresh text content
                 RedactionManager.refreshContent();
             }
 
@@ -693,18 +666,7 @@ class PdfController {
 }
 
 class UI {
-    static init() { 
-        if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } 
-        // Re-added listeners here (now safe because RedactionManager is defined above)
-        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
-        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
-        document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } });
-        
-        // v1.58: Check mobile on init
-        if (window.innerWidth < 768) {
-            UI.toggleSearch(true); // Start collapsed on mobile
-        }
-    }
+    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
