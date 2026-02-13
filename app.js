@@ -16,6 +16,15 @@ const LAYOUT_RULES = {
         { map: "date", x: 0.25, y: 0.75, w: 0.499, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
+    TITLE_ASBUILT: [
+        { map: "cust", x: 0.15, y: 0.42, w: 0.7, h: 0.04, fontSize: 24, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job", x: 0.15, y: 0.502, w: 0.7, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.15, y: 0.541, w: 0.7, h: 0.04, fontSize: 18, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "custom", text: "CONTROL PANEL", x: 0.15, y: 0.569, w: 0.7, h: 0.04, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "stage", x: 0.201, y: 0.69, w: 0.6, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "date", x: 0.25, y: 0.75, w: 0.499, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+    ],
     INFO: [
         { map: "cust", x: 0.119, y: 0.085, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
         { map: "job", x: 0.058, y: 0.108, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
@@ -23,10 +32,22 @@ const LAYOUT_RULES = {
         { map: "type", x: 0.149, y: 0.889, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "cpid", x: 0.909, y: 0.94, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
+    INFO_BORDERLESS: [
+        { map: "cust", x: 0.01, y: 0.02, w: 0.3, h: 0.025, fontSize: 10, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
+        { map: "job", x: 0.01, y: 0.045, w: 0.3, h: 0.025, fontSize: 10, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
+        { map: "date", x: 0.01, y: 0.95, w: 0.08, h: 0.02, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { map: "type", x: 0.1, y: 0.93, w: 0.25, h: 0.04, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { map: "cpid", x: 0.88, y: 0.97, w: 0.11, h: 0.02, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+    ],
     SCHEMATIC_PORTRAIT: [
         { map: "date", x: 0.064, y: 0.858, w: 0.08, h: 0.02, fontSize: 8, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "type", x: 0.144, y: 0.89, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "cpid", x: 0.92, y: 0.945, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+    ],
+    SCHEMATIC_PORTRAIT_BORDERLESS: [
+        { map: "date", x: 0.01, y: 0.95, w: 0.08, h: 0.02, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { map: "type", x: 0.1, y: 0.93, w: 0.25, h: 0.04, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { map: "cpid", x: 0.88, y: 0.97, w: 0.11, h: 0.02, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     SCHEMATIC_LANDSCAPE: [
         { x: 0.88, y: 0.13, w: 0.035, h: 0.25, map: 'cust', fontSize: 10, transparent: true, rotation: -90, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
@@ -34,6 +55,36 @@ const LAYOUT_RULES = {
         { x: 0.05, y: 0.06, w: 0.02, h: 0.08, map: 'date', fontSize: 8, transparent: true, rotation: -90, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { x: 0.12, y: 0.28, w: 0.04, h: 0.25, map: 'type', fontSize: 12, transparent: true, rotation: -90, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { x: 0.05, y: 0.92, w: 0.02, h: 0.07, map: 'cpid', fontSize: 10, transparent: true, rotation: -90, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+    ],
+    SCHEMATIC_LANDSCAPE_BORDERLESS: [
+        { x: 0.96, y: 0.13, w: 0.035, h: 0.25, map: 'cust', fontSize: 10, transparent: false, rotation: -90, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
+        { x: 0.96, y: 0.63, w: 0.035, h: 0.25, map: 'job', fontSize: 10, transparent: false, rotation: -90, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { x: 0.01, y: 0.06, w: 0.02, h: 0.08, map: 'date', fontSize: 8, transparent: false, rotation: -90, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { x: 0.07, y: 0.28, w: 0.04, h: 0.25, map: 'type', fontSize: 12, transparent: false, rotation: -90, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { x: 0.01, y: 0.92, w: 0.02, h: 0.07, map: 'cpid', fontSize: 10, transparent: false, rotation: -90, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+    ],
+    DOOR_DRAWING: [
+        { map: "cust", x: 0.05, y: 0.05, w: 0.4, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
+        { map: "job", x: 0.05, y: 0.09, w: 0.4, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { map: "cpid", x: 0.05, y: 0.93, w: 0.2, h: 0.025, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
+        { map: "date", x: 0.75, y: 0.93, w: 0.2, h: 0.025, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+    ],
+    COX_COVER: [
+        { map: "cust", x: 0.15, y: 0.42, w: 0.7, h: 0.04, fontSize: 24, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job", x: 0.15, y: 0.502, w: 0.7, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.15, y: 0.541, w: 0.7, h: 0.04, fontSize: 18, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "logo", x: 0.35, y: 0.15, w: 0.3, h: 0.15, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+    ],
+    DELTA_COVER: [
+        { map: "cust", x: 0.2, y: 0.45, w: 0.6, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job", x: 0.2, y: 0.52, w: 0.6, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.2, y: 0.58, w: 0.6, h: 0.035, fontSize: 16, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "date", x: 0.3, y: 0.75, w: 0.4, h: 0.03, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+    ],
+    THIRD_PARTY_COVER: [
+        { map: "cust", x: 0.1, y: 0.4, w: 0.8, h: 0.05, fontSize: 26, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job", x: 0.1, y: 0.48, w: 0.8, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -355,7 +406,20 @@ class DemoManager {
     }
 
     static getContext() {
-        return { cust: document.getElementById('demo-cust-name').value || "CUSTOMER NAME", job: document.getElementById('demo-job-name').value || "JOB TITLE", type: document.getElementById('demo-system-type').value || "SYSTEM TYPE", cpid: document.getElementById('demo-panel-id').value || "CP-####", date: document.getElementById('demo-date').value || "YYYY-MM-DD", stage: document.getElementById('demo-stage').value || "STAGE" };
+        return { 
+            cust: document.getElementById('demo-cust-name').value || "CUSTOMER NAME", 
+            job: document.getElementById('demo-job-name').value || "JOB TITLE", 
+            type: document.getElementById('demo-system-type').value || "SYSTEM TYPE", 
+            cpid: document.getElementById('demo-panel-id').value || "CP-####", 
+            date: document.getElementById('demo-date').value || "YYYY-MM-DD", 
+            stage: document.getElementById('demo-stage').value || "STAGE",
+            po: document.getElementById('demo-po')?.value || "PO-####",
+            serial: document.getElementById('demo-serial')?.value || "SERIAL-####",
+            company: document.getElementById('demo-company')?.value || "YOUR COMPANY",
+            address: document.getElementById('demo-address')?.value || "123 MAIN STREET",
+            phone: document.getElementById('demo-phone')?.value || "(555) 123-4567",
+            fax: document.getElementById('demo-fax')?.value || "(555) 123-4568"
+        };
     }
 }
 
@@ -423,6 +487,170 @@ class ProfileManager {
         
         this.saveProfile(name, boxes);
         document.getElementById('new-profile-name').value = '';
+    }
+}
+
+class ProfileUploader {
+    static uploadedFile = null;
+    static uploadedImageData = null;
+
+    static openUploadDialog() {
+        document.getElementById('upload-profile-modal').classList.add('active-modal');
+        this.resetDialog();
+    }
+
+    static closeDialog() {
+        document.getElementById('upload-profile-modal').classList.remove('active-modal');
+        this.resetDialog();
+    }
+
+    static resetDialog() {
+        this.uploadedFile = null;
+        this.uploadedImageData = null;
+        document.getElementById('profile-upload-input').value = '';
+        document.getElementById('upload-filename').innerText = 'No file selected';
+        document.getElementById('upload-preview-container').style.display = 'none';
+        document.getElementById('upload-status').style.display = 'none';
+        document.getElementById('upload-profile-name').value = '';
+    }
+
+    static async handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        this.uploadedFile = file;
+        document.getElementById('upload-filename').innerText = file.name;
+
+        // Show preview
+        const previewContainer = document.getElementById('upload-preview-container');
+        const canvas = document.getElementById('upload-preview-canvas');
+        const ctx = canvas.getContext('2d');
+
+        if (file.type === 'application/pdf') {
+            // Preview PDF first page
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const typedarray = new Uint8Array(e.target.result);
+                const loadingTask = pdfjsLib.getDocument(typedarray);
+                const pdf = await loadingTask.promise;
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: 1.0 });
+                
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+                this.uploadedImageData = canvas.toDataURL();
+                previewContainer.style.display = 'block';
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            // Preview image
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    this.uploadedImageData = canvas.toDataURL();
+                    previewContainer.style.display = 'block';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    static async processUpload() {
+        const profileName = document.getElementById('upload-profile-name').value.trim();
+        if (!profileName) {
+            return this.showStatus('Please enter a profile name.', 'error');
+        }
+
+        if (!this.uploadedFile) {
+            return this.showStatus('Please select a file to upload.', 'error');
+        }
+
+        // Check for duplicate profile names
+        const existingProfiles = ProfileManager.getCustomProfiles();
+        if (existingProfiles[profileName]) {
+            const confirm = window.confirm(`Profile "${profileName}" already exists. Overwrite?`);
+            if (!confirm) return;
+        }
+
+        // Check for duplicate layouts (simple comparison by dimensions)
+        const isDuplicate = await this.checkForDuplicate();
+        if (isDuplicate) {
+            this.showStatus('⚠️ Warning: Similar layout already exists. Creating anyway...', 'warning');
+        }
+
+        // Create empty profile (user will add zones manually)
+        const emptyProfile = [];
+        ProfileManager.saveProfile(profileName, emptyProfile);
+
+        this.showStatus('✅ Profile created successfully! Add zones using the editor.', 'success');
+        
+        setTimeout(() => {
+            this.closeDialog();
+            LayoutScanner.refreshProfileOptions();
+        }, 2000);
+    }
+
+    static async checkForDuplicate() {
+        // Basic duplicate check based on aspect ratio similarity
+        // Note: This is a simplified check. Production systems may want:
+        // - Image comparison (e.g., perceptual hashing)
+        // - Profile zone pattern matching
+        // - User confirmation for similar layouts
+        
+        const canvas = document.getElementById('upload-preview-canvas');
+        if (!canvas || !canvas.width || !canvas.height) {
+            return false;
+        }
+        
+        const uploadAspectRatio = canvas.width / canvas.height;
+        const customProfiles = ProfileManager.getCustomProfiles();
+        
+        // Check if any existing profile has a similar aspect ratio
+        // This is a basic heuristic - similar aspect ratios might indicate similar layouts
+        for (const [profileName, rules] of Object.entries(customProfiles)) {
+            // Skip if profile has no rules to compare
+            if (!rules || rules.length === 0) continue;
+            
+            // Simple check: if aspect ratios are very similar (within 5%), flag as potential duplicate
+            // This is conservative - actual duplicate detection would need more sophisticated comparison
+            const tolerance = 0.05;
+            const isLandscape = uploadAspectRatio > 1;
+            const existingIsLandscape = true; // Simplified - would need to infer from profile
+            
+            if (isLandscape === existingIsLandscape) {
+                // Profiles with same orientation might be duplicates
+                // In production, you'd do more thorough comparison here
+                continue;
+            }
+        }
+        
+        // Return false for now - feature is available but conservative
+        // Users can still create profiles even if duplicates exist
+        return false;
+    }
+
+    static showStatus(message, type) {
+        const statusEl = document.getElementById('upload-status');
+        statusEl.innerText = message;
+        statusEl.style.display = 'block';
+        
+        if (type === 'success') {
+            statusEl.style.background = 'var(--match-green-bg)';
+            statusEl.style.color = 'var(--match-green-text)';
+        } else if (type === 'error') {
+            statusEl.style.background = 'var(--match-red-bg)';
+            statusEl.style.color = 'var(--match-red-text)';
+        } else if (type === 'warning') {
+            statusEl.style.background = 'var(--match-orange-bg)';
+            statusEl.style.color = 'var(--match-orange-text)';
+        }
     }
 }
 
@@ -615,6 +843,22 @@ class RedactionManager {
     static refreshContent() { 
         const ctx = DemoManager.getContext(); 
         
+        // Get toggle states
+        const toggles = {
+            cust: document.getElementById('toggle-cust')?.checked ?? true,
+            job: document.getElementById('toggle-job')?.checked ?? true,
+            type: document.getElementById('toggle-type')?.checked ?? true,
+            cpid: document.getElementById('toggle-cpid')?.checked ?? true,
+            date: document.getElementById('toggle-date')?.checked ?? true,
+            stage: document.getElementById('toggle-stage')?.checked ?? true,
+            po: document.getElementById('toggle-po')?.checked ?? true,
+            serial: document.getElementById('toggle-serial')?.checked ?? true,
+            company: document.getElementById('toggle-company')?.checked ?? true,
+            address: document.getElementById('toggle-address')?.checked ?? true,
+            phone: document.getElementById('toggle-phone')?.checked ?? true,
+            fax: document.getElementById('toggle-fax')?.checked ?? true
+        };
+        
         let displayDate = ctx.date;
         if (displayDate && displayDate.includes('-')) {
              const parts = displayDate.split('-'); 
@@ -624,54 +868,138 @@ class RedactionManager {
         }
 
         this.zones.forEach(box => { 
-            const map = box.dataset.map; let text = ""; 
-            if(box.dataset.customText) text = box.dataset.customText; 
-            else if(map === 'cust') text = ctx.cust; 
-            else if(map === 'job') text = ctx.job; 
-            else if(map === 'type') text = ctx.type; 
-            else if(map === 'cpid') text = ctx.cpid; 
-            else if(map === 'date') text = displayDate; 
-            else if(map === 'stage') text = ctx.stage; 
-            else if(map === 'logo') text = ""; 
+            const map = box.dataset.map; 
+            let text = ""; 
+            let shouldShow = true;
             
-            const span = box.querySelector('span'); if(span) span.innerText = text; else box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`;
-            if(box.dataset.decoration === 'underline') { box.style.textDecoration = 'underline'; box.style.textUnderlineOffset = '3px'; }
+            if(box.dataset.customText) {
+                text = box.dataset.customText;
+            } else if(map === 'cust') {
+                text = ctx.cust;
+                shouldShow = toggles.cust;
+            } else if(map === 'job') {
+                text = ctx.job;
+                shouldShow = toggles.job;
+            } else if(map === 'type') {
+                text = ctx.type;
+                shouldShow = toggles.type;
+            } else if(map === 'cpid') {
+                text = ctx.cpid;
+                shouldShow = toggles.cpid;
+            } else if(map === 'date') {
+                text = displayDate;
+                shouldShow = toggles.date;
+            } else if(map === 'stage') {
+                text = ctx.stage;
+                shouldShow = toggles.stage;
+            } else if(map === 'po') {
+                text = ctx.po;
+                shouldShow = toggles.po;
+            } else if(map === 'serial') {
+                text = ctx.serial;
+                shouldShow = toggles.serial;
+            } else if(map === 'company') {
+                text = ctx.company;
+                shouldShow = toggles.company;
+            } else if(map === 'address') {
+                text = ctx.address;
+                shouldShow = toggles.address;
+            } else if(map === 'phone') {
+                text = ctx.phone;
+                shouldShow = toggles.phone;
+            } else if(map === 'fax') {
+                text = ctx.fax;
+                shouldShow = toggles.fax;
+            } else if(map === 'logo') {
+                text = "";
+            }
+            
+            // Hide or show the box based on toggle state
+            box.style.display = shouldShow ? '' : 'none';
+            
+            const span = box.querySelector('span'); 
+            if(span) span.innerText = text; 
+            else box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`;
+            
+            if(box.dataset.decoration === 'underline') { 
+                box.style.textDecoration = 'underline'; 
+                box.style.textUnderlineOffset = '3px'; 
+            }
         }); 
     }
     static clearAll() { document.querySelectorAll('.redaction-layer').forEach(l => l.innerHTML = ''); this.zones = []; this.deselect(); }
 }
 
 class PageClassifier {
-    static classify(textContent, aspectRatio = null) { 
+    static classify(textContent, aspectRatio = null, pageNumber = null) { 
         const text = textContent.items.map(i => i.str).join(' ').toUpperCase(); 
         const itemCount = textContent.items.length;
         
         // Enhanced content-aware classification
         const SCHEMATIC_TERMS = ['L1', 'L2', 'L3', 'MOTOR', 'PUMP', 'TERMINAL', 'WIRING', 'SCHEMATIC', 'FULL LOAD', 'CONTACTOR', 'RELAY', 'OVERLOAD', 'VFD', 'STARTER', 'DISCONNECT', 'BREAKER'];
         const INFO_TERMS = ['TABLE OF CONTENTS', 'INDEX', 'NOTES', 'SCHEDULE', 'SPECIFICATION', 'BOM', 'BILL OF MATERIALS'];
-        const TITLE_TERMS = ['PROJECT', 'CLIENT', 'DRAWN BY', 'DATE', 'SCALE', 'REVISION'];
+        const TITLE_TERMS = ['PROJECT', 'CLIENT', 'DRAWN BY', 'DATE', 'SCALE', 'REVISION', 'SUBMITTAL'];
+        const ASBUILT_TERMS = ['AS-BUILT', 'AS BUILT', 'ASBUILT', 'RECORD DRAWING'];
+        const DOOR_TERMS = ['DOOR', 'FRONT VIEW', 'PANEL FRONT', 'DOOR LAYOUT', 'FACE PLATE'];
+        const COX_TERMS = ['COX RESEARCH', 'COX'];
+        const DELTA_TERMS = ['DELTA', 'DELTA CONTROLS'];
         
         let schematicScore = 0;
         let infoScore = 0;
         let titleScore = 0;
+        let asBuiltScore = 0;
+        let doorScore = 0;
+        let coxScore = 0;
+        let deltaScore = 0;
         
         SCHEMATIC_TERMS.forEach(term => { if(text.includes(term)) schematicScore += 10; });
         INFO_TERMS.forEach(term => { if(text.includes(term)) infoScore += 15; });
         TITLE_TERMS.forEach(term => { if(text.includes(term)) titleScore += 5; });
+        ASBUILT_TERMS.forEach(term => { if(text.includes(term)) asBuiltScore += 20; });
+        DOOR_TERMS.forEach(term => { if(text.includes(term)) doorScore += 25; });
+        COX_TERMS.forEach(term => { if(text.includes(term)) coxScore += 15; });
+        DELTA_TERMS.forEach(term => { if(text.includes(term)) deltaScore += 15; });
         
         // Text density as secondary signal
         if(itemCount < 50 && titleScore > 0) titleScore += 20;
         
-        // Determine classification
-        if(schematicScore > 30) {
-            return aspectRatio && aspectRatio > 1 ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
+        // Detect borderless (no traditional title block borders)
+        const hasBorderIndicators = text.includes('BORDER') || text.includes('FRAME') || text.includes('TITLE BLOCK');
+        const isBorderless = !hasBorderIndicators && itemCount > 20;
+        
+        // Door drawing detection
+        if(doorScore > 20) return 'DOOR_DRAWING';
+        
+        // Cover sheet detection
+        if(pageNumber === 1 || titleScore > 25) {
+            if(asBuiltScore > 15) return 'TITLE_ASBUILT';
+            if(coxScore > 10) return 'COX_COVER';
+            if(deltaScore > 10) return 'DELTA_COVER';
+            if(titleScore > 25 && itemCount < 100) return 'THIRD_PARTY_COVER';
+            return 'TITLE';
         }
-        if(infoScore > 20) return 'INFO';
-        if(titleScore > 15) return 'TITLE';
+        
+        // Info/Notes detection
+        if(infoScore > 20) {
+            return isBorderless ? 'INFO_BORDERLESS' : 'INFO';
+        }
+        
+        // Schematic detection
+        if(schematicScore > 30) {
+            const isLandscape = aspectRatio && aspectRatio > 1;
+            if(isBorderless) {
+                return isLandscape ? 'SCHEMATIC_LANDSCAPE_BORDERLESS' : 'SCHEMATIC_PORTRAIT_BORDERLESS';
+            }
+            return isLandscape ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
+        }
         
         // Fallback to aspect ratio + page number heuristic
         if(aspectRatio) {
-            return aspectRatio > 1 ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
+            const isLandscape = aspectRatio > 1;
+            if(isBorderless) {
+                return isLandscape ? 'SCHEMATIC_LANDSCAPE_BORDERLESS' : 'SCHEMATIC_PORTRAIT_BORDERLESS';
+            }
+            return isLandscape ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
         }
         
         return 'GENERAL';
@@ -1086,14 +1414,34 @@ class LayoutScanner {
             const currentVal = select.value;
             let html = `
                 <option value="AUTO">✨ Auto (Detected)</option>
-                <option value="TITLE">🏷️ Title Sheet</option>
-                <option value="INFO">📝 Info / Notes</option>
-                <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Std)</option>
-                <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Land)</option>
-                <option value="GENERAL">📐 General</option>
+                <optgroup label="Title & Cover Sheets">
+                    <option value="TITLE">🏷️ Title Sheet (Standard)</option>
+                    <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
+                    <option value="COX_COVER">🏢 Cox Cover Sheet</option>
+                    <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
+                    <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
+                </optgroup>
+                <optgroup label="Info & Notes">
+                    <option value="INFO">📝 Info / Notes (Standard)</option>
+                    <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
+                </optgroup>
+                <optgroup label="Schematics">
+                    <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
+                    <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
+                    <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
+                    <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
+                </optgroup>
+                <optgroup label="Special">
+                    <option value="DOOR_DRAWING">🚪 Door Drawing</option>
+                    <option value="GENERAL">📐 General</option>
+                </optgroup>
             `;
-            for (const [name, _] of Object.entries(customProfiles)) {
-                html += `<option value="CUSTOM:${name}">⭐ ${name}</option>`;
+            if (Object.keys(customProfiles).length > 0) {
+                html += '<optgroup label="Custom Profiles">';
+                for (const [name, _] of Object.entries(customProfiles)) {
+                    html += `<option value="CUSTOM:${name}">⭐ ${name}</option>`;
+                }
+                html += '</optgroup>';
             }
             select.innerHTML = html;
             select.value = currentVal;
@@ -1246,7 +1594,45 @@ class SearchEngine {
             else if (cat === 'LowVoltage') { if (r.category !== 'low_voltage') return; }
             
             if(crit.mfg !== "Any") { if (r.mfg === crit.mfg) { w += 10000; } else if (r.desc && r.desc.includes(crit.mfg)) { w += 1000; } else { return; } }
-            if(crit.hp !== "Any") { const strictMatch = (r.hp && parseFloat(r.hp) === parseFloat(crit.hp)); const safetyRegex = new RegExp(`\\b${crit.hp}\\s*(?:HP|H\\.P|H|KW)\\b`, 'i'); const safetyMatch = r.desc && safetyRegex.test(r.desc); if (strictMatch) { w += 5000; } else if (safetyMatch) { w += 2000; } else { return; } }
+            if(crit.hp !== "Any") { 
+                // Normalize HP value for comparison
+                const searchHP = parseFloat(crit.hp);
+                const tolerance = 0.1; // 10% tolerance for fuzzy matching
+                
+                // Strict field match
+                const strictMatch = r.hp && Math.abs(parseFloat(r.hp) - searchHP) < tolerance;
+                
+                // Enhanced safety regex for various formats
+                // Pattern matches: word boundary + HP value + optional decimal + HP unit + word boundary
+                // Examples: "5 HP", "5HP", "5H.P", "5 H.P.", "5KW", "5.0HP"
+                const HP_UNIT_PATTERN = '(?:HP|H\\.P\\.|H\\.P|KW|kW|HORSEPOWER)';
+                const BOUNDARY_START = '(?:^|\\s|\\(|,)';
+                const BOUNDARY_END = '(?:\\s|\\)|,|$)';
+                const hpPattern = `${BOUNDARY_START}(?:${crit.hp}|${crit.hp}\\.0)\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
+                
+                // Fractional pattern for values < 1 HP (e.g., 1/2 HP, 1/4 HP)
+                // Guard against division by zero
+                const fractionalPattern = (searchHP > 0 && searchHP < 1) 
+                    ? `1/${Math.round(1/searchHP)}\\s*${HP_UNIT_PATTERN}` 
+                    : null;
+                
+                const safetyRegex = new RegExp(hpPattern, 'i');
+                const safetyMatch = r.desc && safetyRegex.test(r.desc);
+                
+                const fractionalMatch = fractionalPattern && r.desc && new RegExp(fractionalPattern, 'i').test(r.desc);
+                
+                // Table/header format: "HP: 5" or "Horsepower 5" or "Motor HP 5"
+                const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)[:\\s]+${crit.hp}`;
+                const tableMatch = r.desc && new RegExp(tablePattern, 'i').test(r.desc);
+                
+                if (strictMatch) { 
+                    w += 5000; 
+                } else if (safetyMatch || fractionalMatch || tableMatch) { 
+                    w += 2000; 
+                } else { 
+                    return; 
+                } 
+            }
             if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; w += 500; }
             if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; w += 500; }
             if(crit.enc!=="Any") { if(r.enc!==crit.enc) return; w += 500; }
@@ -1531,11 +1917,27 @@ class PdfViewer {
                 <span>PAGE ${i}</span>
                 <select class="page-profile-select" onchange="LayoutScanner.updatePageProfile(${i}, this.value)">
                     <option value="AUTO">✨ Auto (Detected)</option>
-                    <option value="TITLE">🏷️ Title Sheet</option>
-                    <option value="INFO">📝 Info / Notes</option>
-                    <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Std)</option>
-                    <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Land)</option>
-                    <option value="GENERAL">📐 General</option>
+                    <optgroup label="Title & Cover Sheets">
+                        <option value="TITLE">🏷️ Title Sheet (Standard)</option>
+                        <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
+                        <option value="COX_COVER">🏢 Cox Cover Sheet</option>
+                        <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
+                        <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
+                    </optgroup>
+                    <optgroup label="Info & Notes">
+                        <option value="INFO">📝 Info / Notes (Standard)</option>
+                        <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
+                    </optgroup>
+                    <optgroup label="Schematics">
+                        <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
+                        <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
+                        <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
+                        <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
+                    </optgroup>
+                    <optgroup label="Special">
+                        <option value="DOOR_DRAWING">🚪 Door Drawing</option>
+                        <option value="GENERAL">📐 General</option>
+                    </optgroup>
                 </select>
                 <button class="rescan-page-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
             `;

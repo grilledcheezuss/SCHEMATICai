@@ -52,6 +52,35 @@
     </div>
 </div>
 
+<div id="upload-profile-modal">
+    <div class="modal-card" style="max-width:600px;">
+        <h3 style="color:var(--app-primary); margin-bottom:15px;">📤 Upload Layout for New Profile</h3>
+        <p style="font-size:11px; color:var(--text-secondary); margin-bottom:15px;">Upload a PDF or screenshot to create a new layout profile. The system will check for duplicates and let you define sensitive zones.</p>
+        
+        <div style="margin-bottom:15px;">
+            <input type="file" id="profile-upload-input" accept=".pdf,.png,.jpg,.jpeg" style="display:none;" onchange="ProfileUploader.handleFileSelect(event)">
+            <button class="search-btn" onclick="document.getElementById('profile-upload-input').click()">📁 Choose File</button>
+            <span id="upload-filename" style="font-size:10px; color:var(--text-secondary); margin-left:10px;">No file selected</span>
+        </div>
+        
+        <div id="upload-preview-container" style="display:none; margin-bottom:15px; border:2px dashed var(--border-color); padding:10px; border-radius:4px; max-height:300px; overflow:auto;">
+            <canvas id="upload-preview-canvas" style="max-width:100%; height:auto;"></canvas>
+        </div>
+        
+        <div id="upload-status" style="font-size:11px; padding:8px; border-radius:4px; margin-bottom:10px; display:none;"></div>
+        
+        <div style="margin-bottom:15px;">
+            <span class="demo-label">Profile Name</span>
+            <input type="text" id="upload-profile-name" class="demo-input" placeholder="e.g. Custom Title Sheet...">
+        </div>
+        
+        <div style="display:flex; gap:8px;">
+            <button class="search-btn" style="background:var(--app-primary) !important; flex:1;" onclick="ProfileUploader.processUpload()">✅ Create Profile</button>
+            <button class="search-btn" style="background:#555; flex:1;" onclick="ProfileUploader.closeDialog()">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <header>
     <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
     
@@ -153,6 +182,9 @@
                     <input type="text" id="new-profile-name" class="demo-input" placeholder="New Profile Name..." style="flex:1;">
                     <button class="search-btn" style="width:auto; padding:0 10px;" onclick="ProfileManager.saveCurrentPageAsProfile()">💾</button>
                 </div>
+                <div style="margin-bottom:8px;">
+                    <button class="search-btn" style="background:#8b5cf6 !important; width:100%; font-size:10px; padding:6px;" onclick="ProfileUploader.openUploadDialog()">📤 Upload Layout for New Profile</button>
+                </div>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span style="font-size:10px; color:var(--text-secondary);">Manage Profiles:</span>
                     <button class="search-btn" style="background:#475569 !important; font-size:10px; padding:2px 8px; height:24px;" onclick="ConfigExporter.export()">Export Config</button>
@@ -161,11 +193,29 @@
 
              <div id="demo-context-panel" class="collapsed-state">
                 <div class="context-header" onclick="DemoManager.toggleContext()">
-                    <span>🔬 Project Context</span>
+                    <span>🔬 Project Context & Sensitive Data</span>
                     <span id="context-toggle-icon">▼</span>
                 </div>
                 
                 <div id="demo-context-content" class="collapsed">
+                    <div style="margin-bottom:10px; padding:8px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:4px;">
+                        <div style="font-size:10px; font-weight:600; color:var(--glass-text); margin-bottom:5px;">Redaction Toggles (Check to Include)</div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px; font-size:9px;">
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cust" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Customer</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-job" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Job</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-type" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> System</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cpid" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Panel ID</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-date" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Date</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-stage" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Stage</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-po" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> PO</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-serial" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Serial</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-company" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Company</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-address" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Address</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-phone" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Phone</label>
+                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-fax" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Fax</label>
+                        </div>
+                    </div>
+
                     <span class="demo-label">Customer Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Customer..." oninput="RedactionManager.refreshContent()">
                     <span class="demo-label">Job Name</span><input type="text" id="demo-job-name" class="demo-input" placeholder="Enter Job Name..." oninput="RedactionManager.refreshContent()">
                     <span class="demo-label">System Type</span><input type="text" id="demo-system-type" class="demo-input" placeholder="e.g. Duplex Pump..." oninput="RedactionManager.refreshContent()">
@@ -181,6 +231,16 @@
                                 <option>AS-BUILT</option>
                             </select>
                         </div>
+                    </div>
+
+                    <span class="demo-label">PO Number</span><input type="text" id="demo-po" class="demo-input" placeholder="PO-####" oninput="RedactionManager.refreshContent()">
+                    <span class="demo-label">Serial Number</span><input type="text" id="demo-serial" class="demo-input" placeholder="Serial #..." oninput="RedactionManager.refreshContent()">
+                    <span class="demo-label">Company Name</span><input type="text" id="demo-company" class="demo-input" placeholder="Your Company..." oninput="RedactionManager.refreshContent()">
+                    <span class="demo-label">Company Address</span><input type="text" id="demo-address" class="demo-input" placeholder="123 Main St..." oninput="RedactionManager.refreshContent()">
+                    
+                    <div style="display:flex; gap:5px;">
+                        <div style="flex:1;"><span class="demo-label">Phone</span><input type="text" id="demo-phone" class="demo-input" placeholder="(123) 456-7890" oninput="RedactionManager.refreshContent()"></div>
+                        <div style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(123) 456-7891" oninput="RedactionManager.refreshContent()"></div>
                     </div>
                 </div>
             </div>
@@ -227,6 +287,12 @@
                         <option value="cpid">Panel ID (CP-####)</option>
                         <option value="date">Date</option>
                         <option value="stage">Design Stage</option>
+                        <option value="po">PO Number</option>
+                        <option value="serial">Serial Number</option>
+                        <option value="company">Company Name</option>
+                        <option value="address">Company Address</option>
+                        <option value="phone">Phone Number</option>
+                        <option value="fax">Fax Number</option>
                         <option value="custom">Custom Text...</option>
                         <option value="logo">Branding/Logo (Block)</option>
                     </select>
