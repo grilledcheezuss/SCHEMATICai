@@ -23,8 +23,6 @@ let IS_BUILDING_ML = false;
 const CACHE_DURATION = 1000 * 60 * 60; // 1 Hour
 
 const VOTE_THRESHOLD = 3;
-const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 1000;
 
 // --- EXACT DICTIONARIES ---
 const EXACT_MFGS = {
@@ -380,127 +378,6 @@ export default {
                 return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
             }
 
-            if (target === 'GET_PDF_URLS') {
-                const limitParam = parseInt(url.searchParams.get('limit') || String(DEFAULT_PAGE_SIZE));
-                const limit = Math.min(isNaN(limitParam) ? DEFAULT_PAGE_SIZE : limitParam, MAX_PAGE_SIZE);
-                const offset = url.searchParams.get('offset');
-                
-                // Build Airtable URL using URLSearchParams for better maintainability
-                const airtableParams = new URLSearchParams({
-                    pageSize: limit.toString()
-                });
-                airtableParams.append('fields[]', 'Control Panel Name');
-                airtableParams.append('fields[]', 'Control Panel PDF');
-                
-                if (offset) {
-                    airtableParams.append('offset', offset);
-                }
-                
-                const airtableUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?${airtableParams}`;
-                
-                const response = await fetch(airtableUrl, {
-                    headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` }
-                });
-                
-                if (!response.ok) {
-                    return new Response(JSON.stringify({ 
-                        success: false, 
-                        error: `Airtable API error: ${response.status}` 
-                    }), {
-                        status: response.status,
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                    });
-                }
-                
-                const data = await response.json();
-                
-                const pdfs = data.records
-                    .filter(record => {
-                        const pdf = record.fields['Control Panel PDF'];
-                        return pdf && Array.isArray(pdf) && pdf.length > 0;
-                    })
-                    .map(record => ({
-                        id: record.id,
-                        name: record.fields['Control Panel Name'],
-                        url: record.fields['Control Panel PDF'][0].url
-                    }));
-                
-                return new Response(JSON.stringify({
-                    success: true,
-                    count: pdfs.length,
-                    offset: data.offset || null,
-                    pdfs: pdfs
-                }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
-            }
-
-            if (target === 'ANALYZE_PDF') {
-                const pdfUrl = url.searchParams.get('url');
-                
-                if (!pdfUrl) {
-                    return new Response(JSON.stringify({ 
-                        success: false, 
-                        error: 'Missing required parameter: url' 
-                    }), {
-                        status: 400,
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                    });
-                }
-                
-                // SSRF Protection: Validate URL is from Airtable
-                const decodedUrl = decodeURIComponent(pdfUrl);
-                try {
-                    const urlObj = new URL(decodedUrl);
-                    const allowedDomains = ['dl.airtable.com', 'airtable.com'];
-                    
-                    if (!allowedDomains.some(domain => urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain))) {
-                        return new Response(JSON.stringify({ 
-                            success: false, 
-                            error: 'Invalid URL: Only Airtable URLs are allowed' 
-                        }), {
-                            status: 400,
-                            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                        });
-                    }
-                } catch (e) {
-                    return new Response(JSON.stringify({ 
-                        success: false, 
-                        error: 'Invalid URL format' 
-                    }), {
-                        status: 400,
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                    });
-                }
-                
-                // Fetch PDF
-                const pdfResponse = await fetch(decodedUrl);
-                
-                if (!pdfResponse.ok) {
-                    return new Response(JSON.stringify({ 
-                        success: false, 
-                        error: `Failed to fetch PDF: ${pdfResponse.status}` 
-                    }), {
-                        status: pdfResponse.status,
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                    });
-                }
-                
-                const pdfBytes = await pdfResponse.arrayBuffer();
-                
-                // Placeholder implementation - full PDF parsing would require additional libraries
-                // For now, return basic metadata and structure for future implementation
-                return new Response(JSON.stringify({
-                    success: true,
-                    url: decodedUrl,
-                    size: pdfBytes.byteLength,
-                    message: 'PDF analysis placeholder - full text extraction requires PDF parsing library',
-                    note: 'Consider client-side processing with PDF.js for detailed text extraction'
-                }), {
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
-            }
-
             // Immediately ready to authenticate!
             await ensureAuthAndFeedback();
 
@@ -517,213 +394,28 @@ export default {
 
             if (target === 'MAIN') {
                 const offset = url.searchParams.get('offset');
+                const direction = url.searchParams.get('sort[0][direction]') || 'desc';
                 const pageSize = url.searchParams.get('pageSize') || '100';
-                
-                // Option to force Main DB read (for testing/fallback)
-                const forceMainDB = url.searchParams.get('force_main') === 'true';
-                
-                if (forceMainDB) {
-                    // FALLBACK: Original logic (reads from Main DB, processes on-the-fly)
-                    const direction = url.searchParams.get('sort[0][direction]') || 'desc';
-                    let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${pageSize}` +
-                                  `&fields%5B%5D=Control%20Panel%20Name` +
-                                  `&fields%5B%5D=Items` +
-                                  `&fields%5B%5D=Control%20Panel%20PDF` +
-                                  `&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name` +
-                                  `&sort%5B0%5D%5Bdirection%5D=${direction}`;
-                    
-                    if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
-                    
-                    const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } });
-                    if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
-                    const mainJson = await mainResp.json();
-                    
-                    const activeRecords = (mainJson.records || []).map(r => {
-                        const rawId = String(r.fields['Control Panel Name'] || "");
-                        const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                        
-                        const rawItems = r.fields['Items'];
-                        const fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "").toUpperCase();
-                        
-                        const textToParse = fullDesc + " " + cleanId;
-                        const explicit = extractSpecsStrict(textToParse);
 
-                        let finalMfg = explicit.mfg;
-                        let finalEnc = explicit.enc;
-                        if (CACHE_NB_MODEL) {
-                            const bayesText = textToParse.slice(0, 1500); 
-                            if (!finalMfg) finalMfg = CACHE_NB_MODEL.predict(bayesText, 'mfg');
-                            if (!finalEnc) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
-                        }
+                let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${pageSize}` +
+                              `&fields%5B%5D=Control%20Panel%20Name` +
+                              `&fields%5B%5D=Items` +
+                              `&fields%5B%5D=Control%20Panel%20PDF` +
+                              `&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name` +
+                              `&sort%5B0%5D%5Bdirection%5D=${direction}`;
+                
+                if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
 
-                        let finalHp = explicit.hp;
-                        let finalVolt = explicit.volt;
-                        let finalPhase = explicit.phase;
-                        let finalCategory = null;
-
-                        const overrides = CACHE_HEALED[cleanId];
-                        if (overrides) {
-                            if (overrides.mfg) finalMfg = overrides.mfg;
-                            if (overrides.hp) finalHp = overrides.hp;
-                            if (overrides.volt) finalVolt = overrides.volt;
-                            if (overrides.phase) finalPhase = overrides.phase;
-                            if (overrides.enc) finalEnc = overrides.enc;
-                            if (overrides.category) finalCategory = overrides.category;
-                        }
-
-                        return {
-                            id: cleanId, displayId: "CP-" + cleanId, desc: fullDesc, pdfUrl: r.fields['Control Panel PDF']?.[0]?.url || "",
-                            mfg: finalMfg, hp: finalHp, volt: finalVolt, phase: finalPhase, enc: finalEnc, category: finalCategory,
-                            reject_keywords: overrides ? (overrides.reject_keywords || []) : []
-                        };
-                    });
-                    
-                    return new Response(JSON.stringify({ records: activeRecords, offset: mainJson.offset }), { 
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                    });
-                }
+                const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } });
+                if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
+                const mainJson = await mainResp.json();
                 
-                // PRIMARY PATH: Read from Golden DB (fast, pre-processed)
-                let goldenUrl = `https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_LEGACY}?pageSize=${pageSize}` +
-                                `&sort%5B0%5D%5Bfield%5D=Panel%20ID` +
-                                `&sort%5B0%5D%5Bdirection%5D=desc`;
-                
-                if (offset) goldenUrl += `&offset=${encodeURIComponent(offset)}`;
-                
-                const goldenResp = await fetch(goldenUrl, { headers: { 'Authorization': `Bearer ${KEY_READ_WRITE}` } });
-                
-                if (goldenResp.status === 429) {
-                    return new Response(JSON.stringify({ 
-                        error: "Rate Limited", 
-                        message: "Too many requests. Please wait and retry.",
-                        retry_after: 1
-                    }), { 
-                        status: 429, 
-                        headers: { 
-                            ...corsHeaders, 
-                            'Content-Type': 'application/json',
-                            'Retry-After': '1'
-                        } 
-                    });
-                }
-                
-                if (!goldenResp.ok) {
-                    // If Golden DB read fails, fall back to Main DB
-                    console.error(`Golden DB read failed: ${goldenResp.status}, falling back to Main DB`);
-                    return new Response(JSON.stringify({ 
-                        error: "Golden DB unavailable", 
-                        message: "Please rebuild using ?target=BUILD_GOLDEN",
-                        status: goldenResp.status
-                    }), { 
-                        status: 503, 
-                        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                    });
-                }
-                
-                const goldenJson = await goldenResp.json();
-                
-                // Data is already processed! Just apply healer overrides and format
-                const activeRecords = (goldenJson.records || []).map(r => {
-                    const cleanId = r.fields['Panel ID'] || '';
-                    const overrides = CACHE_HEALED[cleanId];
-                    
-                    // Use healer overrides if available, otherwise use Golden DB values
-                    return {
-                        id: cleanId,
-                        displayId: "CP-" + cleanId,
-                        desc: r.fields['Description'] || '',
-                        pdfUrl: r.fields['PDF URL'] || '',
-                        mfg: overrides?.mfg || r.fields['Manufacturer'],
-                        hp: overrides?.hp || r.fields['HP'],
-                        volt: overrides?.volt || r.fields['Voltage'],
-                        phase: overrides?.phase || r.fields['Phase'],
-                        enc: overrides?.enc || r.fields['Enclosure'],
-                        category: overrides?.category || null,
-                        confidence: r.fields['Confidence'] ?? 0,
-                        source: overrides ? 'healer' : (r.fields['Source'] || 'unknown'),
-                        reject_keywords: overrides?.reject_keywords || []
-                    };
-                });
-                
-                return new Response(JSON.stringify({ 
-                    records: activeRecords, 
-                    offset: goldenJson.offset,
-                    source: 'golden_db' 
-                }), { 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                });
-            }
-
-            if (target === 'BUILD_GOLDEN') {
-                // Security: Only allow authorized users
-                const u = request.headers.get('X-Cox-User');
-                const p = request.headers.get('X-Cox-Pass');
-                if (!CACHE_USERS || !CACHE_USERS.some(r => r.fields['Username']?.toLowerCase() === u?.toLowerCase() && r.fields['Passcode'] === p)) {
-                    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-                }
-                
-                console.log('🏗️ Building Golden DB...');
-                
-                // Fetch ALL records from Main DB (paginated)
-                let allRecords = [];
-                let offset = null;
-                let pages = 0;
-                const MAX_PAGES = 100; // Safety limit (~10,000 records max)
-                let fetchRetries = 0;
-                const MAX_FETCH_RETRIES = 5;
-                
-                do {
-                    let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=100` +
-                                  `&fields%5B%5D=Control%20Panel%20Name` +
-                                  `&fields%5B%5D=Items` +
-                                  `&fields%5B%5D=Control%20Panel%20PDF`;
-                    
-                    if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
-                    
-                    const resp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } });
-                    
-                    if (resp.status === 429) {
-                        fetchRetries++;
-                        if (fetchRetries >= MAX_FETCH_RETRIES) {
-                            console.error('Max fetch retries reached due to rate limiting');
-                            break;
-                        }
-                        await new Promise(r => setTimeout(r, 1000));
-                        continue;
-                    }
-                    
-                    fetchRetries = 0; // Reset retry counter on success
-                    
-                    if (!resp.ok) break;
-                    
-                    const data = await resp.json();
-                    allRecords.push(...(data.records || []));
-                    offset = data.offset;
-                    pages++;
-                    
-                    console.log(`📦 Fetched page ${pages}, total records: ${allRecords.length}`);
-                    
-                    // Rate limit: wait 200ms between requests (5 req/sec)
-                    if (offset) await new Promise(r => setTimeout(r, 200));
-                    
-                } while (offset && pages < MAX_PAGES);
-                
-                console.log(`✅ Fetched ${allRecords.length} total records from Main DB`);
-                
-                // Process each record
-                const processedRecords = [];
-                
-                for (const r of allRecords) {
+                const activeRecords = (mainJson.records || []).map(r => {
                     const rawId = String(r.fields['Control Panel Name'] || "");
                     const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                     
                     const rawItems = r.fields['Items'];
-                    const fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
-                    const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
-                    
-                    // Extract specs using existing regex logic
-                    const textToParse = fullDesc.toUpperCase() + " " + cleanId;
-                    const extracted = extractSpecsStrict(textToParse);
+                    const fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "").toUpperCase();
                     
                     const textToParse = fullDesc + " " + cleanId;
                     const explicit = extractSpecsStrict(textToParse);
@@ -755,102 +447,23 @@ export default {
                     let finalCategory = null;
 
                     const overrides = CACHE_HEALED[cleanId];
-                    if (overrides && Object.keys(overrides).length > 0) {
-                        // Healer overrides get 95-100 confidence
-                        if (overrides.mfg) extracted.mfg = overrides.mfg;
-                        if (overrides.hp) extracted.hp = overrides.hp;
-                        if (overrides.volt) extracted.volt = overrides.volt;
-                        if (overrides.phase) extracted.phase = overrides.phase;
-                        if (overrides.enc) extracted.enc = overrides.enc;
-                        confidence = 95;
-                        source = 'healer';
+                    if (overrides) {
+                        if (overrides.mfg) finalMfg = overrides.mfg;
+                        if (overrides.hp) finalHp = overrides.hp;
+                        if (overrides.volt) finalVolt = overrides.volt;
+                        if (overrides.phase) finalPhase = overrides.phase;
+                        if (overrides.enc) finalEnc = overrides.enc;
+                        if (overrides.category) finalCategory = overrides.category;
                     }
-                    
-                    processedRecords.push({
-                        fields: {
-                            'Panel ID': cleanId,
-                            'Description': fullDesc.substring(0, 100000), // Airtable long text limit
-                            'HP': extracted.hp || null,
-                            'Voltage': extracted.volt || null,
-                            'Phase': extracted.phase || null,
-                            'Manufacturer': extracted.mfg || null,
-                            'Enclosure': extracted.enc || null,
-                            'PDF URL': pdfUrl,
-                            'Confidence': confidence,
-                            'Source': source,
-                            'Last Updated': new Date().toISOString()
-                        }
-                    });
-                }
-                
-                console.log(`🔧 Processed ${processedRecords.length} records`);
-                
-                // Clear existing Legacy Panels table first (optional - comment out to append instead)
-                // Note: Airtable doesn't have a "delete all" API, so we'd need to fetch IDs first
-                // For now, we'll just overwrite/update existing records
-                
-                // Write to Legacy Panels (Golden DB) in batches of 10 (Airtable limit)
-                let written = 0;
-                let updated = 0;
-                let failed = 0;
-                
-                for (let i = 0; i < processedRecords.length; i += 10) {
-                    const batch = processedRecords.slice(i, i + 10);
-                    
-                    // Note: Current implementation creates new records on each run
-                    // For production, implement upsert logic to update existing records
-                    
-                    try {
-                        const writeResp = await fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_LEGACY}`, {
-                            method: 'POST',
-                            headers: { 
-                                'Authorization': `Bearer ${KEY_READ_WRITE}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ 
-                                records: batch,
-                                typecast: true // Auto-convert types
-                            })
-                        });
-                        
-                        if (writeResp.status === 429) {
-                            await new Promise(r => setTimeout(r, 1000));
-                            // Don't increment i in this iteration - retry the same batch
-                            i -= 10;
-                            continue;
-                        }
-                        
-                        if (writeResp.ok) {
-                            const result = await writeResp.json();
-                            written += result.records?.length || 0;
-                        } else {
-                            console.error(`Write failed: ${writeResp.status}`);
-                            failed += batch.length;
-                        }
-                    } catch (e) {
-                        console.error('Write error:', e);
-                        failed += batch.length;
-                    }
-                    
-                    // Rate limit: 5 req/sec
-                    await new Promise(r => setTimeout(r, 200));
-                    
-                    // Log progress every 100 records
-                    if ((i + 10) % 100 === 0) {
-                        console.log(`💾 Progress: ${i + 10}/${processedRecords.length} (${written} written, ${failed} failed)`);
-                    }
-                }
-                
-                console.log('✅ Golden DB build complete!');
-                
-                return new Response(JSON.stringify({ 
-                    success: true,
-                    total_fetched: allRecords.length,
-                    total_processed: processedRecords.length,
-                    written: written,
-                    failed: failed,
-                    timestamp: new Date().toISOString()
-                }), { 
+
+                    return {
+                        id: cleanId, displayId: "CP-" + cleanId, desc: fullDesc, pdfUrl: r.fields['Control Panel PDF']?.[0]?.url || "",
+                        mfg: finalMfg, hp: finalHp, volt: finalVolt, phase: finalPhase, enc: finalEnc, category: finalCategory,
+                        reject_keywords: overrides ? (overrides.reject_keywords || []) : []
+                    };
+                });
+
+                return new Response(JSON.stringify({ records: activeRecords, offset: mainJson.offset }), { 
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
                 });
             }
