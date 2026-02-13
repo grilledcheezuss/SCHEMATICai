@@ -59,7 +59,7 @@ const STOP_WORDS = new Set(['PANEL','CONTROL','PUMP','MOTOR','VOLT','VAC','PHASE
 // CAD software (AutoCAD, etc.) uses control codes like %%U (underline), %%O (overline), etc.
 // These codes prevent regex parsing (e.g., "%%U7.5HP" won't match HP patterns)
 function normalizeCADText(text) {
-    if (!text || typeof text !== 'string') return text;
+    if (!text || typeof text !== 'string') return '';
     // Strip common CAD control codes:
     // - %%X (single letter): %%U, %%O, %%D (degree), %%P (plus/minus), %%C (diameter), etc.
     // - %%nnn (exactly 3 digits): ASCII character codes like %%175
