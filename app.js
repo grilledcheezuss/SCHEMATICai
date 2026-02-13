@@ -4,8 +4,6 @@ const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev";
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 window.TEMPLATE_BYTES = null;
-window.BORDER_INFO_BYTES = null;
-window.BORDER_STD_BYTES = null;
 
 const LAYOUT_RULES = {
     TITLE: [
@@ -138,9 +136,7 @@ class DataLoader {
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 PREPARING...";
         
         const loads = [
-            fetch('cover_sheet_template.pdf').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.TEMPLATE_BYTES=b; console.log("✅ PDF Template Loaded");}).catch(e=>console.warn("⚠️ PDF Template Missing")),
-            fetch('border_info.png').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.BORDER_INFO_BYTES=b; console.log("✅ Info Border Loaded");}).catch(e=>console.warn("⚠️ Info Border Missing")),
-            fetch('border_standard.png').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.BORDER_STD_BYTES=b; console.log("✅ Std Border Loaded");}).catch(e=>console.warn("⚠️ Std Border Missing"))
+            fetch('cover_sheet_template.pdf').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.TEMPLATE_BYTES=b; console.log("✅ PDF Template Loaded");}).catch(e=>console.warn("⚠️ PDF Template Missing"))
         ];
         await Promise.allSettled(loads);
 
@@ -645,9 +641,7 @@ class RedactionManager {
     static clearAll() { document.querySelectorAll('.redaction-layer').forEach(l => l.innerHTML = ''); this.zones = []; this.deselect(); }
 }
 
-class RedactionEditor { static close() { RedactionManager.deselect(); } }
-
-class PageClassifier { 
+class PageClassifier {
     static classify(textContent, aspectRatio = null) { 
         const text = textContent.items.map(i => i.str).join(' ').toUpperCase(); 
         const itemCount = textContent.items.length;
@@ -1363,15 +1357,8 @@ class PdfExporter {
                 const remainingIndices = Array.from({ length: mainPdfDoc.getPageCount() - 1 }, (_, i) => i + 1);
                 const remainingPages = await compositeDoc.copyPages(mainPdfDoc, remainingIndices);
                 
-                let infoImg, stdImg;
-                if(window.BORDER_INFO_BYTES) infoImg = await compositeDoc.embedPng(window.BORDER_INFO_BYTES.slice(0));
-                if(window.BORDER_STD_BYTES) stdImg = await compositeDoc.embedPng(window.BORDER_STD_BYTES.slice(0));
-
-                remainingPages.forEach((p, idx) => {
-                    const newPage = compositeDoc.addPage(p);
-                    const { width, height } = newPage.getSize();
-                    if (idx === 0 && infoImg) { newPage.drawImage(infoImg, { x: 0, y: 0, width, height }); } 
-                    else if (stdImg) { newPage.drawImage(stdImg, { x: 0, y: 0, width, height }); }
+                remainingPages.forEach((p) => {
+                    compositeDoc.addPage(p);
                 });
             }
 
@@ -1528,16 +1515,6 @@ class PdfViewer {
              coverDoc = await tTask.promise;
         }
 
-        let infoImgUrl, stdImgUrl;
-        if (window.BORDER_INFO_BYTES) {
-            const blob = new Blob([window.BORDER_INFO_BYTES.slice(0)], { type: "image/png" });
-            infoImgUrl = URL.createObjectURL(blob);
-        }
-        if (window.BORDER_STD_BYTES) {
-            const blob = new Blob([window.BORDER_STD_BYTES.slice(0)], { type: "image/png" });
-            stdImgUrl = URL.createObjectURL(blob);
-        }
-
         for (let i = 1; i <= this.doc.numPages; i++) {
             await new Promise(r => setTimeout(r, 10)); 
             let page; let isTemplate = false;
@@ -1572,12 +1549,6 @@ class PdfViewer {
             const canvas = document.createElement('canvas'); canvas.className = 'pdf-page-canvas';
             canvas.width = viewport.width; canvas.height = viewport.height; 
             
-            if (DemoManager.isGeneratorActive && !isTemplate) { 
-                const img = document.createElement('img'); img.className = 'pdf-border-overlay';
-                if (i === 2 && infoImgUrl) img.src = infoImgUrl; else if (i > 2 && stdImgUrl) img.src = stdImgUrl;
-                if (img.src) contentContainer.appendChild(img);
-            }
-
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
             

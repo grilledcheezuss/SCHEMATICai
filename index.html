@@ -238,14 +238,12 @@
             </div>
             
             <div style="margin-top:auto; display:flex; flex-direction:column; gap:5px;">
+                <button class="search-btn" style="background:var(--app-accent) !important;" onclick="SmartScanner.scanAllPages()">🔍 Auto-Scan Pages</button>
                 <div style="display:flex; gap:5px;">
                     <button class="search-btn" style="background:var(--app-primary) !important;" onclick="RedactionManager.addZoneToCurrentView('custom')">➕ Text</button>
                     <button class="search-btn" style="background:var(--match-green-bg) !important;" onclick="RedactionManager.addZoneToCurrentView('blocker')">➕ Whiteout</button>
                 </div>
-                
                 <button class="search-btn" style="background:#dc2626 !important;" onclick="RedactionManager.deleteSelected()">❌ Delete Selected</button>
-                
-                <button class="search-btn" style="background:var(--app-accent) !important; margin-top:5px;" onclick="SmartScanner.scanAllPages()">📄 Auto-Scan Page</button>
                 <button class="search-btn" style="background:#475569 !important;" onclick="PdfExporter.export()">💾 Export Redacted PDF</button>
                 <button class="search-btn" style="background:#555;" onclick="RedactionManager.clearAll()">🗑️ Clear All</button>
             </div>
