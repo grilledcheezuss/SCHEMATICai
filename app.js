@@ -1200,7 +1200,13 @@ class SmartScanner {
             return;
         }
         
-        console.log(`🔍 Starting scan of ${PdfViewer.doc.numPages} pages...`);
+        const numPages = PdfViewer.doc?.numPages || 0;
+        if(numPages === 0) {
+            console.error('❌ Cannot scan: PDF has no pages');
+            return;
+        }
+        
+        console.log(`🔍 Starting scan of ${numPages} pages...`);
         
         const btn = document.querySelector('button[onclick="SmartScanner.scanAllPages()"]');
         const origText = btn ? btn.innerText : "";
@@ -1210,8 +1216,8 @@ class SmartScanner {
         let ocrPages = 0;
         
         try {
-            console.log(`📄 Scanning ${PdfViewer.doc.numPages} pages...`);
-            for(let i = 1; i <= PdfViewer.doc.numPages; i++) {
+            console.log(`📄 Scanning ${numPages} pages...`);
+            for(let i = 1; i <= numPages; i++) {
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
                 if(!wrapper) continue;
                 
@@ -1268,7 +1274,7 @@ class SmartScanner {
             
             // Show summary
             if(btn) {
-                const summary = `✅ Scanned ${PdfViewer.doc.numPages} pages (${textPages} text, ${ocrPages} OCR)`;
+                const summary = `✅ Scanned ${numPages} pages (${textPages} text, ${ocrPages} OCR)`;
                 btn.innerText = summary;
                 setTimeout(() => { btn.innerText = origText; }, 3000);
             }
