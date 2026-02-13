@@ -10,6 +10,9 @@ const REDACTION_CHECKBOX_IDS = [
     'toggle-company', 'toggle-address', 'toggle-phone', 'toggle-fax'
 ];
 
+// Preloading configuration
+const PRELOAD_START_DELAY_MS = 500; // Delay before starting preload after search completes
+
 window.TEMPLATE_BYTES = null;
 
 const LAYOUT_RULES = {
@@ -1701,7 +1704,7 @@ class SearchEngine {
         if (res.length > 0) {
             setTimeout(() => {
                 PdfController.preloadSearchResults(res);
-            }, 500);
+            }, PRELOAD_START_DELAY_MS);
         }
     }
 
@@ -2112,7 +2115,10 @@ class PdfViewer {
         } else {
             // Auto-scan if any redaction checkboxes are enabled
             setTimeout(() => {
-                const anyChecked = REDACTION_CHECKBOX_IDS.some(id => document.getElementById(id)?.checked);
+                const anyChecked = REDACTION_CHECKBOX_IDS.some(id => {
+                    const el = document.getElementById(id);
+                    return el && el.type === 'checkbox' && el.checked;
+                });
                 
                 if (anyChecked) {
                     SmartScanner.scanAllPages();
@@ -2127,7 +2133,7 @@ class PdfController {
     static pdfCache = new Map(); // Cache for preloaded PDFs
     static preloadQueue = [];
     static isPreloading = false;
-    static PRELOAD_DELAY_MS = 250; // Delay between preload requests (250ms for better performance)
+    static PRELOAD_DELAY_MS = 250; // Delay between preload requests to avoid overwhelming browser/network
     static CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
     static CACHE_MAX_SIZE = 20; // Maximum number of PDFs to cache
 
@@ -2199,19 +2205,26 @@ class PdfController {
         const now = Date.now();
         
         // First, remove expired entries
+        const toDelete = [];
         for (const [id, cached] of this.pdfCache.entries()) {
             if (now - cached.timestamp > this.CACHE_MAX_AGE_MS) {
-                this.pdfCache.delete(id);
+                toDelete.push(id);
             }
         }
+        toDelete.forEach(id => this.pdfCache.delete(id));
         
-        // If still over size limit, remove oldest entries (LRU eviction)
+        // If still over size limit, remove oldest entries (simple LRU eviction)
         if (this.pdfCache.size > this.CACHE_MAX_SIZE) {
-            const sortedEntries = Array.from(this.pdfCache.entries())
-                .sort((a, b) => a[1].timestamp - b[1].timestamp);
+            // Find oldest entries to remove
+            const entries = Array.from(this.pdfCache.entries());
+            const numToRemove = this.pdfCache.size - this.CACHE_MAX_SIZE;
             
-            const toRemove = sortedEntries.slice(0, this.pdfCache.size - this.CACHE_MAX_SIZE);
-            toRemove.forEach(([id]) => this.pdfCache.delete(id));
+            // Simple sort only on the entries we need to examine
+            entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+            
+            for (let i = 0; i < numToRemove; i++) {
+                this.pdfCache.delete(entries[i][0]);
+            }
         }
     }
 }
