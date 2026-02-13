@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICai WORKER v2.5.0 (Instant Sync & Background ML)
+// 🧠 SCHEMATICA ai WORKER v2.4.4 (Instant Sync & Background ML)
 // ==========================================
 
 const KEY_READ_WRITE = "patVooLrBRWad4TAs.90ec7ef74526de7d40d9718240e4c98bfd8fcc786ada7ac6cfbb632796e8d24e"; 
@@ -371,6 +371,58 @@ export default {
             if (target === 'PDF') {
                 const pdfUrl = url.searchParams.get('url');
                 if (!pdfUrl) return new Response("Missing URL", { status: 400, headers: corsHeaders });
+                const pdfResponse = await fetch(pdfUrl);
+                const newHeaders = new Headers(pdfResponse.headers);
+                newHeaders.set('Access-Control-Allow-Origin', '*');
+                newHeaders.set('Content-Type', 'application/pdf');
+                return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+            }
+
+            if (target === 'PDF_BY_ID') {
+                const panelId = url.searchParams.get('id');
+                if (!panelId) return new Response("Missing ID", { status: 400, headers: corsHeaders });
+                
+                // Normalize the panel ID - remove CP- prefix, .dwg, .pdf extensions
+                const cleanId = panelId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').trim();
+                
+                // Try multiple variations to find the record (most likely to least likely)
+                // This typically matches on the first try with cleanId
+                const variations = [
+                    cleanId,
+                    `CP-${cleanId}`,
+                    `${cleanId}.dwg`,
+                    `${cleanId}.pdf`,
+                    `CP-${cleanId}.dwg`,
+                    `CP-${cleanId}.pdf`
+                ];
+                
+                let pdfUrl = null;
+                
+                // Search for the record in the main database
+                for (const variant of variations) {
+                    const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
+                                    `filterByFormula=${encodeURIComponent(`{Control Panel Name}="${variant}"`)}` +
+                                    `&fields%5B%5D=Control%20Panel%20PDF`;
+                    
+                    const searchResp = await fetch(searchUrl, { 
+                        headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } 
+                    });
+                    
+                    if (!searchResp.ok) continue;
+                    
+                    const searchData = await searchResp.json();
+                    if (searchData.records && searchData.records.length > 0) {
+                        const record = searchData.records[0];
+                        pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
+                        if (pdfUrl) break;
+                    }
+                }
+                
+                if (!pdfUrl) {
+                    return new Response("PDF not found for panel ID", { status: 404, headers: corsHeaders });
+                }
+                
+                // Fetch and stream the PDF
                 const pdfResponse = await fetch(pdfUrl);
                 const newHeaders = new Headers(pdfResponse.headers);
                 newHeaders.set('Access-Control-Allow-Origin', '*');

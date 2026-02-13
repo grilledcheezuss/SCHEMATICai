@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v2.4.3 (Strict Keyword Boundaries) ---
-const APP_VERSION = "v2.4.3";
+// --- SCHEMATICA ai v2.4.4 (Strict Keyword Boundaries) ---
+const APP_VERSION = "v2.4.4";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
@@ -1830,6 +1830,71 @@ class PdfViewer {
     static currentFetchId = 0;
     static loadingTask = null;
 
+    static async loadById(panelId, fallbackUrl) {
+        // Load PDF by panel ID via worker (fetches fresh attachment URL from Airtable)
+        this.url = fallbackUrl || "";
+        document.getElementById('pdf-fallback').style.display = 'none'; 
+        document.getElementById('pdf-toolbar').style.display = 'none';
+        document.getElementById('custom-pdf-viewer').style.display = 'none'; 
+        document.getElementById('pdf-viewer-frame').style.display = 'none';
+        document.getElementById('pdf-placeholder-text').style.display = 'flex';
+        document.getElementById('pdf-placeholder-text').innerText = "⏳ DOWNLOADING PDF...";
+
+        const fetchId = Date.now();
+        this.currentFetchId = fetchId;
+
+        try {
+            if (this.loadingTask) {
+                await this.loadingTask.destroy().catch(()=>{});
+                this.loadingTask = null;
+            }
+
+            // Use the new PDF_BY_ID endpoint
+            const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(panelId)}`;
+            const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+            
+            if (!resp.ok) {
+                throw new Error(`Failed to fetch PDF by ID: ${resp.status}`);
+            }
+            
+            const arrayBuffer = await resp.arrayBuffer();
+
+            if (this.currentFetchId !== fetchId) return; 
+
+            const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentBlobUrl = URL.createObjectURL(blob);
+            
+            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+            this.doc = await this.loadingTask.promise; 
+
+            if (window.innerWidth < 768) {
+                 this.currentScale = 0.8;
+                 UI.toggleSearch(true); 
+            } else {
+                 this.currentScale = 1.1;
+            }
+
+            document.getElementById('pdf-placeholder-text').style.display = 'none';
+            document.getElementById('pdf-toolbar').style.display = 'flex';
+            document.getElementById('custom-pdf-viewer').style.display = 'flex';
+
+            await this.renderStack(); 
+        } catch(e) {
+            if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
+                console.log('PDF Load Cancelled (Fast Click)');
+            } else {
+                console.error("PDF Load Error:", e);
+                document.getElementById('pdf-placeholder-text').style.display = 'none';
+                document.getElementById('pdf-fallback').style.display = 'block';
+                // Set fallback link to the cached URL if available
+                if (fallbackUrl) {
+                    document.getElementById('pdf-fallback-link').href = fallbackUrl;
+                }
+            }
+        }
+    }
+
     static async load(url) {
         this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; 
@@ -1976,8 +2041,16 @@ class PdfController {
         document.getElementById('pdf-placeholder-text').style.display = 'none';
         const rec = window.ID_MAP.get(id);
         if(rec && rec.displayId) { document.getElementById('demo-panel-id').value = rec.displayId; }
-        if (!url) { document.getElementById('pdf-fallback').style.display = 'block'; return; }
-        PdfViewer.load(url);
+        
+        // Load PDF by panel ID via worker (Option 1)
+        if (!id) { 
+            document.getElementById('pdf-fallback').style.display = 'block'; 
+            if (url) document.getElementById('pdf-fallback-link').href = url;
+            return; 
+        }
+        
+        // Pass panel ID and fallback URL to PdfViewer
+        PdfViewer.loadById(id, url);
     }
 }
 
