@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.1 (Control Panel Fixes) ---
-const APP_VERSION = "v2.5.1";
+// --- SCHEMATICA ai v2.5.2 (Control Panel Tab Organization + Redaction Box Visibility) ---
+const APP_VERSION = "v2.5.2";
 const VERSION_HISTORY = {
+    "v2.5.2": "Fixed Control Panel tabs organization, CSS for redaction boxes, version sync",
     "v2.5.1": "Fixed Control Panel: redaction boxes now appear, page dropdown works, added tabbed UI",
     "v2.5.0": "Refactored Control Panel - functional checkboxes, page-aware UI",
     "v2.4.5": "Fixed PDF scanning errors and preload conflicts",
@@ -865,17 +866,17 @@ class RedactionManager {
         let container = wrapper.querySelector('.pdf-content-container');
         if (!container && wrapper.classList.contains('pdf-content-container')) container = wrapper;
         if (!container) {
-            console.warn('createZoneOnWrapper: No container found');
+            console.error('❌ Container not found for zone creation');
             return;
         }
 
         const layer = container.querySelector('.redaction-layer'); 
         if(!layer) {
-            console.warn('createZoneOnWrapper: No redaction layer found');
+            console.error('❌ Redaction layer not found');
             return;
         }
         
-        console.log(`Creating zone: ${mapKey} at (${Math.round(x)}, ${Math.round(y)})`);
+        console.log(`✅ Creating zone: ${mapKey} at (${Math.round(x)}, ${Math.round(y)}) size: ${Math.round(w)}x${Math.round(h)}`);
         
         const box = document.createElement('div'); box.className = 'redaction-box';
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
@@ -901,7 +902,7 @@ class RedactionManager {
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
         box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box);
         
-        console.log(`✅ Zone created: ${mapKey}, total zones: ${this.zones.length}`);
+        console.log(`📦 Total zones: ${this.zones.length}, Layer children: ${layer.children.length}`);
         
         return box;
     }
@@ -1195,9 +1196,17 @@ class SmartScanner {
         console.log('🔍 Auto-scanning PDF pages...');
         RedactionManager.clearAll(); 
         if(!PdfViewer.isDocumentValid()) {
-            console.warn('Cannot scan: PDF document is not loaded or invalid');
+            console.error('❌ Cannot scan: PDF document is not loaded or invalid');
             return;
         }
+        
+        const numPages = PdfViewer.doc?.numPages || 0;
+        if(numPages === 0) {
+            console.error('❌ Cannot scan: PDF has no pages');
+            return;
+        }
+        
+        console.log(`🔍 Starting scan of ${numPages} pages...`);
         
         const btn = document.querySelector('button[onclick="SmartScanner.scanAllPages()"]');
         const origText = btn ? btn.innerText : "";
@@ -1207,8 +1216,8 @@ class SmartScanner {
         let ocrPages = 0;
         
         try {
-            console.log(`📄 Scanning ${PdfViewer.doc.numPages} pages...`);
-            for(let i = 1; i <= PdfViewer.doc.numPages; i++) {
+            console.log(`📄 Scanning ${numPages} pages...`);
+            for(let i = 1; i <= numPages; i++) {
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
                 if(!wrapper) continue;
                 
@@ -1260,9 +1269,12 @@ class SmartScanner {
             
             RedactionManager.refreshContent();
             
+            console.log(`✅ Scan complete. Created zones on ${textPages + ocrPages} pages`);
+            console.log(`📊 Total zones in manager: ${RedactionManager.zones.length}`);
+            
             // Show summary
             if(btn) {
-                const summary = `✅ Scanned ${PdfViewer.doc.numPages} pages (${textPages} text, ${ocrPages} OCR)`;
+                const summary = `✅ Scanned ${numPages} pages (${textPages} text, ${ocrPages} OCR)`;
                 btn.innerText = summary;
                 setTimeout(() => { btn.innerText = origText; }, 3000);
             }
@@ -2330,6 +2342,10 @@ class PdfViewer {
             contentContainer.appendChild(rLayer); 
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
+            
+            console.log(`📄 Created layer structure for page ${i}`);
+            console.log(`  - Container: ${contentContainer.offsetWidth}x${contentContainer.offsetHeight}`);
+            console.log(`  - Redaction layer: ${rLayer.offsetWidth}x${rLayer.offsetHeight}`);
 
             // Add null check for canvas context
             const ctx = canvas.getContext('2d');
@@ -2646,6 +2662,12 @@ window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set(); 
 
 document.addEventListener('DOMContentLoaded', () => { 
     try {
+        // Sync version in header
+        const versionEl = document.getElementById('app-version');
+        if (versionEl) {
+            versionEl.textContent = APP_VERSION;
+        }
+        
         UI.init(); 
         if(AuthService.init()) { 
             DataLoader.preload(); 

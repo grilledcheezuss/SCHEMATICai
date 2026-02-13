@@ -393,28 +393,46 @@ body.demo-mode .page-toolbar { display: flex; }
     cursor: help;
 }
 
+/* CRITICAL: Ensure PDF content container and layers are properly positioned */
 .pdf-content-container {
-    position: relative; 
+    position: relative !important; 
     width: 100%;
     height: auto;
 }
 
-.pdf-page-canvas { display: block; width: 100%; height: 100%; }
+.pdf-page-canvas { 
+    display: block; 
+    width: 100%; 
+    height: 100%;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 1 !important; /* Below redaction layer */
+}
 
 body.gen-minimized .page-toolbar { display: none !important; }
 body.gen-minimized .redaction-box { border: none !important; pointer-events: none !important; }
 body.gen-minimized .redaction-resize-handle { display: none !important; }
 body.gen-minimized .redaction-box.selected { border: none !important; z-index: 20 !important; }
 
+/* CRITICAL: Redaction layer must be visible and interactive */
+/* Z-index hierarchy: PDF canvas (1) < redaction-layer (10) < redaction-box (15) < selected box (100) */
 .redaction-layer { 
     display: none; 
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-    z-index: 50; 
-    pointer-events: none; 
+    position: absolute !important; 
+    top: 0 !important; 
+    left: 0 !important; 
+    width: 100% !important; 
+    height: 100% !important; 
+    z-index: 10 !important; /* Above PDF canvas (z-index: 1) */
+    pointer-events: auto !important; /* Must be able to interact */
 } 
 
-body.demo-mode .redaction-layer { display: block; } 
+body.demo-mode .redaction-layer { 
+    display: block !important; 
+} 
 
+/* CRITICAL: Redaction boxes must be visible in editor mode */
 .redaction-box { 
     position: absolute; 
     background: transparent; 
@@ -422,11 +440,17 @@ body.demo-mode .redaction-layer { display: block; }
     font-size: 14px; 
     font-family: 'Times New Roman', serif; 
     font-weight: bold; 
-    display: flex; align-items: center; justify-content: center; text-align: center; 
+    display: flex !important; /* NOT hidden */
+    align-items: center; 
+    justify-content: center; 
+    text-align: center; 
     overflow: hidden; 
-    z-index: 20; 
+    z-index: 15 !important; 
     border: none; 
     pointer-events: none; 
+    box-sizing: border-box !important;
+    min-width: 20px;
+    min-height: 20px;
 } 
 
 .redaction-box[data-transparent="false"] { 
@@ -435,18 +459,21 @@ body.demo-mode .redaction-layer { display: block; }
 }
 
 body.editor-active .redaction-box { 
-    pointer-events: auto; 
+    pointer-events: auto !important; 
     cursor: grab !important; 
-    border: 1px dashed var(--app-primary); 
+    border: 2px solid #9333ea !important; /* Purple border - highly visible */
+    background: rgba(147, 51, 234, 0.15) !important; /* Semi-transparent purple */
 }
 body.editor-active .redaction-box[data-transparent="true"] {
-    background: rgba(70, 29, 124, 0.05);
+    background: rgba(147, 51, 234, 0.15) !important;
 }
 
 body.editor-active .redaction-box:active { cursor: grabbing !important; } 
 
 body.editor-active .redaction-box.selected { 
-    border: 2px solid blue !important; 
+    border-color: #ec4899 !important; /* Pink when selected */
+    background: rgba(236, 72, 153, 0.2) !important;
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.5) !important;
     z-index: 100 !important; 
 }
 
