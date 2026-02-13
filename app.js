@@ -2133,8 +2133,7 @@ class PdfViewer {
                 }
             }
         }
-        }
-        if(DemoManager.isGeneratorActive) { 
+        if(DemoManager.isGeneratorActive) {
             setTimeout(() => {
                 LayoutScanner.refreshProfileOptions();
                 SmartScanner.scanAllPages();
