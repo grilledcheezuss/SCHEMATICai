@@ -1031,7 +1031,10 @@ class SmartScanner {
     
     static async scanAllPages() {
         RedactionManager.clearAll(); 
-        if(!PdfViewer.doc) return;
+        if(!PdfViewer.doc || !PdfViewer.isDocumentValid()) {
+            console.warn('Cannot scan: PDF document is not loaded or invalid');
+            return;
+        }
         
         const btn = document.querySelector('button[onclick="SmartScanner.scanAllPages()"]');
         const origText = btn ? btn.innerText : "";
@@ -1046,6 +1049,12 @@ class SmartScanner {
                 if(!wrapper) continue;
                 
                 if(btn) btn.innerText = `🔍 ANALYZING PAGE ${i}/${PdfViewer.doc.numPages}...`;
+                
+                // Validate document is still valid before getPage()
+                if(!PdfViewer.isDocumentValid()) {
+                    console.warn('PDF document became invalid during scan');
+                    break;
+                }
                 
                 // Try fast path first
                 const page = await PdfViewer.doc.getPage(i);
@@ -1344,7 +1353,10 @@ class SmartScanner {
     }
     
     static async rescanPage(pageNum) {
-        if(!PdfViewer.doc) return;
+        if(!PdfViewer.doc || !PdfViewer.isDocumentValid()) {
+            console.warn('Cannot rescan: PDF document is not loaded or invalid');
+            return;
+        }
         
         const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${pageNum}"]`);
         if(!wrapper) return;
@@ -1357,6 +1369,12 @@ class SmartScanner {
             // Clear existing zones on this page
             const layer = wrapper.querySelector('.redaction-layer');
             if(layer) layer.innerHTML = '';
+            
+            // Validate document is still valid before getPage()
+            if(!PdfViewer.isDocumentValid()) {
+                console.warn('PDF document is invalid, cannot rescan');
+                return;
+            }
             
             // Run smart scan on this page only
             const page = await PdfViewer.doc.getPage(pageNum);
@@ -1865,6 +1883,10 @@ class PdfViewer {
     static currentFetchId = 0;
     static loadingTask = null;
 
+    static isDocumentValid() {
+        return this.doc && !this.doc.destroyed;
+    }
+
     static async loadById(panelId, fallbackUrl) {
         // Load PDF by panel ID via worker (fetches fresh attachment URL from Airtable)
         this.url = fallbackUrl || "";
@@ -1889,6 +1911,15 @@ class PdfViewer {
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             
             if (!resp.ok) {
+                if (resp.status === 404) {
+                    console.warn(`PDF not found for panel ${panelId} (404)`);
+                    document.getElementById('pdf-placeholder-text').style.display = 'none';
+                    document.getElementById('pdf-fallback').style.display = 'block';
+                    if (fallbackUrl) {
+                        document.getElementById('pdf-fallback-link').href = fallbackUrl;
+                    }
+                    return; // Exit gracefully
+                }
                 throw new Error(`Failed to fetch PDF by ID: ${resp.status}`);
             }
             
@@ -1960,6 +1991,11 @@ class PdfViewer {
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
             this.doc = await this.loadingTask.promise; 
+
+            // Verify document is valid before continuing
+            if (!this.isDocumentValid()) {
+                throw new Error('Loaded PDF document is invalid');
+            }
 
             if (window.innerWidth < 768) {
                  this.currentScale = 0.8;
@@ -2207,6 +2243,11 @@ class PdfController {
             try {
                 const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(result.id)}`;
                 const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+                
+                if (resp.status === 404) {
+                    console.warn(`Skipping preload: PDF not found for ${result.displayId || result.id}`);
+                    continue; // Skip this one, continue with others
+                }
                 
                 if (resp && resp.ok) {
                     const arrayBuffer = await resp.arrayBuffer();
