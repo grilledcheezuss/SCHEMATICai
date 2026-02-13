@@ -3,6 +3,13 @@ const APP_VERSION = "v2.4.4";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
+// Redaction checkbox IDs used for auto-scan detection
+const REDACTION_CHECKBOX_IDS = [
+    'toggle-cust', 'toggle-job', 'toggle-type', 'toggle-cpid', 
+    'toggle-date', 'toggle-stage', 'toggle-po', 'toggle-serial',
+    'toggle-company', 'toggle-address', 'toggle-phone', 'toggle-fax'
+];
+
 window.TEMPLATE_BYTES = null;
 
 const LAYOUT_RULES = {
@@ -2105,10 +2112,7 @@ class PdfViewer {
         } else {
             // Auto-scan if any redaction checkboxes are enabled
             setTimeout(() => {
-                const anyChecked = ['toggle-cust', 'toggle-job', 'toggle-type', 'toggle-cpid', 
-                                   'toggle-date', 'toggle-stage', 'toggle-po', 'toggle-serial',
-                                   'toggle-company', 'toggle-address', 'toggle-phone', 'toggle-fax']
-                    .some(id => document.getElementById(id)?.checked);
+                const anyChecked = REDACTION_CHECKBOX_IDS.some(id => document.getElementById(id)?.checked);
                 
                 if (anyChecked) {
                     SmartScanner.scanAllPages();
@@ -2123,7 +2127,7 @@ class PdfController {
     static pdfCache = new Map(); // Cache for preloaded PDFs
     static preloadQueue = [];
     static isPreloading = false;
-    static PRELOAD_DELAY_MS = 100; // Delay between preload requests
+    static PRELOAD_DELAY_MS = 250; // Delay between preload requests (250ms for better performance)
     static CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
     static CACHE_MAX_SIZE = 20; // Maximum number of PDFs to cache
 
@@ -2150,6 +2154,9 @@ class PdfController {
     }
 
     static async preloadSearchResults(results) {
+        // Stop any in-progress preloading first
+        this.stopPreloading();
+        
         // Preload first page of search results (top to bottom)
         this.preloadQueue = results.slice(0, SearchEngine.pageSize).filter(r => r.id && !this.pdfCache.has(r.id));
         this.isPreloading = true;
