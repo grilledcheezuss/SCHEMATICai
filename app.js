@@ -685,6 +685,13 @@ class PageClassifier {
 }
 
 class SmartScanner {
+    // Configuration constants
+    static WIDTH_PADDING_FACTOR = 1.5;
+    static HEIGHT_PADDING_FACTOR = 1.2;
+    static VERTICAL_TOLERANCE = 10;
+    static HORIZONTAL_TOLERANCE = 20;
+    static FONT_SIZE_ESTIMATE_FACTOR = 0.8; // OCR font size estimation adjustment
+    
     static async scanAllPages() {
         RedactionManager.clearAll(); 
         if(!PdfViewer.doc) return;
@@ -801,8 +808,8 @@ class SmartScanner {
                     zones.push({
                         x: valueItem.x,
                         y: valueItem.y,
-                        w: valueItem.width * 1.5, // Add some padding
-                        h: valueItem.height * 1.2,
+                        w: valueItem.width * this.WIDTH_PADDING_FACTOR,
+                        h: valueItem.height * this.HEIGHT_PADDING_FACTOR,
                         map: mapKey,
                         fontSize: Math.round(valueItem.fontSize),
                         transparent: true,
@@ -838,8 +845,8 @@ class SmartScanner {
     static findNearbyValue(labelItem, allItems) {
         // Look for text items to the right or below the label
         const candidates = allItems.filter(item => {
-            const isRight = item.x > labelItem.x && item.y >= labelItem.y - 10 && item.y <= labelItem.y + 10;
-            const isBelow = item.y > labelItem.y && item.x >= labelItem.x - 20;
+            const isRight = item.x > labelItem.x && item.y >= labelItem.y - this.VERTICAL_TOLERANCE && item.y <= labelItem.y + this.VERTICAL_TOLERANCE;
+            const isBelow = item.y > labelItem.y && item.x >= labelItem.x - this.HORIZONTAL_TOLERANCE;
             return (isRight || isBelow) && item.text !== labelItem.text;
         });
         
@@ -885,7 +892,7 @@ class SmartScanner {
                 y: word.bbox.y0 * scaleY,
                 width: (word.bbox.x1 - word.bbox.x0) * scaleX,
                 height: (word.bbox.y1 - word.bbox.y0) * scaleY,
-                fontSize: (word.bbox.y1 - word.bbox.y0) * scaleY * 0.8
+                fontSize: (word.bbox.y1 - word.bbox.y0) * scaleY * this.FONT_SIZE_ESTIMATE_FACTOR
             }));
             
             // Use same detection logic as text extraction
@@ -908,8 +915,8 @@ class SmartScanner {
                         zones.push({
                             x: valueItem.x,
                             y: valueItem.y,
-                            w: valueItem.width * 1.5,
-                            h: valueItem.height * 1.2,
+                            w: valueItem.width * this.WIDTH_PADDING_FACTOR,
+                            h: valueItem.height * this.HEIGHT_PADDING_FACTOR,
                             map: mapKey,
                             fontSize: Math.round(valueItem.fontSize),
                             transparent: true,
@@ -1428,6 +1435,8 @@ class PdfExporter {
                                 page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
                             }
                             
+                            // Note: Underline decoration is only applied for non-rotated text
+                            // Rotated text underlines would require complex transform calculations
                             if (box.dataset.decoration === 'underline' && rotation === 0) {
                                 page.drawLine({ start: { x: textX, y: textY - 2 }, end: { x: textX + textWidth, y: textY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
                             }
