@@ -1031,7 +1031,7 @@ class SmartScanner {
     
     static async scanAllPages() {
         RedactionManager.clearAll(); 
-        if(!PdfViewer.doc || !PdfViewer.isDocumentValid()) {
+        if(!PdfViewer.isDocumentValid()) {
             console.warn('Cannot scan: PDF document is not loaded or invalid');
             return;
         }
@@ -1353,7 +1353,7 @@ class SmartScanner {
     }
     
     static async rescanPage(pageNum) {
-        if(!PdfViewer.doc || !PdfViewer.isDocumentValid()) {
+        if(!PdfViewer.isDocumentValid()) {
             console.warn('Cannot rescan: PDF document is not loaded or invalid');
             return;
         }
