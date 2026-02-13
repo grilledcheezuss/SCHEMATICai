@@ -575,6 +575,23 @@ body.editor-active .redaction-resize-handle {
     transform: rotate(-90deg);
 }
 
+.active-page-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+}
+
+.profile-badge {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.input-wrapper {
+    /* Wrapper for input fields to enable show/hide */
+    display: block;
+}
+
 #pdf-viewer-frame { width: 100%; height: 100%; border: none; background: #fff; display: none; } 
 #pdf-fallback { display: none; text-align: center; color: white; padding: 20px; width: 100%; align-self: center; } 
 
