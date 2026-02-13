@@ -385,7 +385,8 @@ export default {
                 // Normalize the panel ID - remove CP- prefix, .dwg, .pdf extensions
                 const cleanId = panelId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').trim();
                 
-                // Try multiple variations to find the record
+                // Try multiple variations to find the record (most likely to least likely)
+                // This typically matches on the first try with cleanId
                 const variations = [
                     cleanId,
                     `CP-${cleanId}`,
