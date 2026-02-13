@@ -2123,6 +2123,9 @@ class PdfController {
     static pdfCache = new Map(); // Cache for preloaded PDFs
     static preloadQueue = [];
     static isPreloading = false;
+    static PRELOAD_DELAY_MS = 100; // Delay between preload requests
+    static CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+    static CACHE_MAX_SIZE = 20; // Maximum number of PDFs to cache
 
     static load(id, url) {
         document.getElementById('pdf-placeholder-text').style.display = 'none';
@@ -2172,10 +2175,11 @@ class PdfController {
             }
             
             // Small delay between requests to avoid overwhelming the browser
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, this.PRELOAD_DELAY_MS));
         }
         
         this.isPreloading = false;
+        this.clearCache(); // Clean up old entries after preloading
     }
 
     static stopPreloading() {
@@ -2184,14 +2188,23 @@ class PdfController {
     }
 
     static clearCache() {
-        // Clear old cached PDFs (older than 5 minutes)
+        // Clear old cached PDFs (older than CACHE_MAX_AGE_MS) and enforce size limit
         const now = Date.now();
-        const MAX_AGE = 5 * 60 * 1000;
         
+        // First, remove expired entries
         for (const [id, cached] of this.pdfCache.entries()) {
-            if (now - cached.timestamp > MAX_AGE) {
+            if (now - cached.timestamp > this.CACHE_MAX_AGE_MS) {
                 this.pdfCache.delete(id);
             }
+        }
+        
+        // If still over size limit, remove oldest entries (LRU eviction)
+        if (this.pdfCache.size > this.CACHE_MAX_SIZE) {
+            const sortedEntries = Array.from(this.pdfCache.entries())
+                .sort((a, b) => a[1].timestamp - b[1].timestamp);
+            
+            const toRemove = sortedEntries.slice(0, this.pdfCache.size - this.CACHE_MAX_SIZE);
+            toRemove.forEach(([id]) => this.pdfCache.delete(id));
         }
     }
 }
