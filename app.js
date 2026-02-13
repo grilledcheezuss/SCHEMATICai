@@ -546,6 +546,11 @@ class AnalysisManager {
             y: ((viewport.height - y) / viewport.height * 100).toFixed(2)
         });
         
+        // Proximity thresholds for field detection (in PDF coordinate units)
+        const SAME_LINE_THRESHOLD = 20;      // Max Y-distance for same line
+        const MAX_VERTICAL_DISTANCE = 50;    // Max Y-distance for multi-line
+        const MIN_HORIZONTAL_OFFSET = -50;   // Min X-distance (allows left placement)
+        
         // Helper: Check if text looks like a date
         const isDateLike = (text) => {
             return /\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/.test(text) || /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/.test(text);
@@ -556,7 +561,17 @@ class AnalysisManager {
             return /^[A-Z][a-z]+/.test(text) && text.length > 2;
         };
         
-        // Helper: Find value near a label (within next N items, proximity-based)
+        /**
+         * Find a value near a label using spatial proximity
+         * @param {number} startIdx - Index of the label item in the items array
+         * @param {number} maxDistance - Maximum number of items to search ahead (default: 10)
+         * @param {function|null} validator - Optional function to validate candidate text
+         * @returns {object|null} Object with {item, text} if found, null otherwise
+         * 
+         * Proximity rules:
+         * - Same line: Y-distance < 20 units
+         * - Multi-line: Y-distance < 50 units AND X-offset > -50 units
+         */
         const findNearbyValue = (startIdx, maxDistance = 10, validator = null) => {
             const labelItem = items[startIdx];
             const labelX = labelItem.transform[4];
@@ -578,7 +593,7 @@ class AnalysisManager {
                 const deltaX = candidate.transform[4] - labelX;
                 
                 // Value should be: same line (small deltaY) or below (larger deltaY but reasonable)
-                if (deltaY < 20 || (deltaY < 50 && deltaX > -50)) {
+                if (deltaY < SAME_LINE_THRESHOLD || (deltaY < MAX_VERTICAL_DISTANCE && deltaX > MIN_HORIZONTAL_OFFSET)) {
                     return { item: candidate, text };
                 }
             }
@@ -818,7 +833,7 @@ class AnalysisManager {
         const a = document.createElement('a');
         a.href = url;
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        a.download = `pdf-field-analysis-${this.analyzed}pdfs-${timestamp}.json`;
+        a.download = `pdf-field-analysis-${this.analyzed}-pdfs-${timestamp}.json`;
         a.click();
         URL.revokeObjectURL(url);
         
