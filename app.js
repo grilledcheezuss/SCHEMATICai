@@ -546,7 +546,14 @@ class AnalysisManager {
             y: ((viewport.height - y) / viewport.height * 100).toFixed(2)
         });
         
-        // Proximity thresholds for field detection (in PDF coordinate units)
+        /**
+         * Proximity thresholds for field detection
+         * These values are in PDF coordinate units (not pixels) as provided by PDF.js transform[4] (x) and transform[5] (y).
+         * Values are empirically chosen based on common PDF submittal layouts where:
+         * - Labels and values on the same line are typically within 20 units vertically
+         * - Multi-line values (label above, value below) are within 50 units vertically
+         * - Values can appear slightly to the left of labels (up to -50 units horizontally)
+         */
         const SAME_LINE_THRESHOLD = 20;      // Max Y-distance for same line
         const MAX_VERTICAL_DISTANCE = 50;    // Max Y-distance for multi-line
         const MIN_HORIZONTAL_OFFSET = -50;   // Min X-distance (allows left placement)
