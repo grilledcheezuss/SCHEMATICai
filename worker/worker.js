@@ -23,6 +23,8 @@ let IS_BUILDING_ML = false;
 const CACHE_DURATION = 1000 * 60 * 60; // 1 Hour
 
 const VOTE_THRESHOLD = 3;
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 1000;
 
 // --- EXACT DICTIONARIES ---
 const EXACT_MFGS = {
@@ -352,18 +354,22 @@ export default {
             }
 
             if (target === 'GET_PDF_URLS') {
-                const limitParam = parseInt(url.searchParams.get('limit') || '100');
-                const limit = Math.min(isNaN(limitParam) ? 100 : limitParam, 1000);
+                const limitParam = parseInt(url.searchParams.get('limit') || String(DEFAULT_PAGE_SIZE));
+                const limit = Math.min(isNaN(limitParam) ? DEFAULT_PAGE_SIZE : limitParam, MAX_PAGE_SIZE);
                 const offset = url.searchParams.get('offset');
                 
-                let airtableUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}`;
-                airtableUrl += `?pageSize=${limit}`;
-                airtableUrl += `&fields%5B%5D=Control%20Panel%20Name`;
-                airtableUrl += `&fields%5B%5D=Control%20Panel%20PDF`;
+                // Build Airtable URL using URLSearchParams for better maintainability
+                const airtableParams = new URLSearchParams({
+                    pageSize: limit.toString()
+                });
+                airtableParams.append('fields[]', 'Control Panel Name');
+                airtableParams.append('fields[]', 'Control Panel PDF');
                 
                 if (offset) {
-                    airtableUrl += `&offset=${encodeURIComponent(offset)}`;
+                    airtableParams.append('offset', offset);
                 }
+                
+                const airtableUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?${airtableParams}`;
                 
                 const response = await fetch(airtableUrl, {
                     headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` }
@@ -382,7 +388,10 @@ export default {
                 const data = await response.json();
                 
                 const pdfs = data.records
-                    .filter(record => record.fields['Control Panel PDF'])
+                    .filter(record => {
+                        const pdf = record.fields['Control Panel PDF'];
+                        return pdf && Array.isArray(pdf) && pdf.length > 0;
+                    })
                     .map(record => ({
                         id: record.id,
                         name: record.fields['Control Panel Name'],
@@ -412,8 +421,33 @@ export default {
                     });
                 }
                 
+                // SSRF Protection: Validate URL is from Airtable
+                const decodedUrl = decodeURIComponent(pdfUrl);
+                try {
+                    const urlObj = new URL(decodedUrl);
+                    const allowedDomains = ['dl.airtable.com', 'airtable.com'];
+                    
+                    if (!allowedDomains.some(domain => urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain))) {
+                        return new Response(JSON.stringify({ 
+                            success: false, 
+                            error: 'Invalid URL: Only Airtable URLs are allowed' 
+                        }), {
+                            status: 400,
+                            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                        });
+                    }
+                } catch (e) {
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        error: 'Invalid URL format' 
+                    }), {
+                        status: 400,
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+                
                 // Fetch PDF
-                const pdfResponse = await fetch(decodeURIComponent(pdfUrl));
+                const pdfResponse = await fetch(decodedUrl);
                 
                 if (!pdfResponse.ok) {
                     return new Response(JSON.stringify({ 
@@ -431,7 +465,7 @@ export default {
                 // For now, return basic metadata and structure for future implementation
                 return new Response(JSON.stringify({
                     success: true,
-                    url: decodeURIComponent(pdfUrl),
+                    url: decodedUrl,
                     size: pdfBytes.byteLength,
                     message: 'PDF analysis placeholder - full text extraction requires PDF parsing library',
                     note: 'Consider client-side processing with PDF.js for detailed text extraction'
