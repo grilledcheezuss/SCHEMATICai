@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.4.3)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.4.4)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -56,7 +56,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version">v2.4.3</span>
+        <span class="app-title-version">v2.4.4</span>
     </div>
 
     <div class="header-controls">
@@ -184,6 +184,70 @@
                 </div>
             </div>
 
+            
+<!-- PDF Database Analysis Section -->
+<div id="pdf-analysis-panel" class="collapsed-state" style="margin-bottom:15px;">
+    <div class="context-header" onclick="AnalysisManager.togglePanel()">
+        <span>📊 PDF Database Analysis</span>
+        <span id="analysis-toggle-icon">▼</span>
+    </div>
+    
+    <div id="pdf-analysis-content" class="collapsed">
+        <div style="font-size:10px; color:var(--text-secondary); margin-bottom:10px;">
+            Analyze all PDFs in database to detect field patterns and locations.
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+            <button class="search-btn" style="width:100%;" onclick="AnalysisManager.start()">
+                🚀 Start Mass Analysis
+            </button>
+        </div>
+        
+        <div id="analysis-progress" style="display:none;">
+            <div class="progress-stats" style="margin-bottom:10px;">
+                <div style="font-size:11px; color:var(--text-secondary); margin-bottom:5px;">
+                    Status: <span id="analysis-status" style="font-weight:bold;">Idle</span>
+                </div>
+                <div style="font-size:11px; margin-bottom:5px;">
+                    Analyzed: <span id="analysis-count">0</span> / <span id="analysis-total">0</span>
+                    (<span id="analysis-percent">0</span>%)
+                </div>
+                <div class="progress-bar" style="background:rgba(255,255,255,0.1); height:8px; border-radius:4px; margin-bottom:10px; overflow:hidden;">
+                    <div id="analysis-progress-fill" style="background:var(--lsu-purple); height:100%; width:0%; border-radius:4px; transition:width 0.3s;"></div>
+                </div>
+                <div style="font-size:10px; color:var(--text-secondary);">
+                    Current: <span id="analysis-current-pdf">-</span>
+                </div>
+                <div style="font-size:10px; color:var(--text-secondary); margin-bottom:10px;">
+                    Speed: <span id="analysis-speed">-</span> PDFs/min | 
+                    ETA: <span id="analysis-eta">-</span>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:5px;">
+                <button id="analysis-pause-btn" class="search-btn" style="flex:1; background:#555;" onclick="AnalysisManager.togglePause()">
+                    ⏸ Pause
+                </button>
+                <button class="search-btn" style="flex:1; background:#555;" onclick="AnalysisManager.stop()">
+                    ⏹ Stop
+                </button>
+                <button class="search-btn" style="flex:1; background:var(--lsu-purple);" onclick="AnalysisManager.exportResults()">
+                    📥 Export
+                </button>
+            </div>
+        </div>
+        
+        <div id="analysis-results" style="display:none; margin-top:15px; padding-top:15px; border-top:1px solid var(--border-color);">
+            <div style="font-size:11px; font-weight:bold; margin-bottom:8px; color:var(--text-primary);">Detection Statistics:</div>
+            <div id="analysis-stats" style="font-size:10px; color:var(--text-secondary); line-height:1.6;"></div>
+            
+            <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.05);">
+                <div style="font-size:11px; font-weight:bold; margin-bottom:8px; color:var(--text-primary);">Common Field Positions:</div>
+                <div id="analysis-positions" style="font-size:10px; color:var(--text-secondary); line-height:1.6;"></div>
+            </div>
+        </div>
+    </div>
+</div>
             <div id="editor-controls" class="disabled-overlay">
                 <div class="editor-section">
                     <span class="editor-label">CAD Font Style</span>
