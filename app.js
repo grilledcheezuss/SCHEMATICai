@@ -1561,13 +1561,28 @@ class FeedbackService {
         
         if (Object.keys(corrections).length === 0) return alert("Please select a correction."); 
         
+        // Prepare payload for submission
+        const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections) } }] }; 
+        
         // Show instant UI feedback
         this.close(); 
         alert("Thank you! System will learn from this."); 
         
-        // Submit in background
-        const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections) } }] }; 
-        fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(e => console.warn('Feedback submission failed:', e)); 
+        // Submit in background - using sendBeacon for reliability
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        const url = `${WORKER_URL}?target=FEEDBACK`;
+        if (navigator.sendBeacon) {
+            const formData = new FormData();
+            formData.append('data', blob);
+            // Try sendBeacon first for reliability, fallback to fetch if it fails
+            try {
+                navigator.sendBeacon(url, blob);
+            } catch(e) {
+                fetch(url, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(err => console.warn('Feedback submission failed:', err));
+            }
+        } else {
+            fetch(url, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(e => console.warn('Feedback submission failed:', e));
+        }
     }
     static resetLockout() { this.lockout.clear(); }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
@@ -2084,7 +2099,7 @@ class UI {
         // Use found manufacturers if available, otherwise use training data
         const cleanList = window.FOUND_MFGS.size > 0 
             ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
-            : AI_TRAINING_DATA.MANUFACTURERS.sort();
+            : [...AI_TRAINING_DATA.MANUFACTURERS].sort();
         
         m.innerHTML='<option value="Any">Any</option>'; 
         cleanList.forEach(v=>m.add(new Option(v,v))); 
