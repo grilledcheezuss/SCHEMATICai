@@ -587,10 +587,6 @@ body.editor-active .redaction-resize-handle {
     white-space: nowrap;
 }
 
-.toggle-row {
-    /* Additional styling can be added here if needed */
-}
-
 .input-wrapper {
     /* Wrapper for input fields to enable show/hide */
     display: block;

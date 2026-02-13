@@ -452,7 +452,11 @@ class PageContext {
     
     static getActiveProfile() {
         const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${this.currentPage}"]`);
-        const select = wrapper?.querySelector('.page-profile-select');
+        if (!wrapper) {
+            console.warn(`PageContext: No wrapper found for page ${this.currentPage}`);
+            return 'AUTO';
+        }
+        const select = wrapper.querySelector('.page-profile-select');
         return select?.value || 'AUTO';
     }
     
@@ -521,7 +525,7 @@ class ControlPanelManager {
     };
     
     static refreshForProfile(profile) {
-        const relevantFields = this.PROFILE_FIELDS[profile] || this.PROFILE_FIELDS['TITLE'];
+        const relevantFields = this.PROFILE_FIELDS[profile] || this.PROFILE_FIELDS['AUTO'];
         
         // Show/hide checkbox rows based on profile
         const allFields = ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'po', 'serial', 'company', 'address', 'phone', 'fax'];
