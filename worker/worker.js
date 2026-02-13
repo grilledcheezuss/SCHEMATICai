@@ -378,6 +378,62 @@ export default {
                 return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
             }
 
+            if (target === 'PDF_BY_ID') {
+                const panelId = url.searchParams.get('id');
+                if (!panelId) return new Response("Missing panel ID", { status: 400, headers: corsHeaders });
+                
+                // Normalize the panel ID: strip CP- prefix and file extensions
+                const cleanId = panelId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').trim();
+                
+                // Query Airtable for the panel by Control Panel Name
+                // We need to search for multiple variants: cleanId, CP-cleanId, cleanId.dwg, cleanId.pdf, etc.
+                const searchVariants = [
+                    cleanId,
+                    `CP-${cleanId}`,
+                    `${cleanId}.dwg`,
+                    `${cleanId}.pdf`,
+                    `CP-${cleanId}.dwg`,
+                    `CP-${cleanId}.pdf`
+                ];
+                
+                // Build a filter formula to match any variant
+                const filterFormula = `OR(${searchVariants.map(v => `{Control Panel Name}="${v}"`).join(',')})`;
+                const airtableUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
+                    `filterByFormula=${encodeURIComponent(filterFormula)}` +
+                    `&fields%5B%5D=Control%20Panel%20PDF` +
+                    `&maxRecords=1`;
+                
+                const airtableResp = await fetch(airtableUrl, { 
+                    headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } 
+                });
+                
+                if (!airtableResp.ok) {
+                    return new Response(`Airtable Error: ${airtableResp.status}`, { 
+                        status: 502, 
+                        headers: corsHeaders 
+                    });
+                }
+                
+                const airtableData = await airtableResp.json();
+                
+                if (!airtableData.records || airtableData.records.length === 0) {
+                    return new Response("Panel not found", { status: 404, headers: corsHeaders });
+                }
+                
+                const pdfUrl = airtableData.records[0].fields['Control Panel PDF']?.[0]?.url;
+                
+                if (!pdfUrl) {
+                    return new Response("PDF not available for this panel", { status: 404, headers: corsHeaders });
+                }
+                
+                // Fetch and stream the PDF
+                const pdfResponse = await fetch(pdfUrl);
+                const newHeaders = new Headers(pdfResponse.headers);
+                newHeaders.set('Access-Control-Allow-Origin', '*');
+                newHeaders.set('Content-Type', 'application/pdf');
+                return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+            }
+
             // Immediately ready to authenticate!
             await ensureAuthAndFeedback();
 
