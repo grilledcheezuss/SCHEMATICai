@@ -61,7 +61,8 @@ const STOP_WORDS = new Set(['PANEL','CONTROL','PUMP','MOTOR','VOLT','VAC','PHASE
 function normalizeCADText(text) {
     if (!text || typeof text !== 'string') return text;
     // Strip common CAD control codes: %%U, %%O, %%D (degree symbol), %%P (plus/minus), %%C (diameter), etc.
-    return text.replace(/%%[A-Z]/g, '');
+    // Match both uppercase and lowercase variants
+    return text.replace(/%%[A-Za-z0-9]/gi, '');
 }
 
 function isValidHP(hp) {
@@ -484,10 +485,10 @@ export default {
                     const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                     
                     const rawItems = r.fields['Items'];
-                    let fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "").toUpperCase();
+                    let fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
                     
-                    // Normalize CAD control codes before parsing
-                    fullDesc = normalizeCADText(fullDesc);
+                    // Normalize CAD control codes before case conversion to ensure lowercase codes are also removed
+                    fullDesc = normalizeCADText(fullDesc).toUpperCase();
                     
                     const textToParse = fullDesc + " " + cleanId;
                     const explicit = extractSpecsStrict(textToParse);
