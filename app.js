@@ -438,6 +438,142 @@ class DemoManager {
     }
 }
 
+class PageContext {
+    static currentPage = 1;
+    
+    static setActivePage(pageNum) {
+        this.currentPage = pageNum;
+        this.updateUI();
+    }
+    
+    static getActivePage() {
+        return this.currentPage;
+    }
+    
+    static getActiveProfile() {
+        const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${this.currentPage}"]`);
+        const select = wrapper?.querySelector('.page-profile-select');
+        return select?.value || 'AUTO';
+    }
+    
+    static updateUI() {
+        // Update page selector
+        const pageSelector = document.getElementById('page-selector');
+        if (pageSelector) {
+            pageSelector.value = this.currentPage;
+        }
+        
+        // Update page number display
+        const pageNumEl = document.getElementById('active-page-num');
+        if (pageNumEl) {
+            pageNumEl.textContent = this.currentPage;
+        }
+        
+        // Update profile badge
+        const profileBadge = document.getElementById('active-profile-badge');
+        if (profileBadge) {
+            const profile = this.getActiveProfile();
+            profileBadge.textContent = this.getProfileDisplayName(profile);
+        }
+        
+        // Refresh control panel to show relevant fields
+        ControlPanelManager.refreshForProfile(this.getActiveProfile());
+    }
+    
+    static getProfileDisplayName(profile) {
+        const names = {
+            'AUTO': 'Auto-Detect',
+            'TITLE': 'Title Sheet',
+            'TITLE_ASBUILT': 'As-Built Title',
+            'COX_COVER': 'Cox Cover',
+            'DELTA_COVER': 'Delta Cover',
+            'THIRD_PARTY_COVER': '3rd Party Cover',
+            'INFO': 'Info/Notes',
+            'INFO_BORDERLESS': 'Info (Borderless)',
+            'SCHEMATIC_LANDSCAPE': 'Schematic (Landscape)',
+            'SCHEMATIC_PORTRAIT': 'Schematic (Portrait)',
+            'SCHEMATIC_LANDSCAPE_BORDERLESS': 'Schematic (Landscape Borderless)',
+            'SCHEMATIC_PORTRAIT_BORDERLESS': 'Schematic (Portrait Borderless)',
+            'DOOR_DRAWING': 'Door Drawing',
+            'GENERAL': 'General'
+        };
+        return names[profile] || profile;
+    }
+}
+
+class ControlPanelManager {
+    // Define which fields are relevant for each profile
+    static PROFILE_FIELDS = {
+        'TITLE': ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'company', 'address', 'phone', 'fax'],
+        'TITLE_ASBUILT': ['cust', 'job', 'cpid', 'date', 'company', 'address', 'phone'],
+        'COX_COVER': ['cust', 'job', 'date', 'cpid', 'company', 'address', 'phone', 'fax'],
+        'DELTA_COVER': ['cust', 'job', 'date', 'cpid'],
+        'THIRD_PARTY_COVER': ['cust', 'job', 'date', 'cpid'],
+        'INFO': ['cpid', 'date'],
+        'INFO_BORDERLESS': ['cpid', 'date'],
+        'SCHEMATIC_LANDSCAPE': ['cpid', 'date'],
+        'SCHEMATIC_PORTRAIT': ['cpid', 'date'],
+        'SCHEMATIC_LANDSCAPE_BORDERLESS': ['cpid', 'date'],
+        'SCHEMATIC_PORTRAIT_BORDERLESS': ['cpid', 'date'],
+        'DOOR_DRAWING': ['cpid', 'date'],
+        'GENERAL': ['cust', 'job', 'cpid', 'date'],
+        'AUTO': ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'po', 'serial', 'company', 'address', 'phone', 'fax']
+    };
+    
+    static refreshForProfile(profile) {
+        const relevantFields = this.PROFILE_FIELDS[profile] || this.PROFILE_FIELDS['TITLE'];
+        
+        // Show/hide checkbox rows based on profile
+        const allFields = ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'po', 'serial', 'company', 'address', 'phone', 'fax'];
+        
+        allFields.forEach(field => {
+            const checkbox = document.getElementById(`toggle-${field}`);
+            const row = checkbox?.closest('.toggle-row');
+            
+            if (row) {
+                row.style.display = relevantFields.includes(field) ? '' : 'none';
+            }
+        });
+        
+        // Also update input field visibility
+        this.updateInputFields(relevantFields);
+    }
+    
+    static updateInputFields(relevantFields) {
+        // Show/hide input fields in "PROJECT CONTEXT & SENSITIVE DATA" section
+        const fieldMap = {
+            'cust': 'demo-cust-name',
+            'job': 'demo-job-name',
+            'type': 'demo-system-type',
+            'cpid': 'demo-panel-id',
+            'date': 'demo-date',
+            'stage': 'demo-stage',
+            'po': 'demo-po',
+            'serial': 'demo-serial',
+            'company': 'demo-company',
+            'address': 'demo-address',
+            'phone': 'demo-phone',
+            'fax': 'demo-fax'
+        };
+        
+        Object.entries(fieldMap).forEach(([field, inputId]) => {
+            const input = document.getElementById(inputId);
+            const wrapper = input?.closest('.input-wrapper');
+            
+            if (wrapper) {
+                wrapper.style.display = relevantFields.includes(field) ? '' : 'none';
+            } else if (input) {
+                // If there's no wrapper, try to hide the input and its label
+                const label = input.previousElementSibling;
+                if (label && label.classList.contains('demo-label')) {
+                    label.style.display = relevantFields.includes(field) ? '' : 'none';
+                }
+                input.style.display = relevantFields.includes(field) ? '' : 'none';
+            }
+        });
+    }
+}
+
 class ProfileManager {
     static getCustomProfiles() {
         const stored = localStorage.getItem('cox_custom_profiles');
@@ -1509,6 +1645,11 @@ class LayoutScanner {
 
         LayoutScanner.applyRuleToWrapper(wrapper, rules);
         RedactionManager.refreshContent();
+        
+        // Update page context UI if this is the active page
+        if (PageContext.getActivePage() === pageNum) {
+            PageContext.updateUI();
+        }
     }
 
     static applyRuleToWrapper(wrapper, ruleSet) { 
@@ -2173,6 +2314,21 @@ class PdfViewer {
             }
         }
         if(DemoManager.isGeneratorActive) {
+            // Populate page selector
+            const pageSelector = document.getElementById('page-selector');
+            if (pageSelector) {
+                pageSelector.innerHTML = '';
+                for (let i = 1; i <= this.doc.numPages; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `Page ${i}`;
+                    pageSelector.appendChild(option);
+                }
+            }
+            
+            // Set initial page context
+            PageContext.setActivePage(1);
+            
             setTimeout(() => {
                 LayoutScanner.refreshProfileOptions();
                 SmartScanner.scanAllPages();

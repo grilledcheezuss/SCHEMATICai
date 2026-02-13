@@ -168,7 +168,16 @@
 
     <div id="generator-panel" style="display:none;">
         <div id="gen-drag-handle" class="editor-header" style="cursor: move;">
-            <span class="editor-title">Control Panel</span>
+            <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
+                <span class="editor-title">Control Panel</span>
+                <div class="active-page-indicator">
+                    <label style="font-size:9px; color:rgba(255,255,255,0.8);">Editing Page:</label>
+                    <select id="page-selector" onchange="PageContext.setActivePage(parseInt(this.value))" style="font-size:9px; padding:2px 4px; border-radius:3px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.1); color:white;">
+                        <option value="1">Page 1</option>
+                    </select>
+                    <span class="profile-badge" id="active-profile-badge" style="font-size:8px; background:rgba(255,255,255,0.2); padding:2px 6px; border-radius:3px; margin-left:4px;">Auto-Detect</span>
+                </div>
+            </div>
             <div class="panel-controls">
                 <button class="panel-btn" onclick="DemoManager.minimizePanel()" title="Minimize to View">─</button>
                 <button class="panel-btn" onclick="DemoManager.toggleGenerator()" title="Close Generator">✖</button>
@@ -201,29 +210,29 @@
                     <div style="margin-bottom:10px; padding:8px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:4px;">
                         <div style="font-size:10px; font-weight:600; color:var(--glass-text); margin-bottom:5px;">Redaction Toggles (Check to Include)</div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px; font-size:9px;">
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cust" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Customer</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-job" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Job</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-type" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> System</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cpid" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Panel ID</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-date" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Date</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-stage" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Stage</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-po" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> PO</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-serial" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Serial</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-company" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Company</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-address" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Address</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-phone" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Phone</label>
-                            <label style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-fax" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Fax</label>
+                            <label class="toggle-row" data-field="cust" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cust" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Customer</label>
+                            <label class="toggle-row" data-field="job" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-job" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Job</label>
+                            <label class="toggle-row" data-field="type" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-type" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> System</label>
+                            <label class="toggle-row" data-field="cpid" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cpid" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Panel ID</label>
+                            <label class="toggle-row" data-field="date" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-date" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Date</label>
+                            <label class="toggle-row" data-field="stage" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-stage" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Stage</label>
+                            <label class="toggle-row" data-field="po" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-po" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> PO</label>
+                            <label class="toggle-row" data-field="serial" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-serial" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Serial</label>
+                            <label class="toggle-row" data-field="company" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-company" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Company</label>
+                            <label class="toggle-row" data-field="address" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-address" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Address</label>
+                            <label class="toggle-row" data-field="phone" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-phone" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Phone</label>
+                            <label class="toggle-row" data-field="fax" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-fax" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Fax</label>
                         </div>
                     </div>
 
-                    <span class="demo-label">Customer Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Customer..." oninput="RedactionManager.refreshContent()">
-                    <span class="demo-label">Job Name</span><input type="text" id="demo-job-name" class="demo-input" placeholder="Enter Job Name..." oninput="RedactionManager.refreshContent()">
-                    <span class="demo-label">System Type</span><input type="text" id="demo-system-type" class="demo-input" placeholder="e.g. Duplex Pump..." oninput="RedactionManager.refreshContent()">
-                    <span class="demo-label">Panel ID</span><input type="text" id="demo-panel-id" class="demo-input" placeholder="CP-####" oninput="RedactionManager.refreshContent()">
+                    <div class="input-wrapper" data-field="cust"><span class="demo-label">Customer Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Customer..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="job"><span class="demo-label">Job Name</span><input type="text" id="demo-job-name" class="demo-input" placeholder="Enter Job Name..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="type"><span class="demo-label">System Type</span><input type="text" id="demo-system-type" class="demo-input" placeholder="e.g. Duplex Pump..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="cpid"><span class="demo-label">Panel ID</span><input type="text" id="demo-panel-id" class="demo-input" placeholder="CP-####" oninput="RedactionManager.refreshContent()"></div>
                     
                     <div style="display:flex; gap:5px;">
-                        <div style="flex:1;"><span class="demo-label">Date</span><input type="date" id="demo-date" class="demo-input" oninput="RedactionManager.refreshContent()"></div>
-                        <div style="flex:1;">
+                        <div class="input-wrapper" data-field="date" style="flex:1;"><span class="demo-label">Date</span><input type="date" id="demo-date" class="demo-input" oninput="RedactionManager.refreshContent()"></div>
+                        <div class="input-wrapper" data-field="stage" style="flex:1;">
                             <span class="demo-label">Stage</span>
                             <select id="demo-stage" class="demo-input" onchange="RedactionManager.refreshContent()">
                                 <option selected>SUBMITTAL</option>
@@ -233,14 +242,14 @@
                         </div>
                     </div>
 
-                    <span class="demo-label">PO Number</span><input type="text" id="demo-po" class="demo-input" placeholder="PO-####" oninput="RedactionManager.refreshContent()">
-                    <span class="demo-label">Serial Number</span><input type="text" id="demo-serial" class="demo-input" placeholder="Serial #..." oninput="RedactionManager.refreshContent()">
-                    <span class="demo-label">Company Name</span><input type="text" id="demo-company" class="demo-input" placeholder="Your Company..." oninput="RedactionManager.refreshContent()">
-                    <span class="demo-label">Company Address</span><input type="text" id="demo-address" class="demo-input" placeholder="123 Main St..." oninput="RedactionManager.refreshContent()">
+                    <div class="input-wrapper" data-field="po"><span class="demo-label">PO Number</span><input type="text" id="demo-po" class="demo-input" placeholder="PO-####" oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="serial"><span class="demo-label">Serial Number</span><input type="text" id="demo-serial" class="demo-input" placeholder="Serial #..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="company"><span class="demo-label">Company Name</span><input type="text" id="demo-company" class="demo-input" placeholder="Your Company..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="address"><span class="demo-label">Company Address</span><input type="text" id="demo-address" class="demo-input" placeholder="123 Main St..." oninput="RedactionManager.refreshContent()"></div>
                     
                     <div style="display:flex; gap:5px;">
-                        <div style="flex:1;"><span class="demo-label">Phone</span><input type="text" id="demo-phone" class="demo-input" placeholder="(123) 456-7890" oninput="RedactionManager.refreshContent()"></div>
-                        <div style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(123) 456-7891" oninput="RedactionManager.refreshContent()"></div>
+                        <div class="input-wrapper" data-field="phone" style="flex:1;"><span class="demo-label">Phone</span><input type="text" id="demo-phone" class="demo-input" placeholder="(123) 456-7890" oninput="RedactionManager.refreshContent()"></div>
+                        <div class="input-wrapper" data-field="fax" style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(123) 456-7891" oninput="RedactionManager.refreshContent()"></div>
                     </div>
                 </div>
             </div>
