@@ -1568,21 +1568,14 @@ class FeedbackService {
         this.close(); 
         alert("Thank you! System will learn from this."); 
         
-        // Submit in background - using sendBeacon for reliability
-        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-        const url = `${WORKER_URL}?target=FEEDBACK`;
-        if (navigator.sendBeacon) {
-            const formData = new FormData();
-            formData.append('data', blob);
-            // Try sendBeacon first for reliability, fallback to fetch if it fails
-            try {
-                navigator.sendBeacon(url, blob);
-            } catch(e) {
-                fetch(url, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(err => console.warn('Feedback submission failed:', err));
-            }
-        } else {
-            fetch(url, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(e => console.warn('Feedback submission failed:', e));
-        }
+        // Submit in background - fire and forget for instant UI response
+        // Note: Using fetch instead of sendBeacon because API requires custom auth headers
+        fetch(`${WORKER_URL}?target=FEEDBACK`, { 
+            method: 'POST', 
+            headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(payload),
+            keepalive: true  // Ensures request completes even if page is navigating away
+        }).catch(e => console.warn('Feedback submission failed:', e));
     }
     static resetLockout() { this.lockout.clear(); }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
