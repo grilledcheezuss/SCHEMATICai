@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICai WORKER v2.5.0 (Instant Sync & Background ML)
+// 🧠 SCHEMATICai WORKER v2.6.0 (Golden Database Architecture)
 // ==========================================
 
 const KEY_READ_WRITE = "patVooLrBRWad4TAs.90ec7ef74526de7d40d9718240e4c98bfd8fcc786ada7ac6cfbb632796e8d24e"; 
@@ -57,6 +57,7 @@ const VOLT_PRIORITY = [
 
 const STOP_WORDS = new Set(['PANEL','CONTROL','PUMP','MOTOR','VOLT','VAC','PHASE','HP','ALARM','RELAY','SWITCH','FLOAT','NEMA','ENCLOSURE']);
 
+// Validation functions for data quality
 function isValidHP(hp) {
     const val = parseFloat(hp);
     return !isNaN(val) && val >= 0.1 && val <= 500;
@@ -74,13 +75,13 @@ function isValidPhase(phase) {
 class NaiveBayes {
     constructor() {
         this.vocab = new Set();
-        this.classCounts = { mfg: {}, enc: {}, hp: {}, volt: {}, phase: {} };
-        this.wordCounts = { mfg: {}, enc: {}, hp: {}, volt: {}, phase: {} };
-        this.classWordTotals = { mfg: {}, enc: {}, hp: {}, volt: {}, phase: {} };
-        this.totalDocs = { mfg: 0, enc: 0, hp: 0, volt: 0, phase: 0 };
-        this.priorLog = { mfg: {}, enc: {}, hp: {}, volt: {}, phase: {} };
-        this.fallbackLog = { mfg: {}, enc: {}, hp: {}, volt: {}, phase: {} };
-        this.wordLog = { mfg: {}, enc: {}, hp: {}, volt: {}, phase: {} };
+        this.classCounts = { mfg: {}, enc: {} };
+        this.wordCounts = { mfg: {}, enc: {} };
+        this.classWordTotals = { mfg: {}, enc: {} };
+        this.totalDocs = { mfg: 0, enc: 0 };
+        this.priorLog = { mfg: {}, enc: {} };
+        this.fallbackLog = { mfg: {}, enc: {} };
+        this.wordLog = { mfg: {}, enc: {} };
     }
     tokenize(text) { 
         return (String(text||'').toUpperCase().match(/[A-Z0-9\-]+/g) || [])
@@ -92,7 +93,7 @@ class NaiveBayes {
         tokens.forEach(t => this.vocab.add(t));
         
         for (const [category, rawLabel] of Object.entries(labels)) {
-            if (!rawLabel || rawLabel === '-' || rawLabel === 'null' || rawLabel === '') continue;
+            if (!rawLabel || rawLabel === '-' || rawLabel === 'null') continue;
             const label = String(rawLabel).trim();
             if (!label) continue;
             
@@ -109,7 +110,7 @@ class NaiveBayes {
     }
     finalize() {
         const V = this.vocab.size;
-        for (const cat of ['mfg', 'enc', 'hp', 'volt', 'phase']) {
+        for (const cat of ['mfg', 'enc']) {
             for (const label in this.classCounts[cat]) {
                 this.priorLog[cat][label] = Math.log(this.classCounts[cat][label] / this.totalDocs[cat]);
                 const denom = (this.classWordTotals[cat][label] || 0) + V;
@@ -238,53 +239,25 @@ async function buildMLBackground() {
     IS_BUILDING_ML = true;
     try {
         console.log("Building ML in background...");
-        
-        // Fetch from MAIN database instead of Legacy Panels
-        let mainRecords = [];
-        let offset = null;
-        let pages = 0;
-        const maxPages = 100; // Fetch up to 10,000 records (100 pages * 100 per page)
-        
-        do {
-            let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=100` +
-                          `&fields%5B%5D=Items`;
-            if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
-            
-            const resp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } });
-            if (!resp.ok) {
-                if (resp.status === 429) { 
-                    await new Promise(r => setTimeout(r, 500)); 
-                    continue; 
-                }
-                break;
-            }
-            const data = await resp.json();
-            if (data.records) mainRecords.push(...data.records);
-            offset = data.offset;
-            pages++;
-        } while (offset && pages < maxPages);
-        
+        const legacyData = await fetchAirtablePages(TABLE_LEGACY, 15, ['Manufacturer', 'Description']);
         const nb = new NaiveBayes();
-        mainRecords.forEach(r => {
-            const rawItems = r.fields['Items'];
-            const desc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
-            if (!desc) return;
-            
-            const extracted = extractSpecsStrict(desc);
-            
-            const labels = {};
-            if (extracted.mfg) labels.mfg = extracted.mfg;
-            if (extracted.enc) labels.enc = extracted.enc;
-            if (extracted.hp && isValidHP(extracted.hp)) labels.hp = extracted.hp;
-            if (extracted.volt && isValidVoltage(extracted.volt)) labels.volt = extracted.volt;
-            if (extracted.phase && isValidPhase(extracted.phase)) labels.phase = extracted.phase;
-            
-            // Only train if we have at least one valid label
-            if (Object.keys(labels).length > 0) {
-                nb.train(desc, labels);
+        legacyData.forEach(r => {
+            let mfgRaw = r.fields['Manufacturer'];
+            let enc = null;
+            let mfg = Array.isArray(mfgRaw) ? mfgRaw[0] : mfgRaw;
+
+            if (typeof mfg === 'string') {
+                const mfgUpper = mfg.toUpperCase();
+                if (mfgUpper.includes('4X') || mfgUpper.includes('NEMA') || mfgUpper.includes('ENCLOSURE') || mfgUpper.includes('POLY')) {
+                    enc = mfgUpper.replace('ENCLOSURE', '').trim();
+                    mfg = null; 
+                }
             }
+            mfg = normalizeLegacyMfg(mfg);
+            let rawDesc = r.fields['Description'];
+            let desc = typeof rawDesc === 'string' ? rawDesc : Array.isArray(rawDesc) ? rawDesc.join(' ') : "";
+            nb.train(desc, { mfg: mfg, enc: enc });
         });
-        
         nb.finalize();
         CACHE_NB_MODEL = nb;
         console.log("ML Build Complete!");
@@ -725,35 +698,25 @@ export default {
                     const textToParse = fullDesc.toUpperCase() + " " + cleanId;
                     const extracted = extractSpecsStrict(textToParse);
                     
-                    const textToParse = fullDesc + " " + cleanId;
-                    const explicit = extractSpecsStrict(textToParse);
-
-                    let finalMfg = explicit.mfg;
-                    let finalEnc = explicit.enc;
-                    let finalHp = explicit.hp;
-                    let finalVolt = explicit.volt;
-                    let finalPhase = explicit.phase;
+                    // Calculate confidence score
+                    let confidence = 0;
+                    let source = 'none';
+                    let fieldCount = 0;
                     
-                    if (CACHE_NB_MODEL) {
-                        const bayesText = textToParse.slice(0, 1500); 
-                        if (!finalMfg) finalMfg = CACHE_NB_MODEL.predict(bayesText, 'mfg');
-                        if (!finalEnc) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
-                        if (!finalHp) {
-                            const predictedHp = CACHE_NB_MODEL.predict(bayesText, 'hp');
-                            if (predictedHp && isValidHP(predictedHp)) finalHp = predictedHp;
-                        }
-                        if (!finalVolt) {
-                            const predictedVolt = CACHE_NB_MODEL.predict(bayesText, 'volt');
-                            if (predictedVolt && isValidVoltage(predictedVolt)) finalVolt = predictedVolt;
-                        }
-                        if (!finalPhase) {
-                            const predictedPhase = CACHE_NB_MODEL.predict(bayesText, 'phase');
-                            if (predictedPhase && isValidPhase(predictedPhase)) finalPhase = predictedPhase;
-                        }
+                    if (extracted.mfg) fieldCount++;
+                    if (extracted.hp && isValidHP(extracted.hp)) fieldCount++;
+                    if (extracted.volt && isValidVoltage(extracted.volt)) fieldCount++;
+                    if (extracted.phase && isValidPhase(extracted.phase)) fieldCount++;
+                    if (extracted.enc) fieldCount++;
+                    
+                    if (fieldCount > 0) {
+                        // Regex extraction base confidence: 60 points
+                        // Bonus: +8 points per field extracted (up to 100)
+                        confidence = Math.min(60 + (fieldCount * 8), 95);
+                        source = 'regex';
                     }
-
-                    let finalCategory = null;
-
+                    
+                    // Check if healer has overrides for this panel
                     const overrides = CACHE_HEALED[cleanId];
                     if (overrides && Object.keys(overrides).length > 0) {
                         // Healer overrides get 95-100 confidence

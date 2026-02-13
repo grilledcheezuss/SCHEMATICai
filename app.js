@@ -1,4 +1,3 @@
-// --- SCHEMATICA ai v2.4.3 (Strict Keyword Boundaries) ---
 const APP_VERSION = "v2.4.3";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
@@ -363,6 +362,491 @@ class DemoManager {
     }
 }
 
+// ==========================================
+// 📊 ANALYSIS MANAGER - Mass PDF Analysis
+// ==========================================
+class AnalysisManager {
+    static isRunning = false;
+    static isPaused = false;
+    static analyzed = 0;
+    static total = 0;
+    static results = [];
+    static startTime = null;
+    static currentOffset = null;
+    static abortController = null;
+    
+    static togglePanel() {
+        const content = document.getElementById('pdf-analysis-content');
+        const icon = document.getElementById('analysis-toggle-icon');
+        const panel = document.getElementById('pdf-analysis-panel');
+        
+        if (content.classList.contains('collapsed')) {
+            content.classList.remove('collapsed');
+            panel.classList.remove('collapsed-state');
+            icon.textContent = '▲';
+        } else {
+            content.classList.add('collapsed');
+            panel.classList.add('collapsed-state');
+            icon.textContent = '▼';
+        }
+    }
+    
+    static async start() {
+        if (this.isRunning) return;
+        
+        const confirm = window.confirm(
+            'This will analyze all PDFs in the database.\n\n' +
+            '• Analysis may take several hours\n' +
+            '• You can pause/resume at any time\n' +
+            '• Results are saved as you go\n\n' +
+            'Continue?'
+        );
+        
+        if (!confirm) return;
+        
+        this.isRunning = true;
+        this.isPaused = false;
+        this.analyzed = 0;
+        this.total = 0;
+        this.results = [];
+        this.startTime = Date.now();
+        this.abortController = new AbortController();
+        this.currentOffset = null;
+        
+        document.getElementById('analysis-progress').style.display = 'block';
+        document.getElementById('analysis-status').textContent = 'Starting...';
+        document.getElementById('analysis-status').style.color = 'var(--lsu-gold)';
+        
+        const savedProgress = localStorage.getItem('analysis_progress');
+        if (savedProgress) {
+            const data = JSON.parse(savedProgress);
+            this.results = data.results || [];
+            this.analyzed = data.analyzed || 0;
+            this.currentOffset = data.offset || null;
+        }
+        
+        await this.fetchAndAnalyze();
+    }
+    
+    static async fetchAndAnalyze() {
+        const BATCH_SIZE = 100;
+        const DELAY_BETWEEN_PDFS = 200;
+        
+        try {
+            while (this.isRunning && !this.isPaused) {
+                let url = `${WORKER_URL}?target=GET_PDF_URLS&limit=${BATCH_SIZE}`;
+                if (this.currentOffset) {
+                    url += `&offset=${encodeURIComponent(this.currentOffset)}`;
+                }
+                
+                const response = await fetch(url, { signal: this.abortController.signal });
+                const data = await response.json();
+                
+                if (!data.success || !data.pdfs || data.pdfs.length === 0) {
+                    console.log('No more PDFs to analyze');
+                    break;
+                }
+                
+                if (this.total === 0) {
+                    this.total = this.analyzed + (data.pdfs.length * 75);
+                }
+                
+                this.currentOffset = data.offset;
+                
+                for (const pdf of data.pdfs) {
+                    if (this.isPaused || !this.isRunning) break;
+                    
+                    await this.analyzePdf(pdf);
+                    this.analyzed++;
+                    this.updateProgress(pdf.name);
+                    
+                    if (this.analyzed % 10 === 0) {
+                        this.saveProgress();
+                    }
+                    
+                    await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_PDFS));
+                }
+                
+                if (!this.currentOffset) {
+                    console.log('Reached end of database');
+                    break;
+                }
+                
+                while (this.isPaused && this.isRunning) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+            
+            if (this.isRunning && !this.isPaused) {
+                this.complete();
+            }
+            
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                console.log('Analysis stopped by user');
+            } else {
+                console.error('Analysis error:', err);
+                alert('Analysis error: ' + err.message);
+            }
+            this.stop();
+        }
+    }
+    
+    static async analyzePdf(pdf) {
+        try {
+            const proxyUrl = `${WORKER_URL}?target=PDF&url=${encodeURIComponent(pdf.url)}`;
+            const pdfResponse = await fetch(proxyUrl, { signal: this.abortController.signal });
+            
+            if (!pdfResponse.ok) {
+                throw new Error(`Failed to fetch PDF: ${pdfResponse.status}`);
+            }
+            
+            const pdfBlob = await pdfResponse.blob();
+            const pdfUrl = URL.createObjectURL(pdfBlob);
+            
+            const loadingTask = pdfjsLib.getDocument(pdfUrl);
+            const pdfDoc = await loadingTask.promise;
+            
+            const analysis = {
+                id: pdf.id,
+                name: pdf.name,
+                url: pdf.url,
+                pageCount: pdfDoc.numPages,
+                detectedFields: {},
+                timestamp: new Date().toISOString()
+            };
+            
+            if (pdfDoc.numPages > 0) {
+                const page = await pdfDoc.getPage(1);
+                const viewport = page.getViewport({ scale: 1.0 });
+                const textContent = await page.getTextContent();
+                
+                analysis.pageDimensions = {
+                    width: viewport.width,
+                    height: viewport.height
+                };
+                
+                analysis.detectedFields = this.detectFields(textContent, viewport);
+            }
+            
+            this.results.push(analysis);
+            URL.revokeObjectURL(pdfUrl);
+            
+        } catch (err) {
+            console.error(`Failed to analyze ${pdf.name}:`, err);
+        }
+    }
+    
+    static detectFields(textContent, viewport) {
+        const fields = {};
+        const items = textContent.items;
+        
+        const normalize = (x, y) => ({
+            x: (x / viewport.width * 100).toFixed(2),
+            y: ((viewport.height - y) / viewport.height * 100).toFixed(2)
+        });
+        
+        /**
+         * Proximity thresholds for field detection
+         * These values are in PDF coordinate units (not pixels) as provided by PDF.js transform[4] (x) and transform[5] (y).
+         * Values are empirically chosen based on common PDF submittal layouts where:
+         * - Labels and values on the same line are typically within 20 units vertically
+         * - Multi-line values (label above, value below) are within 50 units vertically
+         * - Values can appear slightly to the left of labels (up to -50 units horizontally)
+         */
+        const SAME_LINE_THRESHOLD = 20;      // Max Y-distance for same line
+        const MAX_VERTICAL_DISTANCE = 50;    // Max Y-distance for multi-line
+        const MIN_HORIZONTAL_OFFSET = -50;   // Min X-distance (allows left placement)
+        
+        // Helper: Check if text looks like a date
+        const isDateLike = (text) => {
+            return /\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/.test(text) || /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/.test(text);
+        };
+        
+        // Helper: Check if text is title case / capitalized (likely a name)
+        const isTitleCase = (text) => {
+            return /^[A-Z][a-z]+/.test(text) && text.length > 2;
+        };
+        
+        /**
+         * Find a value near a label using spatial proximity
+         * @param {number} startIdx - Index of the label item in the items array
+         * @param {number} maxDistance - Maximum number of items to search ahead (default: 10)
+         * @param {function|null} validator - Optional function to validate candidate text
+         * @returns {object|null} Object with {item, text} if found, null otherwise
+         * 
+         * Proximity rules:
+         * - Same line: Y-distance < 20 units
+         * - Multi-line: Y-distance < 50 units AND X-offset > -50 units
+         */
+        const findNearbyValue = (startIdx, maxDistance = 10, validator = null) => {
+            const labelItem = items[startIdx];
+            const labelX = labelItem.transform[4];
+            const labelY = labelItem.transform[5];
+            
+            for (let i = startIdx + 1; i < Math.min(items.length, startIdx + maxDistance); i++) {
+                const candidate = items[i];
+                const text = candidate.str.trim();
+                if (!text || text.length < 2) continue;
+                
+                // Skip if it looks like another label
+                if (/^[A-Z\s]+:$/i.test(text)) continue;
+                
+                // If validator provided, use it
+                if (validator && !validator(text)) continue;
+                
+                // Check proximity (allow values within reasonable distance)
+                const deltaY = Math.abs(candidate.transform[5] - labelY);
+                const deltaX = candidate.transform[4] - labelX;
+                
+                // Value should be: same line (small deltaY) or below (larger deltaY but reasonable)
+                if (deltaY < SAME_LINE_THRESHOLD || (deltaY < MAX_VERTICAL_DISTANCE && deltaX > MIN_HORIZONTAL_OFFSET)) {
+                    return { item: candidate, text };
+                }
+            }
+            return null;
+        };
+        
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const text = item.str.trim();
+            if (!text) continue;
+            
+            const textUpper = text.toUpperCase();
+            const x = item.transform[4];
+            const y = item.transform[5];
+            const normalized = normalize(x, y);
+            
+            // CUSTOMER DETECTION - match multiple variations
+            if (!fields.customer && /^(CUSTOMER|CLIENT|COMPANY|OWNER|FOR|ATTN|TO)S?:?$/i.test(textUpper)) {
+                const found = findNearbyValue(i, 10, (t) => isTitleCase(t) || /[A-Z]{2,}/.test(t));
+                if (found) {
+                    const valueNorm = normalize(found.item.transform[4], found.item.transform[5]);
+                    fields.customer = {
+                        label: { text: item.str, x: normalized.x, y: normalized.y },
+                        value: { text: found.text, x: valueNorm.x, y: valueNorm.y }
+                    };
+                }
+            }
+            
+            // JOB/PROJECT DETECTION - match multiple variations
+            if (!fields.jobNo && /^(JOB|PROJECT|P\. ?O\. ?|WO|WORK\s*ORDER)[\s#NO\.]*:?$/i.test(textUpper)) {
+                const found = findNearbyValue(i, 10, (t) => /[A-Z0-9\-]+/.test(t) && t.length > 1);
+                if (found) {
+                    const valueNorm = normalize(found.item.transform[4], found.item.transform[5]);
+                    fields.jobNo = {
+                        label: { text: item.str, x: normalized.x, y: normalized.y },
+                        value: { text: found.text, x: valueNorm.x, y: valueNorm.y }
+                    };
+                }
+            }
+            
+            // DATE DETECTION - match multiple variations and date formats
+            if (!fields.date && /^(DATE|SUBMITTAL|REVISION|ISSUED|REV)[\s\w]*:?$/i.test(textUpper)) {
+                const found = findNearbyValue(i, 8, isDateLike);
+                if (found) {
+                    const valueNorm = normalize(found.item.transform[4], found.item.transform[5]);
+                    fields.date = {
+                        label: { text: item.str, x: normalized.x, y: normalized.y },
+                        value: { text: found.text, x: valueNorm.x, y: valueNorm.y }
+                    };
+                }
+            }
+            
+            // PANEL ID - keep existing pattern + enhance with label detection
+            if (!fields.panelId) {
+                if (/CP-\d{4}/i.test(text)) {
+                    fields.panelId = {
+                        label: { text: "Panel ID", x: normalized.x, y: normalized.y },
+                        value: { text: text, x: normalized.x, y: normalized.y }
+                    };
+                } else if (/^(PANEL|TAG|EQUIPMENT)[\s#]*:?$/i.test(textUpper)) {
+                    const found = findNearbyValue(i, 5, (t) => /CP-\d{4}|[A-Z]{2,}-\d+/.test(t));
+                    if (found) {
+                        const valueNorm = normalize(found.item.transform[4], found.item.transform[5]);
+                        fields.panelId = {
+                            label: { text: item.str, x: normalized.x, y: normalized.y },
+                            value: { text: found.text, x: valueNorm.x, y: valueNorm.y }
+                        };
+                    }
+                }
+            }
+        }
+        
+        return fields;
+    }
+    
+    static updateProgress(currentPdf) {
+        const percent = this.total > 0 ? Math.round((this.analyzed / this.total) * 100) : 0;
+        const elapsed = (Date.now() - this.startTime) / 1000 / 60;
+        const speed = elapsed > 0 ? Math.round(this.analyzed / elapsed) : 0;
+        const remaining = speed > 0 ? Math.round((this.total - this.analyzed) / speed) : 0;
+        
+        document.getElementById('analysis-count').textContent = this.analyzed;
+        document.getElementById('analysis-total').textContent = this.total;
+        document.getElementById('analysis-percent').textContent = percent;
+        document.getElementById('analysis-progress-fill').style.width = `${Math.min(percent, 100)}%`;
+        document.getElementById('analysis-current-pdf').textContent = currentPdf;
+        document.getElementById('analysis-speed').textContent = speed;
+        document.getElementById('analysis-eta').textContent = remaining > 60 
+            ? `${Math.floor(remaining / 60)}h ${remaining % 60}m`
+            : `${remaining}m`;
+        
+        if (this.analyzed % 50 === 0) {
+            this.showStats();
+        }
+    }
+    
+    static showStats() {
+        const stats = this.calculateStats();
+        
+        const statsHtml = `
+            • Customer field: ${stats.customer.count} / ${this.analyzed} (${stats.customer.percent}%)<br>
+            • Job Number: ${stats.jobNo.count} / ${this.analyzed} (${stats.jobNo.percent}%)<br>
+            • Date: ${stats.date.count} / ${this.analyzed} (${stats.date.percent}%)<br>
+            • Panel ID: ${stats.panelId.count} / ${this.analyzed} (${stats.panelId.percent}%)
+        `;
+        
+        const positionsHtml = `
+            • Customer: x=${stats.customer.avgX}%, y=${stats.customer.avgY}% (${stats.customer.confidence}% confidence)<br>
+            • Job #: x=${stats.jobNo.avgX}%, y=${stats.jobNo.avgY}% (${stats.jobNo.confidence}% confidence)<br>
+            • Date: x=${stats.date.avgX}%, y=${stats.date.avgY}% (${stats.date.confidence}% confidence)
+        `;
+        
+        document.getElementById('analysis-stats').innerHTML = statsHtml;
+        document.getElementById('analysis-positions').innerHTML = positionsHtml;
+        document.getElementById('analysis-results').style.display = 'block';
+    }
+    
+    static calculateStats() {
+        const total = this.results.length;
+        
+        const getFieldStats = (fieldName) => {
+            const withField = this.results.filter(r => r.detectedFields[fieldName]);
+            const count = withField.length;
+            const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+            
+            if (count === 0) {
+                return { count, percent, avgX: '-', avgY: '-', confidence: 0 };
+            }
+            
+            const positions = withField.map(r => ({
+                x: parseFloat(r.detectedFields[fieldName].label.x),
+                y: parseFloat(r.detectedFields[fieldName].label.y)
+            }));
+            
+            const avgX = (positions.reduce((sum, p) => sum + p.x, 0) / count).toFixed(1);
+            const avgY = (positions.reduce((sum, p) => sum + p.y, 0) / count).toFixed(1);
+            
+            const xVariance = positions.map(p => Math.abs(p.x - avgX)).reduce((sum, v) => sum + v, 0) / count;
+            const yVariance = positions.map(p => Math.abs(p.y - avgY)).reduce((sum, v) => sum + v, 0) / count;
+            const confidence = Math.max(0, 100 - Math.round((xVariance + yVariance) * 2));
+            
+            return { count, percent, avgX, avgY, confidence };
+        };
+        
+        return {
+            customer: getFieldStats('customer'),
+            jobNo: getFieldStats('jobNo'),
+            date: getFieldStats('date'),
+            panelId: getFieldStats('panelId')
+        };
+    }
+    
+    static togglePause() {
+        this.isPaused = !this.isPaused;
+        const btn = document.getElementById('analysis-pause-btn');
+        const status = document.getElementById('analysis-status');
+        
+        if (this.isPaused) {
+            btn.innerHTML = '▶️ Resume';
+            status.textContent = 'Paused';
+            status.style.color = '#f59e0b';
+            this.saveProgress();
+        } else {
+            btn.innerHTML = '⏸ Pause';
+            status.textContent = 'Running...';
+            status.style.color = 'var(--lsu-gold)';
+        }
+    }
+    
+    static stop() {
+        if (!this.isRunning) return;
+        
+        const confirm = window.confirm('Stop analysis? Progress will be saved.');
+        if (!confirm) return;
+        
+        this.isRunning = false;
+        this.isPaused = false;
+        
+        if (this.abortController) {
+            this.abortController.abort();
+        }
+        
+        document.getElementById('analysis-status').textContent = 'Stopped';
+        document.getElementById('analysis-status').style.color = '#ef4444';
+        
+        this.saveProgress();
+        this.showStats();
+    }
+    
+    static complete() {
+        this.isRunning = false;
+        this.isPaused = false;
+        
+        document.getElementById('analysis-status').textContent = 'Complete! 🎉';
+        document.getElementById('analysis-status').style.color = '#22c55e';
+        
+        this.showStats();
+        this.saveProgress();
+        
+        alert(`Analysis complete!\n\nAnalyzed ${this.analyzed} PDFs\n\nClick "Export" to download results.`);
+    }
+    
+    static saveProgress() {
+        const progress = {
+            analyzed: this.analyzed,
+            total: this.total,
+            offset: this.currentOffset,
+            results: this.results,
+            timestamp: new Date().toISOString()
+        };
+        
+        localStorage.setItem('analysis_progress', JSON.stringify(progress));
+    }
+    
+    static exportResults() {
+        if (this.results.length === 0) {
+            alert('No results to export yet.');
+            return;
+        }
+        
+        const stats = this.calculateStats();
+        
+        const exportData = {
+            metadata: {
+                totalAnalyzed: this.analyzed,
+                totalPDFs: this.total,
+                timestamp: new Date().toISOString(),
+                completionPercent: this.total > 0 ? Math.round((this.analyzed / this.total) * 100) : 0
+            },
+            statistics: stats,
+            results: this.results
+        };
+        
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        a.download = `pdf-field-analysis-${this.analyzed}-pdfs-${timestamp}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        alert(`Exported analysis of ${this.analyzed} PDFs!`);
+    }
+}
 class ProfileManager {
     static getCustomProfiles() {
         const stored = localStorage.getItem('cox_custom_profiles');
