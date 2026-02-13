@@ -225,8 +225,12 @@ class DataLoader {
                 console.group(`📥 Sync Batch ${loop}`); 
                 
                 if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
-                    const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); 
-                    btn.innerText = `⬇️ UPDATING ${pct}%`; 
+                    if(loop === 1 && fetchedCount === 0) {
+                        btn.innerText = `⏳ Initializing...`;
+                    } else {
+                        const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); 
+                        btn.innerText = `⬇️ UPDATING ${pct}%`; 
+                    }
                 }
                 
                 const urlParams = `&pageSize=100${offset ? '&offset='+encodeURIComponent(offset) : ''}&sort%5B0%5D%5Bdirection%5D=${dir}`;
@@ -1494,11 +1498,12 @@ class LayoutScanner {
 }
 
 class FeedbackService {
-    static currentId = null; static lockout = new Set();
+    static currentId = null; static currentDownBtn = null; static lockout = new Set();
     static async up(id, btn, crit) { if(btn.classList.contains('voted-up')) return; btn.classList.add('voted-up'); const implicit = {}; if(crit && crit.mfg !== 'Any') implicit.mfg = crit.mfg; if(crit && crit.hp !== 'Any') implicit.hp = crit.hp; if(crit && crit.volt !== 'Any') implicit.volt = crit.volt; if(crit && crit.phase !== 'Any') implicit.phase = crit.phase; if(crit && crit.enc !== 'Any') implicit.enc = crit.enc; const payload = { records: [{ fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(implicit) } }] }; await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
     
-    static down(id) { 
+    static down(id, btn) { 
         this.currentId = id; 
+        if(btn) this.currentDownBtn = btn;
         
         this.setupInput('fb-mfg', [...AI_TRAINING_DATA.MANUFACTURERS].sort(), 'mfg'); 
         this.setupInput('fb-hp', AI_TRAINING_DATA.DATA.HP, 'hp'); 
@@ -1565,8 +1570,9 @@ class FeedbackService {
         const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections) } }] }; 
         
         // Show instant UI feedback
+        if(this.currentDownBtn) this.currentDownBtn.classList.add('voted-down');
         this.close(); 
-        alert("Thank you! System will learn from this."); 
+        alert("Thank you! System will learn from this.");
         
         // Submit in background - fire and forget for instant UI response
         // Note: Using fetch instead of sendBeacon because API requires custom auth headers
@@ -1986,7 +1992,8 @@ class PdfViewer {
             const viewport = page.getViewport({ scale: this.currentScale });
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
             wrapper.style.width = Math.floor(viewport.width) + "px"; 
-            wrapper.dataset.pageNumber = i; 
+            wrapper.dataset.pageNumber = i;
+            wrapper.style.animationDelay = `${Math.min((i - 1) * 0.05, 0.5)}s`; // Staggered animation, max 0.5s delay
             
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
@@ -2161,7 +2168,7 @@ class UI {
                 <div class="badge-row">${b}</div>
                 <div class="card-actions">
                     <button class="thumb-btn up" onclick="event.stopPropagation();FeedbackService.up('${i.id}',this, ${critJson})">👍</button>
-                    <button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${i.id}')">👎</button>
+                    <button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${i.id}',this)">👎</button>
                 </div>
             `; 
             
