@@ -184,13 +184,14 @@ class DataLoader {
         }
 
         console.log("🚀 Starting Preload...");
-        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "🔒 PREPARING...";
+        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "⏳ INITIALIZING...";
         
         const loads = [
             fetch('cover_sheet_template.pdf').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.TEMPLATE_BYTES=b; console.log("✅ PDF Template Loaded");}).catch(e=>console.warn("⚠️ PDF Template Missing"))
         ];
         await Promise.allSettled(loads);
 
+        btn.innerText = "🔒 PREPARING...";
         await new Promise(r => setTimeout(r, 100)); 
         const p = localStorage.getItem('cox_pass'); await CacheService.prepareKey(p); await DB.deleteLegacy();
         let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
@@ -202,7 +203,7 @@ class DataLoader {
         if(hasData) { 
             if(window.LOCAL_DB.length > 7000) { localStorage.setItem('cox_db_complete', 'true'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; }
             if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; } else { btn.innerText = "⬇️ RESUMING..."; } 
-        } else { btn.innerText = "⬇️ SYNCING..."; }
+        } else { btn.innerText = "⏳ INITIALIZING SYNC..."; await new Promise(r => setTimeout(r, 200)); btn.innerText = "⬇️ SYNCING..."; }
         
         await this.fetchPartition('desc', btn);
         if(!btn.classList.contains('error')) { 
@@ -1560,10 +1561,21 @@ class FeedbackService {
         
         if (Object.keys(corrections).length === 0) return alert("Please select a correction."); 
         
+        // Prepare payload for submission
         const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections) } }] }; 
-        await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
+        
+        // Show instant UI feedback
         this.close(); 
         alert("Thank you! System will learn from this."); 
+        
+        // Submit in background - fire and forget for instant UI response
+        // Note: Using fetch instead of sendBeacon because API requires custom auth headers
+        fetch(`${WORKER_URL}?target=FEEDBACK`, { 
+            method: 'POST', 
+            headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(payload),
+            keepalive: true  // Ensures request completes even if page is navigating away
+        }).catch(e => console.warn('Feedback submission failed:', e));
     }
     static resetLockout() { this.lockout.clear(); }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
@@ -2066,9 +2078,21 @@ class UI {
     static toggleMenu() { document.getElementById('main-menu').classList.toggle('visible'); }
     
     static pop() { 
+        // Save current filter values before repopulating
         const m = document.getElementById('mfgInput'); const cv = m.value; 
+        const savedValues = {
+            hp: document.getElementById('hpInput').value,
+            volt: document.getElementById('voltInput').value,
+            phase: document.getElementById('phaseInput').value,
+            enc: document.getElementById('encInput').value,
+            cat: document.getElementById('catInput').value,
+            keyword: document.getElementById('keywordInput').value
+        };
         
-        const cleanList = Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort();
+        // Use found manufacturers if available, otherwise use training data
+        const cleanList = window.FOUND_MFGS.size > 0 
+            ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
+            : [...AI_TRAINING_DATA.MANUFACTURERS].sort();
         
         m.innerHTML='<option value="Any">Any</option>'; 
         cleanList.forEach(v=>m.add(new Option(v,v))); 
@@ -2077,10 +2101,16 @@ class UI {
         ['hp','volt','phase','enc'].forEach(k=>{ 
             const s=document.getElementById(k+'Input'); 
             if(!s)return; 
-            const d = (k==='enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()]; 
+            const d = (k==='enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()];
             s.innerHTML='<option value="Any">Any</option>'; 
             d.forEach(v=>s.add(new Option(v,v))); 
+            // Restore saved value
+            if(savedValues[k]) s.value = savedValues[k];
         }); 
+        
+        // Restore category and keyword (these don't get repopulated, but restore just in case)
+        if(savedValues.cat) document.getElementById('catInput').value = savedValues.cat;
+        if(savedValues.keyword) document.getElementById('keywordInput').value = savedValues.keyword;
     }
 
     static render(res, crit, totalCount) { 

@@ -98,7 +98,7 @@ Custom profiles can be created through:
 
 ### Method 1: Upload Layout (Recommended)
 
-1. **Open Generator Controls**
+1. **Open Control Panel**
    - Click the menu (☰) → "Submittal Generator"
    - Generator panel appears on the right side
 
@@ -172,7 +172,7 @@ Custom profiles can be created through:
 
 1. **Open Project Context Panel**
    - Expand "🔬 Project Context & Sensitive Data"
-   - Located in Generator Controls panel
+   - Located in Control Panel
 
 2. **Configure Redaction Toggles**
    - All fields checked by default (all redacted)
