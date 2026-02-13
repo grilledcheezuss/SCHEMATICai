@@ -60,9 +60,11 @@ const STOP_WORDS = new Set(['PANEL','CONTROL','PUMP','MOTOR','VOLT','VAC','PHASE
 // These codes prevent regex parsing (e.g., "%%U7.5HP" won't match HP patterns)
 function normalizeCADText(text) {
     if (!text || typeof text !== 'string') return text;
-    // Strip common CAD control codes: %%U, %%O, %%D (degree symbol), %%P (plus/minus), %%C (diameter), etc.
+    // Strip common CAD control codes:
+    // - %%X (single letter): %%U, %%O, %%D (degree), %%P (plus/minus), %%C (diameter), etc.
+    // - %%nnn (exactly 3 digits): ASCII character codes like %%175
     // Match both uppercase and lowercase variants
-    return text.replace(/%%[A-Za-z0-9]/gi, '');
+    return text.replace(/%%(?:[A-Za-z]|\d{3})/g, '');
 }
 
 function isValidHP(hp) {
@@ -93,7 +95,7 @@ class NaiveBayes {
     tokenize(text) { 
         // Normalize CAD control codes before tokenization
         const normalized = normalizeCADText(text);
-        return (String(normalized||'').toUpperCase().match(/[A-Z0-9\-]+/g) || [])
+        return (String(normalized).toUpperCase().match(/[A-Z0-9\-]+/g) || [])
             .filter(w => w.length > 2 && !STOP_WORDS.has(w)); 
     }
     train(text, labels) {
