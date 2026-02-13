@@ -1906,7 +1906,7 @@ class PdfViewer {
             }
 
             // Use the new PDF_BY_ID endpoint
-            const proxyUrl = `${WORKER_URL}?target=pdf_by_id&id=${encodeURIComponent(id)}`;
+            const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(id)}`;
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
             
