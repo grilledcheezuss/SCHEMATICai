@@ -3,6 +3,16 @@ const APP_VERSION = "v2.4.4";
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
+// Redaction checkbox IDs used for auto-scan detection
+const REDACTION_CHECKBOX_IDS = [
+    'toggle-cust', 'toggle-job', 'toggle-type', 'toggle-cpid', 
+    'toggle-date', 'toggle-stage', 'toggle-po', 'toggle-serial',
+    'toggle-company', 'toggle-address', 'toggle-phone', 'toggle-fax'
+];
+
+// Preloading configuration
+const PRELOAD_START_DELAY_MS = 500; // Delay before starting preload after search completes
+
 window.TEMPLATE_BYTES = null;
 
 const LAYOUT_RULES = {
@@ -1689,6 +1699,13 @@ class SearchEngine {
         document.getElementById('pagination-footer').style.display = res.length > 0 ? 'flex' : 'none';
         
         UI.toggleSearch(false);
+
+        // Preload PDFs for first page of results (in background)
+        if (res.length > 0) {
+            setTimeout(() => {
+                PdfController.preloadSearchResults(res);
+            }, PRELOAD_START_DELAY_MS);
+        }
     }
 
     static renderCurrentPage(crit) {
@@ -1913,6 +1930,51 @@ class PdfViewer {
         }
     }
 
+    static async loadFromCache(cached, panelId, fallbackUrl) {
+        // Load PDF from preloaded cache
+        this.url = fallbackUrl || "";
+        document.getElementById('pdf-fallback').style.display = 'none'; 
+        document.getElementById('pdf-toolbar').style.display = 'none';
+        document.getElementById('custom-pdf-viewer').style.display = 'none'; 
+        document.getElementById('pdf-viewer-frame').style.display = 'none';
+        document.getElementById('pdf-placeholder-text').style.display = 'flex';
+        document.getElementById('pdf-placeholder-text').innerText = "⚡ LOADING FROM CACHE...";
+
+        const fetchId = Date.now();
+        this.currentFetchId = fetchId;
+
+        try {
+            if (this.loadingTask) {
+                await this.loadingTask.destroy().catch(()=>{});
+                this.loadingTask = null;
+            }
+
+            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentBlobUrl = URL.createObjectURL(cached.blob);
+            
+            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
+            this.doc = await this.loadingTask.promise; 
+
+            if (window.innerWidth < 768) {
+                 this.currentScale = 0.8;
+                 UI.toggleSearch(true); 
+            } else {
+                 this.currentScale = 1.1;
+            }
+
+            document.getElementById('pdf-placeholder-text').style.display = 'none';
+            document.getElementById('pdf-toolbar').style.display = 'flex';
+            document.getElementById('custom-pdf-viewer').style.display = 'flex';
+
+            await this.renderStack();
+            console.log('✓ Loaded from cache'); 
+        } catch(e) {
+            console.error("Cache Load Error:", e);
+            // Fall back to regular loading
+            this.loadById(panelId, fallbackUrl);
+        }
+    }
+
     static async load(url) {
         this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; 
@@ -2050,12 +2112,31 @@ class PdfViewer {
                 LayoutScanner.refreshProfileOptions();
                 SmartScanner.scanAllPages();
             }, 500); 
+        } else {
+            // Auto-scan if any redaction checkboxes are enabled
+            setTimeout(() => {
+                const anyChecked = REDACTION_CHECKBOX_IDS.some(id => {
+                    const el = document.getElementById(id);
+                    return el && el.type === 'checkbox' && el.checked;
+                });
+                
+                if (anyChecked) {
+                    SmartScanner.scanAllPages();
+                }
+            }, 500);
         }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
 }
 
 class PdfController {
+    static pdfCache = new Map(); // Cache for preloaded PDFs
+    static preloadQueue = [];
+    static isPreloading = false;
+    static PRELOAD_DELAY_MS = 250; // Delay between preload requests to avoid overwhelming browser/network
+    static CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+    static CACHE_MAX_SIZE = 20; // Maximum number of PDFs to cache
+
     static load(id, url) {
         document.getElementById('pdf-placeholder-text').style.display = 'none';
         const rec = window.ID_MAP.get(id);
@@ -2068,8 +2149,83 @@ class PdfController {
             return; 
         }
         
-        // Pass panel ID and fallback URL to PdfViewer
-        PdfViewer.loadById(id, url);
+        // Check cache first
+        const cached = this.pdfCache.get(id);
+        if (cached) {
+            PdfViewer.loadFromCache(cached, id, url);
+        } else {
+            // Pass panel ID and fallback URL to PdfViewer
+            PdfViewer.loadById(id, url);
+        }
+    }
+
+    static async preloadSearchResults(results) {
+        // Stop any in-progress preloading first
+        this.stopPreloading();
+        
+        // Preload first page of search results (top to bottom)
+        this.preloadQueue = results.slice(0, SearchEngine.pageSize).filter(r => r.id && !this.pdfCache.has(r.id));
+        this.isPreloading = true;
+        
+        for (const result of this.preloadQueue) {
+            if (!this.isPreloading) break; // Allow cancellation
+            
+            try {
+                const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(result.id)}`;
+                const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+                
+                if (resp.ok) {
+                    const arrayBuffer = await resp.arrayBuffer();
+                    this.pdfCache.set(result.id, {
+                        arrayBuffer: arrayBuffer,
+                        blob: new Blob([arrayBuffer], { type: "application/pdf" }),
+                        timestamp: Date.now()
+                    });
+                    console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
+                }
+            } catch (e) {
+                console.warn(`Failed to preload PDF ${result.id}:`, e);
+            }
+            
+            // Small delay between requests to avoid overwhelming the browser
+            await new Promise(resolve => setTimeout(resolve, this.PRELOAD_DELAY_MS));
+        }
+        
+        this.isPreloading = false;
+        this.clearCache(); // Clean up old entries after preloading
+    }
+
+    static stopPreloading() {
+        this.isPreloading = false;
+        this.preloadQueue = [];
+    }
+
+    static clearCache() {
+        // Clear old cached PDFs (older than CACHE_MAX_AGE_MS) and enforce size limit
+        const now = Date.now();
+        
+        // First, remove expired entries
+        const toDelete = [];
+        for (const [id, cached] of this.pdfCache.entries()) {
+            if (now - cached.timestamp > this.CACHE_MAX_AGE_MS) {
+                toDelete.push(id);
+            }
+        }
+        toDelete.forEach(id => this.pdfCache.delete(id));
+        
+        // If still over size limit, remove oldest entries (simple LRU eviction)
+        if (this.pdfCache.size > this.CACHE_MAX_SIZE) {
+            // Find oldest entries to remove
+            const entries = Array.from(this.pdfCache.entries());
+            const numToRemove = this.pdfCache.size - this.CACHE_MAX_SIZE;
+            
+            // Simple sort only on the entries we need to examine
+            entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+            
+            for (let i = 0; i < numToRemove; i++) {
+                this.pdfCache.delete(entries[i][0]);
+            }
+        }
     }
 }
 
