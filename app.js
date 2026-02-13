@@ -1689,6 +1689,13 @@ class SearchEngine {
         document.getElementById('pagination-footer').style.display = res.length > 0 ? 'flex' : 'none';
         
         UI.toggleSearch(false);
+
+        // Preload PDFs for first page of results (in background)
+        if (res.length > 0) {
+            setTimeout(() => {
+                PdfController.preloadSearchResults(res);
+            }, 500);
+        }
     }
 
     static renderCurrentPage(crit) {
@@ -1913,6 +1920,51 @@ class PdfViewer {
         }
     }
 
+    static async loadFromCache(cached, panelId, fallbackUrl) {
+        // Load PDF from preloaded cache
+        this.url = fallbackUrl || "";
+        document.getElementById('pdf-fallback').style.display = 'none'; 
+        document.getElementById('pdf-toolbar').style.display = 'none';
+        document.getElementById('custom-pdf-viewer').style.display = 'none'; 
+        document.getElementById('pdf-viewer-frame').style.display = 'none';
+        document.getElementById('pdf-placeholder-text').style.display = 'flex';
+        document.getElementById('pdf-placeholder-text').innerText = "⚡ LOADING FROM CACHE...";
+
+        const fetchId = Date.now();
+        this.currentFetchId = fetchId;
+
+        try {
+            if (this.loadingTask) {
+                await this.loadingTask.destroy().catch(()=>{});
+                this.loadingTask = null;
+            }
+
+            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentBlobUrl = URL.createObjectURL(cached.blob);
+            
+            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
+            this.doc = await this.loadingTask.promise; 
+
+            if (window.innerWidth < 768) {
+                 this.currentScale = 0.8;
+                 UI.toggleSearch(true); 
+            } else {
+                 this.currentScale = 1.1;
+            }
+
+            document.getElementById('pdf-placeholder-text').style.display = 'none';
+            document.getElementById('pdf-toolbar').style.display = 'flex';
+            document.getElementById('custom-pdf-viewer').style.display = 'flex';
+
+            await this.renderStack();
+            console.log('✓ Loaded from cache'); 
+        } catch(e) {
+            console.error("Cache Load Error:", e);
+            // Fall back to regular loading
+            this.loadById(panelId, fallbackUrl);
+        }
+    }
+
     static async load(url) {
         this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; 
@@ -2050,12 +2102,28 @@ class PdfViewer {
                 LayoutScanner.refreshProfileOptions();
                 SmartScanner.scanAllPages();
             }, 500); 
+        } else {
+            // Auto-scan if any redaction checkboxes are enabled
+            setTimeout(() => {
+                const anyChecked = ['toggle-cust', 'toggle-job', 'toggle-type', 'toggle-cpid', 
+                                   'toggle-date', 'toggle-stage', 'toggle-po', 'toggle-serial',
+                                   'toggle-company', 'toggle-address', 'toggle-phone', 'toggle-fax']
+                    .some(id => document.getElementById(id)?.checked);
+                
+                if (anyChecked) {
+                    SmartScanner.scanAllPages();
+                }
+            }, 500);
         }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
 }
 
 class PdfController {
+    static pdfCache = new Map(); // Cache for preloaded PDFs
+    static preloadQueue = [];
+    static isPreloading = false;
+
     static load(id, url) {
         document.getElementById('pdf-placeholder-text').style.display = 'none';
         const rec = window.ID_MAP.get(id);
@@ -2068,8 +2136,63 @@ class PdfController {
             return; 
         }
         
-        // Pass panel ID and fallback URL to PdfViewer
-        PdfViewer.loadById(id, url);
+        // Check cache first
+        const cached = this.pdfCache.get(id);
+        if (cached) {
+            PdfViewer.loadFromCache(cached, id, url);
+        } else {
+            // Pass panel ID and fallback URL to PdfViewer
+            PdfViewer.loadById(id, url);
+        }
+    }
+
+    static async preloadSearchResults(results) {
+        // Preload first page of search results (top to bottom)
+        this.preloadQueue = results.slice(0, SearchEngine.pageSize).filter(r => r.id && !this.pdfCache.has(r.id));
+        this.isPreloading = true;
+        
+        for (const result of this.preloadQueue) {
+            if (!this.isPreloading) break; // Allow cancellation
+            
+            try {
+                const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(result.id)}`;
+                const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+                
+                if (resp.ok) {
+                    const arrayBuffer = await resp.arrayBuffer();
+                    this.pdfCache.set(result.id, {
+                        arrayBuffer: arrayBuffer,
+                        blob: new Blob([arrayBuffer], { type: "application/pdf" }),
+                        timestamp: Date.now()
+                    });
+                    console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
+                }
+            } catch (e) {
+                console.warn(`Failed to preload PDF ${result.id}:`, e);
+            }
+            
+            // Small delay between requests to avoid overwhelming the browser
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        this.isPreloading = false;
+    }
+
+    static stopPreloading() {
+        this.isPreloading = false;
+        this.preloadQueue = [];
+    }
+
+    static clearCache() {
+        // Clear old cached PDFs (older than 5 minutes)
+        const now = Date.now();
+        const MAX_AGE = 5 * 60 * 1000;
+        
+        for (const [id, cached] of this.pdfCache.entries()) {
+            if (now - cached.timestamp > MAX_AGE) {
+                this.pdfCache.delete(id);
+            }
+        }
     }
 }
 
