@@ -351,6 +351,94 @@ export default {
                 return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
             }
 
+            if (target === 'GET_PDF_URLS') {
+                const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 1000);
+                const offset = url.searchParams.get('offset');
+                
+                let airtableUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}`;
+                airtableUrl += `?pageSize=${limit}`;
+                airtableUrl += `&fields%5B%5D=Control%20Panel%20Name`;
+                airtableUrl += `&fields%5B%5D=Control%20Panel%20PDF`;
+                
+                if (offset) {
+                    airtableUrl += `&offset=${encodeURIComponent(offset)}`;
+                }
+                
+                const response = await fetch(airtableUrl, {
+                    headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` }
+                });
+                
+                if (!response.ok) {
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        error: `Airtable API error: ${response.status}` 
+                    }), {
+                        status: response.status,
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+                
+                const data = await response.json();
+                
+                const pdfs = data.records
+                    .filter(record => record.fields['Control Panel PDF'])
+                    .map(record => ({
+                        id: record.id,
+                        name: record.fields['Control Panel Name'],
+                        url: record.fields['Control Panel PDF'][0].url
+                    }));
+                
+                return new Response(JSON.stringify({
+                    success: true,
+                    count: pdfs.length,
+                    offset: data.offset || null,
+                    pdfs: pdfs
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            if (target === 'ANALYZE_PDF') {
+                const pdfUrl = url.searchParams.get('url');
+                
+                if (!pdfUrl) {
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        error: 'Missing required parameter: url' 
+                    }), {
+                        status: 400,
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+                
+                // Fetch PDF
+                const pdfResponse = await fetch(decodeURIComponent(pdfUrl));
+                
+                if (!pdfResponse.ok) {
+                    return new Response(JSON.stringify({ 
+                        success: false, 
+                        error: `Failed to fetch PDF: ${pdfResponse.status}` 
+                    }), {
+                        status: pdfResponse.status,
+                        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                }
+                
+                const pdfBytes = await pdfResponse.arrayBuffer();
+                
+                // Placeholder implementation - full PDF parsing would require additional libraries
+                // For now, return basic metadata and structure for future implementation
+                return new Response(JSON.stringify({
+                    success: true,
+                    url: decodeURIComponent(pdfUrl),
+                    size: pdfBytes.byteLength,
+                    message: 'PDF analysis placeholder - full text extraction requires PDF parsing library',
+                    note: 'Consider client-side processing with PDF.js for detailed text extraction'
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
             // Immediately ready to authenticate!
             await ensureAuthAndFeedback();
 
