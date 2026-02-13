@@ -1994,7 +1994,7 @@ class PdfViewer {
 
             // Verify document is valid before continuing
             if (!this.isDocumentValid()) {
-                throw new Error('Loaded PDF document is invalid');
+                throw new Error('Loaded PDF document is null or destroyed after loading from cache');
             }
 
             if (window.innerWidth < 768) {
