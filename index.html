@@ -10,6 +10,7 @@
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
@@ -244,7 +245,7 @@
                 
                 <button class="search-btn" style="background:#dc2626 !important;" onclick="RedactionManager.deleteSelected()">❌ Delete Selected</button>
                 
-                <button class="search-btn" style="background:var(--app-accent) !important; margin-top:5px;" onclick="LayoutScanner.scanAllPages()">📄 Auto-Scan Page</button>
+                <button class="search-btn" style="background:var(--app-accent) !important; margin-top:5px;" onclick="SmartScanner.scanAllPages()">📄 Auto-Scan Page</button>
                 <button class="search-btn" style="background:#475569 !important;" onclick="PdfExporter.export()">💾 Export Redacted PDF</button>
                 <button class="search-btn" style="background:#555;" onclick="RedactionManager.clearAll()">🗑️ Clear All</button>
             </div>

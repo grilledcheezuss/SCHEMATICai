@@ -354,6 +354,29 @@ body.dark-mode .thumb-btn:hover { background: #3f3f46; }
 }
 body.demo-mode .page-toolbar { display: flex; }
 
+.rescan-page-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 8px;
+    transition: all 0.2s ease;
+}
+
+.rescan-page-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.scan-confidence {
+    margin-left: 8px;
+    font-size: 14px;
+    cursor: help;
+}
+
 .pdf-content-container {
     position: relative; 
     width: 100%;
