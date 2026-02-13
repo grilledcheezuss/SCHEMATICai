@@ -1854,7 +1854,7 @@ class PdfViewer {
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             
             if (!resp.ok) {
-                throw new Error(`Fetch Error: ${resp.status}`);
+                throw new Error(`Failed to fetch PDF by ID: ${resp.status}`);
             }
             
             const arrayBuffer = await resp.arrayBuffer();

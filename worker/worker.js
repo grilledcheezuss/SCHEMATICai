@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICai WORKER v2.4.4 (Instant Sync & Background ML)
+// 🧠 SCHEMATICA ai WORKER v2.4.4 (Instant Sync & Background ML)
 // ==========================================
 
 const KEY_READ_WRITE = "patVooLrBRWad4TAs.90ec7ef74526de7d40d9718240e4c98bfd8fcc786ada7ac6cfbb632796e8d24e"; 
