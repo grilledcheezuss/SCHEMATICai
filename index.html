@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.4.4)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.1)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -170,13 +170,6 @@
         <div id="gen-drag-handle" class="editor-header" style="cursor: move;">
             <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
                 <span class="editor-title">Control Panel</span>
-                <div class="active-page-indicator">
-                    <label style="font-size:9px; color:rgba(255,255,255,0.8);">Editing Page:</label>
-                    <select id="page-selector" onchange="PageContext.setActivePage(parseInt(this.value))" style="font-size:9px; padding:2px 4px; border-radius:3px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.1); color:white;">
-                        <option value="1">Page 1</option>
-                    </select>
-                    <span class="profile-badge" id="active-profile-badge" style="font-size:8px; background:rgba(255,255,255,0.2); padding:2px 6px; border-radius:3px; margin-left:4px;">Auto-Detect</span>
-                </div>
             </div>
             <div class="panel-controls">
                 <button class="panel-btn" onclick="DemoManager.minimizePanel()" title="Minimize to View">─</button>
@@ -184,8 +177,20 @@
             </div>
         </div>
         
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" data-tab="project" onclick="ControlPanel.switchTab('project')">
+                📄 Project Data
+            </button>
+            <button class="tab-btn" data-tab="editor" onclick="ControlPanel.switchTab('editor')">
+                🎨 Page Editor
+            </button>
+        </div>
+        
         <div id="redaction-editor-content">
-             
+            
+            <!-- Tab Content: Project Data -->
+            <div class="tab-content active" id="project-tab">
              <div class="editor-section" style="border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:10px;">
                 <div style="display:flex; gap:5px; margin-bottom:5px;">
                     <input type="text" id="new-profile-name" class="demo-input" placeholder="New Profile Name..." style="flex:1;">
@@ -250,6 +255,85 @@
                     <div style="display:flex; gap:5px;">
                         <div class="input-wrapper" data-field="phone" style="flex:1;"><span class="demo-label">Phone</span><input type="text" id="demo-phone" class="demo-input" placeholder="(123) 456-7890" oninput="RedactionManager.refreshContent()"></div>
                         <div class="input-wrapper" data-field="fax" style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(123) 456-7891" oninput="RedactionManager.refreshContent()"></div>
+                    </div>
+                </div>
+            </div>
+            </div>
+            
+            <!-- Tab Content: Page Editor -->
+            <div class="tab-content" id="editor-tab" style="display: none;">
+                <div style="padding:8px; border-bottom:1px solid var(--border-color); margin-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <label style="font-size:10px; color:var(--text-secondary);">Editing Page:</label>
+                        <select id="page-selector" onchange="PageContext.setActivePage(parseInt(this.value))" style="font-size:10px; padding:4px 6px; border-radius:3px; border:1px solid var(--border-color); background:var(--bg-controls); color:var(--text-primary); flex:1;">
+                            <option value="1">Page 1</option>
+                        </select>
+                    </div>
+                    <div style="font-size:9px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+                        <span>Profile:</span>
+                        <span class="profile-badge" id="active-profile-badge" style="font-size:9px; background:var(--app-primary); color:white; padding:3px 8px; border-radius:3px; flex:1; text-align:center;">Auto-Detect</span>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom:15px;">
+                    <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom:8px; padding:0 8px;">Redaction Toggles (Check to Include)</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; font-size:10px; padding:0 8px;">
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-cust-editor" checked onchange="document.getElementById('toggle-cust').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Customer
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-job-editor" checked onchange="document.getElementById('toggle-job').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Job
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-type-editor" checked onchange="document.getElementById('toggle-type').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> System
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-cpid-editor" checked onchange="document.getElementById('toggle-cpid').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Panel ID
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-date-editor" checked onchange="document.getElementById('toggle-date').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Date
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-stage-editor" checked onchange="document.getElementById('toggle-stage').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Stage
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-po-editor" checked onchange="document.getElementById('toggle-po').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> PO Number
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-serial-editor" checked onchange="document.getElementById('toggle-serial').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Serial
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-company-editor" checked onchange="document.getElementById('toggle-company').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Company
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-address-editor" checked onchange="document.getElementById('toggle-address').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Address
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-phone-editor" checked onchange="document.getElementById('toggle-phone').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Phone
+                        </label>
+                        <label class="toggle-item" style="display:flex; align-items:center; cursor:pointer;">
+                            <input type="checkbox" id="toggle-fax-editor" checked onchange="document.getElementById('toggle-fax').checked = this.checked; RedactionManager.refreshContent()" style="margin-right:6px; width:16px; height:16px;"> Fax
+                        </label>
+                    </div>
+                </div>
+                
+                <div style="padding:0 8px; margin-bottom:15px;">
+                    <button class="search-btn" style="width:100%; background:var(--app-accent) !important; font-size:10px; padding:8px;" onclick="SmartScanner.rescanPage(PageContext.currentPage)">
+                        🔄 Re-scan Current Page
+                    </button>
+                </div>
+                
+                <div class="editor-section" style="border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:10px;">
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" id="new-profile-name" class="demo-input" placeholder="New Profile Name..." style="flex:1;">
+                        <button class="search-btn" style="width:auto; padding:0 10px;" onclick="ProfileManager.saveCurrentPageAsProfile()">💾</button>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <button class="search-btn" style="background:#8b5cf6 !important; width:100%; font-size:10px; padding:6px;" onclick="ProfileUploader.openUploadDialog()">📤 Upload Layout for New Profile</button>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:10px; color:var(--text-secondary);">Manage Profiles:</span>
+                        <button class="search-btn" style="background:#475569 !important; font-size:10px; padding:2px 8px; height:24px;" onclick="ConfigExporter.export()">Export Config</button>
                     </div>
                 </div>
             </div>

@@ -675,3 +675,53 @@ body.editor-active .redaction-resize-handle {
 @media (min-width: 768px) {
     #menu-demo { display: flex; }
 }
+
+/* Tab Navigation Styles */
+.tab-navigation {
+    display: flex;
+    border-bottom: 2px solid var(--app-primary);
+    margin-bottom: 0;
+    background: var(--bg-card);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 11px;
+    transition: all 0.2s;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+    background: rgba(147, 51, 234, 0.1);
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    color: var(--app-primary);
+    border-bottom-color: var(--app-primary);
+    background: rgba(147, 51, 234, 0.05);
+}
+
+.tab-content {
+    padding: 0;
+}
+
+.toggle-item {
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.toggle-item:hover {
+    background: rgba(147, 51, 234, 0.05);
+}
+
+.toggle-item input[type="checkbox"] {
+    cursor: pointer;
+}
