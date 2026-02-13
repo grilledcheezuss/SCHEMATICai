@@ -385,8 +385,11 @@ export default {
                 // Normalize the panel ID: strip CP- prefix and file extensions
                 const cleanId = panelId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').trim();
                 
-                // Sanitize the ID to prevent formula injection (escape quotes and backslashes)
-                const sanitizeForFormula = (str) => str.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                // Validate that the panel ID contains only safe characters (alphanumeric, hyphens, underscores, periods)
+                // This prevents formula injection and other potential attacks
+                if (!/^[a-zA-Z0-9\-_.]+$/.test(cleanId)) {
+                    return new Response("Invalid panel ID format", { status: 400, headers: corsHeaders });
+                }
                 
                 // Query Airtable for the panel by Control Panel Name
                 // We need to search for multiple variants: cleanId, CP-cleanId, cleanId.dwg, cleanId.pdf, etc.
@@ -397,7 +400,7 @@ export default {
                     `${cleanId}.pdf`,
                     `CP-${cleanId}.dwg`,
                     `CP-${cleanId}.pdf`
-                ].map(sanitizeForFormula);
+                ];
                 
                 // Build a filter formula to match any variant
                 const filterFormula = `OR(${searchVariants.map(v => `{Control Panel Name}="${v}"`).join(',')})`;

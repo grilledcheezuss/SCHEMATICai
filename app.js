@@ -2038,7 +2038,7 @@ class PdfController {
         document.getElementById('pdf-placeholder-text').style.display = 'none';
         const rec = window.ID_MAP.get(id);
         if(rec && rec.displayId) { document.getElementById('demo-panel-id').value = rec.displayId; }
-        // Load PDF by panel ID via the worker (Option 1)
+        // Load PDF by panel ID, fetching fresh URL from Airtable via worker
         PdfViewer.loadById(id, url);
     }
 }
