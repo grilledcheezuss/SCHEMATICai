@@ -322,9 +322,9 @@ function extractSpecsStrict(t) {
         if (s.mfg) break;
     }
 
-    if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,30}(?:4XSS|STAINLESS|304|316)/i.test(t)) s.enc = '4XSS';
-    else if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,30}(?:POLY|POLYCARBONATE)/i.test(t)) s.enc = 'POLY';
-    else if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,30}(?:FIBERGLASS|FRP|NON-METALLIC|4XFG)/i.test(t)) s.enc = '4XFG';
+    if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,100}(?:4XSS|STAINLESS|304|316)/i.test(t)) s.enc = '4XSS';
+    else if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,100}(?:POLY|POLYCARBONATE)/i.test(t)) s.enc = 'POLY';
+    else if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,100}(?:FIBERGLASS|FRP|NON-METALLIC|4XFG)/i.test(t)) s.enc = '4XFG';
     
     if (!s.enc) {
         if (/\b(POLY|POLYCARBONATE)\b/i.test(t)) s.enc = 'POLY';
@@ -333,8 +333,9 @@ function extractSpecsStrict(t) {
             const ssMatch = t.match(/\b(4XSS|STAINLESS|304|316|NEMA 4X SS|SS)\b/i);
             if (ssMatch) {
                 const idx = ssMatch.index;
-                const context = t.substring(Math.max(0, idx - 50), idx + 50);
-                if (!/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET|SWITCH|SELECTOR|POS/i.test(context)) s.enc = '4XSS';
+                const context = t.substring(Math.max(0, idx - 100), idx + 100);
+                // Only reject if clearly hardware-related (not table context)
+                if (!/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET/i.test(context)) s.enc = '4XSS';
             }
         }
     }
@@ -343,7 +344,7 @@ function extractSpecsStrict(t) {
     const hpPatterns = [
         /\b(\d+)\s+(\d+\/\d+)\s*(?:HP|H\.P\.|HORSEPOWER|KW)\b/gi, 
         /(?:^|[^0-9a-z\/\.-])((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\s*(?:HP|H\.P\.|HORSEPOWER|KW)\b/gi, 
-        /\b(?:HP|H\.P\.|HORSEPOWER)\s*[:\-]?\s*((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\b/gi 
+        /\b(?:HP|H\.P\.|HORSEPOWER)\s*[:\-|]?\s*((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\b/gi 
     ];
 
     for (const regex of hpPatterns) {
