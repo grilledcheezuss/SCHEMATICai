@@ -55,6 +55,18 @@ const VOLT_PRIORITY = [
 
 const STOP_WORDS = new Set(['PANEL','CONTROL','PUMP','MOTOR','VOLT','VAC','PHASE','HP','ALARM','RELAY','SWITCH','FLOAT','NEMA','ENCLOSURE']);
 
+// Normalize CAD-style control codes from Airtable Items text
+// CAD software (AutoCAD, etc.) uses control codes like %%U (underline), %%O (overline), etc.
+// These codes prevent regex parsing (e.g., "%%U7.5HP" won't match HP patterns)
+function normalizeCADText(text) {
+    if (!text || typeof text !== 'string') return '';
+    // Strip common CAD control codes:
+    // - %%X (single letter): %%U, %%O, %%D (degree), %%P (plus/minus), %%C (diameter), etc.
+    // - %%nnn (exactly 3 digits): ASCII character codes like %%175
+    // Match both uppercase and lowercase variants
+    return text.replace(/%%(?:[A-Za-z]|\d{3})/g, '');
+}
+
 function isValidHP(hp) {
     const val = parseFloat(hp);
     return !isNaN(val) && val >= 0.1 && val <= 500;
@@ -81,7 +93,9 @@ class NaiveBayes {
         this.wordLog = { mfg: {}, enc: {}, hp: {}, volt: {}, phase: {} };
     }
     tokenize(text) { 
-        return (String(text||'').toUpperCase().match(/[A-Z0-9\-]+/g) || [])
+        // Normalize CAD control codes before tokenization
+        const normalized = normalizeCADText(text);
+        return (String(normalized).toUpperCase().match(/[A-Z0-9\-]+/g) || [])
             .filter(w => w.length > 2 && !STOP_WORDS.has(w)); 
     }
     train(text, labels) {
@@ -265,8 +279,11 @@ async function buildMLBackground() {
         const nb = new NaiveBayes();
         mainRecords.forEach(r => {
             const rawItems = r.fields['Items'];
-            const desc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
+            let desc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
             if (!desc) return;
+            
+            // Normalize CAD control codes before training
+            desc = normalizeCADText(desc);
             
             const extracted = extractSpecsStrict(desc);
             
@@ -293,6 +310,9 @@ async function buildMLBackground() {
 function extractSpecsStrict(t) {
     const s = { mfg: null, hp: null, volt: null, phase: null, enc: null };
     if (!t || typeof t !== 'string') return s;
+    
+    // Normalize CAD control codes before parsing
+    t = normalizeCADText(t);
     
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
@@ -467,7 +487,10 @@ export default {
                     const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
                     
                     const rawItems = r.fields['Items'];
-                    const fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "").toUpperCase();
+                    let fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
+                    
+                    // Normalize CAD control codes before case conversion to ensure lowercase codes are also removed
+                    fullDesc = normalizeCADText(fullDesc).toUpperCase();
                     
                     const textToParse = fullDesc + " " + cleanId;
                     const explicit = extractSpecsStrict(textToParse);
