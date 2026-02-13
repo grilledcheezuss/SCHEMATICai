@@ -1621,6 +1621,9 @@ class SearchEngine {
     static pageSize = 50;
 
     static perform() {
+        // CRITICAL: Stop any running preload from previous search
+        PdfController.stopPreloading();
+        
         FeedbackService.resetLockout();
 
         const rawKeywords = document.getElementById('keywordInput').value.split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length);
