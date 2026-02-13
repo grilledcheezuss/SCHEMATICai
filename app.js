@@ -1,7 +1,16 @@
-// --- SCHEMATICA ai v2.4.4 (Strict Keyword Boundaries) ---
-const APP_VERSION = "v2.4.4";
+// --- SCHEMATICA ai v2.5.1 (Control Panel Fixes) ---
+const APP_VERSION = "v2.5.1";
+const VERSION_HISTORY = {
+    "v2.5.1": "Fixed Control Panel: redaction boxes now appear, page dropdown works, added tabbed UI",
+    "v2.5.0": "Refactored Control Panel - functional checkboxes, page-aware UI",
+    "v2.4.5": "Fixed PDF scanning errors and preload conflicts",
+    "v2.4.4": "Strict keyword boundaries"
+};
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
+
+console.log(`%c🚀 SCHEMATICA ai ${APP_VERSION}`, 'color: #9333ea; font-weight: bold; font-size: 16px;');
+console.log(`📋 ${VERSION_HISTORY[APP_VERSION]}`);
 
 // Redaction checkbox IDs used for auto-scan detection
 const REDACTION_CHECKBOX_IDS = [
@@ -855,9 +864,18 @@ class RedactionManager {
     static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14, text = null, decoration = null, type = null, fontWeight = 'normal', transparent = false, rotation = 0, fontFamily = null, textAlign = 'center') {
         let container = wrapper.querySelector('.pdf-content-container');
         if (!container && wrapper.classList.contains('pdf-content-container')) container = wrapper;
-        if (!container) return; 
+        if (!container) {
+            console.warn('createZoneOnWrapper: No container found');
+            return;
+        }
 
-        const layer = container.querySelector('.redaction-layer'); if(!layer) return;
+        const layer = container.querySelector('.redaction-layer'); 
+        if(!layer) {
+            console.warn('createZoneOnWrapper: No redaction layer found');
+            return;
+        }
+        
+        console.log(`Creating zone: ${mapKey} at (${Math.round(x)}, ${Math.round(y)})`);
         
         const box = document.createElement('div'); box.className = 'redaction-box';
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
@@ -881,7 +899,11 @@ class RedactionManager {
         }
 
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
-        box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box); return box;
+        box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box);
+        
+        console.log(`✅ Zone created: ${mapKey}, total zones: ${this.zones.length}`);
+        
+        return box;
     }
 
     static addManualZone() { const pages = document.querySelectorAll('.pdf-page-wrapper'); if(pages.length === 0) return; const wrapper = pages[0]; const container = wrapper.querySelector('.pdf-content-container'); const w = container.offsetWidth; const h = container.offsetHeight; this.createZoneOnWrapper(wrapper, w*0.3, h*0.4, w*0.4, h*0.1, 'custom', 16, null, null, 'blocker'); this.refreshContent(); }
@@ -1170,6 +1192,7 @@ class SmartScanner {
     static FONT_SIZE_ESTIMATE_FACTOR = 0.8; // OCR font size estimation adjustment
     
     static async scanAllPages() {
+        console.log('🔍 Auto-scanning PDF pages...');
         RedactionManager.clearAll(); 
         if(!PdfViewer.isDocumentValid()) {
             console.warn('Cannot scan: PDF document is not loaded or invalid');
@@ -1184,6 +1207,7 @@ class SmartScanner {
         let ocrPages = 0;
         
         try {
+            console.log(`📄 Scanning ${PdfViewer.doc.numPages} pages...`);
             for(let i = 1; i <= PdfViewer.doc.numPages; i++) {
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
                 if(!wrapper) continue;
@@ -2328,6 +2352,7 @@ class PdfViewer {
                     option.textContent = `Page ${i}`;
                     pageSelector.appendChild(option);
                 }
+                console.log(`📄 Initialized page selector with ${this.doc.numPages} pages`);
             }
             
             // Set initial page context
@@ -2335,6 +2360,7 @@ class PdfViewer {
             
             setTimeout(() => {
                 LayoutScanner.refreshProfileOptions();
+                console.log('🔍 Auto-scanning PDF pages...');
                 SmartScanner.scanAllPages();
             }, 500); 
         } else {
@@ -2346,6 +2372,7 @@ class PdfViewer {
                 });
                 
                 if (anyChecked) {
+                    console.log('🔍 Auto-scanning based on enabled toggles...');
                     SmartScanner.scanAllPages();
                 }
             }, 500);
@@ -2588,6 +2615,32 @@ class UI {
 }
 
 window.UI = UI;
+
+class ControlPanel {
+    static switchTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.tab === tabName) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.style.display = 'none';
+            content.classList.remove('active');
+        });
+        
+        const activeTab = document.getElementById(`${tabName}-tab`);
+        if (activeTab) {
+            activeTab.style.display = 'block';
+            activeTab.classList.add('active');
+        }
+        
+        console.log(`Switched to ${tabName} tab`);
+    }
+}
 
 window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set(); window.FOUND_ENCS = new Set();
 
