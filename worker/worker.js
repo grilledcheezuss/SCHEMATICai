@@ -352,7 +352,8 @@ export default {
             }
 
             if (target === 'GET_PDF_URLS') {
-                const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 1000);
+                const limitParam = parseInt(url.searchParams.get('limit') || '100');
+                const limit = Math.min(isNaN(limitParam) ? 100 : limitParam, 1000);
                 const offset = url.searchParams.get('offset');
                 
                 let airtableUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}`;
