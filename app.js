@@ -1649,8 +1649,8 @@ class SearchEngine {
                 
                 const fractionalMatch = fractionalPattern && r.desc && new RegExp(fractionalPattern, 'i').test(r.desc);
                 
-                // Table/header format: "HP: 5" or "Horsepower 5" or "Motor HP 5"
-                const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)[:\\s]+${crit.hp}`;
+                // Table/header format: "HP: 5", "HP | 5", "HP 5", "Horsepower 5" or "Motor HP 5"
+                const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${crit.hp}\\b`;
                 const tableMatch = r.desc && new RegExp(tablePattern, 'i').test(r.desc);
                 
                 if (strictMatch) { 
@@ -1932,6 +1932,12 @@ class PdfViewer {
 
     static async loadFromCache(cached, panelId, fallbackUrl) {
         // Load PDF from preloaded cache
+        // Validate cached data
+        if (!cached || !cached.arrayBuffer || !cached.blob) {
+            console.warn('Invalid cached PDF data, falling back to regular load');
+            return this.loadById(panelId, fallbackUrl);
+        }
+        
         this.url = fallbackUrl || "";
         document.getElementById('pdf-fallback').style.display = 'none'; 
         document.getElementById('pdf-toolbar').style.display = 'none';
@@ -2037,8 +2043,18 @@ class PdfViewer {
         iframe.onload = () => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => { document.body.removeChild(iframe); }, 2000); };
     }
     static async renderStack() {
-        const container = document.getElementById('pdf-main-view'); container.innerHTML = ''; 
+        const container = document.getElementById('pdf-main-view'); 
+        if (!container) {
+            console.error('PDF container not found');
+            return;
+        }
+        container.innerHTML = ''; 
         document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
+        
+        if (!this.doc) {
+            console.error('No PDF document loaded');
+            return;
+        }
         
         let coverDoc = this.doc;
         if (window.TEMPLATE_BYTES) {
@@ -2051,6 +2067,8 @@ class PdfViewer {
             let page; let isTemplate = false;
             if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) { page = await coverDoc.getPage(1); isTemplate = true; } else { page = await this.doc.getPage(i); }
 
+            if (!page) continue; // Skip if page couldn't be loaded
+            
             const viewport = page.getViewport({ scale: this.currentScale });
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
             wrapper.style.width = Math.floor(viewport.width) + "px"; 
@@ -2105,7 +2123,16 @@ class PdfViewer {
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
 
-            page.render({ canvasContext: canvas.getContext('2d'), viewport });
+            // Add null check for canvas context
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                try {
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                } catch (e) {
+                    console.warn(`Failed to render page ${i}:`, e);
+                }
+            }
+        }
         }
         if(DemoManager.isGeneratorActive) { 
             setTimeout(() => {
@@ -2163,32 +2190,51 @@ class PdfController {
         // Stop any in-progress preloading first
         this.stopPreloading();
         
+        // Validate inputs
+        if (!results || !Array.isArray(results) || results.length === 0) {
+            return;
+        }
+        
         // Preload first page of search results (top to bottom)
-        this.preloadQueue = results.slice(0, SearchEngine.pageSize).filter(r => r.id && !this.pdfCache.has(r.id));
+        this.preloadQueue = results.slice(0, SearchEngine.pageSize).filter(r => r && r.id && !this.pdfCache.has(r.id));
         this.isPreloading = true;
         
         for (const result of this.preloadQueue) {
             if (!this.isPreloading) break; // Allow cancellation
             
+            // Validate result object
+            if (!result || !result.id) continue;
+            
             try {
                 const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(result.id)}`;
                 const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
                 
-                if (resp.ok) {
+                if (resp && resp.ok) {
                     const arrayBuffer = await resp.arrayBuffer();
-                    this.pdfCache.set(result.id, {
-                        arrayBuffer: arrayBuffer,
-                        blob: new Blob([arrayBuffer], { type: "application/pdf" }),
-                        timestamp: Date.now()
-                    });
-                    console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
+                    
+                    // Check if still preloading (might have been cancelled)
+                    if (!this.isPreloading) break;
+                    
+                    // Validate arrayBuffer before caching
+                    if (arrayBuffer && arrayBuffer.byteLength > 0) {
+                        this.pdfCache.set(result.id, {
+                            arrayBuffer: arrayBuffer,
+                            blob: new Blob([arrayBuffer], { type: "application/pdf" }),
+                            timestamp: Date.now()
+                        });
+                        console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
+                    }
                 }
             } catch (e) {
                 console.warn(`Failed to preload PDF ${result.id}:`, e);
+                // Continue preloading other PDFs even if one fails
             }
             
             // Small delay between requests to avoid overwhelming the browser
-            await new Promise(resolve => setTimeout(resolve, this.PRELOAD_DELAY_MS));
+            // Check if still preloading before delay
+            if (this.isPreloading) {
+                await new Promise(resolve => setTimeout(resolve, this.PRELOAD_DELAY_MS));
+            }
         }
         
         this.isPreloading = false;
