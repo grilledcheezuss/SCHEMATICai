@@ -416,6 +416,7 @@ body.gen-minimized .redaction-resize-handle { display: none !important; }
 body.gen-minimized .redaction-box.selected { border: none !important; z-index: 20 !important; }
 
 /* CRITICAL: Redaction layer must be visible and interactive */
+/* Z-index hierarchy: PDF canvas (1) < redaction-layer (10) < redaction-box (15) < selected box (100) */
 .redaction-layer { 
     display: none; 
     position: absolute !important; 
@@ -423,7 +424,7 @@ body.gen-minimized .redaction-box.selected { border: none !important; z-index: 2
     left: 0 !important; 
     width: 100% !important; 
     height: 100% !important; 
-    z-index: 10 !important; /* Above PDF canvas */
+    z-index: 10 !important; /* Above PDF canvas (z-index: 1) */
     pointer-events: auto !important; /* Must be able to interact */
 } 
 
