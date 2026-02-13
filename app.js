@@ -648,13 +648,401 @@ class RedactionManager {
 class RedactionEditor { static close() { RedactionManager.deselect(); } }
 
 class PageClassifier { 
-    static classify(textContent) { 
-        let titleScore = 0; let schematicScore = 0; 
+    static classify(textContent, aspectRatio = null) { 
         const text = textContent.items.map(i => i.str).join(' ').toUpperCase(); 
-        const SCHEMATIC_SIGNS = ['L1', 'L2', 'L3', 'MOTOR', 'PUMP', 'FLOAT', 'TERMINAL', 'WIRING', 'SCHEMATIC', 'FULL LOAD']; 
-        SCHEMATIC_SIGNS.forEach(w => { if(text.includes(w)) schematicScore += 10; }); 
-        return (schematicScore > 50) ? 'STANDARD' : 'TITLE'; 
+        const itemCount = textContent.items.length;
+        
+        // Enhanced content-aware classification
+        const SCHEMATIC_TERMS = ['L1', 'L2', 'L3', 'MOTOR', 'PUMP', 'TERMINAL', 'WIRING', 'SCHEMATIC', 'FULL LOAD', 'CONTACTOR', 'RELAY', 'OVERLOAD', 'VFD', 'STARTER', 'DISCONNECT', 'BREAKER'];
+        const INFO_TERMS = ['TABLE OF CONTENTS', 'INDEX', 'NOTES', 'SCHEDULE', 'SPECIFICATION', 'BOM', 'BILL OF MATERIALS'];
+        const TITLE_TERMS = ['PROJECT', 'CLIENT', 'DRAWN BY', 'DATE', 'SCALE', 'REVISION'];
+        
+        let schematicScore = 0;
+        let infoScore = 0;
+        let titleScore = 0;
+        
+        SCHEMATIC_TERMS.forEach(term => { if(text.includes(term)) schematicScore += 10; });
+        INFO_TERMS.forEach(term => { if(text.includes(term)) infoScore += 15; });
+        TITLE_TERMS.forEach(term => { if(text.includes(term)) titleScore += 5; });
+        
+        // Text density as secondary signal
+        if(itemCount < 50 && titleScore > 0) titleScore += 20;
+        
+        // Determine classification
+        if(schematicScore > 30) {
+            return aspectRatio && aspectRatio > 1 ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
+        }
+        if(infoScore > 20) return 'INFO';
+        if(titleScore > 15) return 'TITLE';
+        
+        // Fallback to aspect ratio + page number heuristic
+        if(aspectRatio) {
+            return aspectRatio > 1 ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
+        }
+        
+        return 'GENERAL';
     } 
+}
+
+class SmartScanner {
+    static async scanAllPages() {
+        RedactionManager.clearAll(); 
+        if(!PdfViewer.doc) return;
+        
+        const btn = document.querySelector('button[onclick="SmartScanner.scanAllPages()"]');
+        const origText = btn ? btn.innerText : "";
+        if(btn) { btn.innerText = "🔍 INITIALIZING..."; btn.disabled = true; }
+        
+        let textPages = 0;
+        let ocrPages = 0;
+        
+        try {
+            for(let i = 1; i <= PdfViewer.doc.numPages; i++) {
+                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
+                if(!wrapper) continue;
+                
+                if(btn) btn.innerText = `🔍 ANALYZING PAGE ${i}/${PdfViewer.doc.numPages}...`;
+                
+                // Try fast path first
+                const page = await PdfViewer.doc.getPage(i);
+                const textContent = await page.getTextContent();
+                
+                let detectedZones = null;
+                let scanConfidence = 'low';
+                
+                // Check if text extraction yielded useful results
+                if(textContent.items.length > 10) {
+                    if(btn) btn.innerText = `🔍 TEXT SCAN PAGE ${i}/${PdfViewer.doc.numPages}...`;
+                    detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
+                    if(detectedZones && detectedZones.length > 0) {
+                        scanConfidence = 'high';
+                        textPages++;
+                    }
+                } else {
+                    // Fallback to OCR for scanned/image PDFs
+                    if(btn) btn.innerText = `🔍 OCR PAGE ${i}/${PdfViewer.doc.numPages}...`;
+                    detectedZones = await this.ocrBasedZones(page, wrapper);
+                    if(detectedZones && detectedZones.length > 0) {
+                        scanConfidence = 'medium';
+                        ocrPages++;
+                    }
+                }
+                
+                // Apply detected zones or fallback to layout rules
+                if(detectedZones && detectedZones.length > 0) {
+                    this.applyDetectedZones(wrapper, detectedZones);
+                } else {
+                    // Fallback to existing LAYOUT_RULES
+                    scanConfidence = 'low';
+                    await this.fallbackToLayoutRules(wrapper, i, page, textContent);
+                }
+                
+                // Add scan confidence indicator to toolbar
+                this.addConfidenceIndicator(wrapper, scanConfidence);
+            }
+            
+            RedactionManager.refreshContent();
+            
+            // Show summary
+            if(btn) {
+                const summary = `✅ Scanned ${PdfViewer.doc.numPages} pages (${textPages} text, ${ocrPages} OCR)`;
+                btn.innerText = summary;
+                setTimeout(() => { btn.innerText = origText; }, 3000);
+            }
+        } catch(e) { 
+            console.error(e); 
+            if(btn) btn.innerText = "❌ SCAN FAILED";
+        } finally {
+            if(btn) btn.disabled = false;
+        }
+    }
+    
+    static async extractTextBasedZones(page, textContent, wrapper) {
+        const viewport = page.getViewport({ scale: 1.0 });
+        const container = wrapper.querySelector('.pdf-content-container');
+        if(!container) return null;
+        
+        const width = container.offsetWidth;
+        const height = container.offsetHeight;
+        const scaleX = width / viewport.width;
+        const scaleY = height / viewport.height;
+        
+        // Build spatial map of text items
+        const textItems = textContent.items.map(item => ({
+            text: item.str.toUpperCase(),
+            x: item.transform[4] * scaleX,
+            y: height - (item.transform[5] * scaleY), // Flip Y coordinate
+            width: item.width * scaleX,
+            height: item.height * scaleY,
+            fontSize: Math.abs(item.transform[0]) * scaleY
+        }));
+        
+        // Detect title block region (typically bottom-right for landscape, bottom for portrait)
+        const aspectRatio = viewport.width / viewport.height;
+        const titleBlockItems = this.detectTitleBlock(textItems, width, height, aspectRatio);
+        
+        // Find labeled fields
+        const zones = [];
+        const fieldMappings = {
+            'CUSTOMER': 'cust', 'CLIENT': 'cust', 'OWNER': 'cust',
+            'JOB': 'job', 'PROJECT': 'job', 'JOB NAME': 'job',
+            'TYPE': 'type', 'SYSTEM': 'type', 'DESCRIPTION': 'type',
+            'PANEL': 'cpid', 'CP': 'cpid', 'PANEL ID': 'cpid', 'ID': 'cpid',
+            'DATE': 'date', 'ISSUE DATE': 'date', 'DRAWN': 'date',
+            'STAGE': 'stage', 'STATUS': 'stage', 'SUBMITTAL': 'stage'
+        };
+        
+        for(const [label, mapKey] of Object.entries(fieldMappings)) {
+            const labelItem = titleBlockItems.find(item => item.text.includes(label));
+            if(labelItem) {
+                // Find value text near this label (typically to the right or below)
+                const valueItem = this.findNearbyValue(labelItem, titleBlockItems);
+                if(valueItem) {
+                    zones.push({
+                        x: valueItem.x,
+                        y: valueItem.y,
+                        w: valueItem.width * 1.5, // Add some padding
+                        h: valueItem.height * 1.2,
+                        map: mapKey,
+                        fontSize: Math.round(valueItem.fontSize),
+                        transparent: true,
+                        fontFamily: "'Courier New', monospace",
+                        textAlign: 'left'
+                    });
+                }
+            }
+        }
+        
+        return zones.length > 0 ? zones : null;
+    }
+    
+    static detectTitleBlock(textItems, width, height, aspectRatio) {
+        // For landscape schematics, title block is typically in bottom-right
+        // For portrait, it's typically at the bottom
+        const threshold = aspectRatio > 1 ? 0.7 : 0.6;
+        
+        return textItems.filter(item => {
+            const relY = item.y / height;
+            const relX = item.x / width;
+            
+            if(aspectRatio > 1) {
+                // Landscape: bottom-right corner
+                return relY > threshold && relX > threshold;
+            } else {
+                // Portrait: bottom section
+                return relY > threshold;
+            }
+        });
+    }
+    
+    static findNearbyValue(labelItem, allItems) {
+        // Look for text items to the right or below the label
+        const candidates = allItems.filter(item => {
+            const isRight = item.x > labelItem.x && item.y >= labelItem.y - 10 && item.y <= labelItem.y + 10;
+            const isBelow = item.y > labelItem.y && item.x >= labelItem.x - 20;
+            return (isRight || isBelow) && item.text !== labelItem.text;
+        });
+        
+        // Return the closest one
+        if(candidates.length === 0) return null;
+        return candidates.sort((a, b) => {
+            const distA = Math.hypot(a.x - labelItem.x, a.y - labelItem.y);
+            const distB = Math.hypot(b.x - labelItem.x, b.y - labelItem.y);
+            return distA - distB;
+        })[0];
+    }
+    
+    static async ocrBasedZones(page, wrapper) {
+        try {
+            // Render page to high-resolution canvas
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            const ctx = canvas.getContext('2d');
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            
+            // Run Tesseract.js OCR
+            const { data } = await Tesseract.recognize(canvas, 'eng', {
+                logger: () => {} // Suppress logs
+            });
+            
+            if(!data.words || data.words.length < 5) return null;
+            
+            // Convert OCR results to same format as text extraction
+            const container = wrapper.querySelector('.pdf-content-container');
+            if(!container) return null;
+            
+            const width = container.offsetWidth;
+            const height = container.offsetHeight;
+            const scaleX = width / viewport.width;
+            const scaleY = height / viewport.height;
+            
+            const textItems = data.words.map(word => ({
+                text: word.text.toUpperCase(),
+                x: word.bbox.x0 * scaleX,
+                y: word.bbox.y0 * scaleY,
+                width: (word.bbox.x1 - word.bbox.x0) * scaleX,
+                height: (word.bbox.y1 - word.bbox.y0) * scaleY,
+                fontSize: (word.bbox.y1 - word.bbox.y0) * scaleY * 0.8
+            }));
+            
+            // Use same detection logic as text extraction
+            const aspectRatio = viewport.width / viewport.height;
+            const titleBlockItems = this.detectTitleBlock(textItems, width, height, aspectRatio);
+            
+            const zones = [];
+            const fieldMappings = {
+                'CUSTOMER': 'cust', 'CLIENT': 'cust',
+                'JOB': 'job', 'PROJECT': 'job',
+                'DATE': 'date',
+                'PANEL': 'cpid'
+            };
+            
+            for(const [label, mapKey] of Object.entries(fieldMappings)) {
+                const labelItem = titleBlockItems.find(item => item.text.includes(label));
+                if(labelItem) {
+                    const valueItem = this.findNearbyValue(labelItem, titleBlockItems);
+                    if(valueItem) {
+                        zones.push({
+                            x: valueItem.x,
+                            y: valueItem.y,
+                            w: valueItem.width * 1.5,
+                            h: valueItem.height * 1.2,
+                            map: mapKey,
+                            fontSize: Math.round(valueItem.fontSize),
+                            transparent: true,
+                            fontFamily: "'Courier New', monospace",
+                            textAlign: 'left'
+                        });
+                    }
+                }
+            }
+            
+            return zones.length > 0 ? zones : null;
+        } catch(e) {
+            console.error('OCR failed:', e);
+            return null;
+        }
+    }
+    
+    static applyDetectedZones(wrapper, zones) {
+        zones.forEach(zone => {
+            RedactionManager.createZoneOnWrapper(
+                wrapper, 
+                zone.x, 
+                zone.y, 
+                zone.w, 
+                zone.h, 
+                zone.map, 
+                zone.fontSize, 
+                zone.text || null, 
+                null, 
+                null, 
+                'normal', 
+                zone.transparent, 
+                zone.rotation || 0, 
+                zone.fontFamily, 
+                zone.textAlign
+            );
+        });
+    }
+    
+    static async fallbackToLayoutRules(wrapper, pageNum, page, textContent) {
+        const container = wrapper.querySelector('.pdf-content-container');
+        const manualSelect = wrapper.querySelector('.page-profile-select');
+        let profileKey = manualSelect ? manualSelect.value : null;
+        
+        if (!profileKey || profileKey === "AUTO") {
+            // Enhanced classification using content
+            const viewport = page.getViewport({ scale: 1.0 });
+            const aspectRatio = viewport.width / viewport.height;
+            
+            if (pageNum === 1) {
+                profileKey = 'TITLE';
+            } else if (pageNum === 2) {
+                profileKey = 'INFO';
+            } else {
+                profileKey = PageClassifier.classify(textContent, aspectRatio);
+            }
+            
+            if(manualSelect) manualSelect.value = profileKey;
+        }
+        
+        LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
+    }
+    
+    static addConfidenceIndicator(wrapper, confidence) {
+        const toolbar = wrapper.querySelector('.page-toolbar');
+        if(!toolbar) return;
+        
+        const indicator = document.createElement('span');
+        indicator.className = 'scan-confidence';
+        indicator.title = `Scan confidence: ${confidence}`;
+        
+        if(confidence === 'high') {
+            indicator.innerText = '🟢';
+            indicator.title = 'High confidence (text extraction found fields)';
+        } else if(confidence === 'medium') {
+            indicator.innerText = '🟡';
+            indicator.title = 'Medium confidence (OCR or partial detection)';
+        } else {
+            indicator.innerText = '🔴';
+            indicator.title = 'Low confidence (using default layout)';
+        }
+        
+        // Remove existing indicator if any
+        const existing = toolbar.querySelector('.scan-confidence');
+        if(existing) existing.remove();
+        
+        toolbar.appendChild(indicator);
+    }
+    
+    static async rescanPage(pageNum) {
+        if(!PdfViewer.doc) return;
+        
+        const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${pageNum}"]`);
+        if(!wrapper) return;
+        
+        const btn = wrapper.querySelector('.rescan-page-btn');
+        const origText = btn ? btn.innerHTML : "🔄";
+        if(btn) btn.innerHTML = "⏳";
+        
+        try {
+            // Clear existing zones on this page
+            const layer = wrapper.querySelector('.redaction-layer');
+            if(layer) layer.innerHTML = '';
+            
+            // Run smart scan on this page only
+            const page = await PdfViewer.doc.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            
+            let detectedZones = null;
+            let scanConfidence = 'low';
+            
+            if(textContent.items.length > 10) {
+                detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
+                if(detectedZones && detectedZones.length > 0) scanConfidence = 'high';
+            } else {
+                detectedZones = await this.ocrBasedZones(page, wrapper);
+                if(detectedZones && detectedZones.length > 0) scanConfidence = 'medium';
+            }
+            
+            if(detectedZones && detectedZones.length > 0) {
+                this.applyDetectedZones(wrapper, detectedZones);
+            } else {
+                await this.fallbackToLayoutRules(wrapper, pageNum, page, textContent);
+            }
+            
+            this.addConfidenceIndicator(wrapper, scanConfidence);
+            RedactionManager.refreshContent();
+        } catch(e) {
+            console.error('Rescan failed:', e);
+        } finally {
+            if(btn) btn.innerHTML = origText;
+        }
+    }
 }
 
 class LayoutScanner {
@@ -1008,19 +1396,39 @@ class PdfExporter {
                         const text = box.querySelector('span')?.innerText || "";
                         if (text) { 
                             const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
-                            const textWidth = fontTimes.widthOfTextAtSize(text, fontSize); 
+                            
+                            // FIX BUG #1: Use correct font for width calculation
+                            let fontToUse = fontTimes;
+                            if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
+                            const textWidth = fontToUse.widthOfTextAtSize(text, fontSize);
                             
                             let textX = drawX;
                             if (box.style.textAlign === 'center') textX = drawX + (drawW/2) - (textWidth/2);
                             else if (box.style.textAlign === 'right') textX = drawX + drawW - textWidth;
 
-                            const textY = drawY + (drawH/2) - (fontSize/4); 
+                            const textY = drawY + (drawH/2) - (fontSize/4);
                             
-                            let fontToUse = fontTimes;
-                            if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
-
-                            page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) }); 
-                            if (box.dataset.decoration === 'underline') {
+                            // FIX BUG #2: Apply rotation if specified
+                            const rotation = parseFloat(box.dataset.rotation) || 0;
+                            if (rotation !== 0) {
+                                // Apply rotation transform
+                                const centerX = drawX + drawW/2;
+                                const centerY = drawY + drawH/2;
+                                const radians = (rotation * Math.PI) / 180;
+                                
+                                page.drawText(text, { 
+                                    x: centerX, 
+                                    y: centerY, 
+                                    size: fontSize, 
+                                    font: fontToUse, 
+                                    color: PDFLib.rgb(0,0,0),
+                                    rotate: PDFLib.degrees(rotation)
+                                });
+                            } else {
+                                page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
+                            }
+                            
+                            if (box.dataset.decoration === 'underline' && rotation === 0) {
                                 page.drawLine({ start: { x: textX, y: textY - 2 }, end: { x: textX + textWidth, y: textY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
                             }
                         }
@@ -1143,6 +1551,7 @@ class PdfViewer {
                     <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Land)</option>
                     <option value="GENERAL">📐 General</option>
                 </select>
+                <button class="rescan-page-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
             `;
             wrapper.appendChild(toolbar);
 
@@ -1173,7 +1582,7 @@ class PdfViewer {
         if(DemoManager.isGeneratorActive) { 
             setTimeout(() => {
                 LayoutScanner.refreshProfileOptions();
-                LayoutScanner.scanAllPages();
+                SmartScanner.scanAllPages();
             }, 500); 
         }
     }
