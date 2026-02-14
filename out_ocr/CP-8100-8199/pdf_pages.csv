@@ -1,0 +1,8644 @@
+pdf_path,page,page_width,page_height,text
+samples\CP-8100-8199\CP-8102.pdf,1,1700,2200,"DELTA
+PROCESS
+4Z4EQUIPMENT
+
+CAMERON PARISH
+WATERWORKS DISTRICT #7
+WATER WELL #5
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+JANUARY 24, 2026
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+OCOX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8102"
+samples\CP-8100-8199\CP-8102.pdf,2,1700,2200,"SOLD TO: Delta Process SHIP TO:
+
+TAG: Cameron Parish Waterworks District #7
+
+Water Well #5 Control Panel
+
+SPECIAL NOTES: Alarm Light - Panel Door Mount Xx
+Alarm Light - Panel Top Mount
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezzo
+Cycle Counters
+Panel Type Simplex Economy Version
+Voltage 240 Elapsed Time Meters x
+Phase/HZ 3/60 Flasher xX
+No. Motors I Green Run Lights vs. Red Xx
+HP 50 Ground Fault Receptacle XxX
+FLA 130est. High Temp Lights xX
+Pump Manufacturer High Temp Pump Shutdown - Auto Reset xX
+Type of Pump Well High Temp Pump Shutdown - Manual Reset
+Catalog Number Intrinsically Safe Relays Pts
+Capacitors [No Lightning Arrestor X
+Control Voltage 120V. Main Disconnect with door Mt. Handle X
+Control Power Transformer VA =5000_|Yes Panel Heater/Thermostat W = 150 X
+Enclosure NEMA Rating 4x Phase Monitor
+Enclosure Material Stainless Steel Pole, Box, Seal
+Enclosure Size 30x24x12 Seal Fail Lights
+Tnner Swing Panel Yes Seal Fail Relay - Fixed
+Control Sensor SCADA Seal Fail Relay - Adjustable
+ULS08A Labeling No Seal Fail Shutdown
+UL698A Labeling INo Starters - IEC
+Starters - NEMA
+Unpowered Alarm Circuits # as needed xX
+COX"" CAMO’ System
+Opti-Float® Level Dectector Pts
+OTHER: Spare breakers, panel light,
+XT3 breaker
+Drawing Title
+PANEL DESCRIPTION
+DATE : REFERENCE PRAWN | aoa 7 sr ON LOCA ECN ants BY
+01/24/26 AD. ” AD. . BY SAL BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+WATER WELL Fo 70726 DRAWING NUMBER
+CONTROL PANEL  EGUIPMENT Bh. (225) 665-1666 ENE a"
+samples\CP-8100-8199\CP-8102.pdf,3,1700,2200,"Lt [2 [3 MAIN SERVICE
+
+oto 240V, 36
+1 1 1
+
+1 1 1
+
+dx, d\6
+
+y>=5 200A, 3POLE
+07 070
+
+3/o
+
+@}-----o
+
+MAIN CIRCUIT BREAKER
+L WITH THROUGH DOOR HANDLE
+DISTRIBUTION BLOCK 1
+? EXTERNAL
+Loh en VFD
+\ u u
+\
+Pert —-------- ~~ +-© @}------ on
+\
+Vi y
+LIGHTNING \| 4
+ARRESTOR WA 1 SOHP
+\ WELL
+[| 9 rqr rrr tcc tcc r 230V,30
+\
+\
+\
+\
+\ L3
+L-- + L©
+208 7
+cat -\2P
+To _ o+
+cHEMicAL ~< ! 50A
+TREATMENT A CB2 /.2P
+PLANT <4 & > 4 raps (®)-------- 4
+i]
+P?’\ ! EXTERNAL A
+oO {%)---7 | TRANSFORMER
+SKVA
+240V=120VAC
+DISTRIBUTION SOA —
+83 -\1P
+oo oO 12 mm —_
+1
+4 cB4 6B 149 &)_@ roan §GFI RECEPTACLE
+LN
++ 025 SF a t
+NP
+¢ cBB6 6 129 (29) —scana — —(30) °
+lain
+e C875 6} 129 # 31)— —HEaT— — +32 :
+20A TRACE
+rN
+¢ cess OF 129 #2 (3) _oupwen,— (34)
+158 T-STAT
+LN
+ce9 iP
+¢ Oo Oo Tag °C? 149 2 HEATER) °
+ote GROUND
+TP VERIFY 120V BETWEEN CB10_ AND NEUTRAL BAR
+fe) BEFORE TURNING ON CIRCUIT BREAKER
+
+0000000
+
+ASHIPPED LOOSE
+
+Drawing Title
+POWER DIAGRAM
+REFERENCE DRAWING. No. REVISION-LOCATION ECN | DATE _| BY
+DATE Say Sales Engineer [Apphoation Engineer DRAWN APPROVED
+01/24/26 AD. AD. SAL BY DATE
+Project Title $075 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+WATER WELL PROCESS 70726 DRAWING NUMBER
+CP-8102
+CONTROL PANEL JEQGUIPMENT pp. Oe oe eee SHEET NUMBER
+ax (225) 665- 2"
+samples\CP-8100-8199\CP-8102.pdf,4,1700,2200,"APROVIDED BY OTHERS/EXTERNAL
+
+U3 L2 WELL VFD A
++—-991 (11) ©) 96 &7-\
+| _ ot- WELL
+992 (12) 97 sO) ve
+j---9 93 (L3) ™ 98 &7—
+Lre99 6 7-~ @
+ET
+2 Wy.
+RELAY 1 + G
+9 54 3 A
+eG
+4 44
+PO) vy
+5, Vay
+RELAY 2 o-- {5} + fay
+6 i
+® Cc. rey {i Ue
+------4 —>9 27 i
+Tor-1-b i
+VFD CALL @)------4 _-0 18 RELAY 7 o-—-|-1{6)
+® (OPTIONAL SPARE) I
+4 © 1
+DANFOSS VFD !
+
+ELAPSED TIME METER
+
+® WELL RUN LIGHT
+
+WELL FAULT LIGHT
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING
+
+NO. REVISION - LOCATION ECN | DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED
+01/24/26 AD. AD. BY: SAL BY: DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+70726 DRAWING NUMBER
+WATER WELL PROCESS cpaion
+CONTROL PANEL JEGUIPMENT pp. (O59) os eee SHEET NUMBER
+ax (2 - 4"
+samples\CP-8100-8199\CP-8102.pdf,5,1700,2200,"H N
+1-3 ©
+¢
+CALL
+2-2 @ FLASH Vv WELL CALL LIGHT
++ ee {8} FLASH: FLUSH WATER
+CALL “~ SOLID: WELL PUMP
+CALL
+(ON: 2min
+11 @ WELL START DELAY
+Ye
+(OFF: 3min
+rs D2 FLUSH WATER TIMER
+Nur
+“The @
+WELL CALL
+@ Fut N.C. ENERGIZE
+2A/BAF TD2-1 TO OPEN
+ve‘ FLUSH WATER
+(®) ® S.A SOLENOID VALVE
+Yay. LOW FLOW
+Low FLOW ere PILOT LIGHT
+ns @ (op) LOW FLOW
+t——_®---1 ----@ OTNERST © 7 AUX RELAY
+FROM FLOW METER
+CLOSE ON LOW FLOW Ly
+vant CONTROL POWER
+we PILOT LIGHT
+(ora CONTROL POWER
++ eR ® 7 AUX RELAY
+Vey CHEM TREATMENT
+G
+CHEM TTVEN ENT A PILOT LIGHT
+---| |---g ® b(cre)-4 4 CHEM TREATMENT
+FROM CHEM BLOG. Ney ACTIVE AUX RELAY
+TEMP SWITCH
+>——1?--- -i8 (cre) @ HIGH TEMP RELAY
+“at ee)
+CR6-2 \V~Z
+¢ oY) (A) @ HIGH TEMP PILOT LIGHT
+ms
+@ RI CR2-1 CR3-1 CR4-1 CR5-1
+ONO @7'O OF' SB O'S @FO
+WELL WELL. LOW CONTROL CHEM
+RUN FAULT FLOW POWER TREATMENT
+FAIL ACTIVE rot roy it
+\ j 1
+TO SCADA hoor ro
+PRESSURE_X—DUCER
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED. FEED— THROUGH
+Drawing Title
+CONTROL DIAGRAM
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+01/24/26 AD. SAL BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+WA TER WELL PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL EQUIPMENT | ”». 225) 665-1666 [Ee
+
+Fax (225) 665-1855
+
+4"
+samples\CP-8100-8199\CP-8102.pdf,6,1700,2200,"NOTE:
+
+a NEMA 4X STAINLESS STEEL ENCLOSURE
+
+2. awumnum SWING OUT pane S
+
+|
+
+I LIGHTNING I
+| ARRESTER \
+
+L--~_4I
+
+Q
+
+VIEW_OF INNER SWING PANEL
+
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+NAMEPLATE SCHEDULE
+
+NP-1
+
+NP-2
+NP-3
+NP—4
+NP-5
+NP-6
+NP-7
+NP-8
+NP-9
+
+WELL CALL
+
+WELL RUN
+HAND—OFF—AUTO
+
+VFD FAULT
+
+CABINET LIGHT/OFF—ON
+LOW FLOW
+
+CHEM TREATMENT/ACTIVE
+CONTROL POWER
+
+HIGH TEMP.
+
+Drawing Title
+ENCLOSURE
+REFERENCE DRAWING NO. REVISION-LOCATION ECN [| DATE [BY
+DATE Sales Engineer [Apphoation Engineer DRAWN APPROVED
+01/24/26 AD. SAL BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+WATER WELL PROCESS 70726 DRAWING NUMBER
+5 es CP-8102
+CONTROL PANEL JEGUIPMENT Fee (38) 668-1885 SHEET NUMBER :"
+samples\CP-8100-8199\CP-8102.pdf,7,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+SCE-30EL2412SSLP
+
+ENCLOSURE
+
+CAMO302412UU
+
+BACKPLATE
+
+XT3NUS200AFFOOOXXX
+
+CBI
+
+MPDB67523
+
+DISTRIBUTION BLOCK
+
+SDSA3650
+
+LIGHTNING ARRESTOR
+
+QOU250
+
+CB2
+
+QOU150
+
+CB3
+
+1321580
+
+DISTRIBUTION BLOCK
+
+W]OO]N IO}! BI] Gyno} —
+
+QOU110
+
+CB5,10
+
+QOU120
+
+CB6-8
+
+C3SS110B—20
+
+3 POS. SWITCH
+
+46.52.8.120.0054
+
+CONTROL RELAY
+
+85.04.0.125.0000
+
+TD1-2
+
+sINo}No}a@]—] ou] mo] }—o}—a]afo]o]a]a
+
+94.04
+
+D_BASE
+
+TSOB—212
+
+LAPSED TIME METER
+
+BUSSMANN
+
+BAF2
+
+USE 1
+
+PHOENIX
+
+5048386
+
+USE HOLDER
+
+ZERUST
+
+VC2-1
+
+ORROSION_ INHIBITOR
+
+HUBBELL
+
+FISGYL
+
+ROUND FAULT RECEPTACLE
+
+COX
+
+4
+[o)
+[e)
+~
+
+ABINET LIGHT
+
+ABB
+
+HB65J10
+
+ANDLE
+
+ABB
+
+XP10X255
+
+HAFT
+
+ABB
+
+2SS110B—20
+
+=POS SWITCH
+
+ABB
+
+LS13Y
+
+MBER PILOT LIGHT
+
+SAGINAW
+
+CE-—PLWKB
+
+ADLOCK_ HANDLE
+
+FINDER
+
+T.81.0.000.2401
+
+HERMOSTAT
+
+ABB
+
+L513L
+
+LUE PILOT LIGHT
+
+LITTLEFUSE
+
+S$126RC
+
+LASHER
+
+FINDER
+
+H.51.0.230.0100
+
+EATER
+
+SQUARE D
+
+0QU115
+
+ODI DDS VSIN|O/LTIOJO/O}] 4 aM)H4
+
+B4,9
+
+ABB
+
+L513G
+
+REEN PILOT LIGHT
+
+ABB
+
+L513C
+
+=/0
+
+HITE PILOT LIGHT
+
+SQUARE D
+
+QIDIO/POWI FQN IPIQIOIO/Q]4|@
+
+[e)
+Cc
+NO
+NO
+oO
+
+ive)
+ay
+
+MARATHON
+
+=
+Ww
+i)
+Ww
+o)
+oo
+[o)
+
+STRIBUTION BLOCK
+
+ABB
+
+XTBRHEBFP
+
+ECHANISM
+
+ww) }]—] a} I po}no] a] a] a]
+
+FS
+
+PAG
+
+K
+MPDBC6667
+
+DOlZ|VIOQ
+
+ST BLOCK COVER
+
+Drawing Title
+
+BILL OF MATERIALS
+
+CONTROL PANEL
+
+Ph. (225) 665-1666
+
+CP-8102
+
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+DATE PAGE 1 OF 2 low Sales Engineer [Application Engineer DRAWN APPROVED
+01/24/26 A.D. SAL BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+WATER WELL PROCESS 70726 DRAWING NUMBER
+JEGUIPMENT
+
+Fax (225) 665-1855 SHEET NUMBER
+
+6"
+samples\CP-8100-8199\CP-8102.pdf,8,1700,2200,"SPARES/ SHIP LOOSE
+
+TEM | QTY. | MANUFACTURER | | PARTNUMBER | NUMBER
+
+| DESCRIPTION, |
+
+SQUARE D 5S1F TRANSFORMER
+2 2__| BUSSMANN BAF2 SPARES
+
+>K SPARE PARTS
+
+ASHIPPED LOOSE [ A (5 [— y ( |
+
+2
+
+CONTROL PANEL
+
+Ph. (225) 665-1666
+
+CP-8102
+
+Drawing Title
+
+BILL _OF MATERIALS REFERENCE DRAWING NO. REVISION-LOCATION ECN [| DATE [BY
+DATE PAGE 2 OF 2 low Sales Engineer [Application Engineer DRAWN APPROVED
+01/24/26 AD. SAL BY DATE
+
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+WATER WELL PROCESS 70726 DRAWING NUMBER
+JEGUIPMENT
+
+Fax (225) 665-1855
+
+SHEET NUMBER."
+samples\CP-8100-8199\CP-8104.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+STRAWBERRY ESTATES
+DUPLEX PUMP
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+JANUARY 27, 2026
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8104"
+samples\CP-8100-8199\CP-8104.pdf,2,1700,2200,"SOLD TO: Delta Process SHIP TO: Delta Process
+TAG: Strawberry Estates Duplex Pump
+Control Panel
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount x
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+Panel Type Duplex Cycle Counters
+Voltage 120/240V Economy Version
+Phase/HZ 1/60 Elapsed Time Meters Xx
+No. Motors 2 Flasher
+HP 2 Green Run Lights vs. Red
+FLA 14.5 Ground Fault Receptacle x
+Pump Manufacturer Zoeller High Temp Lights
+Type of Pump Submersible High Temp Pump Shutdown - Auto Reset xX
+Catalog Number E6122-A High Temp Pump Shutdown - Manual Reset
+Capacitors Yes Intrinsically Safe Relays Pts
+Control Voltage _ T20V Lightning Arrestor xX
+Control Power Transformer VA = INo Main Disconnect without door Mt. Handle Xx
+Enclosure NEMA Rating Ax Panel Heater/Thermostat_ W =
+Enclosure Material Fiberglass Phase Monitor
+Enclosure Size 24x20x10 Pole, Box, Seal
+Inner Swing Panel Yes Seal Fail Lights x
+Control Sensor Floats Seal Fail Relay - Fixed
+ULS08A Labeling INo Seal Fail Relay - Adjustable
+UL698A Labeling INo Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA
+Unpowered Alarm Circuits #2 Xx
+OTHER:
+Drawing Title
+PANEL DESCRIPTION
+DATE : REFERENCE PRAWN | aoa 7 sr ON LOCA ECN ants BY
+01/27/26 TM. ” ° BY JCF BY DATE
+Project Title PURCHASE ORDER NUMBER
+
+8275 Florida Blvd.
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70728
+CP-8104
+EQUIPMENT | ’b. 225) 665-1666 SUEFTRUMAER
+
+CONTROL PANEL
+
+DRAWING NUMBER
+Fax (225) 665-1855 1"
+samples\CP-8100-8199\CP-8104.pdf,3,1700,2200,"MAIN. SERVICE
+; "" il ? 120/240V,19 LEGEND
+roto tt @ PANEL TERMINAL
+ont out vat © COMPONENT TERMINAL
+Js 6 6 8 @ WIRE NUMBER
+= — PANEL WIRING
+---f--- 60A, 3POLE
+(0-77 BRK DISCONNECT --- FIELD WIRING
+Ps _ ®
+if DISTRIBUTION BLOCK
+SS)
+LIGHTNING
+ARRESTOR cet ee ot
+10 lam oui 1 aK 2
+© 010 XL Ss 6X)
+i] AS
+~-_ a gu 2HP
+\ PUMP_1
+A ‘
+13 rv |
++ Oo oO oS 56R)2 ‘pt $Y
++ ZOELLER J
+£6122—A S}-----
+sRk_sc| +
+1
+OR]
+270-324 Hf
+™ m2
+CB2 2P
+10 C82, o2 1 8
+e re) ° X, © T W/BK @- E>,
+\
+~—_# w/BL vO 2H
+! PUMP 2
+| j 230.10
+rN 13 as |
+6 6 x~— 5(SR)2-» W/n0 ey |
+ST at €-
+ZOELLER 4
+E6122-A S+-----
+sk_sc|
+15A 1
+CB3 1P 270-324 H!
+¢ os 129 (i)
+“I GFI
+¢
+cB4 VERIFY 120V BETWEEN CB4 AND NEUTRAL
+fe) 10A BEFORE TURNING ON CIRCUIT BREAKER
+1P
+9)
+! }
+N H
+Drawing Title
+POWER DIAGRAM
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+91/27/26 TM BY JCF BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL ,ZQUIPMENT Bh, (225) 6651666 ETE"
+samples\CP-8100-8199\CP-8104.pdf,4,1700,2200,"H N
+120VAC
+PO o--®© ® {Ry 9
+HIGH LEVEL ALARM
+PANEL TERM.
+0 (TYP.) vay
+{R)
+e
+0) 2 @ ap 2 Len)
+Pee @ 2 Y
+LEAD PUMP ON
+'  |@
+¢
+1
+i 4}+— ALTERNATOR
+alt | Min TERM. (TYP.)
+FS-1 |
+I
+Poy @
+ALL PUMPS OFF ALT2 |
+i]
+i]
+FS-3 ALTI |
+To ¢ i)
+LAG PUMP ON
+¢
+i SEAL PROBE 1
+¢ R x)-----@ }----{x)—_——_——_——_»
+Ly SEAL PROBE 2
+vA N
+CR1-1 CR2-1
+| | |
+1 Vt
+& & © ©
+HIGH POWER
+LEVEL LOSS
+
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+
+HIGH LEVEL AUX RELAY
+
+ALARM LIGHT
+
+PUMP 1 RUNLIGHT
+
+PUMP 1 MOTOR STARTER
+
+PUMP 1
+ELAPSED TIME METER
+
+ALTERNATOR
+
+PUMP 2 RUNLIGHT
+
+PUMP 2 MOTOR STARTER
+PUMP 2
+
+ELAPSED TIME METER
+
+PUMP 1 SEAL FAIL
+LIGHT
+
+PUMP 2 SEAL FAIL
+LIGHT
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING No. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 TM BY JCF BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL ABGUIPMENT | ?.225) 065-1006 ETE
+2 - 3"
+samples\CP-8100-8199\CP-8104.pdf,5,1700,2200,"NOTE:
+
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+VIEW_OF INNER SWING PANEL
+
+NEMA 4X FIBERGLASS ENCLOSURE
+
+NAMEPLATE SCHEDULE
+
+NP-1
+
+NP-2
+NP-3
+NP—4
+NP-5
+NP-6
+NP-7
+
+PUMP 1/RUN
+PUMP 2/RUN
+HOA
+
+HIGH TEMP.
+SEAL FAIL
+ALARM/TEST
+SILENCE
+
+Drawing Title
+
+Fax (225) 665-1855
+
+ENCLOSURE
+REFERENCE DRAWING: NO. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+01/27/26 TM BY JCF BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL JZQUIPMENT | *. 225) 565-1666 sTETNOMEER
+
+5"
+samples\CP-8100-8199\CP-8104.pdf,6,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+SAGINAW M2420HPL ENCLOSURE
+CMW. CAMOM2420 BACKPLATE
+MARATHON 1323580 DISTRIBUTION BLOCK
+SQUARE D QQU230 CB1,2
+SQUARE D QOU110 CB4
+ABB AF16—30—-10-13 MOTOR STARTER
+DIVERSIFIED ARB—120—ADA ALTERNATOR
+C3SS110B—20 H.0.A. SWITCH
+CL100R RED PILOT LIGHT
+CL513R RED PILOT LIGHT
+MARS67 START RELAY
+2MEU1 ART CAP. 270—324xf
+2MEE4 UN CAP. 50+f
+CONERY R40—XLS LARM_LIGHT
+ABB TF42—16 L. RELAY (13-16A)
+ENM TSOB— 212 LAPSED TIME METER
+SQUARE _D SDSA1175 GHTNING ARRESTOR
+ABB OT80F3. SCONNECT SWITCH
+SQUARE D QOU115
+HUBBELL =
+FINDER 46.52.8.120.0054
+
+O]O| NH) ORIGIN}
+
+Luu)
+Ww
+
+Fl RECEPTACLE
+R1,2
+
+1
+1
+2
+1
+2
+1
+2
+2
+2
+2
+2
+2
+1
+2
+2
+1
+1
+1
+1
+1
+
+QO O/PIL|MoO!|>lalo
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING: NO. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer |Application Engineer DRAWN APPROVED
+01/27/26 TM TM. BY JCF BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CP-8104
+CONTROL PANEL EQUIPMENT Bh (225) 665: 1666 SHEET NUMBER ;
+6"
+samples\CP-8100-8199\CP-8100.pdf,1,1700,2200,"SWIMMING RIVER, NEW JERSEY
+
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+JANUARY 27, 2026
+
+Pipe Tech, Inc.
+PO Box 8853
+Mandeville, LA 70471
+(985) 892-8898
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8100"
+samples\CP-8100-8199\CP-8100.pdf,2,1700,2200,"SOLD TO:
+
+TAG: Swimming River, New Jersey Control Panel
+
+SHIP TO:
+
+SPECIAL NOTES: Alarm Light - Panel Door Mount xX
+Alarm Light - Panel Top Mount
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+COX""™CAMO"" System
+Panel Type Hydrotank Cycle Counters
+Voltage 120 Economy Version
+Phase/HZ 1/60 Elapsed Time Meter
+No. Motors 4 Flasher
+HP 1/2 Green Run Lights vs. Red
+FLA 9.8est Ground Fault Receptacle
+Pump Manufacturer Iwaki High Temp Lights
+Type of Pump Recirc. High Temp Pump Shutdown - Auto Reset
+Catalog Number MX250 High Temp Pump Shutdown - Manual Reset
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120 Lightning Arrestor
+Control Power Transformer VA= No Main Disconnect with Door Mt. Handle
+Enclosure NEMA Rating 12 Opti-Float® Level Dectector Pts.
+Enclosure Material Painted Steel] | Panel Heater / Thermostat W=
+Enclosure Size 36x30x12 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Transducer Seal Fail Lights
+ULS508A Labeling Yes Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA
+Unpowered Alarm Circuits #
+OTHER: Precision Digital Setpoint Controllers,
+Courtesy Receptacle,
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 BY: JCF BY: DATE:
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+SWIMMING RIVER, NEW JERSEY wr DRAWINGNUMBER
+CONTROL PANEL (985) 892-8898 SHEET NUMBER =m
+1"
+samples\CP-8100-8199\CP-8100.pdf,3,1700,2200,"H N G
+1 , 4
+Le 120VAC “1
+| | i}
+Sy
+og, ® =
+5. 40A
+)'
+i)
+20A RECIRCULATION PUMP
+ce, PRI-1 * ~ 1/2HP, 9.8Aest TANK 1
+° Oo 0 f= ---=-{ Mp ------ ~() ——————# RECIRC PUMP 1
+20A RECIRCULATION PUMP
+CB3,~\1 PR2-1 1/2HP, 9.8Aest TAN
+‘ANK 1
+¢ o 0 {9)- === i) Tota (x) ——————# RECIRC PUMP 2
+20A RECIRCULATION PUMP.
+CB4,A1 PR3-1 * — 1/2HP, 9.8Aest tank 2
+t 0 0 rn Can 8) ————-+ RECIRC PUMP 3
+20A RECIRCULATION PUMP
+CB5,—~\1 PR4-1 4 1/2HP, 9.8Aest TANK 2
+ba Oo ° fo OC; wa 8) —————+ RECIRG PUMP 4
+cas, i CONVENIENCE OUTLET =
+CB7
+oO. 20A
+1P
+°
+* PUMPS TO HAVE INTERNAL OVERLOAD PROTECTION.
+Drawing Title
+CON TR OL SCH EM All C REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+
+SWIMMING RIVER, NEW JERSEY
+CONTROL PANEL
+
+70471
+
+(985) 892-8898
+
+DRAWING NUMBER
+CP-8100
+
+SHEET NUMBER
+2"
+samples\CP-8100-8199\CP-8100.pdf,4,1700,2200,"H N
+~ 120VAC |
+PRECISION DIGITAL 1 ¢ |
+t_9 4(+) Co (-)2e °
+P01
+@® @ P+ VexPaNnsiON_BOARD
+2 P- LOW LEVEL VENT apo Hic ueven |
+ALAR ‘a aR ALAR
+@ COM [maouT vai 7 v7 cz
+@ matt Ic R 1 te! <e ee | ee ae
+2? 4 fia RE RGERG
+Ful FA FU2 A n
+Po! SAU ® d | meen
+@ ae @
+® GS GO DS o@
+RELAY # | DESCRIPTION | ON | OFF [ON DLY|OFF DLY
+RELAY 1
+RELAY 2
+TANK 1 RELAY 3.
+ROSEMOUNT 3051CD RELAY 4
+DIFFERENTIAL PRESSURE RELAY 5
+TRANSMITTER RELAY 6
+Oe RELAY 7.
+SCALED 0-72” H20 TAYE
+PRECISION DIGITAL 2
+Cl] ere r)
+LOW HIGH
+PRESSURE PRESSURE
+% q
+> @ OXO ROX CREO]
+RELAY # | DESCRIPTION | ON | OFF [ON DLY|OFF DLY
+RELAY 1
+RELAY 2
+RELAY 3
+TANK 1 RELAY 4
+ROSEMOUNT 3051T
+SYSTEM PRESSURE
+TRANSMITTER
+4—20mA
+0-150PSI
+APROVIDED BY PIPETECH
+Drawing Title
+CON TR OL SCH EM ATl C REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+SWIMMING RIVER, NEW JERSEY mal DRAWING NUMBER
+CONTROL PANEL P8100
+(985) 892-8898 SHEET NUMBER
+3"
+samples\CP-8100-8199\CP-8100.pdf,5,1700,2200,"H N
+~ 120VAC |
+PRECISION DIGITAL 3 ¢ |
+t_9 4(+) Co (-)2e °
+@ P+ be FOS
+() EXPANSION BOARD
+@ P- Low LEVEL VENT apo Hic ueven |
+ALAR ‘a aR ALAR
+@ COM [~mAduT vai 7 v7 cz
+@ matt Ic R 1 te! <e ee | ee ae
+2? 4 fia RE RGERG
+FU6 FT rl
+BAe 1 rh eh
+6) on ‘OKO! ON @
+& @) Qe De @ Oe
+1
+11 ()\
+i RELAY # | DESCRIPTION | ON | OFF [ON DLY|OFF DLY
+RELAY 1
+RELAY 2
+TANK 2 RELAY 3
+ROSEMOUNT 3051CD RELAY 4
+DIFFERENTIAL PRESSURE RELAY 5
+TRANSMITTER RELAY 6
+Oe RELAY 7.
+SCALED 0-72” H20 =e
+PRECISION DIGITAL 4
+Cl] ere r)
+LOW HIGH
+PRESSURE PRESSURE
+ddd de ee
+@ @ ) @)
+RELAY # | DESCRIPTION | ON | OFF [ON DLY|OFF DLY
+RELAY 1
+RELAY 2
+RELAY 3
+TANK 2 RELAY 4
+ROSEMOUNT 3051T
+SYSTEM PRESSURE
+TRANSMITTER
+4—20mA
+0-150PSI
+APROVIDED BY PIPETECH
+Drawing Title
+CON TR OL SCH EM All C REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+SWIMMING RIVER, NEW JERSEY wat DRAWING NUMBER
+CONTROL PANEL P8100
+(985) 892-8898 SHEET NUMBER
+4"
+samples\CP-8100-8199\CP-8100.pdf,6,1700,2200,"H N
+‘a 120VAC =|
+ADD AIR S.V.
+Nw
+open o U {s} ADD AIR LIGHT
+(cri) @ ADD AIR RELAY
+PD1,R3 CR3-1
+on O-es5 6 ‘
+ADD !
+i
+PD3,R3 !
+'
+23) 24 '
+ADD
+VENT AIR S.V.
+CLOSE YN. VENT. AIR
+EN | AUTO wa LIGHT
+“ (oro) VENT. AIR
+CR2)}-—®
+ee RELAY
+PD1,R2 CR3-2
+on O-eX3 4 f
+VENT 1
+i
+PD3,R2 1
+'
+21 22; '
+VENT
+TANK 1 TANK 2
+¢ O ° (2) # TANK SELECTOR
+PD1,R4 CR3-3
+¢ 7 8 + ° (cra) ° Hit veel ay
+HIGH LEVEL 1 NEAT] ALARM REL
+i HIGH LEVEL
+PD3,R4 i RESET CR4-1 a,
+! \| Ry HIGH LEVEL
+t e High LEVEL aa ° 1% ""32? ALARM LIGHT
+PD1,R1 CR3-4
+¢ 1 2 a % (Rs) @ LOW LEVEL
+OW LEVEL \ ey ALARM RELAY
+L ~ i LOW_LEVEL
+PD3,R1 | RESET CR5-1
+! im YN. LOW LEVEL
+’ 8 Low EVEL |"" ° 1 #18? ALARM LIGHT
+APROVIDED BY PIPETECH
+Drawing Title
+CONTROL SCHEMATIC REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+
+SWIMMING RIVER, NEW JERSEY
+
+CONTROL PANEL
+
+70471
+
+(985) 892-8898
+
+DRAWING NUMBER
+CP-8100
+
+SHEET NUMBER
+
+5"
+samples\CP-8100-8199\CP-8100.pdf,7,1700,2200,"x=
+z
+
+~ 120VAC =|
+OFF vay. PUMP 1
+HAND} AUTO PUMP 1 PUMP 2 @—F RUNNING
+e [e; 2 (rr) @ PUMP RELAY 1
+PD1,R5 CR3A-1
+|| ae ene oO (oR2)
+¢ 9 1 | 10, | O oO 2 \PR2} @ PUMP RELAY 2
+PUMP. CALL vv PUMP 2
+2) ? RUNNING
+7—N
+OFF YN. PUMP 3
+HAND. AUTO PUMP. 3. PUMP 4 Oem RUNNING
+e [e; 2 *3) @ PUMP RELAY 3
+PD3,R5 CR3A-2
+| lL at oO (ora)
+e277 1 | 28) 1 | O oO 2 \PR4} @ PUMP RELAY 4
+PUMP CALL VW PUMP 4
+{ y ? RUNNING
+Drawing Title
+CONTROL SCHEMATIC REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title = PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+SWIMMING RIVER, NEW JERSEY qo47l DRAWING NUMBER
+CP-8100
+CONTROL PANEL (985) 892-8898 SHEET NUMBER
+
+6"
+samples\CP-8100-8199\CP-8100.pdf,8,1700,2200,"PD1 SIGNAL 1 CURRENT OU
+
+iT 1
+
+Full Fug
+
+ELETELETELE TEE EET EEE EEE
+Q|P|O|PO|P|PA|P| P| P| S| P| P| P| P| @|@
+|_u u u u u u u u u u u u u u u u-]
+hool1oso2hoshoaios} 1); 2} 3)4)/5]6]7]8]9]10
+}S1 inl inl inl inl inl inl inl inl inl ial ial ial ial iat n_
+AAAiAAaaaQaaQaaiaawaaaz
+ELETETETELE EET E ETE ETE Eee
+
+corr Ud Wd Gd ly
+
+i y v CRI R2 R3 R4 R5)
+© 4 Zoma PDI ReLays
+
+(LEVEL)
+
+TANK 1
+
+3051CD
+DIFF. PRESSURE
+TRANSMITTER
+
+PD2 SIGNAL 2 CURRENT OUT 2
+
+P+ mA+ I- R
+PD2 RELAYS
+XK
+CR R2 R3 R4
+
+E E
+
+ul iW ul
+
+ELELETE
+
+Ei
+Q|Q|Q|O@| O| O|O|O|O|O|@|@|@|@
+
+Pu uy
+
+ur
+200)20 11202/203204/205 11) 12}13)14/15]16]17)18
+
+Lr nitratnrtnatntrAtnrAtntnAtnAtontn
+
+Q|Q|@|O@|O@| O@| @|O@|O@|@|@|@|@|@
+
+e(eleleteleiaialeieieiaiats
+E+! EF F777)?
+1 | 1 | nn nn 2 2 2
+Pio
+oo) +
+4—20mA
+OUT
+© (PRESSURE)
+TANK 1
+3051T
+SYS. PRESSURE
+TRANSMITTER
+
+Drawing Title
+
+EXTERNAL CONNECTIONS
+
+REVISION - LOCATION
+
+SWIMMING RIVER, NEW JERSEY
+CONTROL PANEL
+
+70471
+
+(985) 892-8898
+
+REFERENCE DRAWING | _NO. ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+01/27/26 TM. TM. BY: JCF BY: DATE!
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+
+DRAWING NUMBER
+CP-8100
+
+SHEET NUMBER
+7"
+samples\CP-8100-8199\CP-8100.pdf,9,1700,2200,"PD3 SIGNAL 3 CURRENT OUT 3
+
+P+ mA+ I- R
+
+SWIMMING RIVER, NEW JERSEY
+CONTROL PANEL
+
+70471
+
+(985) 892-8898
+
+FUS Fue
+EEE E EEE EEE ET EEE ET
+Q|P|O|PO|P|PA|P| P| P| S| P| P| P| P| @|@
+|_u u u u u u u u u u u u u u u u-]
+1300}30 11302)303}304)305) 19 | 20| 21] 22] 23} 24 | 25] 26| 27/28
+}S1 inl inl inl inl inl inl inl inl inl ial ial ial al iat n_
+AAAiAAaaaQaaQaaiaawaaaz
+EEE E ETE EEE ELE ETE Eee
+cp -+ E> -5 f f
+1 1 1 1
+Pid GH GE GH GEG
+\ } yvooGR R2 R3 R4 R5)
+Y
+4 Zoma PD3 RELAYS
+(LEVEL)
+TANK 2
+3051¢D
+DIFF. PRESSURE
+TRANSMITTER
+PD4 SIGNAL 4 CURRENT OUT 4
+P+ mA+ I- R
+PD4 RELAYS
+IN
+CR R2 R3 R4
+nll | ih fh hf
+PAE SESE SESE SESE SESE SESE REDE} lal
+QAaiQaaaaaaa;aaamea
+Ree ee CICA)
+4.00/40 114.0214.03/4.0414.05 29] 30 | 31] 32] 33/34) 35] 36 puyuy
+Intintintintintinininininintintintn H|N|G
+QAaiaaaaaaaaaaaa lalolol
+PAE SESE SESE SESE SESE SESE SEE}
+Es. EF7 TTT TTT Biel e
+rho PT Vy bb eb a
+1 t vy fot ot
+\) t+ o- hort
+4-20mA A AK
+(PRESSURE) HN G
+TANK 2 120VAC
+3051T
+SYS. PRESSURE
+TRANSMITTER
+Drawing Title
+EXTERNAL CONNECTIONS REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+
+DRAWING NUMBER
+CP-8100
+
+SHEET NUMBER
+8"
+samples\CP-8100-8199\CP-8100.pdf,10,1700,2200,"NEMA 12 PAINTED STEEL ENCLOSURE
+
+2. awumnum SWING OUT pant S
+
+Lo) VIEW_OF INNER SWING PANEL Lo)
+
+NAMEPLATE SCHEDULE
+
+NP-1 TANK 1/SYSTEM PRESSURE NP-10 VENT AIR
+NP-2 TANK 2/SYSTEM PRESSURE NP-11 OPEN-CLOSE-AUTO
+NP-3 TANK 1/LEVEL NP-12 RECIRC PUMP 1/RUN
+NP-4 TANK 2/LEVEL NP-13  RECIRC PUMP 2/RUN
+NP-5 HIGH LEVEL/ALARM NP-14 RECIRC PUMP 3/RUN
+NP-6 ALARM RESET NP-15  RECIRC PUMP 4/RUN
+NP-7 LOW LEVEL ALARM NP—16 PUMP SELECTOR/
+NP-8 CONTROLLING TANK/ PUMP 1—PUMP 2
+TANK 1—TANK 2 NP-17 PUMP SELECTOR/
+NP-9 ADD AIR PUMP 3—PUMP 4
+NP—18 HAND-OFF—AUTO
+Drawing Title
+ENCLOSURE REFERENCE DRAWING | _NO. REVISION - LOCATION ECN | DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED
+01/27/26 TM. TM. BY: JCF BY: DATE
+Project Title PO Box 8856 PURCHASE ORDER NUMBER
+Mandeville, LA
+SWIMMING RIVER, NEW JERSEY 70471 DRAWING NUMBER
+
+CONTROL PANEL
+
+(985) 892-8898
+
+CP-8100
+
+SHEET NUMBER
+
+9"
+samples\CP-8100-8199\CP-8100.pdf,11,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+SAGINAW
+
+SCE-36EL3012LP
+
+ENCLOSURE
+
+COX RESEARCH
+
+CAMO363012SSLP
+
+BACKPLATE/SWING PANEL
+
+PRECISION DIGITAL
+
+PD6000—6R7
+
+PROCESS METER
+
+SQUARE D
+
+QOU140
+
+CB1
+
+ALTECH
+
+CF4U
+
+FUSE HOLDER
+
+BUSSMANN
+
+S500—32R
+
+FU1-8
+
+PHOENIX
+
+3044102
+
+4MM_TERMINAL BLOCK
+
+PHOENIX
+
+5600461
+
+CONVENIENCE RECEPTACLE
+
+O]O| NH) ORIGIN}
+
+SQUARE D
+
+QOQU120
+
+CB2-5
+
+SQUARE D
+
+QOQU110
+
+CB7
+
+MARATHON
+
+1321580
+
+STRIBUTION BLOCK
+
+SQUARE D
+
+QOU115
+
+Lvs)
+no
+
+PRECISION DIGITAL
+
+PDA1004
+
+ELAY EXPANSION BOARD
+
+ABB
+
+CL2513G
+
+REEN LED PILOT LIGHT
+
+ABB
+
+CL2513R
+
+ED_LED PILOT LIGHT
+
+ABB
+
+C3SS110B-11
+
+POSITION SWITCH
+
+ABB
+
+C2SS210B-11
+
+POSITION SWITCH
+
+ABB
+
+CP110B—11
+
+USH BUTTON
+
+FINDER
+
+55.34.8.120.0050
+
+ONTROL RELAY
+
+1
+4
+1
+is]
+8
+e)
+1
+4
+1
+2
+1
+2
+2
+6
+4
+3
+2
+6
+4
+
+ABB
+
+AF16—30-10-13
+
+VOI VINIWD|DIQ|Dla|O
+
+UMP RELAY
+
+DATE:
+01/27/26
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION ECN DATE
+
+BY
+
+SIN Sales Engineer
+
+T.M
+
+Application Engineer
+TM.
+
+DRAWN
+
+APPROVED
+
+BY: JCF BY: DATE:
+
+Project Title
+
+SWIMMING RIVER, NEW JERSEY
+CONTROL PANEL
+
+PO Box 8856
+Mandeville, LA
+
+PURCHASE ORDER NUMBER
+
+70471
+
+DRAWING NUMBER
+
+CP-8100
+
+(985) 892-8898 SHEET NUMBER
+
+10"
+samples\CP-8100-8199\CP-8106.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+TYLER STREET LS
+DUPLEX PUMP
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+JANUARY 28, 2026
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8106"
+samples\CP-8100-8199\CP-8106.pdf,2,1700,2200,"SOLD TO: Delta Process SHIP TO: Delta Process
+TAG: Tyler Street LS
+Duplex Pump Control Panel
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount x
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+Panel Type Duplex Cycle Counters
+Voltage 120/240V Economy Version
+Phase/HZ 3/60 Elapsed Time Meters Xx
+No. Motors 2 Flasher
+HP 5 Green Run Lights vs. Red
+FLA 15 Ground Fault Receptacle
+Pump Manufacturer Barnes High Temp Lights Xx
+Type of Pump Submersible High Temp Pump Shutdown - Auto Reset xX
+Catalog Number 3SCMPASON4] | High Temp Pump Shutdown - Manual Reset
+Capacitors INo Intrinsically Safe Relays Pts
+Control Voltage _ T20V Lightning Arrestor xX
+Control Power Transformer VA = INo Main Disconnect without door Mt. Handle Xx
+Enclosure NEMA Rating 4x Panel Heater/Thermostat_ W =
+Enclosure Material Fiberglass Phase Monitor xX
+Enclosure Size 24x20x10 Pole, Box, Seal
+Inner Swing Panel Yes Seal Fail Lights x
+Control Sensor Floats Seal Fail Relay - Fixed
+ULS08A Labeling INo Seal Fail Relay - Adjustable Xx
+UL698A Labeling INo Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA
+Unpowered Alarm Circuits #5 Xx
+OTHER:
+Drawing Title
+PANEL DESCRIPTION
+DATE : REFERENCE PRAWN | aoa 7 sr ON LOCA ECN ants BY
+01/28/26 AD. ” ° BY JCM BY DATE
+Project Title PURCHASE ORDER NUMBER
+
+8275 Florida Blvd.
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70728
+CP-8106
+EQUIPMENT | ’b. 225) 665-1666 SUEFTRUMAER 6
+
+CONTROL PANEL
+
+DRAWING NUMBER
+Fax (225) 665-1855 1"
+samples\CP-8100-8199\CP-8106.pdf,3,1700,2200,"u L2 L3
+1 1 1
+! ! ! MAIN. SERVICE
+G N ! | | 120/240V, 30
+\ 1 8 8 8 HIGH LEG MUST BE
+! i CONNECTED TO ”B” PHASE
+! ny a a f— 680A, 3POLE
+'
+co ! ( ~ | MAIN DISCONNECT
+'
+for?
+~ DISTRIBUTION BLOCK
+$ $
+9 9 304
+to cat 77). MI Olt oy
+oe O0!0 4X O~. 5HP
+LIGHTNING OR 1 PUMP 1
+ARRESTOR * o1° o . , 230V, 30
+° o Oo Xe S---7 |
+Gg |
+= 30A_IM
+3P =
+10 cB2 7) M2 OL2
+? aN oad SHP
+PHASE. gor bt x, PUMP 2
+MONITOR oN 230V,36
+oe Oo oO Xr
+cB3
+©) toa VERIFY 120V BETWEEN CB3 AND NEUTRAL
+“ip. BEFORE TURNING ON CIRCUIT BREAKER
+LEGEND
+N H @® PANEL TERMINAL
+
+@ WIRE
+
+© COMPONENT TERMINAL
+
+— PANEL WIRING
+— FIELD WIRING
+
+NUMBER
+
+Drawing Title
+
+POWER DIAGRAM
+
+REFERENCE DRAWING No. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer [Apphoation Engineer DRAWN APPROVED
+01/28/26 AD. BY JCM BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL JSQUIPMENT | °. 225) 665-1666 TEE
+
+Fax (225) 665-1855"
+samples\CP-8100-8199\CP-8106.pdf,4,1700,2200,"H N
+120VAC-
+ri) HIGH LEVEL
+FS-4 AUX RELAY
+® RY.
+PO-+°-® 5 4 ALARM LIGHT
+HIGH LEVEL ALARM
+io) PANE. TERM.
+a Nw
+(R} PUMP 1 RUNLIGHT
+* cro-2 oS | Mt
+4 © ry] PUMP 1 MOTOR STARTER
+©! t
+Fs-2 ALT2 HT
+© | PUMP 1 ELAPSED TIME METER
+Tey @ 2 t
+f
+\
+|
+LEAD PUMP ON 1
+(0) | |®
+¢ ;
+|
+| 4}+— ALTERNATOR
+ALT | Mi-1 TERM. (TYP.)
+| 9 a
+FS-1 i
+: i +T* | @ (3)
+- - i
+Oe cae 2) “Lue 6}—{alt)—{8 4 ALTERNATOR
+ALL PUMPS OFF ALT2 } yo M4
+Ka +
+1 Ww
+| Ho A (R} PUMP 2 RUNLIGHT
+ant ON * ors-2 | 7S | Oe
+Fs-3 | |
+PO-+y-® ho ATLO._|_. oF 5 || D(w2}44 4 PUMP 2 MOTOR STARTER
+| HT
+[tac Pup on ss Len) PUMP 2 ELAPSED TME METER
+
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING No. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer | Application Engineer DRAWN APPROVED
+01/28/26 AD. BY JCM BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL ABGUIPMENT | ?.225) 065-1006 [Ee
+2 - 3"
+samples\CP-8100-8199\CP-8106.pdf,5,1700,2200,"H N
+120VAC:
+° @—s? 79 r)
+SFR1
+173 ce) YY. 4 PUMP 1 SEAL FAIL
+5 T 3s |@ ms ALARM LIGHT/PROBE
+.) © Caan
+1 SPI
+L___gy_$
+(e)
+° @—|s? SFR? 79 r)
+ot} 3 () vay. 4 PUMP 2 SEAL FAIL
+5 IT 3 |® ms ALARM LIGHT/PROBE
+© S 15)-—4
+Te! SP2
+i?
+TSP1 ® D>
+PUMP 1 HIGH TEMP
+| en “anaes \ER2} ? RELAY
+CR2-1
+t v7 @ vay. 4 PUMP 1 HIGH TEMP
+Oe LIGHT
+TSP2 @
+<n Ria Ce) . BUME 2 HIGH TEMP
+CR3-1
+1 iy; @ Yay. 4 PUMP 2 HIGH TEMP
+f fay LIGHT
+M1-2 M2-— CRi-1 CR2-3 CR3-3
+@ 1, @ @ 1) 6 @ 1) @ @ 1, 8 Oy @
+IT IT I] | |
+r¢3)) 22) @3) (4) (28) Ge) (27 (8) (29 Go) ®®®®®
+PUMP. 1 PUMP 2 HIGH LEVEL PUMP _1 PUMP _2
+RUNNING RUNNING HIGH TEMP HIGH TEMP ———_.-——
+SPARES
+Drawing Title
+CONTROL DIAGRAM
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+01/28/26 AD. BY JCM BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CP-8106
+CONTROL PANEL JEQUIPMENT Fe Sees SHEET NUMBER ;"
+samples\CP-8100-8199\CP-8106.pdf,6,1700,2200,"NEMA 4X FIBERGLASS ENCLOSURE
+
+eo)
+
+oO)
+
+NOTE:
+
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+VIEW_OF INNER SWING PANEL
+
+NAMEPLATE SCHEDULE
+
+NP-1 PUMP 1/RUN
+NP-—2 PUMP 2/RUN
+NP-3 HOA
+
+NP—4 HIGH TEMP.
+NP-5 SEAL FAIL
+
+Drawing Title
+
+ENCLOSURE
+REFERENCE DRAWING No. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer | Application Engineer DRAWN APPROVED
+01/28/26 AD. BY JCM BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL ABGUIPMENT | ?.225) 065-1006 [Ee
+2 - 5"
+samples\CP-8100-8199\CP-8106.pdf,7,1700,2200,"BILL OF MAT
+
+ERIALS
+
+MANUFACTURER| PART NO. DESCRIPTION
+
+ATTABOX
+
+M2420HPL
+
+ENCLOSURE
+
+CMW.
+
+CAMOM2420HPL
+
+BACKPLATE & SWING PANEL
+
+ABB
+
+TF42-16
+
+O.L. RELAY (13-16A)
+
+CONERY
+
+R40—XLS
+
+ALARM LIGHT
+
+ABB
+
+C3SS110B—20
+
+HOA SWITCH
+
+DIVERSIFIED
+
+ARB—120—ADA
+
+ALTERNATING RELAY
+
+MARATHON
+
+1323580
+
+DISTRIBUTION BLOCK
+
+MARATHON
+
+1321580
+
+NEUTRAL BLOCK
+
+ENM
+
+TSOB— 212
+
+ETM
+
+SQUARE D
+
+QOU330
+
+CB1, CB2
+
+SQUARE D
+
+QOUTTO
+
+CBS
+
+SQUARE _D
+
+SDSA3650
+
+LIGHTNING ARRESTOR
+
+MACROMATIC
+
+PMPU—WS
+
+PHASE MONITOR
+
+ABB
+
+CL513R
+
+RED PILOT LIGHT
+
+ABB
+
+AF16—350—10-13
+
+MOTOR STARTER
+
+FINDER
+
+55.34.8.120.0050
+
+CR1—3
+
+LITTELFUSE
+
+LLCS4AA
+
+SEAL FAIL RELAY
+
+R
+
+94.04
+
+CR_BASE
+
+CLS513Y
+
+AMBER PILOT LIGHT
+
+CA4—-10
+
+AUX CONTACT
+
+= INDY IWIN] GIN) By
+
+OT63F3
+
+MAIN DISCONNECT
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO. REVISION-LOCATION ECN | DATE | BY
+DATE [SIN Sales Engineer | Application Engineer DRAWN APPROVED
+01/28/26 AD. AD. BY JCM BY DATE
+
+7
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+
+DUPLEX PUMP
+
+DELTA Denham Springs, LA
+PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL EQUIPMENT | °®. (225) 665-1666 EE
+
+Fax (225) 665-1855 6"
+samples\CP-8100-8199\CP-8109.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+SUSAN ST. LS.
+DUPLEX PUMP
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+FEBRUARY 2, 2026
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+CP-8109
+©COX RESEARCH AND TECHNOLOGY, INC. 2026"
+samples\CP-8100-8199\CP-8109.pdf,2,1700,2200,"SOLD TO: Delta Process SHIP TO: Delta Process - Ruston
+TAG: Susan St. L.S. Duplex Pump -
+Control Panel -
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Lightning arrestor shipped loose. Alarm Light - Panel Top Mount x
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+COX""™CAMO"" System
+Panel Type Duplex Cycle Counters
+Voltage 277/480 Economy Version
+Phase/HZ 3/60 Elapsed Time Meter Xx
+No. Motors 2 Flasher
+HP 10 Green Run Lights vs. Red
+FLA 14 est. Ground Fault Receptacle
+Pump Manufacturer GR High Temp Lights x
+Type of Pump Self Prime High Temp Pump Shutdown - Auto Reset
+Catalog Number : High Temp Pump Shutdown - Manual Reset x
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120V Lightning Arrestor x
+Control Power Transformer VA=2000 | Yes Main Disconnect without Door Mt. Handle x
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts.
+Enclosure Material Stainless Steel Panel Heater / Thermostat W=
+Enclosure Size 24x20x10 Phase Monitor x
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Floats Seal Fail Lights
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA
+Unpowered Alarm Circuits #5 xX
+OTHER: Case heater breakers.
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DUPLEX PUMP Process | faewReN
+CONTROL PANEL JJEQUIPMENT | °. 225) 665-1666 SHEET NUMBER —
+Fax (225) 665-1855 1"
+samples\CP-8100-8199\CP-8109.pdf,3,1700,2200,"ASHIP
+
+IH@}------ ©
+
+Lt 2 L
+
+a
+
+A
+
+LIGHTNING
+ARRESTOR
+
+3 MAIN SERVICE
+1 277/480V,36
+
+60A, 3POLE
+
+MAIN DISCONNECT
+
+DISTRIBUTION BLOCK
+
+25A_TM
+CB1-~\3P MI ty
+
+LEGEND
+
+() PANEL TERMINAL
+
+© COMPONENT TERMINAL
+@ WIRE NUMBER
+
+— PANEL WIRING
+
+—— FIELD WIRING
+
+N 10HP
+
+PUMP_1
+{3---- 480V,30
+
+’ i4est FLA
+
+PHASE
+MONITOR
+
+398 .d
+
+25A_TM
+CB2,-\3P M2 gig
+
+49 +
+
+480V,30
+7 14est FLA
+
++e
+bo
+
+fe}
+I> O
+
+27H
+
+-- |
+
+S|----- 4
+
+CASE
+EATER 17-8)
+
+16
+CB7
+db 10A
+
+yr
+9
+
+i
+PED LOOSE H
+
+VERIFY 120V BETWEEN CB7 AND NEUTRAL
+
+[e}
+[e}
+
+BEFORE TURNING ON CIRCUIT BREAKER
+
+CASE
+23 HEATER 2-6)
+
+DATE:
+02/02/26
+
+Drawing Title
+
+POWER DIAGRAM
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION ECN DATE BY
+
+S/N
+
+T.M T.M.
+
+Sales Engineer | Application Engineer DRAWN APPROVED.
+
+BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+DELTA
+PROCESS
+
+8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+
+70726 DRAWING NUMBER
+CP-8109
+
+Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+
+Fax (225) 665-1855
+
+2"
+samples\CP-8100-8199\CP-8109.pdf,4,1700,2200,"H N
+‘oa 120VAC =|
+HIGH LEVEL ALARM
+AUX. RELAY
+FS-4 ® Ww
+tO -© (R) # ALARM LIGHT
+4—N
+HIGH ALARM
+(0) GH LEVEL AL PANEL TERM.
+TYP.
+—-PpM Hoa ( i > © ® PUMP 1 RUN LIGHT
+SY @ CRI-2 i~ OL
+¢ © | 9 ® esi (ut re {— PUMP 1 MOTOR STARTER
+HT
+@ FS-2 @) ELAPSED TIME METER
+Toop [oO
+LEAD PUMP ON
+¢
+we t= ALTERNATOR
+? TERM. (TYP.)
+FS-1 @r)
+Toe ® 6 (7) 8 # ALTERNATOR
+w2—
+ALL PUMPS OFF ae M2~1
+VA~VZ
+H 9A (®}@,,. | PUMP 2 RUN LIGHT
+FS-3 varO) CR2-2 ~ OL
+tO OT re) | © (—_){—+ (u2 +e 4{— PUMP 2 MOTOR STARTER
+HT
+LAG PUMP ON t €n) ELAPSED TIME METER
+r oo
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DU PLEX PUMP 70726 DRAWING NUMBER
+CONTROL PANEL PROCESS cp-si09
+Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 3"
+samples\CP-8100-8199\CP-8109.pdf,5,1700,2200,"H N
+lL. 120VAC “|
+ay
+4—N
+CRI-1 @)
+¢ | | ® €a1 # PUMP 1 HIGH TEMP LIGHT
+PUMP 1
+=~ 0-9) © SET (cp) # PUMP 1 HIGH TEMP
+RESET
+ore TEMP SWITCH sk RESET X 4
+L/S
+Yay
+cR2-1 an
+¢ | | Era) # PUMP 2 HIGH TEMP LIGHT
+PUMP 2
+=o He © SETl Gna) # PUMP 2 HIGH TEMP
+“3 RESET
+j TEMP SWITCH sk ® RESET x 4
+LY
+M1-2 M2-2 RIA-1 CR2A-1 CR3-1
+PUMP 1 PUMP 2 PUMP 1 PUMP 2 HIGH
+RUN RUN HIGH TEMP HIGH TEMP LEVEL
+XR J
+Y
+DRY CONTACTS TO SCADA IF REQUIRED
+Drawing Title
+CON TR OL D | AGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title DELTA 8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DU PLEX P U M P PROCESS 10726 panes DRAWING NUMBER
+CP-8109
+CON TROL PAN EL JBQUIPMENT Ph. (225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 4"
+samples\CP-8100-8199\CP-8109.pdf,6,1700,2200,"NOTE:
+
+‘000001T
+
+ETM
+
+“! SWING OUT PANEL Ss
+
+LIGHTNING
+ARRESTOR
+
+ASHIPPED LOOSE
+
+0)
+
+VIEW_OF INNER SWING PANEL
+
+SEWER GASSES WILL_DESTROY COMPONENTS IN PANEL.
+PROPER_SEALS MUST BE_ INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+NAMEPLATE SCHEDULE
+
+NP-1 PUMP 1/RUN
+NP-—2 PUMP 2/RUN
+
+NP-3 HAND-OFF—AUTO
+
+NP-4 HIGH TEMP
+
+NP-5 HIGH TEMP/RESET
+
+po 4X STAINLESS STEEL ENCLOSURE
+
+oo
+
+Drawing Title
+
+ENCLOSURE REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/02/26 T™M TM. BY: JCF BY: DATE!
+Project Title DELTA 8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DUPLEX PUMP PROCESS 026 DRAWING NUMBER
+CP-8109
+CONTROL PANEL EQUIPMENT | ?». 225) 665-1666 SHEET NUMBER
+
+Fax (225) 665-1855
+
+5"
+samples\CP-8100-8199\CP-8109.pdf,7,1700,2200,"B
+
+ILL_OF MAT
+
+ERIALS
+
+ITEM | QTY. |] MANUFACTURER | PART NUMBER
+
+SAGINAW
+
+SCE—24EL2010SSLP
+
+DESCRIPT
+ENCLOSUR
+
+CAMO242010UU
+
+E
+BACKPLATE
+
+AF26N1—30—10-13.
+
+MOTOR STARTER
+
+TF42—-16
+
+O.L. RELAY (10—13A)
+
+CL2—513R
+
+RED PILOT L
+
+C3SS110B—20
+
+XTINU3O25AFFOOOXXX
+
+SQUARE D
+
+QOU110
+
+OO] OD) RIG] N|—
+
+ABB
+
+CL513Y
+
+s
+
+DIVERSIFIED
+
+ARB—120—ADA
+
+ENM
+
+T50B—120
+
+.
+
+MARATHON
+
+1323580
+
+R40—XLS
+
+s|—
+
+CP110B-11
+
+.
+
+RR2KP—UAC120V
+
+QOU115
+
+®
+oO
+fo)
+
+MACROMATIC
+
+PMPU—WS
+
+HASE_ MONITOR
+
+O][OO}|NIOD/OUN A] WIN} =|O
+
+FINDER
+
+46.52.8.120.0054
+
+R1A,2A,3
+
+ABB
+
+OT63F3
+
+AIN DISCONNECT SWITCH
+
+ABB
+
+CA4—10
+
+UX CONTACTS
+
+EATON
+
+FAZ—D10/2—NA
+
+CB3
+
+SQUARE D
+
+QOU120
+
+CB4
+
+PA
+
+ES /SHI
+
+D
+
+LOOS
+
+ITEM MANUFACTURER | PART NUMBER DESCRIPTION
+5
+
+LIGHTNING ARRESTOR
+
+QUARE D. SDSA3650
+SQUARE _D. 2S1F
+
+TRANSFORMER
+
+ASHIP
+
+PED LOOSE
+
+Drawing Title
+
+BILL OF MATERIALS
+
+DATE:
+02/02/26
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION
+
+ECN DATE BY
+
+SIN Sales Engineer
+
+T.M
+
+T.M.
+
+Application Engineer
+
+DRAWN APPROVED
+
+BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+DELTA
+PROCESS
+JASQGUIPMENT
+
+8275 Florida Blvd. PURCHASE ORDER NUMBER
+
+Denham Springs, LA
+
+DRAWING NUMBER
+CP-8109
+
+70726
+
+Ph. (225) 665-1666
+Fax (225) 665-1855
+
+SHEET NUMBER
+
+6"
+samples\CP-8100-8199\CP-8103.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+BASS LAKE
+DUPLEX PUMP
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+FEBRUARY 3, 2026
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8103"
+samples\CP-8100-8199\CP-8103.pdf,2,1700,2200,"SOLD TO: Delta Process SHIP TO: Delta Process
+TAG: Williams LS CSWR Slidell Duplex Pump -
+Control Panel -
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount xX
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+COX""™CAMO"" System
+Panel Type Duplex Cycle Counters
+Voltage 120/240 Economy Version
+Phase/HZ 1/60 Elapsed Time Meter Xx
+No. Motors 2 Flasher
+HP 5 Green Run Lights vs. Red
+FLA 29.9 Ground Fault Receptacle x
+Pump Manufacturer Barnes High Temp Lights
+Type of Pump Submersible, | High Temp Pump Shutdown - Auto Reset
+Catalog Number 3ESD High Temp Pump Shutdown - Manual Reset
+Capacitors Yes Intrinsically Safe Relays Pts.
+Control Voltage 120 Lightning Arrestor x
+Control Power Transformer VA= No Main Disconnect with Door Mt. Handle
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts.
+Enclosure Material Stainless Steel] | Panel Heater / Thermostat W=
+Enclosure Size 24x20x10 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Floats Seal Fail Lights xX
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC
+Starters - NEMA (ABB) x
+Unpowered Alarm Circuits #
+OTHER:
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/03/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DUPLEX PUMP Process | faewReN
+CONTROL PANEL JJEQUIPMENT | °. 225) 665-1666 SHEET NUMBER a
+Fax (225) 665-1855 1"
+samples\CP-8100-8199\CP-8103.pdf,3,1700,2200,"G N_ Lt L2 MAIN SERVICE
+j ' 1 Y 120/240V,16
+| | | | LEGEND
+1 1 1 1
+1 i i 1
+1 oN ut Lal @® PANEL TERMINAL
+I 6 6 6 © COMPONENT TERMINAL
+1
+WIRE NUMBER
+| f---f---4— BOA, 3POLE 8
+! MAIN DISCONNECT — PANEL WIRING
+1 9 9 9 — FIELD WIRING
+Ble ¢ if DISTRIBUTION BLOCK
+LIGHTNING
+ARRESTOR 031 Aeo
+e 10 rans | | Ou g + BK r’
+1 iT €B-7,
+! \
+! L 400-480nf \
+I TSC one of \
+I TRC
+\ OR 2
+\ 1
+/
+/
+1 M64 5 / I
+12
+x8 ‘ we / |
+i]
+! 4
+——
+rh 3 BARNES ‘Sr
+* Oo oO 2 © 3ESD ~
+=
+ca eos ap
+2P o2 11
+¢ 10 caps 2, * BK/W ? 88)
+\
+! \
+! —L 400-480. f \
+se SL sont ‘
+; TRC \ 5HP.
+! oe $+ MY 69) --— PUMP 2
+t 1 DY 230vii8
+I M64 5 / i
+T2
+x + BUN |
+i]
+! 4
+-----
+rN 3 BARNES. ‘Sr
+5s ~ © 3ESD =
+ces,
+~~ 1P
+¢ Oo oO (1,) GFI RECEPTACLE
+¢
+cB4 VERIFY_120V BETWEEN CB4 AND NEUTRAL
+O~10A BEFORE TURNING ON CIRCUIT BREAKER
+1P
+[o}
+! !
+N H
+Drawing Title
+POWER DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/03/26 S.D. 8.D. BY: JCF BY: DATE:
+Project Title DELTA 8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 panes: DRAWING NUMBER
+CP-8103
+CON TROL PAN EL JBQUIPMENT Ph. (225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 2"
+samples\CP-8100-8199\CP-8103.pdf,4,1700,2200,"H N
+L~ 120VAC -
+(ceo) POWER LOSS
+T (CR?) ? RELAY
+FS—4 © WW
+Vay HIGH_LEVEL ALARM
+Tose sampure LIGHT
+HIGH LEVEL (cr!) 4 HIGH bEVEL
+\V~Z
+@ Hoa ) (R) ® PUMP 1 RUN LIGHT
+NY (©) Ts! on ol
+(n+ Ae PUMP 1. MOTOR
+¢ O__|_ _O 9 ae + Mt) STARTER
+(em)
+FS-2 ALT2 TEMP_ SWITCH E™ ELAPSED TIME METER
+- _ IN PUMP 1 er
+e- oe 12 , 3}5
+LEAD PUMP ON ! @
+t \
+ALTII MI-1 t
+iH ]
+""om
+FS-1 !
+- oa 11 Ob 6} (ar) _{8 @ ALTERNATOR
+“> _ LY
+ALT2! M2 ~~ 2-1
+ALL PUMPS OFF Ly +
+i]
+i] \V~VZ
+H? UA ® (R) © | PUMP 2 RUN LIGHT
+1 4—N
+FS-3 ALT1 | “@® TS2 OL
+_ _ PUMP _2 MOTOR
+ure uy ache STARTER
+
+Toe 0]
+
+i
+\ (em)
+LAG PUMP ON TEMP. SWITCH é™
+| sts RMP SMTS em) ELAPSED TIME METER
+Z) SEAL LEAK PROBE PUMP 1
+¢ Ry. w (3-6 }---4) 6 PUMP 1 SEAL PAIL
+ya ALARM LIGHT/PROBE
+SEAL LEAK PROBE PUMP 2
++ YR. (3) ---0 }--)—____# PUMP 2 SEAL FAIL
+ARE ALARM LIGHT/PROBE
+CRI-1 CR2-1
+} | |
+i Vf
+© & ® ®&
+HIGH POWER
+LEVEL LOSS
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/03/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+
+DUPLEX PUMP
+CONTROL PANEL
+
+DELTA Denham Springs, LA
+70726
+PROCESS
+EQUIPMENT | ’b. 225) 665-1666
+
+Fax (225) 665-1855
+
+DRAWING NUMBER
+CP-8103
+
+SHEET NUMBER
+3"
+samples\CP-8100-8199\CP-8103.pdf,5,1700,2200,"0000011
+
+0000011
+
+ETM
+
+2. awumnum SWING OUT raven SS
+
+ETM
+
+7)
+
+VIEW_OF INNER SWING PANEL
+
+NEMA 4X FIBERGLASS ENCLOSURE
+
+NAMEPLATE SCHEDULE
+
+NP-1 PUMP 1 en
+NP-2 PUMP 2/RUN
+NOTE: NP-—3 HAND—OFF—AUTO
+SEWER GASSES WILL_DESTROY COMPONENTS IN PANEL. NP—4 SEAL FAIL
+PROPER_SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+Drawing Title
+ENCLOSURE REFERENCE DRAWING | _NO REVISION - LOCATION ECN | DATE | BY
+DATE: SN Sales Engineer | Application Engineer DRAWN ‘APPROVED
+02/03/26 8D 8D. BY: JCF BY: DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CP-8103
+CONTROL PANEL JBQUIPMENT | ?2. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 4"
+samples\CP-8100-8199\CP-8103.pdf,6,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+ATTABOX
+
+M2420HPL
+
+ENCLOSURE
+
+CMW.
+
+CAMOM2420HPL
+
+BACKPLATE
+
+MARATHON
+
+1323580
+
+DISTRIBUTION BLOCK
+
+SQUARE D
+
+QOQU240
+
+CB1,2
+
+SQUARE D
+
+QOU110
+
+CB4
+
+ABB
+
+F30—30—-00-13
+
+MOTOR ST
+
+TARTER
+
+DIVERSIFIED
+
+RB-120—ADA
+
+ALTERNATOR
+
+ABB
+
+3SS110B—20
+
+H.0.A. SWITCH
+
+O]O| NH) ORIGIN}
+
+ABB
+
+RED
+
+PILOT LIGHT
+
+ABB
+
+RED
+
+PILOT LIGHT
+
+MARS
+
+=Z|O|O|O|}S|>
+
+START RE
+
+LAY
+
+SHENGYOU
+
+ART CAP. 400—480xf /330V
+
+DAYTON
+
+Cc
+Zz
+
+CAP. 50xf /440V
+
+CONERY
+
+40—XLS
+
+LARM_LIGHT
+
+ABB
+
+F42—24
+
+L. RELAY (20-24A)
+
+ENM
+
+50B—212
+
+LAPSED TIME METER
+
+ABB
+
+A4—-10
+
+UX CONTACT
+
+SQUARE _D
+
+NIOIAAIAIOIO
+
+DSA1175
+
+GHTNING ARRESTOR
+
+ABB
+
+OT63F3.
+
+SCONNECT SWITCH
+
+SQUARE D
+
+Luu)
+W
+
+HUBBELL
+
+QOU115
+
+Fl RECEPTACLE
+
+1
+1
+2
+1
+2
+1
+2
+2
+2
+2
+2
+2
+1
+2
+2
+2
+1
+1
+1
+1
+2
+
+FINDER
+
+46.52.8.120.0054
+
+DIQD/O/VIL|S|MO|}>|AY
+
+A
+I)
+
+2
+
+DATE:
+02/03/26
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION
+
+ECN DATE
+
+BY
+
+SIN Sales Engineer
+
+S.D.
+
+Application Engineer
+S.D.
+
+DRAWN
+
+APPROVED
+
+BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+DELTA
+PROCESS
+JASQGUIPMENT
+
+8275 Florida Blvd.
+Denham Springs, LA
+
+PURCHASE ORDER NUMBER
+
+70726 DRAWING NUMBER
+
+CP-8103
+
+Ph. (225) 665-1666
+Fax (225) 665-1855
+
+SHEET NUMBER
+
+5"
+samples\CP-8100-8199\CP-8101.pdf,1,1700,2200,"INFILTRATOR’
+
+water technologies
+
+P24-0247
+GRAPE CREEK ISD
+
+DUPLEX BLOWERS
+DUPLEX FLOW EQ PUMPS
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+FEBRUARY 3 , 2026
+
+Infiltrator Water Technologies
+15785 Industry Way
+Walker, LA 70785
+(225) 665-6162 Fax (800) 219-9183
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8101"
+samples\CP-8100-8199\CP-8101.pdf,2,1700,2200,"SOLD TO: Infiltrator Water Technologies SHIP TO:
+TAG: Grape Creek ISD Duplex Blowers -
+Duplex Flow Eq Pumps Control Panel -
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Incoming Neutral Required. Alarm Light - Panel Top Mount x
+120V Breakers For Influent Flow Meter, Alarm Light - Remote
+Effluent Mag Meter, Two Filter Alarm Panels. Alarm Test Switch
+Alarm Silence Switch xX
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo xX
+COX""™CAMO"" System
+Panel Type 2+2 Cycle Counters
+Voltage 120/208 Economy Version
+Phase/HZ 3/60 Elapsed Time Meter
+No. Motors 4 Flasher
+HP 5, 0.5 Green Run Lights vs. Red
+FLA 17.5est, 2.5est]_ | Ground Fault Receptacle
+Pump Manufacturer GD, Barnes High Temp Lights
+Type of Pump Blower/EQ High Temp Blower Shutdown - Auto Reset xX
+Catalog Number 3L, SE544 High Temp Pump Shutdown - Manual Reset
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120 Lightning Arrestor
+Control Power Transformer VA= No Main Disconnect without Door Mt. Handle x
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts.
+Enclosure Material Fiberglass Panel Heater / Thermostat W=
+Enclosure Size 30x24x10 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Varies Seal Fail Lights
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA (ABB) x
+Unpowered Alarm Circuits #12 xX
+OTHERS: Overload Indication For Blowers and Flow EQ
+Pumps. Stopped, Running, Overload Dry Contacts For Each
+Motor.
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/03/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+GRAPE CREEK ISD (a 70785 DRAWING NUMBER
+CONTROL PANEL INFILTRATOR’ Fee O29) 219.9185 SHEET NUMBER “ -"
+samples\CP-8100-8199\CP-8101.pdf,3,1700,2200,"N L1 L2 L3 MAIN SERVICE
+D 120/208V,38
+KEY
+Ly Lays @ PANEL TERMINAL
+os o& © © COMPONENT TERMINAL
+| BOA. 3POLE @ WIRE NUMBER
+(71 — (7 AKC DSCONNECT — PANEL WIRING
+S65 © © —— FIELD WIRING
+if DISTRIBUTION BLOCK
+8
+35A
+| 12 BIN SP M1 02
+o SHP
+1
+rl of® x) 5) BLOWER
+¢ Oo 0 cman)
+SL!
+35A =
+| » C82, 3P M2 oL2
+a 5HP.
+@ BLOWER 2
+if 1° Xe) $2) 208,30
+pe 66 no BR 17.5est
+a
+15A M3 =
+CB3-\3P O13
+12
+olo <a,
+if NN O.5HP
+@, FLOW EQ. PUMP 1
+’ ole ot} (3) 208V.30
+a Y 2.5est
+¢ o O° xB
+a
+154A =
+| 12 B45 M4 Ot
+4 0.5HP
+rN FLOW EQ, PUMP 2
+1° oo) {w4) 208V,36
+66 pen 2.5est
+aa
+tot
+N 11
+
+Drawing Title
+
+REFERENCE DRAWING NO.
+
+POWER DIAGRAM REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/03/26 S.D. S.D. BY: JCF BY: DATE!
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+
+GRAPE CREEK ISD
+CONTROL PANEL
+
+G
+
+INFILTRATOR’
+water technologies
+
+70785
+
+Ph. (225) 665-6162
+Fax (225) 219-9183
+
+DRAWING NUMBER
+CP-8101
+
+SHEET NUMBER
+2"
+samples\CP-8100-8199\CP-8101.pdf,4,1700,2200,"ASA
+CBS
+t (m__ _INFLUENT__ gy
+i Ar i
+¢
+15A
+cB6
+4 (m_ _EFFLUENT__ my
+WAG METER Xt
+¢
+15A
+cB7
++ (FILTER __ em
+2 paNeL 1S
+¢
+ASA
+CBB
+¢ > —_FILTER
+W — PANEL 2M
+¢
+ASA
+cee in CHEM
+’ ~~ Bump —
+¢
+cB10
+O\10A
+1P
+fo} VERIFY 120V BETWEEN CB10 AND NEUTRAL
+BEFORE TURNING ON CIRCUIT BREAKER
+tot
+NH
+
+Drawing Title
+
+POWER DIAGRAM
+
+REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/03/26 SD. S.D. BY: JCF BY: DATE
+
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+
+Walker, LA
+GRAPE CREEK ISD 70785 DRAWING NUMBER
+CP-8101
+CONTROL PANEL INFILTRATOR’ Ph, (225) 665-6162 SHEET NUMBER
+water technologies Fax (225) 219-9183 3"
+samples\CP-8100-8199\CP-8101.pdf,5,1700,2200,"H N
+[* 120VAC |
+@Qw ®
+“ eS wi BLOWER 1 RUN LIGHT
+Ts!
+BLOWER 1
+=e ?---- 1-2) (wt) MOTOR STARTER
+(0) ALT2 TEMP SWITCH
+YB IN BLOWER’ 1
+¢
+4
+CRI-1 CR2-1
+RO MOSE 6 Cu) 8 # ALTERNATOR 1
+N /
+H A @ (R) ® | BLOWER 2 RUN LIGHT
+ALT2 TS2 OL
+| ©, BLOWER 2
+t ip —*—#-9__|__° ore 4) MOTOR STARTER
+: TEMP SWITCH
+® IN BLOWER 2
+clock ©
+im
+VI °
+¢
+r' Clock @ CLOCK
+PANEL IS DESIGNED TO RUN AERATORS IF NO OFF TIME IS REQUIRED BETWEEN
+WITH A MINIMUM OF 15 MINUTES OF OFF ALTERNATION, REMOVE JUMPER FROM
+TIME BETWEEN ALTERNATION. PINS PUSHED TERMINALS (©) AND ). PLACE JUMPER
+OUT ON CLOCK INDICATE RUN TIME. PINS ACROSS TERMINALS (7) AND @). NOW
+PUSHED IN INDICATE OFF TIME. EACH PIN AERATORS WILL RUN CONTINUOUSLY.
+IS EQUAL TO 15 MINUTES. SET 1 PIN IN AT THE TIME YOU WISH
+TO AERATORS TO ALTERNATE. ALL
+REMAINING PINS SHOULD BE PUSHED
+OUT.
+ot
+N /
+¢ e—(A)—o # BLOWER 1 OVERLOAD LIGHT
+aA
+(cry)
+CRI BLOWER 1 OVERLOAD RELAY
+M2 ~
+\V~Z
+¢ ® ¢—(A)—9——® BLOWER 2 OVERLOAD LIGHT
+7—N
+yO a (ca) BLOWER 2 OVERLOAD RELAY
+17
+YN.
+¢ @—(R }—e——® CHEM FEED RUN LIGHT
+CHEM FEED i~
+ft i (Prt) CHEM FEED POWER RELAY
+O——{)- 4] Fo
+
+Drawing Title
+
+BLOWER = =
+REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: CONTROL DIAGRAM SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/03/26 SD. S.D. BY: JCF BY: DATE
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+GRAPE CREEK ISD 078s DRAWING NUMBER
+CP-8101
+CONTROL PANEL INFILTRATOR’ Ph, (225) 665-6162 SHEET NUMBER
+water technologies Fax (225) 219-9183 4"
+samples\CP-8100-8199\CP-8101.pdf,6,1700,2200,"120VAC =|
+
+RESET cR7—1
+ale im (ex?) 4 HIGH LEVEL LATCHING
+CR3-1 @ Vw
+t 4 { 4 YR $ COMMON ALARM
+HIGH LEVEL CR4-1 7’
+CRI-2 +t PIEZO # AUDIBLE ALARM
+¢ J 1
+i
+OW e ' 4) @ SILENCE RELAY
+SILENCE
+1 LS
+BLOWER 2 OVERLOAD —o (R)
+TRIA—2 ARE
+t 3 Z b_(Gr3)-4-_4 HIGH LEVEL ALARM
+(CRS) RELAY /LIGHT
+HIGH LEVEL @ yx ® | crow co PUMP 1
+@ * DEX] MS] MOTOR STARTER
+(a3) FLOW EQ PUMP 1
+¢ ey # MS} #19 MOTOR STARTER
+ke TR2A-1
+RCT-2 Gay RI D ALT2
+HO Ka so— +2 rl 3}+0
+LEAD PUMP ON (3)
+’
+ALTI M3-1 7
+- = cR5-1
++o | We | |—4a ae 7 ® BL-in)[s # ALTERNATOR 2
+ALT2 CR6-1 M4—1
+ALL PUMPS OFF 1 “+
+fo) ®@y~ © | Flow eq pump 2
+TRZA—2 HOA * ART 4. | MOTOR STARTER
+ii aay 4 ©) (aa 42rd FLOW EQ PUMP 2
+be — | ~O—1a-Cit-2_} ep OMS) MOTOR STARTER
+LAG PUMP ON |
+¢ rue’
+¢ RCT # REPEAT CYCLE TIMER
+
+* REMOVE JUMPERS AND INSTALL
+
+*RCT MUST BE
+FIELD SET TO DESIRED
+DOSE TIMES.
+
+LOCKOUT DEVICES IF REQUIRED.
+
+** ADD JUMPERS TO) & (10)ALSO(11) & G2)IF TIME DOSE IS NOT REQ’D
+
+Drawing Title
+
+FLOW EQ. PUMPS
+
+REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: CONTROL DIAGRAM SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/03/26 SD. S.D. BY: JCF BY: DATE
+
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+
+Walker, LA
+GRAPE CREEK ISD 70785 DRAWING NUMBER
+E CP-8101
+CONTROL PANEL INFILTRATOR’ pp. (B58) 919.9183 SHEET NUMBER
+water technologies ax (¢- - 5"
+samples\CP-8100-8199\CP-8101.pdf,7,1700,2200,"CONTROL PANEL
+
+INFILTRATOR’
+water technologies
+
+Ph. (225) 665-6162
+Fax (225) 219-9183
+
+H N
+~ 120VAC -_
+TRANSCEIVER 2
+RI
+Ri
+A _O i 4 _
+—~-------T=
+| OPTI“FLOAT
+| CONNECTION
+| HIGH 4
+|
+| Lacy
+| TIMER OVERRIDI
+L J
+| : |
+¢ oe
+©4 POWER SUPPLY & 3)
+TRANSCEIVER 1
+_2 -
+A _®
+—-------T=
+| OPTI“FLOAT
+| CONNECTION
+| LEAD 4
+|
+|
+| OFF
+L
+AOPTI-FLOATS SUPPLIED BY INFILTRATOR.
+Drawing Title
+FLOW EQ. FLOA Ss REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: Sales Engineer | Application Engineer DRAWN ‘APPROVED
+02/03/26 S.D. 8.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+GRAPE CREEK ISD 70785 DRAWING NUMBER
+
+CP-8101
+
+SHEET NUMBER
+6"
+samples\CP-8100-8199\CP-8101.pdf,8,1700,2200,"H N
+a 120VAC =|
+WW
+Ms @)
+OL a
+(ors)
+¢ ° {cR5) o—_o
+W
+(A)
+M4 Ms
+OL
+¢ ° 6) o—_o
+Drawing Title
+FLOW EQ. PUMPS = =
+REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: CONTROL DIAGRAM SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/03/26 SD. S.D. BY: JCF BY: DATE
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+GRAPE CREEK ISD 70785 DRAWING NUMBER
+CP-8101
+CONTROL PANEL INFILTRATOR’ Ph, (225) 665-6162 SHEET NUMBER
+water technologies Fax (225) 219-9183 7"
+samples\CP-8100-8199\CP-8101.pdf,9,1700,2200,"M1-1 M1-—2 CR1-2 M2-1 M2-—2 CR2-2
+| | | } | } |
+I I VF i i
+BLOWER 1 BLOWER 1 BLOWER 1 BLOWER 2 BLOWER 2 BLOWER 2
+STOPPED RUNNING OVERLOAD STOPPED RUNNING OVERLOAD
+M3-2 M3-3 CR5-—2 M4-—2 M4-3 CR6-—2
+| | | | | | |
+I I aa IT IT
+@) 3) G9) ® & ® % © ) 8)
+FEQ PUMP 1 FEQ PUMP 1 FEQ_PUMP 1 FEQ PUMP 2 FEQ PUMP. 2 FEQ PUMP _2
+STOPPED RUNNING OVERLOAD STOPPED NNING OVERLOAD
+@ @G f& & @ @
+4—20mA_FROM 4-20mA TO
+MAG METER CADA
+@ © ©® ®H %) @&
+4—20mA FROM 4-20mA TO
+FLOW METER SCADA
+Drawing Title
+DRY CONTACTS REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/03/26 SD. S.D. BY: JCF BY: DATE
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+GRAPE CREEK ISD 70785. DRAWING NUMBER
+CP-8101
+CONTROL PANEL INFILTRATOR’ pp. (B58) 919.9183 SHEET NUMBER
+water technologies ax i 8"
+samples\CP-8100-8199\CP-8101.pdf,10,1700,2200,"SEWEI
+
+NOTE:
+
+NP-8
+
+PUSH BUTTON—
+
+PIEZO —=
+
+R GASSES WILL_DES
+
+COMMON ALARM
+LIGHT
+
+Ss
+
+NEMA 4X FIBERGLASS ENCLOSURE
+
+NAMEPLATE SCHEDULE
+
+VIEW_OF INNER SWING PANEL
+
+TROY COMPONENTS IN PANEL.
+
+PROPER_SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+NP-1
+
+NP—2
+NP-3
+NP-—4
+NP-5S
+NP-6
+NP-7
+NP-8
+NP-9
+
+BLOWER 1/RUN
+BLOWER 2/RUN
+OVERLOAD
+
+EQ. PUMP 1/RUN
+EQ. PUMP 2/RUN
+HAND—OFF—AUTO
+HIGH LEVEL
+SILENCE
+
+CHEM FEED/RUN
+
+Drawing Title
+ENCLOSURE REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/03/26 SD. S.D. BY: JCF BY: DATE
+
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+
+Walker, LA
+GRAPE CREEK ISD 70785 DRAWING NUMBER
+CP-8101
+CONTROL PANEL INFILTRATOR’ pp. (B58) 919.9183 SHEET NUMBER
+water technologies arte ° 9"
+samples\CP-8100-8199\CP-8101.pdf,11,1700,2200,"MANUFACTURER PART NUMBER DESCRIPTION
+
+ATTABOX
+
+BILL OF MATERIALS
+
+M3024HPL
+
+ENCLOSURE
+
+CMW.
+
+CAMOM3024HPL
+
+BACKPLAT
+
+TE/SWING PANEL
+
+ABB
+
+OT80F3
+
+MAIN DISCONNECT
+
+MARATHON
+
+1323580
+
+DISTRIBUTION BLOCK
+
+SQUARE D
+
+QOQU315
+
+CB3,4
+
+ABB
+
+F16-30-10-13
+
+MOTOR STARTER 3,4
+
+SQUARE D
+
+0U115
+
+CB5-9
+
+ABB
+
+3SS110B—20
+
+H.0.A. SWITCH
+
+O]O| NH) ORIGIN}
+
+ABB
+
+L513R
+
+RED PILOT LIGH
+
+DIVERSIFIED
+
+RB—-120—ADA
+
+LTERNATOR_ 1,2
+
+OMRON
+
+3CR-F8N
+
+EPEAT CYCLE
+
+GRASSLIN
+
+STUZH—-120V
+
+=
+Ss
+
+LOCK
+
+ABB
+
+L513Y
+
+MBER PILOT LI
+
+IDEC
+
+U4SUAC120
+
+R1i-6
+
+ABB
+
+ADOT SIOlOl|oOlS
+
+F42—20
+
+L._ RELAY _1,2(16—20A)
+
+SQUARE _D
+
+QQU335
+
+B1,2
+
+INGRAM
+
+PW120AB
+
+EZO
+
+ABB
+
+CP110B—20
+
+USH BUTTON
+
+CONERY
+
+R40—XLS
+
+YL/VVOO|O|S/OjA|>
+
+LARM_LIGHT
+
+MARATHON
+
+1321580
+
+NEUTRAL BLOCK
+
+ABB
+
+TF42-3.1
+
+O.L. RELAY 3,4 (2.3—3.1A)
+
+SQUARE D
+
+QOU110
+
+CB10
+
+ABB
+
+AF26N1—30—00-13
+
+MOTOR STARTER 1,2
+
+1
+1
+1
+2
+2
+5
+5
+6
+2
+1
+1
+4
+6
+2
+2
+1
+1
+1
+1
+2
+1
+2
+1
+
+FINDER
+
+62.33.8.120.4050
+
+POWER RELAY
+
+DATE:
+02/03/26
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION ECN
+
+DATE
+
+BY
+
+SIN Sales Engineer
+
+Application Engineer
+SD. S.D.
+
+DRAWN
+
+APPROVED
+
+BY: JCF BY:
+
+DATE:
+
+Project Title
+
+GRAPE CREEK ISD
+CONTROL PANEL
+
+G
+
+INFILTRATOR’
+water technologies
+
+15785 Industry Way
+Walker, LA
+
+PURCHASE ORDER NUMBER
+
+70785
+
+DRAWING NUMBER
+
+CP-8101
+
+Ph. (225) 665-6162
+Fax (225) 219-9183
+
+SHEET NUMBER
+
+10"
+samples\CP-8100-8199\CP-8101.pdf,12,1700,2200,"""OFF"" POSITION - TRIPPERS PUSHED INWARD
+""ON"" POSITION - TRIPPERS PUSHED OUTWARD
+
+| = PERMANENT ON
+@® = AUTOMATIC
+OQ = PERMANENT OFF
+
+3 - WAY MANUAL
+OVERRIDE SWITCH
+
+‘|
+é
+
+ON | = PERMANENT ON
+
+OOO © ©
+
+‘
+é
+
+ON
+
+©
+©
+©
+©
+iS
+
+@ = AUTOMATIC
+
+]
+@
+
+TIME SETTING
+
+TURN THE PROGRAM DIAL GRADUALLY CLOCKWISE UNTIL
+THE DAY OF THE WEEK (7-DAY TIMER) AND TIME OF DAY
+
+ON THE OUTER DIAL IS ALIGNED WITH THE TRIANGLE MARKER
+ON THE INNER DIAL (TWO O'CLOCK POSITION.) FOR TO-THE-
+MINUTE SETTING TURN THE MINUTE HAND CLOCKWISE TO
+THE EXACT TIME OF DAY.
+
+EXAMPLE FOR 7-DAY PROGRAM DIAL. MONDAY 10:30AM.
+
+TURN PROGRAM DIAL OR MINUTE HAND CLOCKWISE UNTIL
+MONDAY 10:30AM. IS ALIGNED WITH THE TRIANGLE ON THE INNER
+DIAL. THE HOUR AND MINUTE HAND WILL SHOW EXACTLY 10:30.
+
+EXAMPLE FOR 24-HOUR PROGRAM DIAL. MONDAY 10:30AM.
+TURN MINUTE HAND CLOCKWISE UNTIL 10:30AM. IS ALIGNED
+WITH TRIANGLE ON THE INNER DIAL. THE HOUR AND MINUTE
+HAND WILL SHOW EXACTLY 10:30.
+
+PROGRAMMING
+
+THE WEEKLY PROGRAM DIAL REFLECTS THE SEVEN DAYS
+OF THE WEEK AND AM / PM IMPRINTS FOR EACH DAY.
+THE 24-HOUR DIAL HAS QUARTER - HOUR DIVISIONS AND.
+AM/ PM INDICATIONS.
+
+THE TIME SWITCH IS PROGRAMMED BY PUSHING THE
+CAPTIVE TRIPPERS TO THE OUTER RING POSITION FOR THE
+ENTIRE PERIOD THAT THE LOAD IS TO BE TURNED ""ON"" LE.
+FIFTEEN MINUTES FOR EACH TRIPPER ON THE TWENTY-FOUR
+DIAL AND TWO HOURS FOR EACH TRIPPER ON THE SEVEN
+DAY DIAL. WHEN THE TRIPPER IS PUSHED TO THE INSIDE
+THE SWITCH IS IN THE ""OFF"" POSITION.
+
+HAND WILL SHOW EXACTLY 10:30.
+
+AUTOMATIC MODE
+
+IN ORDER TO OPERATE THE TIME SWITCH MODULE IN THE
+AUTOMATIC MODE THE MANUAL SWITCH MUST BE IN THE
+CENTER POSITION (AUTOMATIC) - SEE DIAGRAM ABOVE.
+
+OFF
+OOOO © MANUAL MODE
+WITH THE MANUAL SWITCH SELECTOR LEVER THE SELECTED
+7, | (i) PROGRAMS CAN BE OVERRIDEN. IN THE LOWER POSITION
+OFF O = PERMANENT OFF MARKED O, TERMINALS 3 AND 5 ARE CLOSED - PERMANENT OFF.
+IN THE UPPER POSITION MARKED L, TERMINALS 3 AND 4 ARE
+© ® ® (3) © CLOSED - PERMANENT ON (SEE DIAGRAM ABOVE.)
+Drawing Title
+CLO C K | N Ss TR U C TI O N S) REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/03/26 S.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+GRAPE CREEK ISD 70785 DRAWING NUMBER
+CP-8101
+CONTROL PANEL INFILTRATOR’ Ph. (225) 665-6162 SHEET NUMBER
+water technologies Fax (225) 219-9183 fn"
+samples\CP-8100-8199\CP-8101.pdf,13,1700,2200,"HOW TO SET THE REPEAT CYCLE TIMER
+
+EXAMPLES OF SETTINGS
+Selector Dial : :
+Time On Time Off
+3 4(On) | 7 (Off) | Orange (On) | Green (Off)
+* 1.2 10m 10h 7 2 Tmin 2hours
+1.2 10m 10h 1.2 1.2 12min 12hours
+3.0 10m hrs 2.0 2.0 20min 2hours
+3.0 10m hrs 3.0 3.0 30min 3hours
+* = Factory Settings
+Time On = 4(On) Setting x Orange Setting
+Time Off = 7(Off) Setting x Green Setting
+Factory Setting:
+Time On = 10m x 0.7 = 7 Minutes
+Time Off = 10h x 0.2 = 2 Hours.
+Q) OFF Indicator (Green)
+*
+1 7 (2) ON Indicator (Orange)
+ores uy G) Range Time Selector
+2
+7 OFF
+7 3 (4) ON Time Unit Selector
+= 6 Setting dial for OFF
+5 10 (Green pointer)
+7 a Setting dial for ON
+(Orange pointer)
+Tom
+od @) OFF Time Unit Selector
+OMRON H3CR :
+x Note: If pointer is turned
+4 counterclockwise until overranged,
+instantaneous output will be
+3 ) (1.2, 3, 12, 30) set.
++ H3CR-F8
+(10s, 10m, hrs, 10h)
+Drawing Title
+R C T N STR U Cll ON S) REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/03/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+valker,
+sos, ra DRAWING NUMBER
+GRAPE CREEK ISD
+CP-8101
+CONTROL PANEL INFILTRATOR’ pp. (B58) 919.9183 SHEET NUMBER
+water technologies ax (¢- - 12"
+samples\CP-8100-8199\CP-8107.pdf,1,1700,2200,"COX
+
+Research and Technology, Inc.
+
+ARENA INDUSTRIAL - BAYWOOD
+
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+FEBRUARY 2, 2026
+
+Cox Research and Technology, Inc.
+PO Box 77808
+Baton Rouge, LA. 70879
+(225) 756-3271 Fax (225) 755-1030
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8107"
+samples\CP-8100-8199\CP-8107.pdf,2,1700,2200,"SOLD TO:
+
+TAG: Arena Industrial - Baywood Control Panel
+
+SHIP TO:
+
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+COX""™CAMO"" System
+Panel Type Valve Control Cycle Counters
+Voltage 120 Economy Version
+Phase/HZ 1/60 Elapsed Time Meter
+No. Motors : Flasher
+HP : Green Run Lights vs. Red
+FLA - Ground Fault Receptacle
+Pump Manufacturer - High Temp Lights
+Type of Pump - High Temp Pump Shutdown - Auto Reset
+Catalog Number : High Temp Pump Shutdown - Manual Reset
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120 Surge Arrestor x
+Control Power Transformer VA= No Main Disconnect without Door Mt. Handle x
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts.
+Enclosure Material Painted Steel] | Panel Heater / Thermostat W=
+Enclosure Size 30x24x12 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Position Seal Fail Lights
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC
+Starters - NEMA
+Unpowered Alarm Circuits # xX
+OTHER: Unitronics PLC/HMI
+Drawing Title
+PAN EL DESCRI PTl ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 S.D. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+CONTROL PANEL
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+
+PURCHASE ORDER NUMBER
+
+COX
+
+70879
+
+DRAWING NUMBER
+
+CP-8107
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+SHEET NUMBER
+
+1"
+samples\CP-8100-8199\CP-8107.pdf,3,1700,2200,"-Z
+
+H
+i}
+~ 120VAC —
+® N
+fe}
+[- e-stor
+fo}
+SURGE
+10A
+CB1 =P ARRESTOR
+O oO S) LINE iS
+.S) LOAD ©
+1S] ©
+POWER
+SUPPLY
+ae NO
+tO +24 -2404
+' '
+H +24 -24 N
+
+LEGEND
+
+@ PANEL TERMINAL
+© COMPONENT TERMINAL
+@) WIRE NUMBER
+
+> CAMO TERMINAL
+
+— PANEL WIRING
+
+--- FIELD WIRING
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 S.D. S.D. BY: JCF BY: DATE:
+PURCHASE ORDER NUMBER
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+DRAWING NUMBER
+CP-8107
+
+SHEET NUMBER
+2"
+samples\CP-8100-8199\CP-8107.pdf,4,1700,2200,"+24VDC A -24VDC.
+r 7
+FUT | USP-104-B10 |
+2N/ATM | + ov |
+¢ ha XX XK ‘© S-OY-  XK °
+HMI
+| TOUCH SCREEN |
+| 10-4"" + I
+! S !
+| = |
+| CPU-USC-P-B10 |
+| |
+Lu )
+URB-TCP
+ETHERNET
+CABLE 5
+2) 7 4
+J *
+2 3
+iS)
+a,
+| __@-__“
+Fu ~ & cS ,
+2A7ATM @ 3 9
+¢ J
+URA-08000
+ANALOG INPUT 1
+VALVE 1 (+)=— T—S CHO CH1O— (+) VALVE 2
+4-20mA 4-20mA
+POSITION (-)=—— () POSITION
+32mA
+5X20
+VALVE 3 (+) = 7—SCH2-CH3O AIH (09) P= (+) VALVE 4
+4-20mA 4-20mA
+POSITION (-)=—— tr (10) —(-) POSITION
+)
+O4 50
+GND GND
+O6 79
+GND GND
+AVIN REMOTE HMI PANEL
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 SD. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8107
+
+SHEET NUMBER"
+samples\CP-8100-8199\CP-8107.pdf,5,1700,2200,"+24VDC
+
+VALVE 5 (+) =
+4-20mA
+POSITION (-)™—
+
+VALVE 7 (+) =
+4-20mA
+POSITION (-)™—
+
+VALVE 9 (+)==—
+4-20mA
+POSITION (-)=——
+
+VALVE 11 (+)=—
+4-20mA
+POSITION (-)=——
+
+t—S CHO
+
+t—S CH2
+
+0,
+ze
+
+oO,
+28
+
+URA-08000
+ANALOG INPUT 2
++—© CHO CH1O—
++—8 CH2 CH3Q—
+O4 59
+GND GND
+O6 79
+GND GND
+URA-08000
+
+ANALOG INPUT 3.
+
+CH19—
+
+CH30—
+
+79
+
+GND
+
+—(-)
+
+——a(+)
+
+—(-)
+
+(+) VALVE 6
+
+4-20mA,
+
+(-) POSITION
+
+VALVE 8
+4-20mA,
+POSITION
+
+(+) VALVE 10
+
+4-20mA,
+
+() PosITION
+
+(+) VALVE 12
+
+4-20mA,
+POSITION
+
+-24VDC
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 S.D. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+70879
+
+P.O. Box 77808
+Baton Rouge, LA
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8107
+
+SHEET NUMBER
+
+4"
+samples\CP-8100-8199\CP-8107.pdf,6,1700,2200,"+24VDC
+
+-24VDC
+URA-0008W
+as ANALOG OUTPUT 1
+mi
+3x20 ©)
+
+VALVE 1 (+) m= t+—9 CHO CH1Q@—4 (+) VALVE 2
+4-20mA ia} 4-20mA
+POSITION (-)=— ste (-) POSITION
+
+7
+FU15
+32mA
+5X20
+VALVE 3 (+) m= t+—9 CH2 CH3Q@—F (+) VALVE 4
+4-20mA 4-20mA
+POSITION (-)=— st | ee (-) POSITION
+“ 98 99 “7
+GND GND
+URA-0008W
+FUT ANALOG OUTPUT 2 FU18
+32mA 32mA
+5X20 5X20
+VALVE 5 ont 1-©CHO CHi@—+ (+) VALVE 6
+4-20mA 4-20mA
+POSITION (-)»— () POSITION
+C7 €)
+FU19 FU20
+32mA 32mA
+5X20 5X20
+VALVE 7 (+) me. 1-©CH2 CH3Q— (+) VALVE 8
+4-20mA 4-20mA
+POSITION (-)»— et () POSITION
+id 98 99 @
+GND GND
+URA-0008W
+Fu21 ANALOG OUTPUT 3 Fuza
+32mA 32mA
+5X20 5X20
+VALVE 9 (+) = t+—9 CHO CH1Q6—4 (+) VALVE 10
+4-20mA ia} 4-20mA
+POSITION (-)=— er — (-) POSITION
+ey ey
+FU23 FU24
+32mA 32mA
+5X20 5X20
+VALVE 11. (+) ==: t+—9 CH2 CH3Q—4 (+) VALVE 12
+4-20mA 4-20mA
+POSITION (-)=— et | eo (-) POSITION
+hd 98 99 @
+GND GND
+Drawing Title
+Cc ON TR OL D AG R AM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 S.D. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8107
+
+SHEET NUMBER"
+samples\CP-8100-8199\CP-8107.pdf,7,1700,2200,"+24VDC -24VDC
+VALVE 1
+FULL OPEN iD
+¢ x x RY J
+VALVE 1
+FULL CLOSED
+¢ x x (x2) @
+VALVE
+FULL OPEN lan
+¢ x x CRS) e
+VALVE 2
+FULL CLOSED
+¢ x x (crs) @
+VALVE 3
+FULL OPEN D>
+¢ x x CRS) e
+VALVE 3
+FULL CLOSED
+¢ x x (exe) @
+VALVE
+FULL OPEN D>
+¢ x x CR) °
+VALVE 4
+FULL CLOSED
+¢ x x (exe) @
+VALVE 5
+FULL OPEN lan
+¢ x x CRS) °
+VALVE 5
+FULL CLOSED
+¢ x x a) @
+VALVE
+FULL OPEN D>
+¢ x x CRY °
+VALVE 6
+FULL CLOSED
+¢ x x (ar) @
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 SD. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8107
+
+SHEET NUMBER
+
+6"
+samples\CP-8100-8199\CP-8107.pdf,8,1700,2200,"+24VDC -24VDC
+VALVE 7
+FULL OPEN lo
+¢ x x CRY J
+VALVE 7
+FULL CLOSED
+¢ x x x) @
+VALVE
+FULL OPEN D>
+¢ x x CR e
+VALVE 8
+FULL CLOSED
+¢ x x Ga) @
+VALVE 9
+FULL OPEN D>
+¢ x x RY) e
+VALVE 9
+FULL CLOSED
+¢ x x S @
+VALVE 10
+FULL OPEN D>
+¢ x x CRY °
+VALVE 10
+FULL CLOSED
+¢ x x (a) @
+VALVE 11
+FULL OPEN D>
+¢ x x CRY) °
+VALVE 11
+FULL CLOSED
+¢ x x (a @
+VALVE 12
+FULL OPEN D>
+¢ x x CR °
+VALVE 12
+FULL CLOSED
+¢ x x (ra!) @
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 SD. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8107
+
+SHEET NUMBER
+
+7"
+samples\CP-8100-8199\CP-8107.pdf,9,1700,2200,"+24VDC.
+URD-0800
+START DIGITAL INPUT 1
++ oO S) CHO CH1©
+STOP
+¢ o oO
+CR1-1
++ @CH2  CH3®.
+CR2-1
+¢
+CR3-1
++ OCH4 CHE®
+CR4-1
+¢
+CR5-1
+¢ CHE CHT
+CR6-1
+¢
+URD-0800
+DIGITAL INPUT 1
+CR7-1
++ OCHO CHIG.
+CR8-1
+¢
+CR9-1
+¢ OCH2 CH3®
+CR10-1
+¢
+CR11-1
+¢ OCH4 — CHE®
+CR12-1
+¢
+CR13-1
+¢ CHE CH7®
+CR14-1
+¢
+
+-24VDC
+
+DATE:
+02/02/26
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+SD. S.D. BY: JCF BY: DATE!
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8107
+
+SHEET NUMBER
+
+8"
+samples\CP-8100-8199\CP-8107.pdf,10,1700,2200,"+24VDC -24VDC
+URD-0800
+DIGITAL INPUT 1
+CR15-1
+° CHO CHIC
+CR16-1
+¢
+CR17-1
+° ©CH2 CH3@
+CR18-1
+¢
+CR19-1
+¢ ©CH4  CHSO@
+CR20-1
+¢
+CR21-1
+° ©CH6 CH7G@
+CR22-1
+¢
+URD-0800
+DIGITAL INPUT 1
+CR23-1
+¢ CHO CHIG
+CR24-1
+¢
+©CH2 CH3©
+©CH4 —CHSO
+©CH6 CH7®
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/02/26 S.D. S.D. BY: JCF BY: DATE!
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8107
+
+SHEET NUMBER
+
+9"
+samples\CP-8100-8199\CP-8107.pdf,11,1700,2200,"NOTE:
+
+[_ NEMA 4X FIBERGLASS ENCLOSURE
+
+VIEW OF INNER SWING PANEL
+
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+NAMEPLATE SCHEDULE
+
+NP-1
+NP-2
+
+START
+
+DATE:
+02/02/26
+
+Drawing Title
+
+ENCLOSURE
+
+REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+SD. S.D. BY: JCF BY: DATE!
+
+Project Title
+
+CONTROL PANEL
+
+COX
+
+Research and Technology, Inc.
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225) 756-3271
+Fax (225) 755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8107
+
+SHEET NUMBER
+
+10"
+samples\CP-8100-8199\CP-8107.pdf,12,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+SAGINAW SCE-30EL2410LP ENCLOSURE
+
+CMW. CAMO302410UU BACKPLATE/SWING PANEL
+
+SQUARE D QOU110 CB1
+
+TPS TK-LT—15A—DIN2 SURGE _ARRESTOR
+
+UNITRONICS URA-—08000 ANALOG INPUT CARD
+
+UNITRONICS URA-0008W ANALOG OUTPUT CARD
+
+UNITRONICS URD-—0800 DIGITAL INPUT CARD
+
+UNITRONICS URD-—O008CH DIGITAL OUTPUT CARD
+
+O]O| NH) ORIGIN}
+
+UNITRONICS USP—104—B10 HMI
+
+UNITRONICS USC—P—B10 CPU
+
+3}o}—o}alulpofro|a]a}o}a
+
+UNITRONICS URB-TCP ETHERNET ADAPTER
+
+N
+aN
+
+PHOENIX UT4—HESI FUSE HOLDER
+
+ND
+BN
+
+BUSSMANN = 32mA_ FUSE
+
+ND
+BN
+
+FINDER 46.52.8.120.0054 120V_CONTROL RELAY
+
+12
+
+FINDER 46.52.8.024.0054 24V_ CONTROL RELAY
+
+SAGINAW SCE-SA230WH WALL_HINGE_ SWIVEL
+
+SAGINAW SCE-SA20TC CLOSED TUBE SUSPENSION
+
+SAGINAW SCE—SA90A ANGLE
+
+SAGINAW. SCE-SA360C COUPLING
+
+SAGINAW. SCE—14HMI1806LP HMI ENCLOSURE
+
+SAGINAW. SCE-14P12 BACKPLATE
+
+SAGINAW SCE-—AUHK HANDLE
+
+SAGINAW SCE-SA45IA INCLINE ADAPTER
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE
+
+BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/02/26 S.D. SD. BY: JCF BY: DATE!
+Project Title ————————— P.O. Box 77808 PURCHASE ORDER NUMBER
+Baton Rouge, LA
+COX 70879 DRAWING NUMBER
+CONTROL PANEL CP-8107
+Research and Technology, Inc. Ph. (225) 756-3271 SHEET NUMBER
+sd Fax (225) 755-1030 u"
+samples\CP-8100-8199\CP-8113.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+HOLLY RIDGE - CASTON LANDING
+WATER BOOSTER STATION
+PRECISION DIGITAL
+CONTROL PANEL
+
+AS BUILTS
+
+FEBRUARY 5, 2026
+SERIAL#102616
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+OCOX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8113"
+samples\CP-8100-8199\CP-8113.pdf,2,1700,2200,"SOLD TO: Delta Process SHIP TO:
+TAG: Holly Ridge - Mammoth Industries Water
+Booster Station Precision Digital Control Panel
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezzo
+Panel Type - Cox® Research Opti-Float® Pts.
+Voltage 120V Cox® CAMO® System
+Phase/HZ 1/60 Cycle Counters
+No. Motors 7 Economy Version
+HP - Elapsed Time Meters
+FLA - Flasher
+Pump Manufacturer - Green Run Lights vs. Red
+Type of Pump - Ground Fault Receptacle
+Catalog Number : High Temp Lights
+Capacitors - High Temp Pump Shutdown - Auto Reset
+Control Voltage 120V High Temp Pump Shutdown - Manual Reset
+Control Power Transformer = INo Intrinsically Safe Relays Pts
+Enclosure NEMA Rating 4x Lightning Arrestor
+Enclosure Material Polycarbonate! | Main Breaker without door Mt. Handle
+Enclosure Size 12x10x6 Panel Heater/Thermostat W =
+Inner Swing Panel No Phase Monitor
+Control Sensor Transducer] | Pole, Box, Seal
+UL508A Labeling No Seal Fail Lights
+UL698A Labeling No Seal Fail Relay - Fixed
+Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC
+Starters - NEMA
+Unpowered Alarm Circuits # 4
+OTHER: PD6000-6R7 Setpoint Controller
+Drawing Title
+PANEL DESCRIPTION
+DATE : REFERENCE ee | — Ta ee ECN ants BY
+02/05/26| AD. BY JCF BY DATE
+Project Title PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CONTROL PANEL CP-8113
+
+8275 Florida Blvd.
+DELTA Denham Springs, LA
+70726
+PROCESS
+EQUIPMENT | ’b. 225) 665-1666
+
+SHEET NUMBER.
+
+Fax (225) 665-1855"
+samples\CP-8100-8199\CP-8113.pdf,3,1700,2200,"4-20mA = 0-100PSI = 0-231'
+
+RELAY # Desc. | ON | OFF |ONDLY | OFF DLY
+RELAY 4 SPARE | - - - -
+RELAY 3 CALL CL2] 8.0 | 120 70sec 2sec
+RELAY 2 CALL WELL| 8.0 | 12.0 2sec 2sec
+RELAY 1 LOWLEVEL| 3.0 | 35 2sec 2sec
+H N G
+[a 120VAC. |
+(4) w) ©
+CB1
+Ox 10A =
+1P
+° PRECISION DIGITAL _PD6000
++ ° @ 1(+) (2 ot ——@
+@ P+
+@ P- WELL cuz
+oO @ tow CALL PUNE SPARE
+@ com —anouT BEAT BELAY] Betas RELAY
+—L —
+2 malo eal ler lez Pe kay
+—
+nu HB
+© ho)
+tod @®
+Ne?
+I im @
+4.50mA CALL CL2 PUMP
+PRESSURE ®
+TRANSMITTER 0. {0}){03 WELL CALL
+© i) @ LOW LEVEL
+CR1-1 CR1-2 CR2-1 CR3-1
+@ yy pO Oy 1 O OFF"" @ OF"" @
+fone 1 orn 1 1 1
+) 2 ® © 5 © @® @ @ (9)
+LOW LEVEL LOW LEVEL CALL CALL
+WELL CL2 PUMP SPARE
+Drawing Title
+CONTROL DIAGRAM R2 SUBMITTAL REVISIONS 07/31/24] A.D.
+REFERENCE DRAWING No. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+02/05/26} AD. BY _ICF BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA DRAWING NUMBER
+7 70726
+CONTROL PANEL PROCESS CP-8113
+@uUIP! IT | Ph. (225) 665-1666
+AE IPMEN Fax (225) 665-1855 SHEET NUMBER 3"
+samples\CP-8100-8199\CP-8113.pdf,4,1700,2200,"NOTE:
+
+‘SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+
+NEMA 4X POLYCARBONATE ENCLOSURE
+
+O
+
+PRECISION DIGITAL PD6000
+
+PANEL TO PREVENT ENTRY OF GASSES.
+
+e)
+
+VIEW OF OUTER DOOR
+
+Drawing Title
+
+ENCLOSURE R2 SUBMITTAL REVISIONS 07/31/24 A.D.
+REFERENCE DRAWING NO, REVISION-LOCATION ECN DATE BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+02/05/26) AD. BY _JCF BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA DRAWING NUMBER
+70726
+CONTROL PANEL PROCESS CP-8113
+JAEQUIPMENT | ’t. (225) 665-1666 SHEET NUMBER
+
+Fax (225) 665-1855"
+samples\CP-8100-8199\CP-8113.pdf,5,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+1 INTEGRA H12106HLL ENCLOSURE
+2 STAHLIN BP1210AL BACKPLATE
+3 SQUARE D QOU110 CB1
+4 PRECISION DIGITAL] PD6000—6R7 SETPOINT CONTROLLER
+5 FINDER 46.52.8.120.0054 CR1I-3
+6 ALTECH CF4U FUSE HOLDER
+7 BUSSMANN S500—32R FUSE
+8
+9
+10
+SPARES/SHIPPED LOOSE
+i BUSSMANN S500—32R SPARE_FUSE *
+A PROVIDED BY DELTA
+°K SPARES
+Drawing Title
+BILL OF MATERIALS R2 SUBMITTAL REVISIONS, 0731/24 A.D.
+DATE aR REFERENCE DRAWING NO. REVISION-LOCATION ECN [DATE [BY
+02/05/26} : a"" ae ia AD BY _ICF BY “[DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA DRAWING NUMBER
+CONTROL PANEL PROCESS 70726 CP-8113
+/JAZEQUIPMENT Feo) pane SHEET NUMBER"
+samples\CP-8100-8199\CP-8114.pdf,1,1700,2200,"NORTH PUMP STATION
+
+TOWN OF BENTON, LA
+VFD CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+FEBRUARY 6, 2026
+
+Red River Pump Specialists
+1555 Wells Island Rd.
+Shreveport, LA 71107
+(318) 459-1131
+CP-8114
+©COX RESEARCH AND TECHNOLOGY, INC. 2026"
+samples\CP-8100-8199\CP-8114.pdf,2,1700,2200,"SOLD TO: Red River Pump Specialists
+
+TAG: North Pump Station Town of Benton, LA
+
+VED Control Panel
+
+SHIP TO:
+
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount
+Alarm Light - Remote xX
+Alarm Test Switch
+Alarm Silence Switch x
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn (Remote) xX
+Audible Alarm - Piezo
+COX™ CAMO™ System
+Panel Type Duplex COX” Research Opti-Float®Pts.
+Voltage 120 Cycle Counters
+Phase/HZ 1/60 Economy Version
+No. Motors 2 Elapsed Time Meter Xx
+HP : Flasher
+FLA - Green Run Lights vs. Red
+Pump Manufacturer Sulzer Ground Fault Receptacle xX
+Type of Pump Submersible, | High Temp Lights xX
+Catalog Number : High Temp Pump Shutdown - Auto Reset x
+Capacitors No High Temp Pump Shutdown - Manual Reset
+Control Voltage 120 Intrinsically Safe Relays Pts.
+Control Power Transformer VA= No Surge Supressor x
+Enclosure NEMA Rating 4x Main Disconnect with Door Mt. Handle
+Enclosure Material Stainless Steel Panel Heater / Thermostat W=150 xX
+Enclosure Size 36x30x12 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Transducer/Floats Seal Fail Lights xX
+ULS508A Labeling No Seal Fail Relay - Fixed (Sulzer) xX
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC
+Starters - NEMA
+Unpowered Alarm Circuits # As Req'd xX
+OTHER: External WCD VEDs, setpoint controller and
+level display, submersible transducer, Float Backup.
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 ALD. ALD. BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+R
+iS)
+
+1555 Wells Island Rd
+Shreveport, LA
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8114
+
+R PUMP |
+s
+
+(318) 459-1131
+
+SHEET NUMBER
+
+1"
+samples\CP-8100-8199\CP-8114.pdf,3,1700,2200,"INCOMING SERVICE
+120V,10
+
+H
+
+|
+Law
+i
+1
+®
+120
+
+120VAC.
+
+IHK@}------@
+
+a
+m1
+Py)
+
+‘g
+cB1
+fo) 20A VERIFY 120V BETWEEN CONTROL CIRCUIT
+yr BREAKERS AND NEUTRAL BEFORE TURING ON.
+[o}
+ca Se
+1P
+12
+— 5S GB) ——--—- SPARE------ <ny—*
+10
+cB3 ANI 150W HEATER
+12
+— 6 > ic) AWWW
+THERMOSTAT
+cB4 <a
+1
+CB5 WY
+oO. 10A =~
+1P
+
+SURGE _ARRESTOR
+
+(© nel Loi LINE 126
+
+Tse
+
+LINE
+
+® GFI
+
+co.
+
+811 oapl2
+
+@ CONDENSATION
+HEA
+
+H N
+Drawing Title
+P OWE R DI AG R AM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 AD. AD. BY: JCF BY: DATE:
+Project Title 1555 Wells Island Rd | PURCHASE ORDER NUMBER
+Shreveport, LA
+DUPLEX PUMP R R PUMP tio DRAWING NUMBER
+cP-8114
+CONTROL PANEL Ss S | 6is)4s0-1131 SHEET NUMBER
+2"
+samples\CP-8100-8199\CP-8114.pdf,4,1700,2200,"lL 120VAC |
+PUSH TO
+TO1-2
+¢ 5)—| He alo
+Low7)
+0 (Hot)
+
+PUMP 1 CALL LIGHT
+
+a cRI-1
+$ °_| 9 OY (cri) # PUMP 1 MOTOR STARTER
+an@
+
+0) OR7—1 CRIS—1 ALT2
++ ¢—(2}---/4- 5
+1 | xo
+TRANS (9) “| H |
+LEAD ; ; 1 |@
+1
+¢ 2 | |
+1 1
+1 1
+1 1
+t 4
+1 ALTII 4 ALTERNATOR
+rib TERM. (TYP.)
+Vt | =7cR4-1
+im I (a)
+i + 5}—@.1)—8 # ALTERNATOR
+cRe-1 cRIS-2 | | ALTZ CR6-1——
+to @* rio
+Trans (2) “! H \
+LAG ! ! ! PUMP 2 CALL LIGHT
+| ' acti!
+I 6) 1 j
+4 2) ho --4—i1 # PUMP 2 MOTOR STARTER
+
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 ALD. ALD. BY: JCF BY: DATE:
+Project Title 1555 Wells Island Rd PURCHASE ORDER NUMBER
+
+DUPLEX PUMP Shreveport, LA DRAWING NUMBER
+CONTROL PANEL R RUMP
+
+CP-8114
+
+(318) 459-1131 SHEET NUMBER
+
+3"
+samples\CP-8100-8199\CP-8114.pdf,5,1700,2200,"H N
+VFD1
+<13)--+-© CoM
+cRi-1
+| | 412)-— + -© START/STOP
+cALL@s3)
+Vw
+(R} VFD1 RUN LIGHT
+4_N
+mi) ELASPED TIME METER
+R1 @8)
+: 2 (crs) VFD1 RUN AUX.
+° {ae ----S §--—4--— +15) {oR3) ? RELAY
+\ (RUN)
+1
+! R2 D
+1 4 5 Ne WV
+L-4---9 ©---4---+16 © (A) @ VFD1 FAULT
+(ALARM/WARNING) a
+VFD1 FAULT AUX.
+RELAY
+VFD2
+417)---8 COM
+cR—1
+| | {18)-— © START/STOP
+caLt@@3)
+VV
+(R} VFD2 RUN LIGHT
+4_N
+mi) ELASPED TIME METER
+R1
+: 2 (crs) VFD2 RUN AUX.
+° Qo) ---S S-—-4--— +24 {oR5) ? RELAY
+\ (RUN)
+1
+! R2 @)
+1 4 5 WV
+L-4---9 ©---4----3 © (A) @ VFD2 FAULT
+(ALARM/WARNING) a
+VFD2 FAULT AUX.
+RELAY
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 ALD. ALD. BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+R
+iS)
+
+R PUMP
+Ss)
+
+1555 Wells Island Rd
+Shreveport, LA
+71107
+
+(318) 459-1131
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8114
+
+SHEET NUMBER
+4"
+samples\CP-8100-8199\CP-8114.pdf,6,1700,2200,"H N
+r 120VAC. =|
+¢ . -——_®
+PRECISION DIGITAL PD6000
+29
+LEAD LAG HIGH
+PUMP PUMP LEVEL SPARE
+mAOUT RELAY 3 RELAY 4 RELAY 3 RELAY 4
+<2 st “
+I+ I- R
+85 8 FBS % OH Aap 4%
+SUBMERSIBLE
+PRESSURE aN
+TRANSDUCER ERI #@ SPARE
+(BY OTHERS) ru2 F
+32mAu Vv
+tp @y
+doo) HIGH LEVEL
+1 1
+4—20mA (or=\—4
+4 20m (cea) LAG PUMP
+(TO SCADA)
+x?) $ LEAD PUMP
+RELAY # | DESC. ON OFF {ON DLY|OFF DLY
+RELAY 3 HL. 9.5 8.5 2 2
+RELAY 2 LAG 7 3 2 2
+RELAY 1 LEAD 6 3 2 2
+4-20mA=0-30° (MJK 209925 TRANSDUCER)
+ANALOG SPLITTER
+DIP SWITCH SETTINGS
+OFF ON
+1 [_]
+2 [|
+3 [_]
+4|
+5| i
+6 [_]
+Drawing Title
+CON TR OL D | AGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 AD. AD. BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+R
+iS)
+
+R PUMP
+Ss)
+
+1555 Wells Island Rd
+Shreveport, LA
+71107
+
+(318) 459-1131
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8114
+
+SHEET NUMBER
+
+5"
+samples\CP-8100-8199\CP-8114.pdf,7,1700,2200,"H N
+CA462-1
++ O11 N©@ —
+vay. PUMP 1 HIGH TEMP
+TEMP. ® {Ay ? LUGHT
+re 46 4 (cen 4 PUMP 1 HIGH TEMP
+a] RELAY
+LEAK
+l_»! 2e ® ° (rio) 4 PUMP 1 SEAL FAIL
+@) ai RELAY
+oo S65 °° VX PUMP 1 SEAL FAIL
+. >--- 491-9 10 8) — x ? UGHT
+@®
+812
+CA462-2
++ O11 N©@ —
+nay { PUMP 2 HIGH TEMP
+TEMP. ® Me LIGHT
+re 46 4 a 4 PUMP 2 HIGH TEMP
+ey RELAY
+LEAK
+Lg! 25 ® ; (ria) 4 PUMP 2 SEAL FAIL
+6) ay RELAY
+eeiMP Bae Bho 4 PUMP 2 SEAL FAIL
+: >--- 41-910 ——8)}— e ? LIGHT
+812
+Drawing Title
+CON TR OL D AGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 AD. AD. BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+R
+iS)
+
+R PUMP
+Ss)
+
+1555 Wells Island Rd
+Shreveport, LA
+71107
+
+(318) 459-1131
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8114
+
+SHEET NUMBER
+
+6"
+samples\CP-8100-8199\CP-8114.pdf,8,1700,2200,"fo REP
+G) TD1-1 CR15-3
+¢ alo © |} |} ) CONTROL RESET
+cR16-1
+4 || ey FLOAT BACK-UP
+F.S. HIGH “~ ACTIVE
+LEVEL
+FS-2 lan
+—_o&-- oO-Xx (R16) HIGH LEVEL FLOAT
+aoe x RIG)
+HIGH LEVEL
+FS-1 Van
+¢+—_%)-- o--{x * TDI LOW LEVEL FLOAT
+aa x Nas
+= 11-4
+LOW LEVEL p
+a1) LOW LEVEL AUX
+CR17-1 Ww
++ Vf (R) LOW LEVEL ALARM
+4—N
+Drawing Title
+Cc ON TR OL D AG R AM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 ALD. ALD. BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+R
+iS)
+
+1555 Wells Island Rd
+Shreveport, LA
+
+R PUMP |
+s
+
+(318) 459-1131
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8114
+
+SHEET NUMBER
+
+7"
+samples\CP-8100-8199\CP-8114.pdf,9,1700,2200,"H N
+TDI-3 cR10-1
+LOW LEVEL ( 3)-CHORN>~(o) —@® AUDIBLE ALARM
+cR9-1 1@
+¢ # TRANSDUCER H.L. | an
+¢ cRi8) # SILENCE RELAY
+CR4-2 SILENCE V4
+¢ ® VFD 1 FAIL
+CR6-2 -—
++ ® VFD 2 FAIL
+cRI1-2
+¢ # PUMP 1 HIGH TEMP COMMON ALARM
+o) CR13-2 bf ? AUX. RELAY
+¢ PUMP 2 HIGH TEMP
+CR16-2
+FLOAT HLL. YN
+¢ ry + ® ry «3-8-4 COMMON ALARM LIGHT
+N
+
+1 @ Oo @ Oi @ Our ® Oar ® ays
+® @ & eo @& & @& ®&
+VED 1 vFD 1 VED 2 VED 2 TRANSDUCER PUMP_1 PUMP. 1
+RUN FAULT RUN FAULT HIGH LEVEL HIGH TEMP SEAL FAIL
+aa ® @ oe () oe? () one @ ais aja
+e © © &® © @ ®
+PUMP 2 PUMP_ 2 BACKUP FLOAT FLOAT COMMON
+HIGH TEMP SEAL FAIL ACTIVE LOW LEVEL HIGH LEVEL ALARM
+© © MOO OH OHO®®
+Xx J
+~~
+SPARE TERMINALS
+Drawing Title
+Cc ON TR OL D | AG R AM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/06/26 AD. AD. BY: JCF BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+R
+iS)
+
+R PUMP
+Ss)
+
+71107
+
+1555 Wells Island Rd
+Shreveport, LA
+
+(318) 459-1131
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8114
+
+SHEET NUMBER
+
+8"
+samples\CP-8100-8199\CP-8114.pdf,10,1700,2200,"REMOTE MOUNTED
+HORN AND
+ALARM LIGHT
+
+PUSH
+
+ASHI
+NOTE:
+SEWER
+
+NP-14 |] ——
+
+—_ 4X STAINLESS STEEL ENCLOSURE
+
+BUTTON —=— (|
+| VIEW_OF_ INNER SWING PANEL
+‘a! NAMEPLATE SCHEDULE
+B NP-1 PUMP 1 NP-8 SEAL FAIL
+lt NP-2 PUMP 2 NP-9 LOW LEVEL
+PPED LOOSE fa NP-3 CALL NP-10 FLOAT BACKUP/ACTIVE
+— H, — —AU 1 IL
+GASSES WILL_DESTROY COMPONENTS IN PANEL. NP-6 VFD FAULT NP-13 PUSH TO ALTERNATE PUMPS
+PROPER_SEALS MUST BE INSTALLED EXTERNAL TO THE NP-—7 HIGH TEMP. NP-14 SILENCE
+
+PANEL TO PREVENT ENTRY OF GASSES. NP-15 TRANSDUCER/HIGH LEVEL
+Drawing Title
+ENCLOSURE REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/06/26 AD. AD. BY: JCF BY: DATE!
+Project Title 1555 Wells Island Rd | PURCHASE ORDER NUMBER
+
+DUPLEX PUMP
+
+CONTROL PANEL
+
+R
+iS)
+
+Shreveport, LA
+
+RPU Me 71107 DRAWING NUMBER cpana
+
+(318) 459-1131 SHEET NUMBER
+9"
+samples\CP-8100-8199\CP-8114.pdf,11,1700,2200,"ITEM
+
+BILL OF MATERIALS
+
+QTY.
+SAGINAW
+
+MANUFACTURER
+
+PART NUMBER
+SCE-36EL3012SSLP
+
+DESCRIPTION
+
+ENCLOSU
+
+RE
+
+COX RESEARCH
+
+CAM0363012SSLP3PT
+
+BACKPLA
+
+TE/SWING PANEL
+
+MARATHON
+
+1321580
+
+1P_DISTR
+
+BUTION BLOCK
+
+SQUARE D
+
+QOU110
+
+CB2,3,5
+
+ALTECH
+
+F4U
+
+FUSE HO
+
+LDER_5X20
+
+PRECISION DIG.
+
+D6000—6R7
+
+SET POI
+
+T CONTROLLER
+
+BUSSMANN
+
+500—32—-R
+
+32mA FU
+
+SES
+
+FINDER
+
+5.34.8.120.0054
+
+POLE RELAYS
+
+WO]OCO]N IO} ] Gyno} —
+
+ABB
+
+3SS110B—20
+
+POS. SWITCH
+
+ABB
+
+L513Y
+
+=
+
+BER P
+
+LOT LIGHT
+
+ABB
+
+L513L
+
+UE PILOT LIGHT
+
+ABB
+
+L513R
+
+ED PILOT
+
+LIGHT
+
+ENM
+
+SOB—212
+
+APSED
+
+TIME METER
+
+FINDER
+
+5.04.0.125.0000
+
+DIVERSIFIED
+
+RB-120—ADA
+
+TERNATOR
+
+D]YS|WO!AOJOOJO|Aw) VIO
+
+P110B-11
+
+[TON
+
+Feige szigAzeezie*+
+
+HERMOSTAT
+
+EATER
+
+TK=LT120—15A—DIN2
+
+20V_ SURGE SUPPRESSOR
+
+N]3]|s]—]s]s]ajs}o}no|N ro] 8 Io] GIy] | ]culny]]
+
+SULZER
+
+CA462—-1
+
+r|-|x
+
+T/SF_RELAY
+
+SPARES/SHIPPED LOOSE
+
+ITEM
+
+MANUFACTURER
+
+| PARTNUMBER | NUMBER
+
+| DESCRIPTION |
+
+or EDWARDS 876—N5 HORN
+CONERY RA—A—VXBR—100RDG | ALARM LIGHT
+
+>k SHIP
+
+PED LOOSE
+
+APROVIDED BY RED RIVER PUMP
+
+DATE:
+02/06/26
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION
+
+ECN DATE BY
+
+SIN Sales Engineer
+
+ALD.
+
+ALD.
+
+Application Engineer
+
+DRAWN
+
+APPROVED
+
+BY: JCF
+
+BY: DATE:
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+R R PUMP
+ee
+
+1555 Wells I
+71107
+
+(318) 459-11
+
+Shreveport, LA
+
+Tul
+sland Rd PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8114
+
+31 SHEET NUMBER
+
+10"
+samples\CP-8100-8199\CP-8108.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+PLANTATION TRACE LS.
+DUPLEX PUMP
+CONTROL PANEL
+
+AS BUILTS
+
+FEBRUARY 10, 2026
+SERIAL#102624
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8108"
+samples\CP-8100-8199\CP-8108.pdf,2,1700,2200,"SOLD TO: Delta Process SHIP TO: Delta Process - Ruston
+TAG: Plantation Trace L.S. Duplex Pump -
+Control Panel -
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Lightning arrestor shipped loose. Alarm Light - Panel Top Mount x
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+COX""™CAMO"" System
+Panel Type Duplex Cycle Counters
+Voltage 120/240V Economy Version
+Phase/HZ 3/60 Elapsed Time Meter Xx
+No. Motors 2 Flasher
+HP 5 Green Run Lights vs. Red
+FLA 15.2 est. Ground Fault Receptacle
+Pump Manufacturer GR High Temp Lights x
+Type of Pump Self Prime High Temp Pump Shutdown - Auto Reset
+Catalog Number : High Temp Pump Shutdown - Manual Reset x
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120V Lightning Arrestor x
+Control Power Transformer VA= No Main Disconnect without Door Mt. Handle x
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts.
+Enclosure Material Stainless Steel] | Panel Heater / Thermostat W=
+Enclosure Size 24x20x10 Phase Monitor x
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Floats Seal Fail Lights
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA
+Unpowered Alarm Circuits #5 xX
+OTHER: Case heater breakers.
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/10/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DUPLEX PUMP Process | faewReN
+CONTROL PANEL JJEQUIPMENT | °. 225) 665-1666 SHEET NUMBER a
+Fax (225) 665-1855 1"
+samples\CP-8100-8199\CP-8108.pdf,3,1700,2200,"G N Lt L2 L3 MAIN SERVICE
+\ \ \ \ \ 120/240V,30
+1 1 ut Lat Lal
+gq | oe
+=> 1
+1
+a a 60A, 3POLE
+(-~-f---1 BIRRT DISCONNECT
+| 96 9 9
+if DISTRIBUTION BLOCK
+98
+PHASE 30A
+MONITOR 1 CBITNSP MT ou
+39 + 0 | oO XL T=
+an 7 POMP 1
+R 1 PUMP_1
+50 rel 0; 0 XG 12)— == 330V.38
+LOT 15.2est FLA
+49 + Oo 0 Xr BR"" |
+1
+b48 —_
+tT =
+0 CB2-K3P— M2
+5 010 Xr Ty L
+a y PUNE 2
+R 1 PUMP_2
+o! 0| 0 ner “2)--— 530\ 3a
+ry LO 1S.2est FLA
+od Oo Oo oe, 13)—-—* 1
+x J
+15A
+CB3,~N1
+co” CASE
+, °° “HEATER 9)
+15A
+CB4,\1P
+__ CASE __
++ o 0° “HEATER © ’
+¢
+cBs VERIFY 120V BETWEEN CBS AND NEUTRAL
+O\10A BEFORE TURNING ON CIRCUIT BREAKER LEGEND
+” @® PANEL TERMINAL
+© COMPONENT TERMINAL
+' q @ WIRE NUMBER
+NH — PANEL WIRING
+--- FIELD WIRING
+ASHIPPED LOOSE
+Drawing Title
+POWER DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/10/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title DELTA 8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DUPLEX PUMP 70726 panes: DRAWING NUMBER
+CONTROL PANEL PROCESS c-st08
+Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 2"
+samples\CP-8100-8199\CP-8108.pdf,4,1700,2200,"H N
+‘oa 120VAC =|
+HIGH LEVEL ALARM
+AUX. RELAY
+FS-4 ® Ww
+tO -© (R) # ALARM LIGHT
+4—N
+HIGH ALARM
+(0) GH LEVEL AL PANEL TERM.
+TYP.
+——PM Hoa ( * > @©R® ®,,, PUMP 1 RUN LIGHT
+SY @ CRI-2 i~ OL
+¢ © | 9 @ ool (ut re {— PUMP 1 MOTOR STARTER
+HT
+@ FS-2 @) ELAPSED TIME METER
+Toop [oO
+LEAD PUMP ON
+¢
+we t= ALTERNATOR
+? TERM. (TYP.)
+FS-1 @r)
+Toe ® 6 (7) 8 # ALTERNATOR
+w2—
+ALL PUMPS OFF ae M2~1
+VA~VZ
+H 9A (®}@,,. | PUMP 2 RUN LIGHT
+FS-3 varO) CR2-2 ~ OL
+tO OT re) | © i —){—+ (u2 +e 4{— PUMP 2 MOTOR STARTER
+HT
+LAG PUMP ON t €n) ELAPSED TIME METER
+r oo
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/10/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DU PLEX PUMP 70726 DRAWING NUMBER
+CONTROL PANEL PROCESS cp-st08
+Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 3"
+samples\CP-8100-8199\CP-8108.pdf,5,1700,2200,"H N
+lL. 120VAC “|
+ay
+4—N
+CRI-1 (0)
+¢ | | © €a1 # PUMP 1 HIGH TEMP LIGHT
+PUMP 1
+=~ 0-9) @ SET (cp) # PUMP 1 HIGH TEMP
+RESET
+ore TEMP SWITCH sk ® RESET X 4
+L/S
+Yay
+cR2-1 o~
+¢ | | Era) # PUMP 2 HIGH TEMP LIGHT
+PUMP 2
+- 00-9 © SETl Gna) # PUMP 2 HIGH TEMP
+“3 RESET
+j TEMP SWITCH sk @ RESET x 4
+LY
+M1-2 M2-2 RIA-1 CR2A-1 CR3-1
+re re BRS SFP
+PUMP 1 PUMP 2 PUMP 1 PUMP 2 HIGH
+RUN RUN HIGH TEMP HIGH TEMP LEVEL
+XR J
+Y
+DRY CONTACTS TO SCADA IF REQUIRED
+Drawing Title
+C ON TR OL D | AG R AM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/10/26 T.M. T.M. BY: JCF BY: DATE:
+Project Title DELTA 8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DU PLEX PUMP PROCESS 10726 panes DRAWING NUMBER
+CP-8108
+CON TROL PAN EL JBQUIPMENT Ph. (225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 4"
+samples\CP-8100-8199\CP-8108.pdf,6,1700,2200,"NOTE:
+
+‘000001T
+
+ETM
+
+! SWING OUT PANEL Ss
+
+LIGHTNING
+ARRESTOR
+
+ASHIPPED LOOSE
+
+0)
+
+VIEW_OF INNER SWING PANEL
+
+SEWER GASSES WILL_DESTROY COMPONENTS IN PANEL.
+PROPER_SEALS MUST BE_ INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+NAMEPLATE SCHEDULE
+
+NP-1 PUMP 1/RUN
+NP-—2 PUMP 2/RUN
+
+NP-3 HAND-OFF—AUTO
+
+NP-4 HIGH TEMP
+
+NP-5 HIGH TEMP/RESET
+
+po 4X STAINLESS STEEL ENCLOSURE
+
+oo
+
+Drawing Title
+
+ENCLOSURE REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/10/26 T™M TM. BY: JCF BY: DATE!
+Project Title DELTA 8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DUPLEX PUMP PROCESS 026 DRAWING NUMBER
+CP-8108
+CONTROL PANEL EQUIPMENT | ?». 225) 665-1666 SHEET NUMBER
+
+Fax (225) 665-1855
+
+5"
+samples\CP-8100-8199\CP-8108.pdf,7,1700,2200,"BILL OF MATERIALS
+
+ITEM | QTY. |] MANUFACTURER | PART NUMBER DESCRIPT
+
+SAGINAW SCE—24EL2010SSLP ENCLOSURE
+CAMOM242010UU BACKPLATE
+AF26N1—30—00—13 MOTOR STARTER
+TF42—16 cL. Y_(13-16A)
+CL513R i
+C3SS110B—20
+Q0U330
+QOU110
+CL513Y
+
+DIVERSIFIED ARB—120—ADA
+
+ENM T50B—120
+
+MARATHON 1323580
+R40—XLS
+CP110B—11
+RR2KP—UACI20V
+QOUu115
+
+MACROMATIC __| PMPU—WS
+
+FINDER 46.52.8.120.0054
+
+ABB OT63F3 AIN DISCONNECT SWITCH
+
+ABB CA4—10 UX CONTACTS
+
+MARATHON 1321580 EUTRAL BLOCK
+
+OO] OD) RIG] N|—
+
+s
+
+.
+
+s|—
+
+. sfos
+O][OO}|NIOD/OUN A] WIN} =|O
+
+SPARES /SHI
+
+ITEM MANUFACTURER | PART NUMBER DESCRIPTION
+
+D_ LOOS
+
+U
+ao
+T
+
+SQUARE D SDSA3650 LIGHTNING ARRESTOR
+2
+
+ASHIPPED LOOSE
+
+Drawing Title
+BILL OF MATERIALS REFERENCE DRAWING | _NO REVISION - LOCATION ECN | DATE | BY
+DATE: SN Sales Engineer | Application Engineer DRAWN ‘APPROVED
+02/10/26 TM TM. BY: JCF BY: DATE
+Project Title DELTA $275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DUPLEX PUMP PROCESS 0126 DRAWING NUMBER
+CP-8108
+CONTROL PANEL JBQUIPMENT | ?2. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 6"
+samples\CP-8100-8199\CP-8111.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+MAGNOLIA - GALVEZ OAKS
+DUPLEX PUMP
+CONTROL PANEL
+
+AS BUILTS
+
+FEBRUARY 9, 2026
+SERIAL#102604
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8111"
+samples\CP-8100-8199\CP-8111.pdf,2,1700,2200,"SOLD TO: Delta Process - Ruston SHIP TO: Delta Process - Ruston
+
+TAG: Magnolia - Galvez Oaks Duplex Pump -
+
+Control Panel -
+
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount xX
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+COX""™CAMO"" System
+Panel Type Duplex Cycle Counters
+Voltage 120/240V Economy Version
+Phase/HZ 1/60 Elapsed Time Meter x
+No. Motors 2 Flasher
+HP 3 Green Run Lights vs. Red
+FLA 17 est. Ground Fault Receptacle
+Pump Manufacturer GR High Temp Lights x
+Type of Pump Self Prime High Temp Pump Shutdown - Auto Reset
+Catalog Number : High Temp Pump Shutdown - Manual Reset x
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120V Lightning Arrestor x
+Control Power Transformer VA= No Main Disconnect with Door Mt. Handle
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts.
+Enclosure Material Fiberglass Panel Heater / Thermostat W=
+Enclosure Size 24x20x10 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Floats Seal Fail Lights
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+
+Seal Fail Shutdown
+Starters - IEC
+
+Starters - NEMA (ABB)| _X
+Unpowered Alarm Circuits #5 xX
+OTHER:
+Drawing Title
+PANEL DESCRIPTION
+REFERENCE DRAWING. No. REVISION-LOCATION ECN | _DATE_| BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED.
+02/02/26 TM. T.M. BY JCF BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+CONTROL BAN L PROCESS 70726 DRAWING NUMBER
+CP-8111
+P| IT | Ph. (225) 665-1666
+4EQGUIPMEN Fax (225) 665-1855 SHEET NUMBER 1"
+samples\CP-8100-8199\CP-8111.pdf,3,1700,2200,"G N_ L1. L2 MAIN SERVICE
+yoy '420/240V,18
+1 1 1 1
+1 1 1 1
+NI ul Lal
+J © 8 6
+= a 80A, 3POLE
+(---¢--- 7 ER SISCONNECT
+Pe © &
+i i i DISTRIBUTION BLOCK
+LIGHTNING 35A IM
+ARREST
+ESTOR 10 CBIN2P MT on qT
+r’ rome. 1X, S-5.
+| T2 * 3HP
+! ew) Bi
+3g
+ry T3
+e Oo oO XL S-
+= S}---
+35A IM
+CB2-N\2P M2 on 1
++ 0} 0 Xr o-5.
+i T2 * 3HP
+2x, -- PUMP_2
+230V18
+aN T3 a
+Oo oO “ &
+o---4
+15A ""
+cB4, Ni CASE
+$0 0 —_ti)-—- EAR
+15A
+BS, 1e CASE
+’ O° {3-—- HEATER €2) ?
+¢
+CBS VERIFY _120V BETWEEN CB3 AND NEUTRAL
+O~10A BEFORE TURNING ON CIRCUIT BREAKER
+1P
+»)
+toy
+N H
+
+DATE
+02/02/26
+
+Drawing Title
+
+POWER DIAGRAM
+
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+Sales Engineer [Application Engineer DRAWN APPROVED
+T.M. T.M BY _JCF BY DATE
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+DELTA
+PROCESS
+JASQGUIPMENT
+
+8275 Florida Blvd.
+Denham Springs, LA
+70726
+
+Ph. (225) 665-1666
+Fax (225) 665-1855
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+
+CP-8111
+
+SHEET NUMBER."
+samples\CP-8100-8199\CP-8111.pdf,4,1700,2200,"H N
+La. 120VAC -
+FS—4 4 VN
+
+- os #—(R o
+pee ”
+4—N
+HIGH LEVEL ALARM PANEL TERM.
+H ° A (wP.) @©-® ®y
+NY ©) aya ~ yi
++ 9 19) @—{ M1 }-@ 2
+I I
+oO Ls
+@ FS-2 ALT2 {em}
+jacana wane 2}---4 “-- {3-9
+i \
+LEAD PUMP ON H H @
+H 1
+be ] ]
+1 ALTI Mi-1 + ALTERNATOR
+r——qir~48 ? “— TERM. (TYP.)
+mu
+FS-1 i !  =-0L
+| faLt2! Me=- Me-1
+ALL PUMPS OFF | [ALTA ot
+yoru .
+1 1 NZ
+ot Ong op OP Ou
+— ‘acti! ue CR2-2 OL
+FS-3 1 \
+Tey ¢ ho -F—-fii}-o_| © ® (2) {—o (wa) +--+
+LAG PUMP ON © Em)
+1 E™
+t on YS
+
+® ar (@) i one or ® oo @)
+
+ALARM LIGHT
+
+PUMP 1 RUN LIGHT
+
+PUMP 1 MOTOR STARTER
+
+ELAPSED TIME METER
+
+ALTERNATOR
+
+PUMP 2 RUN LIGHT
+
+PUMP 2 MOTOR STARTER
+
+ELAPSED TIME METER
+
+) ( ¢9 Go) i @) 3) G4) 8) i)
+PUMP 1 PUMP 2 PUMP 1 PUMP 2 HIGH
+RUN RUN HIGH TEMP HIGH TEMP LEVEL
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+Drawing Title
+CONTROL DIAGRAM
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED.
+02/02/26 TM. T.M. BY JCF BY DATE
+Project Title DELTA 8275 Florida Blvd. PURCHASE ORDER NUMBER
+Denham Springs, LA
+DUPLEX PUMP PROCESS 70726 DRAWING NUMBER
+CONTROL PANEL ) EQUIPMENT | ?». 225) 665-1666 crs
+Fax (225) 665-1855 SHEET NUMBER 3"
+samples\CP-8100-8199\CP-8111.pdf,5,1700,2200,"H N
+L. 120VAC “|
+cRI-1 S y
+¢ @—(a) 4 PUMP 1 HIGH TEMP LIGHT
+ms
+CR2-1 O) =,
++ © +—(a) # PUMP 2 HIGH TEMP LIGHT
+(0) 4—N
+PUMP 1
+t-O-=2-@ i) SETI _(¢R3) 4 PUMP 1 HIGH TEMP
+TEMP SWITCH ok @ RESET Xx 1
+LJ
+PUMP 2
+T&G ® SETI R9) # PUMP 2 HIGH TEMP
+TEMP SWITCH ok @ RESET x t
+LJ
+Drawing Title
+CONTROL DIAGRAM
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+DATE Sales Engineer | Application Engineer DRAWN APPROVED
+02/02/26 TM. T.M. BY JCF BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DUPLEX PUMP DELTA Denham Springs, LA
+CONTROL PANEL PROCESS 70726 DRAWING NUMBER
+CP-8111
+l=) IT | Ph. (225) 665-1666
+4EQGUIPMEN Fax (225) 665-1855 SHEET NUMBER 4"
+samples\CP-8100-8199\CP-8111.pdf,6,1700,2200,"O
+
+NP-1
+
+NP-3
+
+@
+
+TZ SWING OUT PANEL SS
+
+Lo
+
+0)
+
+VIEW_OF INNER SWING PANEL
+
+NOTE:
+
+SEWER GASSES WILL_DESTROY COMPONENTS IN PANEL.
+PROPER_SEALS MUST BE_ INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+NEMA 4X FIBERGLASS ENCLOSURE
+
+NAMEPLATE SCHEDULE
+
+NP—1 PUMP 1/RUN
+NP—2 PUMP 2/RUN
+NP-3 HAND-—OFF—AUTO
+NP—4 HIGH TEMP
+
+NP-S HIGH TEMP/RESET
+
+Drawing Title
+ENCLOSURE
+REFERENCE DRAWING NO. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer [Application Engineer DRAWN nN
+02/02/26 TM. T.M. BY JCF BY DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+DUPLEX PUMP PROCESS 10726 SRAWING NUMBER
+CONTROL PANEL cp-si11
+Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+
+Fax (225) 665-1855
+
+5"
+samples\CP-8100-8199\CP-8111.pdf,7,1700,2200,"BILL OF MATERIALS
+
+Qty. | MANUFACTURER | PART NUMBER DESCRIPTI
+
+M2420HPL ENCLOSURE
+CAMOM2420HPL BACKPLATE
+AF26N1—30—11-13 MOTOR STARTER
+TF42—20 O.L. RELAY (16—20A)
+CL513R RED PILOT LIGHT
+C3SS110B—20 HOA SWITCH
+QOQU235 CB1,2
+SQUARE D QOU110 CB3
+ABB CL2—513Y AMBER PILOT LIGHTS
+DIVERSIFIED ARB-120—ADA LTERNATING RELAY
+ENM TSOB—212 LAPSED TIME METER
+MARATHON 1323580 (e) LOCK
+SQUARE D QOU115
+CONERY R40—XLS
+ABB CP110B-11
+IDEC RR2KP—UAC120V RELAY
+ABB CA4—10 .O. CONTACT BLOCK
+ABB OT80F3 AIN DISCONNECT
+FINDER 46.52.8.120.0054 R1A,2A,3
+SQUARE D SDSA1175 LIGHTNING ARRESTER
+
+WO]OO}NI OD) RI Gingy|—
+NISINININININ]=]—
+
+.
+
+5
+
+s
+
+s
+
+US /O}O|M >
+
+(e)
+1
+2
+3
+4
+15
+16
+7
+is]
+19
+
+Drawing Title
+BILL OF MATERIALS
+REFERENCE DRAWING NO, REVISION-LOCATION ECN | _DATE_| BY
+DATE 3 Sales Engineer [Application Engineer DRAWN APPROVED.
+02/02/26 T.M. T.M. BY _JCF BY DATE
+Project Title $275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+CONTROL BAN L PROCESS 70726 DRAWING NUMBER
+A ( cP-8111
+JAEQUIPMENT Pe (Oo) eb as SHEET NUMBER
+6"
+samples\CP-8100-8199\CP-8110.pdf,1,1700,2200,"®
+
+RESEARCH
+
+OAK ALLEY MAIN LIFT STATION
+DUPLEX PUMP
+CONTROL PANEL
+
+AS BUILTS
+
+FEBRUARY 11, 2026
+SERIAL#102617
+
+Cox Research and Technology, Inc.
+14697 S. Harrells Ferry Road
+Baton Rouge, LA. 70816
+(225) 756-3271 Fax (225) 755-1030
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8110"
+samples\CP-8100-8199\CP-8110.pdf,2,1700,2200,"SOLD TO: Oak Alley SHIP TO:
+
+Tag: Oak Alley Main Lift Station
+
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount x
+Alarm Light - Remote
+Alarm Test Switch
+
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezzo
+
+Panel Type Duplex Cox™ CAMO™ System
+Voltage 120/240V Cycle Counters
+Phase/HZ 1/60 Economy Version
+No. Motors 2 Elapsed Time Meters Xx
+HP 2 Flasher
+FLA 12 Green Run Lights vs. Red
+Pump Manufacturer Myers Ground Fault Receptacle
+Type of Pump Solids Handling} | High Temp Lights
+Catalog Number 3WHV20M4-21 High Temp Pump Shutdown - Auto Reset
+Capacitors Yes High Temp Pump Shutdown - Manual Reset
+Control Voltage 120V Intrinsically Safe Relays Pts
+Control Power Transformer VA = No Lightning Arrestor
+Enclosure NEMA Rating 4x Main Disconnect X
+Enclosure Material Fiberglass Panel Heater/Thermostat W =
+Enclosure Size 18x16x10 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Control Sensor Floats Seal Fail Lights xX
+ULS08A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA
+Unpowered Alarm Circuits #
+OTHER:
+Drawing Title
+PANEL DESCRIPTION
+DATE REFERENCE ee | — Ta ee ECN apd BY
+02/11/26 AD. AD. BY JCF BY DATE
+
+Project Title PURCHASE ORDER NUMBER
+
+® P.O. Box 77808
+a Baton Rouge, LA
+D U P LE Xx P U M P ox 70879 DRAWING NUMBER
+CONTROL PANEL Ph, (225)756-3271 cPsiie
+
+RESEARCH Fax (225)755-1030 SHEET NUMBER 1"
+samples\CP-8100-8199\CP-8110.pdf,3,1700,2200,"MAIN SERVICE
+
+1 120/240V, 18
+8 9
+Ll
+G
+p-S-- Z 60A, 3 POLE
+al MAIN DISCONNECT
+9
+8
+N ul L2
+8 9 9 MAIN DISTRIBUTION
+BLOCK
+9
+254M
+2P B
+cBt oL 71
++ 2 raps xo is 5)
+| T2 \
+| XO st © ) 2HP
+PUMP 4
+| 230V, 76
+A 3 vont RS
+¢ 0 oO Xe 5( sr P B R
+(Sey 20 {R)-9
+MARS RT
+—? as
+SR sc I
+25A TM cit =
+oP 210-324 yf 3
+M2 OL 11
+cB2
+¢ 2 raps Lr 2 Bis B-o
+| T2 1 \
+| Le —2- Bu ° o 2HP-
+PUMP 2
+| 230V, 18
+13 la RS
+a L—2- 5( sr R)-O
+VC?
+MARS
+167
+K
+© cps VERIFY 120V BETWEEN CB3 AND NEUTRAL
+° 104 BEFORE TURNING ON CIRCUIT BREAKER
+120VAC
+H N
+Drawing Title
+REFERENCE DRAWING NO. REVISION-LOCATION ECN DATE BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+02/11/26 AD. BY JCF BY DATE
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+®
+
+RESEARCH
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225)756-3271
+Fax (225)755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8110
+
+SHEET NUMBER."
+samples\CP-8100-8199\CP-8110.pdf,4,1700,2200,"H
+120VAC
+FS-4
+® io
+Poy {By
+HIGH LEVEL ALARM
+(0)
+° PANEL TERM.
+Ho; A (TYP) x YN _O wy
+‘a ey
+¢ Q_ |
+FS-2 @
+po 2--@ Io
+LEAD PUMP ON
+¢
+4}+— ALTERNATOR
+M1 TERM. (TYP.)
+?
+FS-1 — OL
+~ — OL
+TO 2-@ 8 6} ;
+ALL PUMPS OFF Ma
+° Ww
+4 iA * (R) © m2
+FS-3 Y w=N OL
+poo"" o_| o—¢
+! ©
+LAG PUMP ON H
++ re) o®
+yw _@
++ Oy {3---# +--+}
+SF1
+NA~VZ
+oC
++ Oy {§---# }--+i)
+SF2
+
+%* REMOVE JUMPER IF INSTALLING N.C. HIGH TEMP SWITCHES
+
+HIGH LEVEL
+ALARM LIGHT
+
+P1 RUN LIGHT
+
+P1 MOTOR STARTER
+
+ELAPSED TIME METER
+
+ALTERNATOR
+
+P2 RUN LIGHT
+
+P2 MOTOR STARTER
+
+ELAPSED TIME METER
+
+P1 SEAL FAIL ALARM
+
+LIGHT/PROBE
+
+P2 SEAL FAIL ALARM
+
+LIGHT/PROBE
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+REFERENCE DRAWING: NO. REVISION-LOCATION ECN | DATE | BY
+DATE Sales Engineer [Application Engineer DRAWN APPROVED
+02/11/26 AD. BY JCF BY DATE
+Project Title ® | 2.0. Box 77808 PURCHASE ORDER NUMBER
+Baton Rouge, LA
+DUPLEX PUMP 70879 DRAWING NUMBER
+CONTROL PANEL Ph. (225)756-3271
+RESEARCH Fax (225)755-1030 SHEET NUMBER 3"
+samples\CP-8100-8199\CP-8110.pdf,5,1700,2200,"NOTE:
+
+C
+
+O
+
+‘o0000TT
+
+‘Do000TT
+
+ETM
+
+ETM
+
+2. acumnun SWING OUT PANEL LS
+
+‘SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+
+NAMEPLATE SCHEDULE
+
+NP-1
+
+NP—2
+NP-3
+NP—4
+
+NEMA 4X FIBERGLASS ENCLOSURE
+
+PUMP 1/RUN
+PUMP 2/RUN
+
+HAND-—OFF—AUTO
+
+SEAL FAIL
+
+DATE
+02/11/26
+
+Drawing Title
+
+ENCLOSURE
+
+REFERENCE DRAWING
+
+NO.
+
+REVISION-LOCATION
+DRAWN
+
+ECN DATE
+PPROVED
+
+BY
+
+Sales Engineer
+AD.
+
+‘Application Engineer
+
+BY _JCF
+
+BY DATE
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+RESEARCH
+
+®
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225)756-3271
+Fax (225)755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8110
+
+SHEET NUMBER."
+samples\CP-8100-8199\CP-8110.pdf,6,1700,2200,"ITEM MANUFACTURER] PART NO.
+
+STAHLIN
+
+B
+
+LL OF MAT
+
+ERIALS
+
+RJ1816HPLDF
+
+DESCRIPT
+ENCLOSURE
+
+STAHLIN
+
+jQ
+
+BP1816AL
+
+BACKPLATE
+
+ABB
+
+AF16—30—10-1
+
+3 MOTOR STARTER
+
+ABB
+
+TF42-13
+
+O.L. RELA
+
+Y_ (0-13)
+
+CONERY
+
+R40—-XLS
+
+LARM_ LIGHT
+
+ABB
+
+CL513R
+
+ED PILOT LIGHT
+
+ABB
+
+C3SS110B—20
+
+OA SWITCH
+
+MARATHON
+
+1323580
+
+STRIBUTION BLOCK
+
+SQUARE D
+
+QQU225
+
+SQUARE D
+
+QOU110
+
+Bi, CB2
+BS
+
+DIVERSIFIED
+
+ARB—120—ADA
+
+TING RELAY
+
+MARS
+
+19167
+
+TART RELAY
+
+DAYTON
+
+2MEU1
+
+TART CAPACITOR
+
+DAYTON
+
+2MEH1
+
+UN CAPACITOR
+
+ABB
+
+CL100R
+
+ED PILOT LIGHT
+
+1
+1
+1
+
+ENM
+
+TSOB—212
+
+MAD YY SOO|Ol|L|A|>
+
+LAPSED TIME METER
+
+ABB
+
+OT63F3
+
+MAIN DISCONNECT
+
+2
+3
+4
+5
+6
+7
+8
+9
+10
+nl
+2
+3
+4
+5
+6
+7
+8
+i)
+
+Drawing Title
+
+BILL OF MATERIALS
+
+DATE
+02/11/26
+
+REFERENCE DRAWING
+
+BY
+
+AD.
+
+Sales Engineer
+
+NO.
+‘Application Engineer
+
+REVISION-LOCATION
+DRAWN
+
+ECN DATE
+PPROVED
+
+BY _JCF
+
+BY DATE
+
+Project Title
+
+DUPLEX PUMP
+
+CONTROL PANEL
+
+Cox’
+
+RESEARCH
+
+P.O. Box 77808
+Baton Rouge, LA
+70879
+
+Ph. (225)756-3271
+Fax (225)755-1030
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-81
+
+10
+
+SHEET NUMBER."
+samples\CP-8100-8199\CP-8110.pdf,7,1700,2200,"4
+
+FLOAT SWITCH 1 OFF
+
+RED Tg}-5
+218242 [FI ~~~~
+ICN) His ==(=)
+plore [lS
+TCIo@+-—
+igi so [myer
+HIE Hit —==0)
+Hlois4o [ef —-
+af PUMP? SEAL FAL PROBE +
+Wer 8 Fe ~~ ue sea. rat PROBE +
+oe 3e Sy) pene enon ren son
+eae a PUMP 1 HIGH TEMP SWITCH 4
+3 PT voxr sumo sion Lever
+oe ~~ toxrswonsise
+W308 ~~~ rioar suce 2tea0
+Hobs 40 |b --—~
+I]Op- 40
+
+Xa)
+
+REMOVE JUMPER IF USING HIGH TEMP SWITCH
+
+*
+
+ir Not USING SEAL FAIL PROBES, LEAVE TERMINALS EMPTY
+
+BY
+
+DATE
+APPROVED.
+
+ECN
+
+DATE
+
+BY
+
+PURCHASE ORDER NUMBER
+
+6
+
+CP-8110
+
+DRAWING NUMBER
+SHEET NUMBER.
+
+DRAWN
+
+REVISION-LOCATION
+
+JCF
+
+BY
+
+NO.
+
+‘Application Engineer
+
+AD.
+
+P.O. Box 77808
+
+Baton Rouge, LA
+
+70879
+
+25)756-3271
+Fax (225)755-1030
+
+Ph. (2:
+
+Sales Engineer
+
+AD.
+
+REFERENCE DRAWING
+
+®
+
+RESEARCH
+
+Drawing Title
+
+EXTERNAL WIRING
+
+Project Title
+
+DUPLEX PUMP
+CONTROL PANEL
+
+DATE
+
+02/11/26"
+samples\CP-8100-8199\CP-8116.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+WASHATERIA LS.
+MICRO VFD ALTERNATION
+CONTROL PANEL
+
+PROJECT SUBMITTAL
+
+PLEASE REVIEW THOROUGHLY. THESE DRAWINGS ARE OUR
+INTERPRETATION OF THE PROJECT'S REQUIREMENTS. ANY
+CHANGES AFTER FABRICATION WILL BE DONE AT EXTRA COST.
+
+FEBRUARY 11, 2026
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8116"
+samples\CP-8100-8199\CP-8116.pdf,2,1700,2200,"SOLD TO: Delta Process
+
+TAG: Washateria L.S. Micro VFD Alternation
+
+Control Panel
+
+SHIP TO: Delta Process
+
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+. . Alarm Light - Panel Top Mount xX
+-Micro VFDs Provided by Delta Process. Alarm Light - Remote
+-Radar Provided by Delta Process. ‘Alarm Test Switch
+-PD6000 for Level Display. Alarm Silence Switch X
+Alarm Acknowledge Switch
+Alternator with Lead Pump Slector Switch xX
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo xX
+COX""™CAMO"" System
+Panel Type Duplex Cycle Counters
+Voltage 277/480V Economy Version
+Phase/HZ 3/60 Elapsed Time Meter
+No. Motors 2 Flasher
+HP 3 Green Run Lights vs. Red
+FLA 4 8est Ground Fault Receptacle
+Pump Manufacturer BJM High Temp Lights
+Type of Pump : High Temp Pump Shutdown - Auto Reset xX
+Catalog Number : High Temp Pump Shutdown - Manual Reset
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120V Lightning Arrestor
+Control Power Transformer VA= 150 [Yes Main Disconnect without Door Mt. Hanlde x
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts.
+Enclosure Material Fiberglass Panel Heater / Thermostat W=
+Enclosure Size 40x32x12 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Radar/RCT Seal Fail Lights xX
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC
+Starters - NEMA
+Unpowered Alarm Circuits #2 xX
+OTHER: VFDs supplied by Delta, VFD Alternation panel,
+Analog Splitter, Fan/Vent/Thermostat.
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/11/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title D U p LEX DELTA $275 Florida Blvd PURCHASE ORDER NUMER
+VFD ALTERNATION PROCESS |” eaaeeaeeaeaeee op.sti6
+CONTROL PANEL JBQUIPMENT Fee O39) eos. 18s SHEET NUMBER ;"
+samples\CP-8100-8199\CP-8116.pdf,3,1700,2200,"G L1 L2 L3 MAIN SERVICE
+foot EL 2777480,30 LEGEND
+1 i] i] i]
+rot Ld @ PANEL TERMINAL
+| ub at 1s © COMPONENT TERMINAL
+i 9 6 @ WIRE NUMBER
+fe BOA. 3POLE — PANEL WIRING
+| (-~-f--- 7 BR SISCONNECT --- FIELD WIRING
+1 © ©
+S i i i DISTRIBUTION BLOCK
+- MICRO
+15A VFD 1 &
+CBI -N 3P
+e O!0
+14 3HP
+r C1? PUMP_1
+¢ é b 480V.38
+15A
+CB2-\ 3P
++ O10
+4 TR 3HP
+’ aN PUMP_2
+é d 480V,36
+0.5A/CC
+ay
+FUL
+0.5A/cC
+ay
+TRANSFORMER
+150VA
+rl ———s 480V—120VAC
+10A 9
+CB4,-\1P THERMOSTAT
+O oO Ox
+CB3 FAN
+O\10A
+1P
+le} VERIFY_120V BETWEEN CB3 AND NEUTRAL
+BEFORE TURNING ON CIRCUIT BREAKER
+' '
+H N
+
+A SUPPLIED BY DXP
+
+Drawing Title
+
+POWER DIAGRAM
+
+REFERENCE DRAWING | _NO. REVISION - LOCATION ECN | DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN ‘APPROVED
+02/11/26 SD. SD. BY: JCF BY: DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMER
+DUPLEX DELTA Denham Springs, LA
+70726 DRAWING NUMBER
+VFD ALTERNATION PROCESS CP-8116
+CONTROL PANEL JBQUIPMENT Ph. oe) os 1666 SHEET NUMBER
+ax (2 - >"
+samples\CP-8100-8199\CP-8116.pdf,4,1700,2200,"fh 120VAC =
+VFD 1 RUN LIGHT
+¢ VFD 1 RUN RELAY
+*
+ALT2
+¢ & o> © 2 A 3
+1
+1
+® 1
+i]
+1
+1
+1
+i]
+- VFD 2 RUN LIGHT
+1 a 2 .
+y""1 \ ©) (oro)
+1 ° O {3)---0-0---(4) CR2 # VFD 2 RUN RELAY
+i S) am @ WY
+L TEMP. SWITCH
+t ots IN PUMP 2
+¢ 4
+RCT
+¢ | | ® 6 (x) 8 ALTERNATOR
+(ocr)
+¢ RCT # REPEAT CYCLE TIMER
+Ye
+PUMP 1
+VW SEAL LEAK PROBE
+aan) ae PUMP_1, SEAL LEAK
+¢ 8) X)------@ }----{x)--———_# PROBE/LIGHT
+PUMP 2
+LS SEAL LEAK PROBE
+YAY __---e}---- PUMP_2 SEAL LEAK
+4 ®y Xy-----6 }-----{x) $4 BRU 3, eit
+SILENCE
+lL
+ro
+CR6-1
+eH, (6) @ SILENCE RELAY
+cRS1 HIGH LEVEL
+¢ o— PIEZO @ AUDIBLE ALARM
+CR3-3
+¢ VFD 1 FAULT VW
+|________(R})}-—® COMMON ALARM LIGHT
+CR4-3 ~~
+¢ VFD 2 FAULT
+Drawing Title
+CONTROL DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/11/26 S.D. 8.D. BY: JCF BY: DATE:
+
+PURCHASE ORDER NUMER
+
+Fax (225) 665-1855
+
+aoe eeee DUPLEX IDELTA Dechan Sore LA
+VFD ALTERNATION PROCESS 70726 erase ee eER p-SL16
+CONTROL PANEL Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+
+3"
+samples\CP-8100-8199\CP-8116.pdf,5,1700,2200,"4—20mA = 0-30FT
+
+RELAY # DESC. ON OFF |ON DLY|OFF DLY
+RELAY 4 SPARE = = = =
+RELAY 3 SPARE = = - -
+RELAY 2 SPARE = = - -
+RELAY 1 HIGH LEVEL] — = 2sec 2sec
+H N
+a ‘1 20VAC- cat
+PRECISION DIGITAL _PD6000 FOR LEVEL
+¢ a 2 1(+) (-)28;———-®
+@ P+
+@ @ P— HIGH
+©) (EVEL SPARE __—_SPARE___SPARE
+@ COM [ mAOUT
+@ mats ol tlte
+——o
+FU4 5
+32mA0
+5x20 [@)
+0) ¢o)Ko:
+on ®
+Syogeen?
+—
+4=20mA
+RADAR
+op peed
+r {tt ®
+Li | GR5)\—# HIGH LEVEL
+i¢ Ww
+HIGH LEVEL
+ANALOG pa
+SPLITTER
+ARADAR BY DXP
+Drawing Title
+PD6000 DIAGRAM REFERENCE DRAWING | _ NO. REVISION - LOCATION ECN | DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED
+02/11/26 SD. SD. BY: JCF BY: DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMER
+DUPLEX DELTA Denham Springs, LA
+70726 DRAWING NUMBER
+VFD ALTERNATION PROCESS CP-8116
+CONTROL PANEL Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+
+Fax (225) 665-1855
+
+4"
+samples\CP-8100-8199\CP-8116.pdf,6,1700,2200,"H N
+aad 120VAC =|
+EUS
+32mA
+>--- fy --—a-
+4—-20mA
+FROM PD6000 q
+>---Y-@—_____
+“2
+SIEMENS
+LOGO POWER
+¢ OL Ne ry
+9424-249
+of Swntch SETTINGS
+OFF _ON
+ANALOG SIGNAL |
+Pru“ SPuTTER'4 2|
+2mA 3]
+To VFD 1 (re? @ «|
+) rs4 ? s/n
+— |
+TO VFD 2 9| =]
+ig 1-96 o|
+Drawing Title
+ANALOG SPLITTER = =
+REFERENCE DRAWING | _ NO. REVISION - LOCATION ECN | DATE BY
+DATE: DIAGRAM SIN Sales Engineer | Application Engineer DRAWN APPROVED
+02/11/26 SD. SD. BY: JCF BY: DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMER
+DUPLEX DELTA Denham Springs, LA
+70726 DRAWING NUMBER
+VFD ALTERNATION PROCESS CP-8116
+CONTROL PANEL Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 5"
+samples\CP-8100-8199\CP-8116.pdf,7,1700,2200,"CR1-1
+CALL
+
+4-20mA
+FROM SPLITTER
+
+Zz
+
+\
+7
+
+CR2-1
+CALL
+
+aii @ @) yi @ (s)) aii @)
+
+VFD 1
+FAULT
+
+APROVIDED BY DXP
+
+@
+
+VFD 2
+FAULT
+
+HIGH LEVEL
+
+} priv
+FAULT RELAY
+
+DRIVE 1
+FAULT LIGHT
+
+E 1
+
+DRIVE 2
+FAULT LIGHT
+
+DRIVE 2
+
+FAULT RELAY
+
+DATE:
+02/11/26
+
+Drawing Title
+
+CONTROL DIAGRAM
+
+Project Title
+
+DUPLEX
+
+VFD ALTERNATION
+
+CONTROL PANEL
+
+EQUIPMENT | ?». 225) 665-1666
+
+Fax (225) 665-1855
+
+REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+SIN Sales Engineer | Application Engineer DRAWN APPROVED
+S.D. S.D. BY: JCF BY: DATE:
+8275 Florida Blvd. PURCHASE ORDER NUMER
+DELTA Denham Springs, LA
+PROCESS 70726 DRAWING NUMBER .
+CP-8116
+
+SHEET NUMBER
+
+6"
+samples\CP-8100-8199\CP-8116.pdf,8,1700,2200,"NEMA 4X FIBERGLASS ENCLOSURE
+
+c-)
+c°)
+VENT
+PUSH BUTTON —= |
+PIEZO —— |
+c)
+c-)
+
+NP-1
+
+NP-4 NP-4
+
+NP-6
+
+Zann SWING OUT pan
+
+VIEW_OF INNER SWING PANEL
+
+FAN
+
+NAMEPLATE SCHEDULE
+
+NP-1 PUMP 1
+NP-—2 PUMP 2
+NP-3 RUN
+NP-4 HAND-OFF—AUTO
+NOTE: NP-5 VD FAULT
+SEWER GASSES WILL_DESTROY COMPONENTS IN PANEL. Nps ee
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+Drawing Title
+E N C LOSU R E REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/11/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMER
+DUPLEX DELTA Denham Springs, LA
+70726 DRAWING NUMBER
+VFD ALTERNATION PROCESS cP-8it6
+CONTROL PANEL Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 7"
+samples\CP-8100-8199\CP-8116.pdf,9,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+ATTABOX
+
+UU1008030HPL
+
+ENCLOSURE
+
+COX RESEARCH
+
+CAMOM403212UU
+
+BACKPLATE/SWING PANEL
+
+SQUARE D
+
+QOU110
+
+CB3—4
+
+DIVERSIFIED
+
+ARB-120—ADA
+
+LTERNATING RELAY
+
+ABB
+
+C3SS110B—20
+
+0.A. SWITCH
+
+ABB
+
+CL513R
+
+ED PILOT LIGHT
+
+ABB
+
+CLS513Y
+
+MBER_PILOT LIGHT
+
+MARATHON
+
+1323580
+
+STRIBUTION BLOCK
+
+FINDER
+
+46.52.8.120.0054
+
+OJ 00] NO) BY GIN] Gg |=
+
+ABB
+
+XTINU3015AFFOOOXXxX
+
+w
+IND
+
+ABB
+
+X4150PSF1
+
+RANSFORMER
+
+OMRON
+
+H3CR-F8N—100—240AC
+
+EPEAT CYCLE TIMER
+
+ABB
+
+CP110B-11
+
+USH BUTTON
+
+LITTELFUSE
+
+LLCC—0.5
+
+U1-2
+
+LITTELFUSE
+
+BAF-2
+
+LITTLEFUSE
+
+32mA
+
+cic
+Fad loa
+oa
+
+HOENIX
+
+UT4—HESI
+
+YY) UO DISOlO]O} S| ATS
+Sr) :
+|
+fo>)
+
+USE HOLDER
+
+EMENS
+
+6EP33316SBOOO0AYO
+
+OWER SUPPLY
+
+HOENIX
+
+2905026
+
+NALOG SPLITTER
+
+BB
+
+OT63F3.
+
+AIN_ DISCONNECT
+
+USSMANN
+
+SAMI—7N
+
+=| >)0
+
+USE COVER
+
+CL100R
+
+ED PILOT LIGHT
+
+PW120AB
+
+EZO
+
+R40—XLS
+
+LARM_ LIGHT
+
+55.34.8.120.0050
+
+PRECISION DIGITAL
+
+PD6000—6R7
+
+ETPOINT CONTROLLER
+
+DANFOSS
+
+ZNO] S| Viv
+vv)
+in
+ES
+
+CRO_VFDS
+
+SAGINAW
+
+SCE—FA44
+
+FAN
+
+SAGINAW
+
+SCE—FGA44
+
+VENT
+
+SAGINAW
+
+SCE—RH44
+
+RAIN HOOD
+
+= }r}—o{a]ro]s]ro]o]—tro}po} a] a] a]rot ro} tn] a] o]olr] 8] —} ro} afro] a] ro] ao
+
+FINDER
+
+AMMICRO DRIVES PROVIDED BY DXP
+
+77.81.0.000.2301
+
+THERMOSTAT
+
+Drawing Title
+
+BILL OF MATERIALS
+
+DATE:
+02/11/26
+
+ECN DATE BY
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION
+
+SIN Sales Engineer
+SD. S.D.
+
+Application Engineer
+
+DRAWN
+
+APPROVED
+
+BY: JCF
+
+BY: DATE:
+
+Project Title
+
+DUPLEX
+
+VFD ALTERNATION
+
+CONTROL PANEL
+
+DELTA
+PROCESS
+JASQGUIPMENT
+
+8275 Florida Blvd.
+Denham Springs, LA
+70726
+
+Ph. (225) 665-1666
+Fax (225) 665-1855
+
+PURCHASE ORDER NUMER
+
+DRAWING NUMBER
+CP-8116
+
+SHEET NUMBER
+8"
+samples\CP-8100-8199\CP-8112.pdf,1,1700,2200,"a
+
+INFILTRATOR’
+
+water technologies
+
+P22-0156
+ARCADE
+CONTROL PANEL
+
+AS BUILTS
+
+FEBRUARY 12, 2026
+SERIAL#102632
+
+Infiltrator Water Technologies
+15785 Industry Way
+Walker, LA 70785
+(225) 665-6162 Fax (800) 219-9183
+CP-8112
+©COX RESEARCH AND TECHNOLOGY, INC. 2026"
+samples\CP-8100-8199\CP-8112.pdf,2,1700,2200,"SEWER TREATMENT PLANT
+CONTROL PANEL
+
+INFILTRATOR’
+
+Walker, LA
+
+SOLD TO: Infiltrator Water Technologies SHIP TO:
+TAG: P22-0156 Arcade Control Panel -
+SPECIAL NOTES: Alarm Light - Panel Door Mount
+Panel is ""Opti-Ready"" - floats provided by Alarm Light - Panel Top Mount x
+Infiltrator. Alarm Light - Remote
+Duplex 1.5HP Blowers - FPZ - 4.35FLA Alarm Test Switch x
+Duplex 0.4HP EQ Pumps - Myers - 12FLA Alarm Silence Switch X
+Duplex 0.4HP Dosing Pumps - Myers - 12FLA ‘Alarm Acknowledge Switch
+Dosing pump capacitors must be in motor Alternator with Lead Pump Selector Switch xX
+Audible Alarm - Bell
+-Breakers for 120V Exhaust Fans Audible Alarm - Horn
+Audible Alarm - Piezo xX
+COX""™CAMO"" System
+Panel Type STP Cycle Counters
+Voltage 120/208 Economy Version
+Phase/HZ 3/60 Elapsed Time Meter
+No. Motors 6 Flasher
+HP Varies Green Run Lights vs. Red
+FLA Varies Ground Fault Receptacle
+Pump Manufacturer Varies High Temp Lights
+Type of Pump Varies High Temp Blower Shutdown - Auto Reset x
+Catalog Number Varies High Temp Pump Shutdown - Manual Reset
+Capacitors No Intrinsically Safe Relays Pts.
+Control Voltage 120 Lightning Arrestor
+Control Power Transformer VA= No Main Disconnect without Door Mt. Handle x
+Enclosure NEMA Rating 4x Opti-Float® Level Dectector Pts. 8 x
+Enclosure Material Fiberglass Panel Heater / Thermostat W=
+Enclosure Size 30x24x12 Phase Monitor
+Inner Swing Panel Yes Pole, Box, Seal
+Conrol Sensor Varies Seal Fail Lights
+ULS508A Labeling No Seal Fail Relay - Fixed
+UL698A Labeling No Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC xX
+Starters - NEMA (ABB) x
+Unpowered Alarm Circuits #1 xX
+OTHER: Optional Breaker to power flow meter (120V),
+Blower Overload Indication.
+Drawing Title
+P AN E L D E S) C RI P 7 ON REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+
+G-
+
+70785
+
+DRAWING NUMBER
+
+CP-8112
+
+Ph. (225) 665-6162
+Fax (225) 219-9183
+
+SHEET NUMBER
+
+water technologies
+
+1"
+samples\CP-8100-8199\CP-8112.pdf,3,1700,2200,"L2 L3 MAIN SERVICE
+
+N ou LEGEND
+1 1 1 | 120/208V,3¢
+rot Et ® PANEL TERMINAL
+1 Uy La Ls © COMPONENT TERMINAL
+; @ WIRE NUMBER
+i]
+; —--f---/— 60A, 3POLE — PANEL WIRING
+! (—--(--- (7 BIRO DISCONNECT _—- FIELD WIRING
+1 96 9
+® DISTRIBUTION BLOCK
+LS} LS} LS}
+15A
+CBN 3PM ony
+’ 010 ow an 1.5HP
+ra ‘ BLOWER 1
+r 616 oe )-- 208V.30
+y 4.35FLA
+¢ Oo oO XL, i)’
+---4
+154 =
+CBZ 3P_ M2 1p
+¢ 010 X aR. 1.5HP
+ra ‘ BLOWER 2
+616 oe 208V,30
+rn 4.35FLA
+¢ Oo oO 4X
+M3 oL3
+“Xr
+0.4HP
+27 FLOW EQ. PUMP 1
+cp3, 4 120V.18
+oN 12FLA
+¢ Oo oO Xr
+¢
+M+ oL4
+“Xr
+0.4HP
+De FLOW EQ. PUMP 2
+ces 120V,18
+oN 12FLA
+¢ Oo oO Xr
+¢
+N U1 L3
+
+Drawing Title
+
+POWER DIAGRAM
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION
+
+ECN DATE BY
+
+water technologies:
+
+Fax (225) 219-9183
+
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/12/26 SD. S.D. BY: JCF BY: DATE
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785 DRAWING NUMBER
+CP-8112
+CONTROL PANEL INFILTRATOR’ Ph, (225) 665-6162 SHEET NUMBER
+
+2"
+samples\CP-8100-8199\CP-8112.pdf,4,1700,2200,"L3 M
+
+5 os
+4X
+0.4HP
+ne DOSING PUMP 1
+cps, 4 120V.16
+la 12FLA
+¢ Oo oO oe,
+¢
+M6 O16
+4X
+0.4HP
+ne DOSING PUMP 2
+crea 120V.16
+4 oN a 12FLA
+¢
+a 1*
+108
+CB7,~1P
+| ooN Ow |
+; ¢—° 9 ———)—|METERT-<——_,_—s I
+; ;
+1 1
+1 1
+1 1
+i ¢ ;
+1 1
+Life fe 4
+ca M1-1
+CBB, 1 -
+EXHAUST
+,—_o a) igo FAN 1-~<8)—
+ca M2-1
+cB9, N41 —
+oN EXHAUST
+oo ) Oi —FEAN 2 ~<8)——?
+¢
+cB10
+0, 10A
+yr LEGEND
+[o} VERIFY 120V BETWEEN CB7 AND NEUTRAL
+BEFORE TURNING ON CIRCUIT BREAKER ® PANEL TERMINAL
+Ni Mi © COMPONENT TERMINAL
+@ WIRE NUMBER
+— PANEL WIRING
+--- FIELD WIRING
+* OPTIONAL FLOW METER POWER FEED (120V)
+Drawing Title
+POWER DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. 8.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785. DRAWING NUMBER
+CP-8112
+CONTROL PANEL INFILTRATOR’ Fee O29) 219.9185 SHEET NUMBER
+water technologies ax (4 5 3"
+samples\CP-8100-8199\CP-8112.pdf,5,1700,2200,"H N
+L~ 120VAC -|
+XN 4
+yo a © (R) ® w_| BLOWER 1 RUN LIGHT
+N,
+YY @ st | | Py_) BLOWER 1
+¢ o._| 0 yore) (wn) MOTOR STARTER
+(©) ALT1 ) TEMP SWITCH
+{i oe IN BLOWER 1
+4 I
+i
+i 4
+| CR5—1 CR6-1
+\
+\
+i
+eD 2] | 6 (ar) 8 @ ALTERNATOR 1
+i
+i
+! NAZI
+Ho A © (R) 9 | BLOWER 2 RUN LIGHT
+7 7 N
+'ALTI Y @ Ts2 OL
+\! _ _ (yo)_o_1 BLOWER 2
+tor e—*0__|_ 9 S)--OT OA) O{ M2) HH MOTOR STARTER
+TEMP SWITCH
+® ! IN BLOWER 2
+clock © ;
+rs | | o ;
+IT 1
+O
+é CLOCK #@ CLOCK
+PANEL IS DESIGNED TO RUN AERATORS IF NO OFF TIME IS REQUIRED BETWEEN
+WITH A MINIMUM OF 15 MINUTES OF OFF ALTERNATION, REMOVE JUMPER FROM
+TIME BETWEEN ALTERNATION. PINS PUSHED TERMINALS (5) AND ©). PLACE JUMPER
+OUT ON CLOCK INDICATE RUN TIME. PINS ACROSS TERMINALS @) AND @). NOW
+PUSHED IN INDICATE OFF TIME. EACH PIN AERATORS WILL RUN CONTINUOUSLY.
+IS EQUAL TO 15 MINUTES. SET 1 PIN IN AT THE TIME YOU WISH
+TO AERATORS TO ALTERNATE. ALL
+REMAINING PINS SHOULD BE PUSHED
+OUT.
+ane BLOWER 1
+MI e+ t OVERLOAD LIGHT
+OL @
+4 rs) {BLOWER 1
+(CRS) OVERLOAD RELAY
+ant BLOWER 2
+M2 e)——+ r OVERLOAD LIGHT
+4 (ere) 4 BLOWER 2
+(CRS) OVERLOAD RELAY
+Drawing Title
+BLOWERS
+CONTROL DIAGRAM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. 8.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Valker,
+SEWER TREATMENT PLANT joes DRAWING NUMBER
+CP-8112
+CONTROL PANEL INFILTRATOR’ Fee O29) 219.9185 SHEET NUMBER
+water technologies ax (4 5 4"
+samples\CP-8100-8199\CP-8112.pdf,6,1700,2200,"H N
+aes 120VAC =
+Ww
+t+@jLe ® Gai) +4
+HIGH LEVEL
+@rvv ©
+M3
+OL
+La |
+TRANSCEIVER 1
+RCTI—2ee RELAY | @ ALT2
+( eis (20) 11 12, 2
+VI VI
+OAD PUMP ON
+¢
+ALT1
+TRANSCEIVER 1
+RCT1—134k RELAY 2
+a7 | | oo) 9 | | 10) 8 +d
+ALL Pumps ofr | | ALT2
+Ww @
+M4
+mrt ALT1 OL
+bd im tot}
+¢
+| | ON: 2MIN
+¢ 13 1 | 14 Woy 2
+LAG PUMP _ON/
+TIMER OVERRIDE
+¢ RCT1 2
+
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+
+FLOW EQ, TANK
+HIGH LEVEL
+
+FLOW EQ. PUMP 1
+RUN LIGHT
+
+FLOW EQ. PUMP 1
+MOTOR STARTER
+
+ALTERNATOR 2
+
+FLOW EQ, PUMP 2
+RUN LIGHT
+
+FLOW EQ. PUMP 2
+MOTOR STARTER
+
+TIMER_OVERRIDE
+TIME DELAY
+
+REPEAT CYCLE
+TIMER 1
+
+** IF TIME DOSE IS NOT REQUIRED, PLACE JUMPER BETWEEN(i?) &(i8y ALSO(3) & Go)
+Drawing Title
+FLOW EQ. PUMPS
+Cc ON TR OL D | AG R AM REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. S.D. BY: JCF BY: DATE:
+
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+
+Walker, LA
+SEWER TREATMENT PLANT 70785 DRAWING NUMBER
+CP-8112
+CONTROL PANEL INFILTRATOR’ pp. (B58) 919.9183 SHEET NUMBER
+water technologies ax (¢- - 5"
+samples\CP-8100-8199\CP-8112.pdf,7,1700,2200,"120VAC
+
+TRANSCEIVER 2
+
+q
+
+2 tte
+72
+n>
+
+58
+>
+
+34
+
+i] ou
+1 C1
+HIGH |
+ron
+LAG? | c2
+TIMER OVERRID |
+=)
+
+gt =o
+
+o+12v -3)
+
+2k. No}
+
+POWER SUPPLY
+
+$0
+
+TRANSCEIVER 1
+
+1b 2
+1 Fe
+
+rom
+C1
+om
+
+C2
+
+ot a)
+
+AOPTI-FLOATS SUPPLIED BY INFILTRATOR.
+
+DATE:
+02/12/26
+
+Drawing Title
+
+FLOW EQ. FLOATS
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION
+
+ECN DATE BY
+
+S/N
+
+Sales Engineer
+SD. S.D.
+
+Application Engineer
+
+DRAWN
+
+APPROVED
+
+BY: JCF
+
+BY: DATE:
+
+Project Title
+
+SEWER TREATMENT PLANT
+
+CONTROL PANEL
+
+G
+
+INFILTRATOR’
+water technologies
+
+15785 Industry Way
+Walker, LA
+70785
+
+Ph. (225) 665-6162
+Fax (225) 219-9183
+
+PURCHASE ORDER NUMBER
+
+DRAWING NUMBER
+CP-8112
+
+SHEET NUMBER
+6"
+samples\CP-8100-8199\CP-8112.pdf,8,1700,2200,"H N
+b 120VAC ~|
+VV
++ @j-@ ® (a+
+HIGH LEVEL
+Hy
+? O__|
+TRANSCEIVER 3
+RCT2-2 RELAY 1 ALT2
+Mess | | 27 | | 28) 2 / 3/0
+LEAD PUMP ON | )
+1
+b |
+ALTI | M5-1 f
+1
+RCT2-1 io
+OL
+63 | | 34) 25) | | 26) TT 6 «x 8 J
+) ALT2! wp 61
+ALL PUMPS OFF at
+4
+i]
+| (Bo, Lv ®
+1 ! M6
+702-1 @ [am! 1 @) x 7~ |.
+6 | | io} —_- tito. 9 40) (we)
+1
+—i
+¢ re)
+TRANSCEIVER 4
+RELAY 2 2) (<> ON: 2MIN}
+“8»—| | “39 D2 °
+im ey
+LAG PUMP_ON/
+TIMER OVERRIDE
++ RCT2 ry
+
+* REMOVE JUMPERS AND INSTALL LOCKOUT
+IF
+
+DEVICES IF REQUIRED.
+
+IME DOSE IS NOT REQUIRED, PLACE JUMPER BETWEEN ©) & (34) ALSO Gs) & G6)
+
+EFFLUENT TANK
+HIGH LEVEL
+
+DOSING PUMP 1
+RUN LIGHT
+
+DOSING PUMP. 1
+MOTOR STARTER
+
+ALTERNATOR 3
+
+DOSING PUMP 2
+RUN LIGHT
+
+DOSING PUMP 2
+MOTOR STARTER
+
+TIMER_OVERRIDE
+TIME DELAY
+
+REPEAT CYCLE
+TIMER 2
+
+Drawing Title
+
+DOSING PUMPS
+
+CONTROL DIAGRAM REFERENCE DRAWING | _NO. REVISION - LOCATION ECN DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/12/26 SD. S.D. BY: JCF BY: DATE!
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785 DRAWING NUMBER
+CP-8112
+CONTROL PANEL INFILTRATOR’ pp. (B58) 919.9183 SHEET NUMBER
+water technologies at : 7"
+samples\CP-8100-8199\CP-8112.pdf,9,1700,2200,"water technologies:
+
+Fax (225) 219-9183
+
+N
+~ 120VAC _
+TRANSCEIVER 4
+_@® pie _
+Se
+A _9 gi 4 .
+FT 7
+| QPTI-FLOAT \ TRI
+| CONNECTION 1
+I HIGH I
+| yc
+i] i] C2
+LAG
+| TIMER overaBe \
+Loo 4 Igt =
+ry
+| a+12v 2] |
+¢ OL NO J
+$ POWER SUPPLY S 3)
+TRANSCEIVER 3
+—O_{yog| © _
+&
+A _9 3a 4 .
+FT 7
+| QPTI-FLOAT \ TRI
+| CONNECTION at 1
+; LEAD 1
+1 i] ou
+1
+LS OF Vile a
+} °
+AOPTI-FLOATS SUPPLIED BY INFILTRATOR.
+Drawing Title
+D Os| N G PU M P FLOA I Ss REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. 8.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785, DRAWING NUMBER
+CP-8112
+CONTROL PANEL INFILTRATOR’ Ph, (225) 665-6162 SHEET NUMBER
+
+8"
+samples\CP-8100-8199\CP-8112.pdf,10,1700,2200,"H N
+b~ 120VAC |
+TEST
+lL
+¢ oO o
+t CRI-1 stow a CHAMBER HiGH LeveL @) t (cpa)
+Nery
+CR2-1 vay COMMON
+@ DOSING TANK HIGH LEVEL ———_®)—->+ ALARM LIGHT
+CR5-2
+BLOWER 1 OVERLOAD CRI-1 @)
+lt PIEZO AUDIBLE ALARM
+CR6-2 1
+BLOWER 2 OVERLOAD !
+— (3) @ SILENCE RELAY
+SILENCE
+lL
+L—o
+CR4-1
+ir
+COMMON
+ALARM
+
+Drawing Title
+
+COMMON ALARM
+
+DATE BY
+
+CONTROL DIAGRAM REFERENCE DRAWING | _NO. REVISION - LOCATION ECN
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/12/26 S.D. SD. BY: JCF BY: DATE!
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785 DRAWING NUMBER
+
+CONTROL PANEL
+
+INFILTRATOR’
+water technologies
+
+Ph. (225) 665-6162
+Fax (225) 219-9183
+
+CP-8112
+
+SHEET NUMBER
+9"
+samples\CP-8100-8199\CP-8112.pdf,11,1700,2200,"ALARM LIGHT —~
+
+[v2]
+
+PUSH BUTTON —||
+
+PIEZO —=
+2 wuwnum SWING OUT pace
+VIEW _OF INNER SWING PANEL
+NAMEPLATE SCHEDULE
+NP-1 BLOWER 1/RUN NP-8 = SILENCE
+NP—2 BLOWER 2/RUN NP-9 FLOW EQ./HIGH LEVEL
+4 FL 11 ALARM
+SEWER GASSES WILL_DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE NP=e EFFLUENT PUMP 27RUN N12 OVERLOAD
+PANEL TO PREVENT ENTRY OF GASSES. NPo? HAND OFF_-AUTO
+Drawing Title
+EN CLOSU RE REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785 DRAWING NUMBER
+CP-8112
+CONTROL PANEL INFILTRATOR’ Ph, (225) 665-6162 SHEET NUMBER
+water technologies. Fax (225) 219-9183 10"
+samples\CP-8100-8199\CP-8112.pdf,12,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+ATTABOX M3024HPL ENCLOSURE
+
+CMW. CAMOM3024HPL BACKPLATE/SWING PANEL
+MARATHON 1323580 STRIBUTION BLOCK
+SQUARE D QOU110 B7-10
+
+ABB AF16—30-10-13 OTOR STARTER 1-6
+ABB TF42-5.7 L RELAY 1,2 (4.2—5.7A)
+DIVERSIFIED ARB-120—ADA LTERNATOR 1-3
+
+ABB C3SS110B—20 0.A. SWITCH
+
+ABB CL513R ED PILOT LIGHT
+GRASSLIN FM/1_STUZH-120V LOCK
+
+OMRON H3CR-F8N—120240VAC | REPEAT CYCLE TIMER 1,2
+CONERY R40—XLS LARM_LIGHT
+
+FINDER 46.52.8.120.0054 R1i-4
+
+INGRAM PW120AB EZO
+
+ABB CP110B—20 USH BUTTON
+
+ABB OT63F3. AIN_ DISCONNECT
+SQUARE _D QOU120 B3—-6
+
+FINDER 85.04.0.125.0000 D1,2
+
+FINDER 94.04 D BASE
+
+COX RESEARCH | OPTI-F1XX—WT1 XX’ _OPTI-FLOAT
+
+COX RESEARCH | OPTI-TR2A TRANSCEIVER
+
+COX RESEARCH | OPTI-PS1 POWER SUPPLY
+
+SQUARE D QOQU315 CB1,2
+
+MARATHON 1321580 NEUTRAL BLOCK
+
+ABB TF42-13 OL RELAY 3-6 (10-13A)
+ABB CL513Y AMBER PILOT LIGHT
+
+O]OO|N YD) nA] WId|—
+
+FSOJ/E| VU VDO}}S/A/O]A/T|S/O}E|Q/G
+
+i
+1
+4
+6
+2
+3
+6
+8
+1
+2
+1
+4
+1
+2
+1
+4
+2
+2
+8
+4
+2
+2
+1
+4
+2
+
+APROVIDED BY INFILTRATOR.
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+
+DATE: SIN Sales Engineer | Application Engineer DRAWN APPROVED.
+02/12/26 SD. S.D. BY: JCF BY: DATE
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785 DRAWING NUMBER
+TI Pp CP-8112
+CONTROL PANEL INFILTRATOR’ Ph, (225) 665-6162 SHEET NUMBER
+water technologies Fax (225) 219-9183 i"
+samples\CP-8100-8199\CP-8112.pdf,13,1700,2200,"""OFF"" POSITION - TRIPPERS PUSHED INWARD
+""ON"" POSITION - TRIPPERS PUSHED OUTWARD
+
+3 - WAY MANUAL
+OVERRIDE SWITCH
+
+|
+
+ON
+
+OOO ©
+
+‘
+
+ON
+
+©
+‘|e
+©
+©
+
+©
+
+©
+
+©
+
+| = PERMANENT ON
+@® = AUTOMATIC
+OQ = PERMANENT OFF
+
+| = PERMANENT ON
+
+0)
+
+iS
+
+@ = AUTOMATIC
+
+TIME SETTING
+
+TURN THE PROGRAM DIAL GRADUALLY CLOCKWISE UNTIL
+THE DAY OF THE WEEK (7-DAY TIMER) AND TIME OF DAY
+
+ON THE OUTER DIAL IS ALIGNED WITH THE TRIANGLE MARKER
+ON THE INNER DIAL (TWO O'CLOCK POSITION.) FOR TO-THE-
+MINUTE SETTING TURN THE MINUTE HAND CLOCKWISE TO
+THE EXACT TIME OF DAY.
+
+EXAMPLE FOR 7-DAY PROGRAM DIAL. MONDAY 10:30AM.
+
+TURN PROGRAM DIAL OR MINUTE HAND CLOCKWISE UNTIL
+MONDAY 10:30AM. IS ALIGNED WITH THE TRIANGLE ON THE INNER
+DIAL. THE HOUR AND MINUTE HAND WILL SHOW EXACTLY 10:30.
+
+EXAMPLE FOR 24-HOUR PROGRAM DIAL. MONDAY 10:30AM.
+TURN MINUTE HAND CLOCKWISE UNTIL 10:30AM. IS ALIGNED
+WITH TRIANGLE ON THE INNER DIAL. THE HOUR AND MINUTE
+HAND WILL SHOW EXACTLY 10:30.
+
+PROGRAMMING
+
+THE WEEKLY PROGRAM DIAL REFLECTS THE SEVEN DAYS
+OF THE WEEK AND AM / PM IMPRINTS FOR EACH DAY.
+THE 24-HOUR DIAL HAS QUARTER - HOUR DIVISIONS AND.
+AM/ PM INDICATIONS.
+
+THE TIME SWITCH IS PROGRAMMED BY PUSHING THE
+CAPTIVE TRIPPERS TO THE OUTER RING POSITION FOR THE
+ENTIRE PERIOD THAT THE LOAD IS TO BE TURNED ""ON"" LE.
+FIFTEEN MINUTES FOR EACH TRIPPER ON THE TWENTY-FOUR
+DIAL AND TWO HOURS FOR EACH TRIPPER ON THE SEVEN
+DAY DIAL. WHEN THE TRIPPER IS PUSHED TO THE INSIDE
+THE SWITCH IS IN THE ""OFF"" POSITION.
+
+HAND WILL SHOW EXACTLY 10:30.
+
+AUTOMATIC MODE
+
+IN ORDER TO OPERATE THE TIME SWITCH MODULE IN THE
+AUTOMATIC MODE THE MANUAL SWITCH MUST BE IN THE
+CENTER POSITION (AUTOMATIC) - SEE DIAGRAM ABOVE.
+
+OFF
+OOOO © MANUAL MODE
+WITH THE MANUAL SWITCH SELECTOR LEVER THE SELECTED
+7, | (i) PROGRAMS CAN BE OVERRIDEN. IN THE LOWER POSITION
+OFF 0 = PERMANENT OFF MARKED O, TERMINALS 3 AND 5 ARE CLOSED - PERMANENT OFF.
+IN THE UPPER POSITION MARKED L, TERMINALS 3 AND 4 ARE
+© ® ® (3) © CLOSED - PERMANENT ON (SEE DIAGRAM ABOVE.)
+Drawing Title
+CLO C K | N Ss TR U C TI O N S) REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. S.D. BY: JCF BY: DATE:
+Project Title 15785 Industry Way PURCHASE ORDER NUMBER
+Walker, LA
+SEWER TREATMENT PLANT 70785 DRAWING NUMBER
+TI Pp CP-8112
+CONTROL PANEL INFILTRATOR’ Ph. (225) 665-6162 SHEET NUMBER
+water technologies Fax (225) 219-9183 L"
+samples\CP-8100-8199\CP-8112.pdf,14,1700,2200,"HOW TO SET THE REPEAT CYCLE TIMER
+
+EXAMPLES OF SETTINGS
+Selector Dial : :
+Time On Time Off
+
+3 4(On) | 7 (Off) | Orange (On) | Green (Off)
+
+1.2 10m 10h 7 2 7Tmin 2hours
+1.2 10m 10h 1.2 1.2 12min 12hours
+3.0 10m hrs 2.0 2.0 20min 2hours
+3.0 10m hrs 3.0 3.0 30min 3hours
+
+* = Factory Settings
+
+Time On = 4(On) Setting x Orange Setting
+Time Off = 7(Off) Setting x Green Setting
+Factory Setting:
+
+Time On = 10m x 0.7 = 7 Minutes
+Time Off = 10h x 0.2 = 2 Hours.
+
+*
+1 7
+OFF 10h
+ON
+2 y
+6 OFF
+4 8
+10)
+2
+0 12|
+10m
+OMRON H3CR ON
+*
+4
+
+3 ) (1.2, 3, 12, 30)
+
+2 H3CR-F8N
+(10s, 10m, hrs, 10h)
+
+Cd) OFF Indicator (Green)
+@) ON Indicator (Orange)
+
+GB) Range Time Selector
+
+@) ON Time Unit Selector
+
+®
+©
+
+@) OFF Time Unit Selector
+
+Setting dial for OFF
+(Green pointer)
+
+Setting dial, for ON
+(Orange pointer)
+
+Note: If pointer is turned
+counterclockwise until overranged,
+instantaneous output will be
+set.
+
+Drawing Title
+
+RCT INSTRUCTIONS
+
+REFERENCE DRAWING NO. REVISION - LOCATION ECN DATE BY
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/12/26 S.D. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+SEWER TREATMENT PLANT
+CONTROL PANEL
+
+G
+
+INFILTRATOR’
+water technologies
+
+15785 Industry Way
+Valker, LA
+
+PURCHASE ORDER NUMBER
+
+70785
+
+DRAWING NUMBER
+
+CP-8112
+
+SHEET NUMBER
+‘ax (225) 219-9183
+
+fe (225) 665-6162
+
+13"
+samples\CP-8100-8199\CP-8115.pdf,1,1700,2200,"DELTA
+PROCESS
+JZEQUIPMENT
+
+CITY OF RAINE
+WELL PRELUBE
+DIN RAIL
+
+AS BUILTS
+
+FEBRUARY 13, 2026
+SERIAL#102639
+
+Delta Process Equipment
+8275 Florida Blvd.
+Denham Springs, LA 70726
+(225) 665-1666 Fax (225) 665-1855
+
+©COX RESEARCH AND TECHNOLOGY, INC. 2026
+
+CP-8115"
+samples\CP-8100-8199\CP-8115.pdf,2,1700,2200,"O-+=
+
+120VAC
+
+@-Lz
+
+rx) \}
+
+i 1
+rat} CN e'®
+
+START SIGNAL
+FROM PANEL
+
+ey
+Oo @©@ © ©
+
+ENERGIZE TO CLOSE
+(IF REQ'D)
+
+Drawing Title
+
+CONTROL DIAGRAM REFERENCE DRAWING | _NO. REVISION - LOCATION ECN | DATE BY
+DATE: SIN Sales Engineer | Application Engineer DRAWN ‘APPROVED
+02/13/26 SD. SD. BY: JCF BY: DATE
+Project Title 8275 Florida Blvd. PURCHASE ORDER NUMBER
+DELTA Denham Springs, LA
+70726 DRAWING NUMBER
+DIN RAIL PROCESS CP-8115
+Y,EQUIPMENT | ?b. 225) 665-1666 SHEET NUMBER
+Fax (225) 665-1855 1"
+samples\CP-8100-8199\CP-8115.pdf,3,1700,2200,"BILL OF MATERIALS
+
+MANUFACTURER PART NUMBER DESCRIPTION
+
+DIN RAIL
+
+DINRAIL
+
+BUSSMANN
+
+BAF-2
+
+FUSE 1
+
+PHOENIX
+
+STOCK
+
+FUSE 1 HOLDER
+
+FINDER
+
+46.52.8.120.0054
+
+CRX
+
+FINDER
+
+85.04.0.125.0000
+
+TIME DELAY 1-2
+
+O]OO|NY] OD) ORIGIN}
+
+Drawing Title
+
+BILL OF MATERIALS
+
+REFERENCE DRAWING NO.
+
+REVISION - LOCATION ECN DATE BY
+
+DATE: S/N Sales Engineer | Application Engineer DRAWN APPROVED
+02/13/26 S.D. S.D. BY: JCF BY: DATE:
+
+Project Title
+
+DIN RAIL
+
+8275 Florida Blvd. PURCHASE ORDER NUMBER
+
+Denham Springs, LA
+
+DELTA
+PROCESS
+JASQGUIPMENT
+
+70726
+
+Ph. (225) 665-1666
+Fax (225) 665-1855
+
+DRAWING NUMBER
+CP-8115
+
+SHEET NUMBER
+2"
