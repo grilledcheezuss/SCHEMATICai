@@ -458,20 +458,25 @@ body.demo-mode .redaction-layer {
     z-index: 5;
 }
 
+/* CRITICAL: Editor mode - always show outlines and make interactive */
 body.editor-active .redaction-box { 
     pointer-events: auto !important; 
     cursor: grab !important; 
-    border: 2px solid #9333ea !important; /* Purple border - highly visible */
+    border: 2px solid #9333ea !important; /* Purple border - always visible */
     background: rgba(147, 51, 234, 0.15) !important; /* Semi-transparent purple */
 }
+
+/* CRITICAL: Transparent boxes in editor mode - maintain outline visibility */
 body.editor-active .redaction-box[data-transparent="true"] {
-    background: rgba(147, 51, 234, 0.15) !important;
+    background: rgba(147, 51, 234, 0.1) !important; /* Lighter purple for transparent */
+    border: 2px dashed #9333ea !important; /* Dashed border to distinguish from opaque */
 }
 
 body.editor-active .redaction-box:active { cursor: grabbing !important; } 
 
 body.editor-active .redaction-box.selected { 
     border-color: #ec4899 !important; /* Pink when selected */
+    border-style: solid !important; /* Solid border when selected */
     background: rgba(236, 72, 153, 0.2) !important;
     box-shadow: 0 0 10px rgba(236, 72, 153, 0.5) !important;
     z-index: 100 !important; 

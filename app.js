@@ -11,8 +11,42 @@ const VERSION_HISTORY = {
 const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
+// Feature flags
+const FEATURES = {
+    OCR_ENABLED: true, // Set to false to disable OCR features
+};
+
+// OCR state management
+let tesseractLoaded = false;
+let tesseractLoadPromise = null;
+let activeOcrTasks = new Set();
+
 console.log(`%c🚀 SCHEMATICA ai ${APP_VERSION}`, 'color: #9333ea; font-weight: bold; font-size: 16px;');
 console.log(`📋 ${VERSION_HISTORY[APP_VERSION]}`);
+
+// Lazy-load Tesseract.js when OCR feature is first used
+async function loadTesseract() {
+    if (!FEATURES.OCR_ENABLED) {
+        throw new Error('OCR feature is disabled');
+    }
+    
+    if (tesseractLoaded) return;
+    if (tesseractLoadPromise) return tesseractLoadPromise;
+    
+    tesseractLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        script.onload = () => {
+            tesseractLoaded = true;
+            console.log('✓ Tesseract.js loaded');
+            resolve();
+        };
+        script.onerror = () => reject(new Error('Failed to load Tesseract.js'));
+        document.head.appendChild(script);
+    });
+    
+    return tesseractLoadPromise;
+}
 
 // Redaction checkbox IDs used for auto-scan detection
 const REDACTION_CHECKBOX_IDS = [
@@ -1383,7 +1417,35 @@ class SmartScanner {
     }
     
     static async ocrBasedZones(page, wrapper) {
+        if (!FEATURES.OCR_ENABLED) {
+            console.log('OCR feature is disabled');
+            return null;
+        }
+        
+        // Load Tesseract if not already loaded
         try {
+            await loadTesseract();
+        } catch (e) {
+            console.error('Failed to load Tesseract:', e);
+            return null;
+        }
+        
+        if (!window.Tesseract) {
+            console.error('Tesseract not available after loading');
+            return null;
+        }
+        
+        // Create a cancellable task
+        const taskId = Symbol('ocr-task');
+        activeOcrTasks.add(taskId);
+        
+        try {
+            // Null check for page and wrapper
+            if (!page || !wrapper) {
+                console.warn('Invalid page or wrapper for OCR');
+                return null;
+            }
+            
             // Render page to high-resolution canvas
             const viewport = page.getViewport({ scale: 2.0 });
             const canvas = document.createElement('canvas');
@@ -1391,12 +1453,29 @@ class SmartScanner {
             canvas.height = viewport.height;
             
             const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Failed to get canvas context');
+                return null;
+            }
+            
             await page.render({ canvasContext: ctx, viewport }).promise;
+            
+            // Check if task was cancelled
+            if (!activeOcrTasks.has(taskId)) {
+                console.log('OCR task cancelled before recognition');
+                return null;
+            }
             
             // Run Tesseract.js OCR
             const { data } = await Tesseract.recognize(canvas, 'eng', {
                 logger: () => {} // Suppress logs
             });
+            
+            // Check if task was cancelled
+            if (!activeOcrTasks.has(taskId)) {
+                console.log('OCR task cancelled after recognition');
+                return null;
+            }
             
             if(!data.words || data.words.length < 5) return null;
             
@@ -1454,7 +1533,16 @@ class SmartScanner {
         } catch(e) {
             console.error('OCR failed:', e);
             return null;
+        } finally {
+            // Clean up task
+            activeOcrTasks.delete(taskId);
         }
+    }
+    
+    // Cancel all active OCR tasks (call on navigation/page change)
+    static cancelAllOcrTasks() {
+        activeOcrTasks.clear();
+        console.log('All OCR tasks cancelled');
     }
     
     static applyDetectedZones(wrapper, zones) {
@@ -1958,108 +2046,199 @@ class SearchEngine {
 }
 
 class PdfExporter {
+    static previewPdfBytes = null;
+    
+    static async preview() {
+        if (!PdfViewer.doc) return alert("No PDF loaded!");
+        const btn = document.querySelector('button[onclick="PdfExporter.preview()"]');
+        const origText = btn.innerText; btn.innerText = "⏳ GENERATING..."; btn.disabled = true;
+        
+        try {
+            // Generate the redacted PDF
+            this.previewPdfBytes = await this.generateRedactedPdf();
+            
+            // Show preview modal
+            const modal = document.getElementById('pdf-preview-modal');
+            const container = document.getElementById('pdf-preview-container');
+            container.innerHTML = '<p style="text-align:center; padding:20px;">Loading preview...</p>';
+            modal.style.display = 'block';
+            
+            // Render preview
+            const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
+            const previewUrl = URL.createObjectURL(blob);
+            container.innerHTML = `<iframe src="${previewUrl}" style="width:100%; height:600px; border:none;"></iframe>`;
+        } catch (e) {
+            console.error(e);
+            alert("Preview Failed: " + e.message);
+        } finally {
+            btn.innerText = origText;
+            btn.disabled = false;
+        }
+    }
+    
+    static closePreview() {
+        document.getElementById('pdf-preview-modal').style.display = 'none';
+        this.previewPdfBytes = null;
+    }
+    
+    static async confirmExport() {
+        if (!this.previewPdfBytes) {
+            alert("No preview available. Please generate preview first.");
+            return;
+        }
+        
+        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `redacted_${new Date().getTime()}.pdf`;
+        link.click();
+        
+        this.closePreview();
+    }
+    
     static async export() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
         const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
         const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
+        
         try {
-            const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
-            const mainPdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
-            const compositeDoc = await PDFLib.PDFDocument.create();
+            const pdfBytes = await this.generateRedactedPdf();
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `redacted_${new Date().getTime()}.pdf`;
+            link.click();
+        } catch (e) {
+            console.error(e);
+            alert("Export Failed: " + e.message);
+        } finally {
+            btn.innerText = origText;
+            btn.disabled = false;
+        }
+    }
+    
+    static async generateRedactedPdf() {
+        const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
+        const mainPdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+        const compositeDoc = await PDFLib.PDFDocument.create();
+        
+        let coverPage;
+        if (window.TEMPLATE_BYTES) {
+            const templateDoc = await PDFLib.PDFDocument.load(window.TEMPLATE_BYTES.slice(0));
+            const [embeddedTemplate] = await compositeDoc.copyPages(templateDoc, [0]);
+            coverPage = compositeDoc.addPage(embeddedTemplate);
+        } else {
+            const [origPage1] = await compositeDoc.copyPages(mainPdfDoc, [0]);
+            coverPage = compositeDoc.addPage(origPage1);
+        }
+
+        if (mainPdfDoc.getPageCount() > 1) {
+            const remainingIndices = Array.from({ length: mainPdfDoc.getPageCount() - 1 }, (_, i) => i + 1);
+            const remainingPages = await compositeDoc.copyPages(mainPdfDoc, remainingIndices);
             
-            let coverPage;
-            if (window.TEMPLATE_BYTES) {
-                const templateDoc = await PDFLib.PDFDocument.load(window.TEMPLATE_BYTES.slice(0));
-                const [embeddedTemplate] = await compositeDoc.copyPages(templateDoc, [0]);
-                coverPage = compositeDoc.addPage(embeddedTemplate);
-            } else {
-                const [origPage1] = await compositeDoc.copyPages(mainPdfDoc, [0]);
-                coverPage = compositeDoc.addPage(origPage1);
-            }
+            remainingPages.forEach((p) => {
+                compositeDoc.addPage(p);
+            });
+        }
 
-            if (mainPdfDoc.getPageCount() > 1) {
-                const remainingIndices = Array.from({ length: mainPdfDoc.getPageCount() - 1 }, (_, i) => i + 1);
-                const remainingPages = await compositeDoc.copyPages(mainPdfDoc, remainingIndices);
+        const pages = compositeDoc.getPages();
+        const fontTimes = await compositeDoc.embedFont(PDFLib.StandardFonts.TimesRoman); 
+        const fontCourier = await compositeDoc.embedFont(PDFLib.StandardFonts.Courier);
+
+        pages.forEach((page, index) => {
+            const pdfWidth = page.getWidth(); const pdfHeight = page.getHeight();
+            const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
+            if (wrapper) {
+                const container = wrapper.querySelector('.pdf-content-container');
+                const zones = Array.from(container.querySelectorAll('.redaction-box'));
                 
-                remainingPages.forEach((p) => {
-                    compositeDoc.addPage(p);
+                // Sort zones: opaque whiteouts first, then transparent overlays
+                // This ensures whiteouts are drawn before text overlays
+                zones.sort((a, b) => {
+                    const aTransparent = a.dataset.transparent === "true";
+                    const bTransparent = b.dataset.transparent === "true";
+                    if (aTransparent === bTransparent) return 0;
+                    return aTransparent ? 1 : -1; // Opaque first
                 });
-            }
+                
+                zones.forEach(box => {
+                    const relX = box.offsetLeft / container.offsetWidth; 
+                    const relY = box.offsetTop / container.offsetHeight;
+                    const relW = box.offsetWidth / container.offsetWidth; 
+                    const relH = box.offsetHeight / container.offsetHeight;
+                    
+                    const drawX = relX * pdfWidth; const drawH = relH * pdfHeight;
+                    const drawY = pdfHeight - (relY * pdfHeight) - drawH; const drawW = relW * pdfWidth;
+                    
+                    const isTransparent = box.dataset.transparent === "true";
 
-            const pages = compositeDoc.getPages();
-            const fontTimes = await compositeDoc.embedFont(PDFLib.StandardFonts.TimesRoman); 
-            const fontCourier = await compositeDoc.embedFont(PDFLib.StandardFonts.Courier);
+                    if ((!window.TEMPLATE_BYTES || index > 0) && !isTransparent) {
+                         page.drawRectangle({ x: drawX, y: drawY, width: drawW, height: drawH, color: PDFLib.rgb(1,1,1), borderColor: PDFLib.rgb(1,1,1), borderWidth: 0 });
+                    }
 
-            pages.forEach((page, index) => {
-                const pdfWidth = page.getWidth(); const pdfHeight = page.getHeight();
-                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
-                if (wrapper) {
-                    const container = wrapper.querySelector('.pdf-content-container');
-                    const zones = container.querySelectorAll('.redaction-box');
-                    zones.forEach(box => {
-                        const relX = box.offsetLeft / container.offsetWidth; 
-                        const relY = box.offsetTop / container.offsetHeight;
-                        const relW = box.offsetWidth / container.offsetWidth; 
-                        const relH = box.offsetHeight / container.offsetHeight;
+                    const text = box.querySelector('span')?.innerText || "";
+                    if (text) { 
+                        const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
                         
-                        const drawX = relX * pdfWidth; const drawH = relH * pdfHeight;
-                        const drawY = pdfHeight - (relY * pdfHeight) - drawH; const drawW = relW * pdfWidth;
+                        let fontToUse = fontTimes;
+                        if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
+                        const textWidth = fontToUse.widthOfTextAtSize(text, fontSize);
                         
-                        const isTransparent = box.dataset.transparent === "true";
+                        let textX = drawX;
+                        if (box.style.textAlign === 'center') textX = drawX + (drawW/2) - (textWidth/2);
+                        else if (box.style.textAlign === 'right') textX = drawX + drawW - textWidth;
 
-                        if ((!window.TEMPLATE_BYTES || index > 0) && !isTransparent) {
-                             page.drawRectangle({ x: drawX, y: drawY, width: drawW, height: drawH, color: PDFLib.rgb(1,1,1), borderColor: PDFLib.rgb(1,1,1), borderWidth: 0 });
-                        }
-
-                        const text = box.querySelector('span')?.innerText || "";
-                        if (text) { 
-                            const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
+                        const textY = drawY + (drawH/2) - (fontSize/4);
+                        
+                        const rotation = parseFloat(box.dataset.rotation) || 0;
+                        if (rotation !== 0) {
+                            // Apply rotation transform
+                            const centerX = drawX + drawW/2;
+                            const centerY = drawY + drawH/2;
                             
-                            // FIX BUG #1: Use correct font for width calculation
-                            let fontToUse = fontTimes;
-                            if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
-                            const textWidth = fontToUse.widthOfTextAtSize(text, fontSize);
+                            page.drawText(text, { 
+                                x: centerX, 
+                                y: centerY, 
+                                size: fontSize, 
+                                font: fontToUse, 
+                                color: PDFLib.rgb(0,0,0),
+                                rotate: PDFLib.degrees(rotation)
+                            });
                             
-                            let textX = drawX;
-                            if (box.style.textAlign === 'center') textX = drawX + (drawW/2) - (textWidth/2);
-                            else if (box.style.textAlign === 'right') textX = drawX + drawW - textWidth;
-
-                            const textY = drawY + (drawH/2) - (fontSize/4);
-                            
-                            // FIX BUG #2: Apply rotation if specified
-                            const rotation = parseFloat(box.dataset.rotation) || 0;
-                            if (rotation !== 0) {
-                                // Apply rotation transform
-                                const centerX = drawX + drawW/2;
-                                const centerY = drawY + drawH/2;
+                            // FIX: Apply underline for rotated text with proper transform
+                            if (box.dataset.decoration === 'underline') {
+                                const halfWidth = textWidth / 2;
+                                const underlineOffset = fontSize / 8;
                                 const radians = (rotation * Math.PI) / 180;
+                                const cos = Math.cos(radians);
+                                const sin = Math.sin(radians);
                                 
-                                page.drawText(text, { 
-                                    x: centerX, 
-                                    y: centerY, 
-                                    size: fontSize, 
-                                    font: fontToUse, 
-                                    color: PDFLib.rgb(0,0,0),
-                                    rotate: PDFLib.degrees(rotation)
+                                // Calculate underline endpoints with rotation
+                                const startX = centerX - halfWidth * cos - underlineOffset * sin;
+                                const startY = centerY - halfWidth * sin + underlineOffset * cos;
+                                const endX = centerX + halfWidth * cos - underlineOffset * sin;
+                                const endY = centerY + halfWidth * sin + underlineOffset * cos;
+                                
+                                page.drawLine({
+                                    start: { x: startX, y: startY },
+                                    end: { x: endX, y: endY },
+                                    thickness: 1,
+                                    color: PDFLib.rgb(0,0,0)
                                 });
-                            } else {
-                                page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
                             }
+                        } else {
+                            page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
                             
-                            // Note: Underline decoration is only applied for non-rotated text
-                            // Rotated text underlines would require complex transform calculations
-                            if (box.dataset.decoration === 'underline' && rotation === 0) {
+                            if (box.dataset.decoration === 'underline') {
                                 page.drawLine({ start: { x: textX, y: textY - 2 }, end: { x: textX + textWidth, y: textY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
                             }
                         }
-                    });
-                }
-            });
+                    }
+                });
+            }
+        });
 
-            const pdfBytes = await compositeDoc.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `redacted_${new Date().getTime()}.pdf`; link.click();
-        } catch (e) { console.error(e); alert("Export Failed: " + e.message); } finally { btn.innerText = origText; btn.disabled = false; }
+        return await compositeDoc.save();
     }
 }
 
@@ -2203,6 +2382,9 @@ class PdfViewer {
     }
 
     static async load(url) {
+        // Cancel any active OCR tasks when loading a new PDF
+        SmartScanner.cancelAllOcrTasks();
+        
         this.url = url;
         document.getElementById('pdf-fallback').style.display = 'none'; 
         document.getElementById('pdf-toolbar').style.display = 'none';
