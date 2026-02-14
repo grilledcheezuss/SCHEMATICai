@@ -12,8 +12,8 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ### Environment Secrets
 API keys are now read from Worker environment secrets instead of hardcoded values:
-- `KEY_READ_WRITE`: Read/write access key for Airtable
-- `KEY_READ_ONLY`: Read-only access key for Airtable
+- `AIRTABLE_WRITE_KEY`: Read/write access key for Airtable
+- `AIRTABLE_READ_KEY`: Read-only access key for Airtable
 
 **Note**: Rotate existing keys out-of-band after deployment.
 
@@ -255,8 +255,8 @@ All errors return JSON with CORS headers:
 
 ### Environment Variables
 Configure these secrets in your Cloudflare Worker dashboard:
-1. `KEY_READ_WRITE`: Airtable personal access token with read/write permissions
-2. `KEY_READ_ONLY`: Airtable personal access token with read-only permissions
+1. `AIRTABLE_WRITE_KEY`: Airtable personal access token with read/write permissions
+2. `AIRTABLE_READ_KEY`: Airtable personal access token with read-only permissions
 
 ### Airtable Base Configuration
 - **Main Base ID**: `appgc1pbuOgmODRpj`

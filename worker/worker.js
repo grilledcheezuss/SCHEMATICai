@@ -4,8 +4,8 @@
 
 // Security: Keys are now read from Worker environment secrets
 // Set these in your Cloudflare Worker dashboard:
-// - KEY_READ_WRITE: Read/write access key for Airtable
-// - KEY_READ_ONLY: Read-only access key for Airtable
+// - AIRTABLE_WRITE_KEY: Read/write access key for Airtable
+// - AIRTABLE_READ_KEY: Read-only access key for Airtable
 // Note: Rotate existing keys out-of-band after deployment
 
 const BASE_MAIN_ID = 'appgc1pbuOgmODRpj'; 
@@ -194,7 +194,7 @@ async function fetchAirtablePages(table, maxPages, fields = [], env) {
     do {
         let url = `https://api.airtable.com/v0/${BASE_USERS_ID}/${table}?pageSize=100${fieldQuery}`;
         if (offset) url += `&offset=${encodeURIComponent(offset)}`;
-        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${env.KEY_READ_WRITE}` } });
+        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } });
         if (!resp.ok) { if (resp.status === 429) { await new Promise(r => setTimeout(r, 500)); continue; } break; }
         const data = await resp.json();
         if (data.records) records.push(...data.records);
@@ -211,7 +211,7 @@ async function ensureAuthAndFeedback(env) {
     CACHE_AUTH_PROMISE = (async () => {
         console.log("Fetching Auth & Feedback...");
         const [usersData, fbData] = await Promise.all([
-            fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: { 'Authorization': `Bearer ${env.KEY_READ_WRITE}` } }).then(r=>r.json()),
+            fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } }).then(r=>r.json()),
             fetchAirtablePages(TABLE_FEEDBACK, 5, ['Panel ID', 'Corrections'], env) // Cap at 500 to keep it fast
         ]);
 
@@ -275,7 +275,7 @@ async function buildMLBackground(env) {
                           `&fields%5B%5D=Items`;
             if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
             
-            const resp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.KEY_READ_ONLY}` } });
+            const resp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
             if (!resp.ok) {
                 if (resp.status === 429) { 
                     await new Promise(r => setTimeout(r, 500)); 
@@ -490,7 +490,7 @@ export default {
                                     `&fields%5B%5D=Control%20Panel%20PDF`;
                     
                     const searchResp = await fetch(searchUrl, { 
-                        headers: { 'Authorization': `Bearer ${env.KEY_READ_ONLY}` } 
+                        headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
                     });
                     
                     if (!searchResp.ok) continue;
@@ -555,7 +555,7 @@ export default {
                 
                 if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
 
-                const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.KEY_READ_ONLY}` } });
+                const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
                 if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
                 const mainJson = await mainResp.json();
                 
@@ -625,7 +625,7 @@ export default {
                 const body = await request.json();
                 const resp = await fetch(fbUrl, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${env.KEY_READ_WRITE}`, 'Content-Type': 'application/json' },
+                    headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
                 CACHE_TIME = 0; CACHE_USERS = null;
