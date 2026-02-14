@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.1)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.3)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Tesseract.js will be lazy-loaded when OCR feature is used -->
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
@@ -383,8 +383,24 @@
                     <button class="search-btn" style="background:var(--match-green-bg) !important;" onclick="RedactionManager.addZoneToCurrentView('blocker')">➕ Whiteout</button>
                 </div>
                 <button class="search-btn" style="background:#dc2626 !important;" onclick="RedactionManager.deleteSelected()">❌ Delete Selected</button>
+                <button class="search-btn" style="background:#8b5cf6 !important;" onclick="PdfExporter.preview()">👁️ Preview Redacted PDF</button>
                 <button class="search-btn" style="background:#475569 !important;" onclick="PdfExporter.export()">💾 Export Redacted PDF</button>
                 <button class="search-btn" style="background:#555;" onclick="RedactionManager.clearAll()">🗑️ Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Preview Modal -->
+    <div id="pdf-preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; overflow:auto;">
+        <div style="position:relative; max-width:1200px; margin:20px auto; background:var(--app-bg); border-radius:8px; padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h2 style="color:var(--app-primary); margin:0;">Preview Redacted PDF</h2>
+                <button class="search-btn" style="background:#dc2626 !important; padding:8px 16px;" onclick="PdfExporter.closePreview()">✖ Close</button>
+            </div>
+            <div id="pdf-preview-container" style="border:1px solid var(--border-subtle); background:#fff; min-height:400px; overflow:auto;"></div>
+            <div style="display:flex; gap:10px; margin-top:15px; justify-content:flex-end;">
+                <button class="search-btn" style="background:#475569 !important;" onclick="PdfExporter.closePreview()">Cancel</button>
+                <button class="search-btn" style="background:var(--app-primary) !important;" onclick="PdfExporter.confirmExport()">✓ Looks Good - Export PDF</button>
             </div>
         </div>
     </div>

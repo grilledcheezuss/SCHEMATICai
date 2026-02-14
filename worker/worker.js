@@ -1,9 +1,12 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.4.4 (Instant Sync & Background ML)
+// 🧠 SCHEMATICA ai WORKER v2.5.3 (Security Hardening & SSRF Guards)
 // ==========================================
 
-const KEY_READ_WRITE = "patVooLrBRWad4TAs.90ec7ef74526de7d40d9718240e4c98bfd8fcc786ada7ac6cfbb632796e8d24e"; 
-const KEY_READ_ONLY = "patNuv7rNHCIHeq5t.157bc0a55e1463fa54dbe4f8538ffd944fd8e11a333cd1cafccc788e094c0bfb"; 
+// Security: Keys are now read from Worker environment secrets
+// Set these in your Cloudflare Worker dashboard:
+// - KEY_READ_WRITE: Read/write access key for Airtable
+// - KEY_READ_ONLY: Read-only access key for Airtable
+// Note: Rotate existing keys out-of-band after deployment
 
 const BASE_MAIN_ID = 'appgc1pbuOgmODRpj'; 
 const TABLE_MAIN = 'Control%20Panel%20Items'; 
@@ -12,6 +15,16 @@ const BASE_USERS_ID = 'app88zF2k4FgjU8hK';
 const TABLE_LEGACY = 'Legacy%20Panels';
 const TABLE_FEEDBACK = 'Feedback';
 const TABLE_USERS = 'Users';
+
+// Security: Host allowlist for PDF fetching to prevent SSRF attacks
+const ALLOWED_PDF_HOSTS = [
+    'dl.airtable.com',
+    'v5.airtableusercontent.com'
+];
+
+// Security: PDF download limits
+const MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+const PDF_FETCH_TIMEOUT_MS = 30000; // 30 seconds
 
 // --- IN-MEMORY EDGE CACHE ---
 let CACHE_USERS = null;
@@ -175,13 +188,13 @@ function normalizeLegacyMfg(raw) {
     return null; 
 }
 
-async function fetchAirtablePages(table, maxPages, fields = []) {
+async function fetchAirtablePages(table, maxPages, fields = [], env) {
     let records = []; let offset = null; let pages = 0;
     let fieldQuery = fields.length > 0 ? '&' + fields.map(f => `fields%5B%5D=${encodeURIComponent(f)}`).join('&') : '';
     do {
         let url = `https://api.airtable.com/v0/${BASE_USERS_ID}/${table}?pageSize=100${fieldQuery}`;
         if (offset) url += `&offset=${encodeURIComponent(offset)}`;
-        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${KEY_READ_WRITE}` } });
+        const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${env.KEY_READ_WRITE}` } });
         if (!resp.ok) { if (resp.status === 429) { await new Promise(r => setTimeout(r, 500)); continue; } break; }
         const data = await resp.json();
         if (data.records) records.push(...data.records);
@@ -191,15 +204,15 @@ async function fetchAirtablePages(table, maxPages, fields = []) {
 }
 
 // 1. FAST CORE CACHE: Only fetches Auth and Feedback (Takes < 0.5s)
-async function ensureAuthAndFeedback() {
+async function ensureAuthAndFeedback(env) {
     if (CACHE_USERS && (Date.now() - CACHE_TIME < CACHE_DURATION)) return;
     if (CACHE_AUTH_PROMISE) return CACHE_AUTH_PROMISE;
     
     CACHE_AUTH_PROMISE = (async () => {
         console.log("Fetching Auth & Feedback...");
         const [usersData, fbData] = await Promise.all([
-            fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: { 'Authorization': `Bearer ${KEY_READ_WRITE}` } }).then(r=>r.json()),
-            fetchAirtablePages(TABLE_FEEDBACK, 5, ['Panel ID', 'Corrections']) // Cap at 500 to keep it fast
+            fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: { 'Authorization': `Bearer ${env.KEY_READ_WRITE}` } }).then(r=>r.json()),
+            fetchAirtablePages(TABLE_FEEDBACK, 5, ['Panel ID', 'Corrections'], env) // Cap at 500 to keep it fast
         ]);
 
         CACHE_USERS = usersData.records || [];
@@ -245,7 +258,7 @@ async function ensureAuthAndFeedback() {
 }
 
 // 2. BACKGROUND ML CACHE: Runs completely decoupled from User Requests
-async function buildMLBackground() {
+async function buildMLBackground(env) {
     if (CACHE_NB_MODEL || IS_BUILDING_ML) return;
     IS_BUILDING_ML = true;
     try {
@@ -262,7 +275,7 @@ async function buildMLBackground() {
                           `&fields%5B%5D=Items`;
             if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
             
-            const resp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } });
+            const resp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.KEY_READ_ONLY}` } });
             if (!resp.ok) {
                 if (resp.status === 429) { 
                     await new Promise(r => setTimeout(r, 500)); 
@@ -305,6 +318,46 @@ async function buildMLBackground() {
         console.log("ML Build Complete!");
     } catch(e) { console.error("ML Build Error:", e); }
     IS_BUILDING_ML = false;
+}
+
+// Security helper: Validate PDF URL against allowlist
+function isAllowedPdfHost(url) {
+    try {
+        const urlObj = new URL(url);
+        return ALLOWED_PDF_HOSTS.some(host => urlObj.hostname === host || urlObj.hostname.endsWith('.' + host));
+    } catch (e) {
+        return false;
+    }
+}
+
+// Security helper: Fetch PDF with timeout and size limits
+async function fetchPdfWithGuards(url) {
+    if (!isAllowedPdfHost(url)) {
+        throw new Error('PDF host not allowed');
+    }
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), PDF_FETCH_TIMEOUT_MS);
+    
+    try {
+        const response = await fetch(url, { signal: controller.signal });
+        
+        // Check content length if available
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength) > MAX_PDF_SIZE_BYTES) {
+            throw new Error('PDF too large');
+        }
+        
+        return response;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+// Security helper: Validate and clamp pageSize parameter
+function validatePageSize(pageSizeParam) {
+    const pageSize = parseInt(pageSizeParam) || 100;
+    return Math.min(Math.max(pageSize, 1), 100); // Clamp between 1 and 100
 }
 
 function extractSpecsStrict(t) {
@@ -392,11 +445,22 @@ export default {
             if (target === 'PDF') {
                 const pdfUrl = url.searchParams.get('url');
                 if (!pdfUrl) return new Response("Missing URL", { status: 400, headers: corsHeaders });
-                const pdfResponse = await fetch(pdfUrl);
-                const newHeaders = new Headers(pdfResponse.headers);
-                newHeaders.set('Access-Control-Allow-Origin', '*');
-                newHeaders.set('Content-Type', 'application/pdf');
-                return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+                
+                // Security: Validate PDF URL against allowlist
+                if (!isAllowedPdfHost(pdfUrl)) {
+                    return new Response("PDF host not allowed", { status: 403, headers: corsHeaders });
+                }
+                
+                // Security: Fetch with timeout and size guards
+                try {
+                    const pdfResponse = await fetchPdfWithGuards(pdfUrl);
+                    const newHeaders = new Headers(pdfResponse.headers);
+                    newHeaders.set('Access-Control-Allow-Origin', '*');
+                    newHeaders.set('Content-Type', 'application/pdf');
+                    return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+                } catch (e) {
+                    return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
+                }
             }
 
             if (target === 'PDF_BY_ID') {
@@ -426,7 +490,7 @@ export default {
                                     `&fields%5B%5D=Control%20Panel%20PDF`;
                     
                     const searchResp = await fetch(searchUrl, { 
-                        headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } 
+                        headers: { 'Authorization': `Bearer ${env.KEY_READ_ONLY}` } 
                     });
                     
                     if (!searchResp.ok) continue;
@@ -443,34 +507,46 @@ export default {
                     return new Response("PDF not found for panel ID", { status: 404, headers: corsHeaders });
                 }
                 
-                // Fetch and stream the PDF
-                const pdfResponse = await fetch(pdfUrl);
-                const newHeaders = new Headers(pdfResponse.headers);
-                newHeaders.set('Access-Control-Allow-Origin', '*');
-                newHeaders.set('Content-Type', 'application/pdf');
-                return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+                // Security: Validate PDF URL against allowlist
+                if (!isAllowedPdfHost(pdfUrl)) {
+                    return new Response("PDF host not allowed", { status: 403, headers: corsHeaders });
+                }
+                
+                // Security: Fetch with timeout and size guards
+                try {
+                    const pdfResponse = await fetchPdfWithGuards(pdfUrl);
+                    const newHeaders = new Headers(pdfResponse.headers);
+                    newHeaders.set('Access-Control-Allow-Origin', '*');
+                    newHeaders.set('Content-Type', 'application/pdf');
+                    return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+                } catch (e) {
+                    return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
+                }
             }
 
             // Immediately ready to authenticate!
-            await ensureAuthAndFeedback();
+            await ensureAuthAndFeedback(env);
 
             // Fire and forget ML training in the background
             if (!CACHE_NB_MODEL && !IS_BUILDING_ML && ctx && ctx.waitUntil) {
-                ctx.waitUntil(buildMLBackground());
+                ctx.waitUntil(buildMLBackground(env));
             }
 
             const u = request.headers.get('X-Cox-User');
             const p = request.headers.get('X-Cox-Pass');
             if (!CACHE_USERS || !CACHE_USERS.some(r => r.fields['Username']?.toLowerCase() === u?.toLowerCase() && r.fields['Passcode'] === p)) {
-                return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+                return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
             if (target === 'MAIN') {
                 const offset = url.searchParams.get('offset');
                 const direction = url.searchParams.get('sort[0][direction]') || 'desc';
-                const pageSize = url.searchParams.get('pageSize') || '100';
+                
+                // Security: Validate and clamp pageSize
+                const pageSizeParam = url.searchParams.get('pageSize');
+                const pageSize = validatePageSize(pageSizeParam);
 
-                let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${pageSize}` +
+                let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
                               `&fields%5B%5D=Control%20Panel%20Name` +
                               `&fields%5B%5D=Items` +
                               `&fields%5B%5D=Control%20Panel%20PDF` +
@@ -479,7 +555,7 @@ export default {
                 
                 if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
 
-                const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${KEY_READ_ONLY}` } });
+                const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.KEY_READ_ONLY}` } });
                 if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
                 const mainJson = await mainResp.json();
                 
@@ -549,11 +625,11 @@ export default {
                 const body = await request.json();
                 const resp = await fetch(fbUrl, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${KEY_READ_WRITE}`, 'Content-Type': 'application/json' },
+                    headers: { 'Authorization': `Bearer ${env.KEY_READ_WRITE}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
                 CACHE_TIME = 0; CACHE_USERS = null;
-                return new Response(JSON.stringify(await resp.json()), { headers: corsHeaders });
+                return new Response(JSON.stringify(await resp.json()), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
             return new Response("Invalid Target", { status: 400, headers: corsHeaders });
