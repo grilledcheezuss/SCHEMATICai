@@ -1,0 +1,3819 @@
+pdf_path,page,page_width,page_height,text
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6804.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,14,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,15,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,16,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,17,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,18,612.0,792.0,"GENERAL OPERATION 
+ 
+Control panel is for a duplex pump station with 2 HP, 480 volt, 3 phase pumps. Control 
+panel is equipped with a Precision Digital setpoint level controller with radar transmitter 
+(30LT-29029). All control logic is done in the Precision Digital via set-point control. 
+As the liquid level rises to the lead on set-point (4 feet) in the wet-well, the lead pump 
+will start. It will stop when the level drops to the off set-point (3 feet). On the next cycle, 
+the control panel will call for the other pump to operate in a similar manner. If, when the 
+lead pump is running and the level continues to rise, the lag pump will start (5 feet). 
+Both pumps will pump to the off level (3-feet). If the level reaches the high level set-
+point (6 feet), an audible and visual alarm will occur. The audible alarm can be silenced 
+by pressing the silence push button. There is also a high-high level alarm (8 feet) which 
+opens an auxiliary contact that can be connected to a remote alarm. The high high 
+alarm will also activate the audible and visual alarm. Pumps can be manually operated 
+by turning the HOA switch to hand position.   
+There are indicator lights that indicate pump on (30XL-29062A and 30XL-29062B) and 
+pump off (30XL-29064A and 30XL-29064B) status. There are elapsed time meters that 
+record each pump’s run time. There is also an indicator light that will indicate if either 
+pump trips due to overload (30XL—29065).  The overloads will require manual reset if 
+tripped. 
+There are adjustable seal fail relays that will stop the pump if the resistance in the 
+sensing chamber of the pump reaches the relay set-point value. A light (30XL-29063A 
+and 30XL-29063B) will illuminate on the control panel if this occurs. The panel is 
+designed for manual or automatic reset of the seal fail fault. This can be changed using 
+the jumper on sheet 4. 
+Contacts are provided for connection to the customer’s remote system if necessary.  All 
+contacts open on failure.  They are: 
+ 
+ 
+1. 
+Seal fail for each pump 
+ 
+2. 
+Pump run for each pump 
+ 
+3. 
+High wet-well level 
+ 
+4. 
+High-high wet-well level 
+ 
+5. 
+Common trouble 
+6. 
+4-20 ma output indicating wet-well level."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,19,612.0,792.0,"Instrument Index 
+  
+ 
+ 
+ 
+Item # Instrument Tag # 
+Instrument Type 
+ 
+Service Description  
+P&ID Drawing Manufacturer 
+Calibrated Range 
+ 
+1 
+30LPV-PK2911-01 
+Main Control Panel 
+ 
+Sanitary Lift Station 
+000001   
+COX Research 
+480V 
+2 
+30SC-29068 
+ 
+Setpoint Controller 
+ 
+Liquid Level Controller 
+000001  
+Precision Digital 4-20mA 
+3 
+30LT-29029 
+ 
+Radar 
+ 
+ 
+ 
+Liquid Level Detector 
+000001  
+Magnetrol 
+4-20mA 
+4 
+30HS-29061A 
+ 
+HOA Switch Pump #1 
+ 
+Hand /Off/Auto Selector 000001  
+ABB 
+ 
+Full Voltage 
+ 
+5 
+30HS-29061B 
+ 
+HOA Switch Pump #2 
+ 
+Hand/Off/Auto Selector 
+000001  
+ABB 
+ 
+Full Voltage 
+6 
+30XL-29062A 
+ 
+Green Pilot Light Pump#1  
+Pump Run Indicator 
+000001  
+ABB 
+ 
+Full Voltage 
+7 
+30XL-29062B 
+ 
+Green Pilot Light Pump #2 
+Pump Run Indicator 
+000001  
+ABB 
+ 
+Full Voltage 
+8 
+30XL-29063A 
+ 
+Red Pilot Light Pump #1/Push 
+Seal Failure Indicator 
+000001  
+ABB 
+ 
+Full Voltage 
+9 
+30XL-29063B 
+ 
+Red Pilot Light Pump #2/Push 
+Seal Failure Indicator 
+000001  
+ABB 
+ 
+Full Voltage 
+10 
+30XL-29072 
+ 
+High High Level Pilot Light 
+High High Level  
+000001  
+ABB 
+ 
+Full Voltage 
+11 
+30XL-29064A 
+ 
+Red Pilot Light Pump #1  
+Off Indicator 
+ 
+000001  
+ABB 
+ 
+Full Voltage 
+12 
+30XL-29064B 
+ 
+Red Pilot Light Pump #2  
+Off Indicator 
+ 
+000001  
+ABB 
+ 
+Full Voltage 
+13 
+30XL-29065 
+ 
+Red Pilot Light Pump #1/2 
+Common Trouble 
+000001  
+ABB 
+ 
+Full Voltage 
+14 
+30XL-29066A 
+ 
+Elapsed Time Meter Pump #1 
+Pump Time Meter 
+000001  
+ENM 
+ 
+0-99999.99 hrs. 
+15   
+30XL-29066B 
+ 
+Elapsed Time Meter Pump #2 
+Pump Time Meter 
+000001  
+ENM 
+ 
+0-99999.99 hrs. 
+16 
+30XL-29067 
+ 
+Thermostat 
+ 
+ 
+Heater  
+ 
+000001  
+Saginaw  
+30-140°F 
+17 
+30XL-29069 
+ 
+Power On Pilot Light 
+ 
+Power On 
+ 
+000001  
+ABB 
+ 
+Full Voltage 
+18 
+30XL-29070 
+ 
+High Level Pilot Light 
+ 
+High Level 
+ 
+000001  
+ABB 
+ 
+Full Voltage 
+19 
+30XL-29071 
+ 
+Silence Push Button 
+ 
+Silence  
+ 
+000001  
+ABB 
+ 
+Full Voltage"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,20,612.0,792.0,"Alarm Summary 
+ 
+ 
+Alarms 
+ 
+Item 
+ 
+ 
+ 
+Indicator  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Range/Setpoint 
+ 
+30XI-29031 
+Pump #1 Run Aux. Contact 
+ 
+Pump #1 Running Status 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+3.0-4.0ft 
+ 
+30XI-29032 
+Pump #2 Run Aux. Contact 
+ 
+Pump #2 Running Status 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+3.0-4.0ft 
+ 
+30XI-29063 
+Pump #1 Seal Failure   
+ 
+Seal failure – water or moister in the seal cavity – Pump locked out of service until seals are  
+ 
+10-100k Ω 
+ 
+ 
+ 
+ 
+ 
+ 
+replaced 
+ 
+30XI-29064 
+Pump #2 Seal Failure   
+ 
+Seal failure – water or moister in the seal cavity – Pump locked out of service until seals are  
+ 
+10-100k Ω 
+ 
+ 
+ 
+ 
+ 
+ 
+replaced 
+ 
+30UA-29030 
+Pump #1 or #2 Overload Relay  
+Overload relay tripped – possible pump failure, pump clog, high voltage surge or lighting strike 
+ 
+4.2-5.7 Amps 
+ 
+ 
+ 
+ 
+ 
+ 
+Must be manually reset 
+ 
+30LAH-29029 
+High Water Alarm 
+ 
+ 
+High Liquid Level in Sump – Possible pump failure, possible overload relay tripped, pumps 
+ 
+6ft 
+ 
+ 
+ 
+ 
+ 
+ 
+clogged. High water alarm will reset upon clearing high water level.  Audible and Visual Alarms 
+ 
+30LAHH-29029 
+High/High Water Alarm 
+ 
+High/High Liquid Level in Sump – Possible pump failure, possible overload relay tripped, pumps    
+8ft 
+Auxiliary Contact  
+clogged. High/High water alarm will reset upon clearing high/high water level. Audible and Visual Alarms 
+ 
+ 
+Note: All alarms have separate auxiliary contacts for separate alarm signals"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,21,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,22,612.0,792.0,"Control System Functional Description 
+ 
+1. Modes of Operation 
+ 
+The duplex pump system will operate based on level.  The level transmitter will be a Magnetrol 
+Radar (30LT-29029) which will output a 4-20mA signal to the setpoint controller (30SC-29068) 
+within the control panel.  This 4-20mA signal will be interpreted and scaled by the controller then 
+displayed in FEET.  The setpoint controller will be programmed to energize on-board relays when 
+different setpoints are reached.  The setpoints will be LEAD PUMP (4 feet), LAG PUMP (5 feet), 
+HIGH LEVEL (6 feet), and HIGH HIGH LEVEL (8 feet).  These estimated setpoint values will be 
+programmed prior to testing the control panel.  The setpoint controller will also re-transmit the 4-
+20mA signal and output to terminals 300, 301, and 302 for DCS monitoring of level. 
+ 
+The on-board relays will be wired to an alternation circuit which allows for duplex pump 
+alternation.  Pump alternation will distribute the work load evenly between the two pumps. Each 
+pump will have a HAND-OFF-AUTO switch (30HS-29061A and 30HS-29061B).  The HOA 
+switches will allow three modes of operation.  If switched in HAND, the respective pump will turn 
+on, bypassing the AUTO circuit entirely.  If switched in OFF, the respective pump will remain off 
+regardless of level.  If switched in AUTO, the respective pump will run if called through the AUTO 
+circuit (based on radar level and setpoint controller). If the pump’s seal fail relay has been 
+energized due to moisture in the pump housing, the pump will not start in HAND or AUTO. This 
+can be bypassed by installing a jumper in terminals 5 and 6 for pump 1 and terminals 7 and 8 for 
+pump 2.  If the motor overload relay has tripped due to over-current, the respective motor will not 
+run in HAND or AUTO. 
+ 
+2. Selection of mode of operation 
+ 
+The control panel is equipped with one HOA switch (30HS-29061A and 30HS-29061B) for each 
+pump.  This will be the primary means of operator selection.  During normal operation, the 
+operator will have the HOA selector switch turned to the AUTO position.  This will allow standard 
+operation based on the radar level detection.  If a scenario arises that the operator must turn the 
+pumps on manually, they will then switch the HOA selector switch into the HAND position.  If a 
+pump needs to be turned completely off, the operator will switch the HOA selector switch into 
+OFF. 
+ 
+The setpoint controller will be programmed using the estimated level values.  If, however, the 
+customer needs to adjust the setpoints, the operator will use the four operator push buttons on 
+the Precision Digital setpoint controller (30SC-29068).  An instruction manual for the setpoint 
+controller will be provided and the factory set data will be shown in the as-built drawings."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,23,612.0,792.0,"From factory, the seal fail alarm circuit will latch and require a manual reset using the provided 
+push button (30XL-29063A and 30XL-29063B).  If an alarm occurs, the respective light/push 
+button (single pilot device) will be energized and a light will remain on even if the alarm condition 
+returns to normal.  A manual reset must be performed by pushing the energized light/push button 
+in local panel.  If the light remains on after the button is pushed, this means the alarm condition 
+still exists and the circuit cannot be reset at that time.  This manual reset can be converted to 
+automatic reset by removing the jumper in terminals 104 and 105.  If an alarm condition occurs, 
+the light will automatically de-energize after the alarm clears.   
+The control panel is equipped with an alarm light and horn for high level conditions.  If the 
+setpoint controller receives a signal from the radar that the level is at the HIGH or HIGH HIGH 
+condition, the light and horn will be energized.  If this condition clears, the light and horn will 
+automatically de-energize.  If either condition remains and the operator wants to silence the horn, 
+the SILENCE push button (30XL-29071) must be pushed.  This will silence the horn until the 
+condition occurs again.  The alarm light will remain on as long the condition exists. 
+3. Operator dependent actions 
+ 
+The operator is responsible for leaving each HOA selector switch in the desired position.  This will 
+dictate how the system will operate.  The operator is also responsible for monitoring the system 
+and adjusting setpoints on the controller as needed.  Upon installation, these setpoints may have 
+to be adjusted to fit the demand of the system.   
+4. Health and Safety 
+ 
+This control panel will be fed with 480V 3 phase power.  The control portion of the control panel 
+will operate using 120V power.  Extreme caution must be taken to avoid risk of electrical shock 
+when in close proximity to energized components.  Only qualified personnel should be involved in 
+the adjustment or maintenance of electrical equipment. 
+The electrical disconnect should be switched to the OFF position to remove all power from the 
+control panel if an electrician is present for maintenance. 
+5. Start‐up/Shut‐down/Abnormal Operating Conditions 
+ 
+Prior to start-up of this panel, all connections must be checked to ensure proper operation of the 
+control panel.  All power and field connections must be landed in their respective terminal/lug in 
+order for the control panel to function as designed.  Upon shut-down of the control panel, make 
+sure HOA selector switches are moved to the OFF position, all breakers are turned off, and the 
+disconnect is turned off.  This will ensure no power can be fed to the pumps or controls.  Failure 
+to do so could cause a potential safety hazard if maintenance is being performed.  In the event of 
+abnormal operating conditions, the control panel is designed to protect the pumps.  If current 
+becomes too high, the motor overload relays will trip, removing the call signal from the motor 
+starters.  If moisture is detected inside the pump housing, the seal fail relays will remove the call 
+signal from the motor starters (unless bypassed with jumper). If the need arises for setpoints to 
+be adjusted or temporarily changed, the operator can make changes via the push buttons on the 
+Precision Digital controller."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6805.pdf,24,612.0,792.0,"6. I/O Requirements 
+ 
+The installer must run the proper signals to and from the control panel to ensure 
+desired operation.  The primary form of operation is the radar level detector 
+(30LT-29029). This must be connected in the control panel for any AUTO 
+operation.  The seal fail (moisture detection) leads from the pump must be 
+connected to the control panel to ensure proper operation of the control panel.  
+Dry contacts are provided for connection to a remote monitoring device.  These 
+signals are not required for control panel operation, but will give the user optional 
+remote monitoring of the system."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R1.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6806R2.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6807R1.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\cp-6808.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6808R1.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6809.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6809.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6809.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6809.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6810.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6811.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6811.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6811.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6811.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6811.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6811.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6811.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6812.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6813.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6814.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6814.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6814.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6814.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6814.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6814.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6814.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6815.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6816.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6817.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6817.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6817.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6817.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6817.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6817.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6817.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6818.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6818.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6818.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6818.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6818.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6818.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6818.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,14,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,15,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820.pdf,16,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,1,612.0,792.0,"AS BUILTS
+APRIL 20, 2023
+CP-6820R1
+SCOTTSBORO
+CONTROL PANEL
+C COX RESEARCH AND TECHNOLOGY, INC. 2023
+SERIAL#90750
+CHLORINE DIOXIDE (CLO2) GENERATOR
+FIELD REVISION
+JUNE 2024
+Thornton, Musso & Bellemin, Inc
+4788 Waywood Dr
+(225) 654-4955
+Zachary, LA 70791"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,2,612.0,792.0,"SOLD TO:  
+TAG: Chlorine Dioxide (CLO2) Generator
+Control Panel
+SHIP TO:  
+-
+-
+SPECIAL NOTES:  
+OTHER: Unitronics PLC/HMI, Booster Pump Controls,
+Panel Type
+Voltage
+Phase/HZ
+No. Motors
+HP
+FLA
+Pump Manufacturer
+Type of Pump
+Catalog Number
+Capacitors
+Control Voltage
+Control Power Transformer VA=
+Enclosure NEMA Rating
+Enclosure Material
+Enclosure Size
+Inner Swing Panel
+Conrol Sensor
+UL508A Labeling
+UL698A Labeling
+Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount
+Alarm Light - Remote                   (Terminals)
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+Cycle Counters
+Economy Version
+Elapsed Time Meter
+Flasher
+Green Run Lights vs. Red
+Ground Fault Receptacle
+High Temp Lights
+High Temp Pump Shutdown - Auto Reset
+High Temp Pump Shutdown - Manual Reset
+Intrinsically Safe Relays Pts.
+Surge Arrestor/Lightning Arrestor
+Main Disconnect without Door Mt. Handle
+Panel Heater / Thermostat W=
+Phase Monitor
+Pole, Box, Seal
+Seal Fail Lights
+Seal Fail Relay - Fixed
+Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC
+Starters - NEMA
+Unpowered Alarm Circuits #4
+CLO2 Generator
+277/480
+3/60
+1
+15
+17.1
+Goulds
+Booster
+33SV30GK4F60
+No
+120
+No
+4X
+Fiberglass
+40x32x12
+Yes
+Flow/Pressure
+No
+No
+Opti-Float  Level Dectector Pts.
+R
+COX  CAMO  System
+TM
+TM
+DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+1
+REFERENCE DRAWING
+NO.
+R1
+REVISION - LOCATION
+ADD VALVE WIRING
+-
+06/19/24
+A.D.
+ECN
+DATE
+BY
+-
+X
+X
+X
+X
+Chemical pump controls/power, ABB VFD for
+X
+X
+X
+booster pump.
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,3,612.0,792.0,"PANEL TERMINAL
+COMPONENT TERMINAL
+WIRE NUMBER
+PANEL WIRING
+FIELD WIRING
+CAMO TERMINAL
+LEGEND
+DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+2
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
+L1
+L2
+DISTRIBUTION BLOCK
+L3
+G
+MAIN SERVICE
+277/480V,3Ø
+N
+H
+3P
+35A
+CB1
+10
+15HP
+BOOSTER PUMP
+460V,3Ø
+M
+LIGHTNING
+ARRESTOR
+PHASE
+MONITOR
+60A, 3POLE
+MAIN DISCONNECT
+L1
+L2
+L3
+VFD
+L1
+L2
+L3
+U/T1
+V/T2
+W/T3
+(BOOSTER PUMP FEED)
+N
+H
+SECONDARY SERVICE
+120V,1Ø
+(CONTROL FEED)
+CB2
+1P
+40A
+8
+DISTRIBUTION
+BLOCK
+G
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,4,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+3
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
+1P
+10A
+CB3
+TMB-26 PUMP
+1P
+10A
+CB4
+ACID PUMP
+1P
+30A
+CB5
+CB7
+1P
+10A
+CR1-1
+CR2-1
+L1
+N
+SURGE ARRESTOR
+LIGHTS
+L1
+N
+LINE
+LOAD
+TMB-26 PUMP
+115V,62W,0.5A
+ACID PUMP
+115V,62W,0.5A
+H
+N
+1P
+10A
+CB6
+T-STAT
+FAN
+HEATER
+BUILDING HEATER
+BUILDING LIGHTS
+1500W
+TD1
+PM
+TD1-1
+12g
+12g #1
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,5,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+4
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
+FU9
+2A/ATM
+SOLENOID VALVE
+BACKWASH
+CR3-1
+L1
+N
++24
+-24
++24
+-24
+120VAC TO 24VDC
+POWER SUPPLY
+VACUUM TRANSMITTER
+FU12
+2A/ATM
+CR4-1
+L
+SYSTEM REMOTE
+ALARM LIGHT
+0.1A
+115VAC
+H
+A
+CR9
+BOOSTER PUMP VFD
+CALL RELAY
+O
+CR5-1
+CR6-1
+FU10
+2A/ATM
+CR7-1
+FU11
+2A/ATM
+H
+N
+CHEM. PUMP
+ISOLATION VALVE 1
+CHEM. PUMP
+ISOLATION VALVE 2
+R
+SYSTEM TOP MOUNTED
+ALARM LIGHT
+B
+BOOSTER PUMP VFD
+CALL LIGHT
+G
+BOOSTER PUMP VFD
+RUN LIGHT
+CR10-1
+CR9-2
+~
+FU15
+2A/ATM
+* INSTALL JUMPER IF VALVE IS 120VAC 
+** INSTALL JUMPER IF VALVE IS 24VDC.
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,6,612.0,792.0,"RELAY 1
+ABB VFD
+M
+PUMP 1
+VFD
++24V
+DI1
+RB
+RC
+U/T1
+V/T2
+W/T3
+AI1
+AGND
+SCR
+L3 L2
+L1
+L1
+L2
+L3
+G
+CR10
+A
+H
+N
+CR9-1
+VFD CALL
+DRIVE 1 FAULT LIGHT
+H
+A
+O
+VACUUM PRESSURE
+FROM PLC
+4-20MA
+DI4
+DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+5
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
+CR4-2
+CR9-3
+CR10-4
+COMMON
+BOOSTER PUMP
+VFD
+ALARM
+RUN
+FAULT
+~
+RA
+CR8-1
+SYSTEM
+RUNNING
+CR10-2
+CR10-3
+DI2
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,7,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+6
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
++24VDC
+-24VDC
+FU13
+2A/ATM
++V
+HMI
+TOUCH SCREEN
+10-4""
+OV
+USP-104-B10
+CPU-USC-P-B10
+URB-TCP
+S+
+S+
+FG
+S-
+S-
+FG
+F-
+F-
+F+
+F+
+FU14
+2A/ATM
+ETHERNET
+CABLE
+URA-0400T
+ANALOG INPUT 1
+CH0
+CH2
+4
+6
+32mA
+5X20
+FU2
+CH1
+CH3
+5
+7
+(+)
+(-)
+SKID MOUNTED
+PRESSURE TRANSMITTER
+0-3mA
+0 Hg - 30 Hg
+(-)
+(+)
+32mA
+5X20
+FU1
+SKID MOUNTED
+FLOW METER
+4-20mA
+0-50 GPM
+(+)
+(-)
+32mA
+5X20
+FU3
+ANALOG IN FROM
+PLANT FLOW METER
+4-20mA
+0-(SELECTABLE) MGD
+GND
+GND
+GND
+GND
+32mA
+5X20
+FU4
+(+)
+(-)
+MANUAL DOSE RATE
+ANALOG SIGNAL
+4-20mA
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,8,612.0,792.0,"+24VDC
+-24VDC
+URA-0004Y
+ANALOG OUTPUT 1
+CH0
+CH2
+4
+CH1
+CH3
+5
+DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+7
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
+(+)
+(-)
+32mA
+5X20
+FU5
+TMB-26 PUMP
+4-20mA
+0-___ml/min
+32mA
+5X20
+FU6
+(+)
+(-)
+ACID PUMP
+4-20mA
+0-___ml/min
+GND
+GND
+(+)
+(-)
+32mA
+5X20
+FU7
+PLANT FLOW
+4-20mA
+0-___ml/min
+TO VFD
+32mA
+5X20
+FU8
+(+)
+(-)
+VACUUM PRESSURE
+4-20mA
+0-30IN HG
+6
+7
+GND
+GND
+TO VFD
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,9,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+8
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
++24VDC
+URD-0800
+DIGITAL INPUT 1
+CH0
+CH5
+CH4
+CH6
+CH8
+CH2
+CH3
+CH5
+CH7
+CH9
+REMOTE
+E-STOP
+URA-0008CH
+DIGITAL OUTPUT 1
+CH4
+CH5
+CH6
+CH7
+OV
+CH0
+CH1
+CH2
+CH3
+OV
+-24VDC
+CR1
+TMB-26 PUMP
+RUN
+CR2
+ACID PUMP
+RUN
+CR3
+BACKWASH
+INITIATE
+CR7
+ACID
+ISO VALVE
+CR4
+ALARM AUX
+RELAY
+CR5
+CR6
+CR8
+SYSTEM
+RUNNING
+TMB-26
+ISO VALVE
+BOOSTER PUMP
+CALL
+SYSTEM START
+E-STOP
+REMOTE
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D.
+OPEN
+CLOSED
+DISCRETE
+OUTPUTS
+(LIMITS)
+MOTIVE WATER
+VALVE"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,10,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+9
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
++24VDC
+URA-0008CH
+DIGITAL OUTPUT 2
+CH4
+CH5
+CH6
+CH7
+OV
+CH0
+CH1
+CH2
+CH3
+OV
+-24VDC
+CR11
+SUCTION ISO VALVE
+CLOSE COMMAND
+CR12
+SUCTION ISO VALVE
+OPEN COMMAND
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D.
+INPUT
+POWER
+(O/C SIGNAL)
+MOTIVE WATER
+VALVE
+CONTINUED
+CLOSE COMMAND
+CR11-1
+OPEN COMMAND
+CR12-1"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,11,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+10
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
+NOTE:
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+NAMEPLATE SCHEDULE
+NP-4
+NP-2
+~
+~
+ALUMINUM SWING OUT PANEL
+NEMA 4X FIBERGLASS ENCLOSURE
+VIEW OF INNER SWING PANEL
+NP-5
+NP-1
+NP-3
+E-STOP
+SHIPPED LOOSE
+NP-6
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6820R1.pdf,12,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6820R1
+11
+REFERENCE DRAWING
+NO.
+REVISION - LOCATION
+ECN
+DATE
+BY
+-
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+BILL OF MATERIALS
+SHIPPED LOOSE
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+R1
+ADD VALVE WIRING
+-
+06/19/24
+A.D."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1.pdf,1,612.0,792.0,"AS BUILTS
+NOVEMBER 8, 2024
+Cox Research and Technology, Inc.
+PO Box 77808
+(225) 756-3271  Fax (225) 755-1030
+Baton Rouge, LA. 70879
+CP-6821R1
+Research and Technology, Inc.
+COX
+TMB25-2
+CONTROL PANEL
+C COX RESEARCH AND TECHNOLOGY, INC. 2024
+SERIAL#98291-98294
+GENERATOR"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1.pdf,2,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6821R1
+1
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+Research and Technology, Inc.
+COX
+P.O. Box 77808
+Baton Rouge, LA
+70879
+Ph. (225) 756-3271
+Fax (225) 755-1030
+1P
+30A
+CB1
+M1-1
+H
+N
+BOOSTER PUMP
+CB2
+1P
+10A
+H
+A
+O
+CR1-1
+CR2
+G
+POWER ON
+RELAY
+BOOSTER PUMP
+CR2-1
+OFF
+ON
+M1
+G
+BOOSTER PUMP
+MOTOR STARTER
+FU1
+5A/5X20
+SOLENOID VALVE
+SOLENOID VALVE
+CHEM PUMP
+CHEM PUMP POWER
+CRV
+CHLORINE RATE
+VALVE POWER
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+** RELAY MUST BE SELECTED/INSTALLED BASED ON INCOMING SIGNAL VOLTAGE.
+CR1
+PLANT
+POWERED SIGNAL
+120VAC OR
+24VAC
+G
+M1-2
+10G
+120VAC
+120VAC COIL FACTORY INSTALLED
+24VAC COIL RELAY SHIPPED WITH PANEL
+R1
+REMOVED M1 CONTACT/ ADDED GND
+4/18/23
+A.D.
+10g"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1.pdf,3,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6821R1
+2
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+Research and Technology, Inc.
+COX
+P.O. Box 77808
+Baton Rouge, LA
+70879
+Ph. (225) 756-3271
+Fax (225) 755-1030
+NEMA 4X POLYCARBONATE ENCLOSURE
+NP-4
+NP-2
+NP-3
+NP-1
+NAMEPLATE SCHEDULE
+PANEL TO PREVENT ENTRY OF GASSES.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+NOTE:
+VIEW OF SWING OUT PANEL
+R1
+REMOVED M1 CONTACT/ ADDED GND
+4/18/23
+A.D.
+WARNING
+PANEL IS FED FROM
+MULTIPLE SOURCES.
+VERIFY ALL POWER IS
+OFF BEFORE SERVICING."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1.pdf,4,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6821R1
+3
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+Research and Technology, Inc.
+COX
+P.O. Box 77808
+Baton Rouge, LA
+70879
+Ph. (225) 756-3271
+Fax (225) 755-1030
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+BILL OF MATERIALS
+SHIP 24VAC RELAY LOOSE
+R1
+REMOVED M1 CONTACT/ ADDED GND
+4/18/23
+A.D.
+SPARE"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1_101395-397.pdf,1,612.0,792.0,"AS BUILTS
+JULY 31, 2025
+Cox Research and Technology, Inc.
+PO Box 77808
+(225) 756-3271  Fax (225) 755-1030
+Baton Rouge, LA. 70879
+CP-6821R1
+Research and Technology, Inc.
+COX
+TMB25-2
+CONTROL PANEL
+C COX RESEARCH AND TECHNOLOGY, INC. 2025
+SERIAL#101395-101397
+GENERATOR"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1_101395-397.pdf,2,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6821R1
+1
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+Research and Technology, Inc.
+COX
+P.O. Box 77808
+Baton Rouge, LA
+70879
+Ph. (225) 756-3271
+Fax (225) 755-1030
+1P
+30A
+CB1
+M1-1
+H
+N
+BOOSTER PUMP
+CB2
+1P
+10A
+H
+A
+O
+CR1-1
+CR2
+G
+POWER ON
+RELAY
+BOOSTER PUMP
+CR2-1
+OFF
+ON
+M1
+G
+BOOSTER PUMP
+MOTOR STARTER
+FU1
+5A/5X20
+SOLENOID VALVE
+SOLENOID VALVE
+CHEM PUMP
+CHEM PUMP POWER
+CRV
+CHLORINE RATE
+VALVE POWER
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+** RELAY MUST BE SELECTED/INSTALLED BASED ON INCOMING SIGNAL VOLTAGE.
+CR1
+PLANT
+POWERED SIGNAL
+120VAC OR
+24VAC
+G
+M1-2
+10G
+120VAC
+120VAC COIL FACTORY INSTALLED
+24VAC COIL RELAY SHIPPED WITH PANEL
+R1
+REMOVED M1 CONTACT/ ADDED GND
+4/18/23
+A.D.
+10g"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1_101395-397.pdf,3,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6821R1
+2
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+Research and Technology, Inc.
+COX
+P.O. Box 77808
+Baton Rouge, LA
+70879
+Ph. (225) 756-3271
+Fax (225) 755-1030
+NEMA 4X POLYCARBONATE ENCLOSURE
+NP-4
+NP-2
+NP-3
+NP-1
+NAMEPLATE SCHEDULE
+PANEL TO PREVENT ENTRY OF GASSES.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+NOTE:
+VIEW OF SWING OUT PANEL
+R1
+REMOVED M1 CONTACT/ ADDED GND
+4/18/23
+A.D.
+WARNING
+PANEL IS FED FROM
+MULTIPLE SOURCES.
+VERIFY ALL POWER IS
+OFF BEFORE SERVICING."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6821R1_101395-397.pdf,4,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6821R1
+3
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+Research and Technology, Inc.
+COX
+P.O. Box 77808
+Baton Rouge, LA
+70879
+Ph. (225) 756-3271
+Fax (225) 755-1030
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+BILL OF MATERIALS
+SHIP 24VAC RELAY LOOSE
+R1
+REMOVED M1 CONTACT/ ADDED GND
+4/18/23
+A.D.
+SPARE"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6822.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6822.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6822.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6822.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823 MISSIONPDF.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6823.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6824.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6825.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6825.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6825.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6825.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6825.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6825.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6826.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6827.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6827.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6827.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6827.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6827.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6827.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6827.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6828.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6829.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6830.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6831.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6832.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6832.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6832.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6832.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6832.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6832.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6832.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6833.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6834.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6835.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6836.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6836.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6836.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6836.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6836.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6836.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6836.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6837.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6838.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6839.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6839.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6839.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6839.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,14,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,15,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,16,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,17,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,18,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840.pdf,19,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,14,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,15,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,16,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,17,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,18,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R1.pdf,19,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,14,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,15,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,16,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,17,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,18,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R2.pdf,19,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,14,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,15,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,16,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,17,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,18,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6840R3.pdf,19,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6842.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6842.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6842.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6842.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6842.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6842.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6842.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6843.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6843.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6843.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6843.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6843.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6843.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6844.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6845.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1.pdf,1,612.0,792.0,"AS BUILTS
+JUNE 16, 2025
+CP-6846R1
+TMB25-3
+CONTROL PANEL
+C COX RESEARCH AND TECHNOLOGY, INC. 2025
+SERIAL#100727
+GENERATOR
+Thornton, Musso & Bellemin, Inc
+4788 Waywood Dr
+(225) 654-4955
+Zachary, LA 70791"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1.pdf,2,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6846R1
+1
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+1P
+30A
+CB1
+M1-1
+H
+N
+BOOSTER PUMP
+CB2
+1P
+10A
+H
+A
+O
+CR1-1
+CR2
+G
+POWER ON
+RELAY
+BOOSTER PUMP
+CR2-1
+OFF
+ON
+M1
+G
+BOOSTER PUMP
+MOTOR STARTER
+FU1
+5A/5X20
+SOLENOID VALVE
+SOLENOID VALVE
+CHEM PUMP 1
+CHEM PUMP 1 POWER
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+** RELAY MUST BE SELECTED/INSTALLED BASED ON INCOMING SIGNAL VOLTAGE.
+CR1
+PLANT
+POWERED SIGNAL
+120VAC OR
+24VAC
+G
+M1-2
+10G
+CHEM PUMP 2
+CHEM PUMP 2 POWER
+CHEM PUMP 3
+CHEM PUMP 3 POWER
+120VAC
+-
+-
+-
+-
+-
+-
+A.D.
+R1
+REMOVED MS CONTACT/ADDED GND
+03/25/23
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1.pdf,3,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6846R1
+2
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+NEMA 4X POLYCARBONATE ENCLOSURE
+NP-4
+NP-2
+NP-3
+NP-1
+NAMEPLATE SCHEDULE
+PANEL TO PREVENT ENTRY OF GASSES.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+NOTE:
+VIEW OF SWING OUT PANEL
+-
+A.D.
+R1
+REMOVED MS CONTACT/ADDED GND
+03/25/23
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1.pdf,4,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6846R1
+3
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+BILL OF MATERIALS
+-
+A.D.
+R1
+REMOVED MS CONTACT/ADDED GND
+03/25/23
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+SHIPPED LOOSE
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+SPARES/SHIPPED LOOSE"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1_101149.pdf,1,612.0,792.0,"AS BUILTS
+JULY 3, 2025
+CP-6846R1
+TMB25-3
+CONTROL PANEL
+C COX RESEARCH AND TECHNOLOGY, INC. 2025
+SERIAL#101149
+GENERATOR
+Thornton, Musso & Bellemin, Inc
+4788 Waywood Dr
+(225) 654-4955
+Zachary, LA 70791"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1_101149.pdf,2,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6846R1
+1
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+1P
+30A
+CB1
+M1-1
+H
+N
+BOOSTER PUMP
+CB2
+1P
+10A
+H
+A
+O
+CR1-1
+CR2
+G
+POWER ON
+RELAY
+BOOSTER PUMP
+CR2-1
+OFF
+ON
+M1
+G
+BOOSTER PUMP
+MOTOR STARTER
+FU1
+5A/5X20
+SOLENOID VALVE
+SOLENOID VALVE
+CHEM PUMP 1
+CHEM PUMP 1 POWER
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+** RELAY MUST BE SELECTED/INSTALLED BASED ON INCOMING SIGNAL VOLTAGE.
+CR1
+PLANT
+POWERED SIGNAL
+120VAC OR
+24VAC
+G
+M1-2
+10G
+CHEM PUMP 2
+CHEM PUMP 2 POWER
+CHEM PUMP 3
+CHEM PUMP 3 POWER
+120VAC
+-
+-
+-
+-
+-
+-
+A.D.
+R1
+REMOVED MS CONTACT/ADDED GND
+03/25/23
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1_101149.pdf,3,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6846R1
+2
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+NEMA 4X POLYCARBONATE ENCLOSURE
+NP-4
+NP-2
+NP-3
+NP-1
+NAMEPLATE SCHEDULE
+PANEL TO PREVENT ENTRY OF GASSES.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+NOTE:
+VIEW OF SWING OUT PANEL
+-
+A.D.
+R1
+REMOVED MS CONTACT/ADDED GND
+03/25/23
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6846R1_101149.pdf,4,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  JCF
+BY:
+DATE:
+A.D.
+A.D.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6846R1
+3
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+BILL OF MATERIALS
+-
+A.D.
+R1
+REMOVED MS CONTACT/ADDED GND
+03/25/23
+4788 Waywood Dr
+Zachary, LA
+70791
+(225) 654-4955
+SHIPPED LOOSE
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+SPARES/SHIPPED LOOSE"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6847.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6847.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6847.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6847.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6847.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6847.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6847.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6848.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6849R1.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850-KENNY.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850-KENNY.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850-KENNY.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850-KENNY.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850-KENNY.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850-KENNY.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R1.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6850R2.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6851R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6852.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6852.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6852.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6852.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6852.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6852.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6852.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6853.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6853.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6853.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6853.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6853.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6853.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6853.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6854.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6854.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6854.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6854.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6854.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6854.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6854.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6855.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6856.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6856.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6856.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6856.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6856.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6856.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6857.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6857.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6857.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6857.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6858.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6858.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6858.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6858.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6859.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6859.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6859.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6859.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6859.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6859.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6859.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6860.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6860.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6860.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6860.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6860.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6860.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6860.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6861.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6864.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6865.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6865.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6865.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6865.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6865.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6865.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6865.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6866.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6866.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6866.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6866.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6866.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6866.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6866.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6867.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6868R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6869.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6870.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6870.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6870.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6870.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6870.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6870.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6871.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6871.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6871.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6871.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6871.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6871.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6871.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6872R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6873.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6873.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6873.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6873.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6873.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6873.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6873.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6874.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,1,612.0,792.0,"AS BUILTS
+DECEMBER 4, 2024
+CONTROL PANEL
+DUPLEX PUMP
+CP-6875
+C COX RESEARCH AND TECHNOLOGY, INC. 2024
+LIFT STATION REHAB
+SERIAL#98313
+Coastal Process, LLC.
+9072 Lockhart Road Suite D
+(225) 667-4359  Fax (225) 271-4668
+Denham Springs, LA 70727
+WATERPROOF INFLUENT"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,2,612.0,792.0,"SOLD TO: Coastal Process, LLC.
+TAG: Waterproof Influent Lift Station Rehab
+Duplex Pump Control Panel
+SHIP TO:  
+-
+-
+SPECIAL NOTES:  
+Panel Type
+Voltage
+Phase/HZ
+No. Motors
+HP
+FLA
+Pump Manufacturer
+Type of Pump
+Catalog Number
+Capacitors
+Control Voltage
+Control Power Transformer = 2KVA
+Enclosure NEMA Rating
+Enclosure Material
+Enclosure Size
+Inner Swing Panel
+Conrol Sensor
+UL508A Labeling
+UL698A Labeling
+Alarm Light - Panel Door Mount
+Alarm Light - Panel Top Mount       (Existing)
+Alarm Light - Remote
+Alarm Test Switch
+Alarm Silence Switch
+Alarm Acknowledge Switch
+Alternator with Lead Pump Selector Switch
+Audible Alarm - Bell
+Audible Alarm - Horn
+Audible Alarm - Piezo
+Cycle Counters
+Economy Version
+Elapsed Time Meter
+Flasher
+Green Run Lights vs. Red
+Ground Fault Receptacle
+High Temp Lights
+High Temp Pump Shutdown - Auto Reset
+High Temp Pump Shutdown - Manual Reset
+Intrinsically Safe Relays Pts.
+Lightning Arrestor   
+Main Disconnect with Door Mt. Handle
+Panel Heater / Thermostat W= 250W
+Phase Monitor
+Pole, Box, Seal
+Seal Fail Lights
+Seal Fail Relay - Fixed
+Seal Fail Relay - Adjustable
+Seal Fail Shutdown
+Starters - IEC
+Starters - NEMA
+Unpowered Alarm Circuits # 
+Duplex
+480
+3/60
+2
+7.5
+11
+Hydromatic
+-
+-
+No
+120
+Yes
+3R
+Painted Steel
+48x36x12
+Yes
+Probe
+Yes
+No
+Opti-Float  Level Dectector Pts.
+R
+COX  CAMO  System
+TM
+TM
+X
+DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+T.L.
+T.L.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6875
+1
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+X
+X
+X
+X
+X
+X
+X
+X
+X
+OTHER: MPE SC1000 and probe provided by Coastal 
+Process
+X
+X
+-
+9072 Lockhart Rd.
+Suite D
+Denham Springs, LA
+Ph. (225) 667-4359
+Fax (225) 271-4668
+70727
+Enclosure is existing. We will provide a
+CAMO   bucket to replace the internal 
+TM
+components.
+X
+X"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,3,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+T.L.
+T.L.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6875
+2
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+N
+L1
+L2
+L3
+G
+3P
+20A
+CB1
+M1
+OL1
+TVSS
+12
+M
+G
+7.5HP
+PUMP 1
+460V,3Ø
+MAIN SERVICE
+480V,3Ø
+DISTRIBUTION BLOCK
+3P
+20A
+CB2
+M2
+OL2
+12
+M
+G
+7.5HP
+PUMP 2
+460V,3Ø
+PHASE
+MONITOR
+TRANSFORMER
+2KVA
+480V-120VAC
+1P
+10A
+CB7
+CONTROL
+60A, 3POLE
+MAIN CIRCUIT BREAKER WITH
+THROUGH DOOR HANDLE
+VERIFY 120V BETWEEN CB7 AND NEUTRAL
+BEFORE TURNING ON CIRCUIT BREAKER
+6
+14
+14
+2P
+10A
+CB3
+1P
+20A
+CB4
+1P
+10A
+CB6
+1P
+15A
+CB5
+GFI RECEPTACLE
+-
+14
+12g
+14g
+9072 Lockhart Rd.
+Suite D
+Denham Springs, LA
+Ph. (225) 667-4359
+Fax (225) 271-4668
+70727
+THERMOSTAT
+250W HEATER
+1
+3
+2
+12
+11
+FAN"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,4,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+T.L.
+T.L.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6875
+3
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+CONTROL
+N
+120VAC
+A
+LED
+CR1-2
+A
+LED
+CR2-2
+CR1
+TS1
+CR2
+TS2
+PUMP 1 TEMP SWITCH
+PUMP 2 TEMP SWITCH
+PUMP 1 HIGH TEMP
+PUMP 2 HIGH TEMP
+* REMOVE JUMPERS AND INSTALL LOCKOUT DEVICES IF REQUIRED.
+CR5
+PHASE MONITOR
+AUX. RELAY
+P1
+M1
+CR5-1
+PM
+CR1-1
+HT
+R
+LED
+H
+A
+O
+ETM
+OL1
+PUMP 1 MOTOR
+STARTER
+PUMP 1 RUN LIGHT
+ELAPSED TIME METER
+M2
+CR5-2
+PM
+CR2-1
+HT
+R
+LED
+H
+A
+O
+ETM
+OL2
+PUMP 2 MOTOR
+STARTER
+PUMP 2 RUN LIGHT
+ELAPSED TIME METER
+CR7
+R
+HIGH LEVEL LIGHT
+HIGH LEVEL RELAY
+CR6
+R
+LOW LEVEL LIGHT
+LOW LEVEL RELAY
+SC1000
+SHIP LOOSE
+PUMP 1
+HOA IN OFF
+PUMP 2
+HOA IN OFF
+-
+** PROVIDED BY LA RADIO
+9072 Lockhart Rd.
+Suite D
+Denham Springs, LA
+Ph. (225) 667-4359
+Fax (225) 271-4668
+70727
+P2
+HI
+LO
+1
+2
+AUTO
+PM
+CR5-3
+PUMP 2 HOA IN OFF
+LEVEL PROBE
+J25
+J22
+J23
+CR6-1
+LL
+CR6-2
+LL
+PM
+H
+H
+A
+A
+PUMP 1 HOA IN OFF
+TD1-1
+CR8-1
+CR8-2
+TO SC1000
+TO SC1000"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,5,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+T.L.
+T.L.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6875
+4
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+CONTROL
+N
+120VAC
+-
+9072 Lockhart Rd.
+Suite D
+Denham Springs, LA
+Ph. (225) 667-4359
+Fax (225) 271-4668
+70727
+LEVEL PROBE RELAY
+LPR-1
+1
+7
+2
+10
+11
+12
+8
+CR8
+TD1
+DIP SWITCH SETTINGS
+7
+OFF
+ON
+6
+5
+4
+3
+2
+1
+HIGH LEVEL
+PROBE
+H.L. OFF
+H.L. ON
+BACKUP LAG
+TIME DELAY
+BACKUP HIGH LEVEL
+RELAY
+SET @ 3MIN.
+ON DELAY
+0-10MIN."
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,6,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+T.L.
+T.L.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6875
+5
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+CONTROL
+N
+120VAC
+2
+7
+1
+3
+5
+8
+SFR1
+R
+LED
+CR3
+SP1
+2
+7
+1
+3
+5
+8
+SFR2
+R
+LED
+CR4
+SP2
+PUMP 1 SEAL FAIL
+ALARM LIGHT/PROBE
+PUMP 1 SEAL FAIL
+AUX. RELAY
+PUMP 2 SEAL FAIL
+ALARM LIGHT/PROBE
+PUMP 2 SEAL FAIL
+AUX. RELAY
+CR1-3
+PUMP 1
+HIGH TEMP
+CR2-3
+PUMP 2
+HIGH TEMP
+CR3-1
+PUMP 1
+SEAL FAIL
+CR4-1
+PUMP 2
+SEAL FAIL
+CR7-1
+TRANSDUCER
+HIGH LEVEL
+CR6-4
+LOW LEVEL
+M1-1
+PUMP 1
+RUNNING
+M2-1
+PUMP 2
+RUNNING
+-
+9072 Lockhart Rd.
+Suite D
+Denham Springs, LA
+Ph. (225) 667-4359
+Fax (225) 271-4668
+70727
+M2-1
+PUMP 2
+RUNNING
+P12
+P13
+PARAMETER
+ 
+SETTINGS
+2 PUMPS
+P14
+P1 ON
+P15
+3.9
+STANDARD
+FOFO
+P1 OFF
+P16
+LOW
+P17
+1.8
+1.0
+ENABLED
+P18
+PUMP DOWN
+P19
+2 LEVEL PROBE
+F19
+5 INCH
+F20
+OFFSET 1.0 
+F21
+5 SEC
+HI
+5.1
+2 PUMPS
+2 PUMPS
+P2 ON
+P2 OFF
+4.7
+2.2"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,7,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+T.L.
+T.L.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6875
+6
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+VIEW OF INNER SWING PANEL
+NAMEPLATE SCHEDULE
+NOTE:
+SEWER GASSES WILL DESTROY COMPONENTS IN PANEL.
+PROPER SEALS MUST BE INSTALLED EXTERNAL TO THE
+PANEL TO PREVENT ENTRY OF GASSES.
+ALUMINUM SWING OUT PANEL
+~
+~
+0000011
+ETM
+CAMO
+TM
+NEMA 4X EXISTING STAINLESS STEEL ENCLOSURE
+NP-1
+NP-3
+NP-4
+NP-5
+0000011
+ETM
+NP-2
+NP-3
+NP-4
+NP-5
+NP-6
+NP-7
+NP-8
+NP-8
+-
+MPE
+SC1000
+9072 Lockhart Rd.
+Suite D
+Denham Springs, LA
+Ph. (225) 667-4359
+Fax (225) 271-4668
+70727
+NP-9"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6875.pdf,8,612.0,792.0,"DATE:
+Drawing Title
+Project Title
+S/N
+Sales Engineer
+Application Engineer
+DRAWN
+APPROVED
+BY:  NCR
+BY:
+DATE:
+T.L.
+T.L.
+PURCHASE ORDER NUMBER
+DRAWING NUMBER
+SHEET NUMBER
+CP-6875
+7
+REFERENCE DRAWING
+NO.
+-
+REVISION - LOCATION
+-
+-
+-
+-
+ECN
+DATE
+BY
+-
+ITEM
+QTY.
+MANUFACTURER
+PART NUMBER
+DESCRIPTION
+BILL OF MATERIALS
+-
+9072 Lockhart Rd.
+Suite D
+Denham Springs, LA
+Ph. (225) 667-4359
+Fax (225) 271-4668
+70727
+* EXISTING
+PROVIDED BY OTHERS
+SHIPPED LOOSE"
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6876.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6876.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6876.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6876.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6876.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6876.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6876.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6877.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6877.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6877.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6877.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6877.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6877.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6877.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6878.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6878.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6878.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6878.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6878.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6878.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6878.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879A.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879A.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879A.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879A.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879A.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879B.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879B.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879B.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879B.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6879B.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6880.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6880.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6880.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6880.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6880.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6880.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6881.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,12,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,13,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,14,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,15,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,16,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,17,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,18,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,19,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6882.pdf,20,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6883.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6884.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6884.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6884.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6884.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6884.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6884.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6884.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6885.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6885.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6885.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6885.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6885.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6885.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6885.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6886.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6886.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6886.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6886.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6886.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6886.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6886.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6887.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6887.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6887.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6887.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6887.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6887.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6887.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6888.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6888.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6888.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6888.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6888.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6888.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6888.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6889.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6890.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6890.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6890.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6891.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6891.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6891.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6891.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6891.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6891.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6892.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6892.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6892.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6892.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6892.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6892.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6893.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6894.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6895.pdf,11,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,8,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,9,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6896.pdf,10,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6897.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6897.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6897.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6897.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6897.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6897.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6897.pdf,7,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898R1.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898R1.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898R1.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898R1.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898R1.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6898R1.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6899.pdf,1,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6899.pdf,2,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6899.pdf,3,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6899.pdf,4,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6899.pdf,5,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6899.pdf,6,612.0,792.0,
+E:\SCHEMATICai\samples\CP-6800-6899\CP-6899.pdf,7,612.0,792.0,
