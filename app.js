@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.2 (Control Panel Tab Organization + Redaction Box Visibility) ---
-const APP_VERSION = "v2.5.2";
+// --- SCHEMATICA ai v2.5.3 (PDF Viewing/Redaction & Worker Hardening) ---
+const APP_VERSION = "v2.5.3";
 const VERSION_HISTORY = {
+    "v2.5.3": "PDF viewing/redaction improvements: preview step, overlay visibility, OCR lazy-load, export fixes; Worker hardening: secret keys, host allowlist, SSRF guards",
     "v2.5.2": "Fixed Control Panel tabs organization, CSS for redaction boxes, version sync",
     "v2.5.1": "Fixed Control Panel: redaction boxes now appear, page dropdown works, added tabbed UI",
     "v2.5.0": "Refactored Control Panel - functional checkboxes, page-aware UI",
