@@ -546,7 +546,7 @@ export default {
                 const pageSizeParam = url.searchParams.get('pageSize');
                 const pageSize = validatePageSize(pageSizeParam);
 
-                let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${pageSize}` +
+                let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
                               `&fields%5B%5D=Control%20Panel%20Name` +
                               `&fields%5B%5D=Items` +
                               `&fields%5B%5D=Control%20Panel%20PDF` +

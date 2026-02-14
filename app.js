@@ -2153,12 +2153,12 @@ class PdfExporter {
                 const zones = Array.from(container.querySelectorAll('.redaction-box'));
                 
                 // Sort zones: opaque whiteouts first, then transparent overlays
-                // This ensures whiteouts are drawn before text overlays
+                // This ensures whiteouts are drawn before text overlays to prevent overlap issues
                 zones.sort((a, b) => {
                     const aTransparent = a.dataset.transparent === "true";
                     const bTransparent = b.dataset.transparent === "true";
                     if (aTransparent === bTransparent) return 0;
-                    return aTransparent ? 1 : -1; // Opaque first
+                    return aTransparent ? 1 : -1; // Transparent zones sorted last
                 });
                 
                 zones.forEach(box => {
