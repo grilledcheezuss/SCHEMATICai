@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.3 (Security Hardening & SSRF Guards)
+// 🧠 SCHEMATICA ai WORKER v2.5.4 (Enhanced Error Handling & Logging)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -332,23 +332,47 @@ function isAllowedPdfHost(url) {
 
 // Security helper: Fetch PDF with timeout and size limits
 async function fetchPdfWithGuards(url) {
+    // Early validation: Check for null, undefined, or empty URL
+    if (!url || typeof url !== 'string' || url.trim() === '') {
+        console.error('[fetchPdfWithGuards] Invalid or empty URL provided:', url);
+        throw new Error('Invalid or empty PDF URL');
+    }
+    
+    // Validate against allowed hosts
     if (!isAllowedPdfHost(url)) {
-        throw new Error('PDF host not allowed');
+        console.error('[fetchPdfWithGuards] PDF host not allowed. URL:', url, 'Allowed hosts:', ALLOWED_PDF_HOSTS);
+        throw new Error(`PDF host not allowed. Only these hosts are permitted: ${ALLOWED_PDF_HOSTS.join(', ')}`);
     }
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), PDF_FETCH_TIMEOUT_MS);
     
     try {
+        console.log('[fetchPdfWithGuards] Fetching PDF from:', url);
         const response = await fetch(url, { signal: controller.signal });
+        
+        if (!response.ok) {
+            console.error('[fetchPdfWithGuards] PDF fetch failed. Status:', response.status, 'URL:', url);
+            throw new Error(`PDF fetch failed with status ${response.status}`);
+        }
         
         // Check content length if available
         const contentLength = response.headers.get('content-length');
         if (contentLength && parseInt(contentLength) > MAX_PDF_SIZE_BYTES) {
-            throw new Error('PDF too large');
+            console.error('[fetchPdfWithGuards] PDF too large. Size:', contentLength, 'Max allowed:', MAX_PDF_SIZE_BYTES, 'URL:', url);
+            throw new Error(`PDF too large (${contentLength} bytes). Maximum allowed: ${MAX_PDF_SIZE_BYTES} bytes`);
         }
         
+        console.log('[fetchPdfWithGuards] PDF fetch successful. URL:', url);
         return response;
+    } catch (error) {
+        // Enhanced error logging for debugging
+        if (error.name === 'AbortError') {
+            console.error('[fetchPdfWithGuards] PDF fetch timeout after', PDF_FETCH_TIMEOUT_MS, 'ms. URL:', url);
+            throw new Error(`PDF fetch timeout after ${PDF_FETCH_TIMEOUT_MS}ms`);
+        }
+        console.error('[fetchPdfWithGuards] Error fetching PDF:', error.message, 'URL:', url);
+        throw error;
     } finally {
         clearTimeout(timeoutId);
     }
@@ -444,10 +468,22 @@ export default {
             
             if (target === 'PDF') {
                 const pdfUrl = url.searchParams.get('url');
-                if (!pdfUrl) return new Response("Missing URL", { status: 400, headers: corsHeaders });
+                if (!pdfUrl) {
+                    console.error('[PDF] Missing URL parameter');
+                    return new Response("Missing URL", { status: 400, headers: corsHeaders });
+                }
+                
+                // Null/empty URL validation
+                if (typeof pdfUrl !== 'string' || pdfUrl.trim() === '') {
+                    console.error('[PDF] Invalid or empty URL parameter:', pdfUrl);
+                    return new Response("Invalid URL parameter", { status: 400, headers: corsHeaders });
+                }
+                
+                console.log('[PDF] Processing PDF request. URL:', pdfUrl);
                 
                 // Security: Validate PDF URL against allowlist
                 if (!isAllowedPdfHost(pdfUrl)) {
+                    console.error('[PDF] PDF host not allowed. URL:', pdfUrl);
                     return new Response("PDF host not allowed", { status: 403, headers: corsHeaders });
                 }
                 
@@ -457,8 +493,10 @@ export default {
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
                     newHeaders.set('Content-Type', 'application/pdf');
+                    console.log('[PDF] Successfully fetched PDF');
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
                 } catch (e) {
+                    console.error('[PDF] PDF fetch failed. URL:', pdfUrl, 'Error:', e.message);
                     return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
                 }
             }
@@ -469,6 +507,8 @@ export default {
                 
                 // Normalize the panel ID - remove CP- prefix, .dwg, .pdf extensions
                 const cleanId = panelId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').trim();
+                
+                console.log('[PDF_BY_ID] Searching for panel. Original ID:', panelId, 'Clean ID:', cleanId);
                 
                 // Try multiple variations to find the record (most likely to least likely)
                 // This typically matches on the first try with cleanId
@@ -482,33 +522,62 @@ export default {
                 ];
                 
                 let pdfUrl = null;
+                let foundVariant = null;
                 
                 // Search for the record in the main database
                 for (const variant of variations) {
-                    const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
-                                    `filterByFormula=${encodeURIComponent(`{Control Panel Name}="${variant}"`)}` +
-                                    `&fields%5B%5D=Control%20Panel%20PDF`;
-                    
-                    const searchResp = await fetch(searchUrl, { 
-                        headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
-                    });
-                    
-                    if (!searchResp.ok) continue;
-                    
-                    const searchData = await searchResp.json();
-                    if (searchData.records && searchData.records.length > 0) {
-                        const record = searchData.records[0];
-                        pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
-                        if (pdfUrl) break;
+                    try {
+                        console.log('[PDF_BY_ID] Trying variant:', variant);
+                        const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
+                                        `filterByFormula=${encodeURIComponent(`{Control Panel Name}="${variant}"`)}` +
+                                        `&fields%5B%5D=Control%20Panel%20PDF`;
+                        
+                        const searchResp = await fetch(searchUrl, { 
+                            headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
+                        });
+                        
+                        if (!searchResp.ok) {
+                            console.error('[PDF_BY_ID] Search failed for variant:', variant, 'Status:', searchResp.status);
+                            continue;
+                        }
+                        
+                        const searchData = await searchResp.json();
+                        if (searchData.records && searchData.records.length > 0) {
+                            const record = searchData.records[0];
+                            pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
+                            if (pdfUrl) {
+                                foundVariant = variant;
+                                console.log('[PDF_BY_ID] Found record with variant:', variant, 'PDF URL:', pdfUrl);
+                                break;
+                            } else {
+                                console.log('[PDF_BY_ID] Record found for variant:', variant, 'but no PDF URL attached');
+                            }
+                        } else {
+                            console.log('[PDF_BY_ID] No records found for variant:', variant);
+                        }
+                    } catch (error) {
+                        console.error('[PDF_BY_ID] Error searching variant:', variant, 'Error:', error.message);
+                        // Continue to next variant on error
                     }
                 }
                 
+                // Null-URL validation
                 if (!pdfUrl) {
+                    console.error('[PDF_BY_ID] PDF not found. Panel ID:', panelId, 'Tried variations:', variations.join(', '));
                     return new Response("PDF not found for panel ID", { status: 404, headers: corsHeaders });
                 }
                 
+                // Additional null/empty check before proceeding
+                if (typeof pdfUrl !== 'string' || pdfUrl.trim() === '') {
+                    console.error('[PDF_BY_ID] Invalid PDF URL format. Panel ID:', panelId, 'URL value:', pdfUrl);
+                    return new Response("Invalid PDF URL for panel", { status: 500, headers: corsHeaders });
+                }
+                
+                console.log('[PDF_BY_ID] Validated PDF URL for panel:', panelId, 'Variant used:', foundVariant);
+                
                 // Security: Validate PDF URL against allowlist
                 if (!isAllowedPdfHost(pdfUrl)) {
+                    console.error('[PDF_BY_ID] PDF host not allowed. Panel ID:', panelId, 'URL:', pdfUrl);
                     return new Response("PDF host not allowed", { status: 403, headers: corsHeaders });
                 }
                 
@@ -518,8 +587,10 @@ export default {
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
                     newHeaders.set('Content-Type', 'application/pdf');
+                    console.log('[PDF_BY_ID] Successfully fetched PDF for panel:', panelId);
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
                 } catch (e) {
+                    console.error('[PDF_BY_ID] PDF fetch failed. Panel ID:', panelId, 'URL:', pdfUrl, 'Error:', e.message);
                     return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
                 }
             }
