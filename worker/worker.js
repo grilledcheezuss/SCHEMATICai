@@ -506,7 +506,7 @@ export default {
                 if (!panelId) return new Response("Missing ID", { status: 400, headers: corsHeaders });
                 
                 // Normalize the panel ID - remove CP- prefix, .dwg, .pdf extensions
-                const cleanId = panelId.trim().replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '');
+                const cleanId = panelId.trim().replace(/^CP-|\.(?:dwg|pdf)$/gi, '');
                 
                 console.log('[PDF_BY_ID] Searching for panel. Original ID:', panelId, 'Clean ID:', cleanId);
                 
