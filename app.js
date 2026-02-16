@@ -227,7 +227,7 @@ class AuthService {
         
         // Lightweight auth check - fetch 1 record from MAIN
         try {
-            const resp = await NetworkService.fetch('MAIN', '&pageSize=1');
+            const resp = await NetworkService.fetch(CONFIG.mainTable, '&pageSize=1');
             if (resp.status === 401) {
                 return { valid: false, reason: 'invalid_credentials' };
             }
