@@ -2099,86 +2099,8 @@ class SearchEngine {
         }
     }
 
-    static renderCurrentPage(crit) {
-        const start = (this.currentPage - 1) * this.pageSize;
-        const end = start + this.pageSize;
-        const pageData = this.currentResults.slice(start, end);
-        
-        const area = document.getElementById('results-area');
-        area.style.opacity = '0';
-        
-        setTimeout(() => {
-            UI.render(pageData, crit || {}, this.currentResults.length);
-            this.updateControls();
-            area.style.opacity = '1';
-            document.getElementById('results-scroll-area').scrollTop = 0;
-        }, 150);
-    }
 
-    static updateControls() {
-        const total = this.currentResults.length;
-        const totalPages = Math.ceil(total / this.pageSize);
-        
-        document.getElementById('page-prev').disabled = (this.currentPage === 1);
-        document.getElementById('page-next').disabled = (this.currentPage === totalPages || total === 0);
-        
-        const start = (this.currentPage - 1) * this.pageSize + 1;
-        const end = Math.min(start + this.pageSize - 1, total);
-        
-        document.getElementById('page-info').innerText = total > 0 
-            ? `${start}-${end} of ${total}` 
-            : 'No Results';
-    }
-
-    static nextPage() {
-        if ((this.currentPage * this.pageSize) < this.currentResults.length) {
-            this.currentPage++;
-            this.renderCurrentPage();
-        }
-    }
-
-    static prevPage() {
-        if (this.currentPage > 1) {
-            this.currentPage--;
-            this.renderCurrentPage();
-        }
-    }
-}
-
-class PdfExporter {
-    static previewPdfBytes = null;
     
-    static async preview() {
-        if (!PdfViewer.doc) return alert("No PDF loaded!");
-        const btn = document.querySelector('button[onclick="PdfExporter.preview()"]');
-        const origText = btn.innerText; btn.innerText = "⏳ GENERATING..."; btn.disabled = true;
-        
-        try {
-            // Generate the redacted PDF
-            this.previewPdfBytes = await this.generateRedactedPdf();
-            
-            // Show preview modal
-            const modal = document.getElementById('pdf-preview-modal');
-            const container = document.getElementById('pdf-preview-container');
-            container.innerHTML = '<p>Loading preview...</p>';
-            modal.style.display = 'block';
-            
-            // Render preview
-            const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
-            const previewUrl = URL.createObjectURL(blob);
-            container.innerHTML = `<iframe src="${previewUrl}" style="width:100%; height:80vh; border:none;"></iframe>`;
-        } catch (e) {
-            console.error(e);
-            alert("Preview Failed: " + e.message);
-        } finally {
-            btn.innerText = origText;
-            btn.disabled = false;
-        }
-    }
-    
-    static closePreview() {
-        document.getElementById('pdf-preview-modal').style.display = 'none';
-        this.previewPdfBytes = null;
     }
     
     static async confirmExport() {
@@ -3151,76 +3073,80 @@ static pop() {
     if (savedValues.cat) document.getElementById('catInput').value = savedValues.cat;
     if (savedValues.keyword) document.getElementById('keywordInput').value = savedValues.keyword;
 }
-    static render(res, crit, totalCount) { 
-        const a = document.getElementById('results-area'); 
-        a.innerHTML = `Found ${totalCount || res.length} records`; 
-        const critJson = JSON.stringify(crit).replace(/"/g, '"'); 
-        
-        res.forEach(i => { 
-            const isMissingPdf = !i.pdfUrl || i.pdfStatus === "missing";
-            let b = ''; 
-            if(i.category === 'low_voltage') b+=`LOW VOLT`; 
-            
-            if (crit.mfg !== "Any" && i.mfg) { 
-                const isMatch = (i.mfg === crit.mfg); 
-                const style = isMatch ? 'match-green' : 'match-orange'; 
-                b += `${i.mfg}`; 
-            } 
-            if(crit.volt !== "Any") { 
-                if(i.volt) b+=`${i.volt}V`; 
-                else b+=`? V`; 
-            } 
-            if(crit.phase !== "Any") { 
-                if(i.phase) b+=`${i.phase}PH`; 
-                else b+=`? PH`; 
-            } 
-            if(crit.hp !== "Any") { 
-                if(i.hp) { 
-                    if (parseFloat(i.hp) === parseFloat(crit.hp)) b+=`${i.hp} HP`; 
-                    else b+=`${i.hp} HP`; 
-                } else { 
-                    b+=`? HP`; 
-                } 
-            } 
-            if(crit.enc !== "Any" && i.enc) { 
-                b+=`${i.enc}`; 
-            } 
-            if(crit.kw && crit.kw.length > 0) { 
-                crit.kw.forEach(k => { 
-                    if(crit.mfg !== "Any" && i.mfg === k.toUpperCase()) return; 
-                    b += `${k.toUpperCase()}`; 
-                }); 
-            } 
-            if(isMissingPdf) b += `NO PDF`; 
-            
-            const c = document.createElement('div'); 
-            c.className = `record-card ${isMissingPdf ? 'no-pdf-card' : ''} ${!i.p?'varied-result':''}`; 
-            c.innerHTML = `
-                <div class="panel-name">${i.displayId || i.id}</div>
-                <div class="badge-row">
-                    ${b}
-                    ${isMissingPdf ? '<span class="hud-badge no-pdf">NO PDF</span>' : ''}
-                </div>
-                <div class="card-actions">
-                    <button class="thumb-btn up" title="Correct" onclick="event.stopPropagation(); FeedbackService.up('${i.id}', this, ${critJson});">👍</button>
-                    <button class="thumb-btn down" title="Report Inaccuracy" onclick="event.stopPropagation(); FeedbackService.down('${i.id}', this, ${critJson});">👎</button>
-                </div>
-            `; 
-            
-            if (!isMissingPdf) {
-                c.onclick = () => { 
-                    document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
-                    c.classList.add('active-view'); 
-                    PdfController.load(i.id, i.pdfUrl); 
-                };
-            } else {
-                c.title = 'No PDF attached in Airtable';
-                c.style.cursor = 'not-allowed';
-                c.style.opacity = '0.75';
-            }
-            a.appendChild(c); 
-        }); 
-    }
+static render(res, crit, totalCount) { 
+    const a = document.getElementById('results-area'); 
+    a.innerHTML = `Found ${totalCount || res.length} records`; 
+    
+    res.forEach(i => { 
+        const isMissingPdf = !i.pdfUrl || i.pdfStatus === "missing";
+        const badges = [];
+
+        // Category badge
+        if (i.category === 'low_voltage') {
+            badges.push(`<span class="hud-badge match-orange">LOW VOLT</span>`);
+        }
+
+        // Manufacturer badge
+        if (crit.mfg !== "Any" && i.mfg) {
+            const isMatch = (i.mfg === crit.mfg);
+            badges.push(`<span class="hud-badge ${isMatch ? 'match-green' : 'match-orange'}">${i.mfg}</span>`);
+        } else if (i.mfg) {
+            badges.push(`<span class="hud-badge match-green">${i.mfg}</span>`);
+        }
+
+        // Voltage / Phase / HP / Enclosure
+        if (crit.volt !== "Any") {
+            badges.push(`<span class="hud-badge ${i.volt ? 'match-green' : 'unknown'}">${i.volt ? i.volt + 'V' : '? V'}</span>`);
+        }
+        if (crit.phase !== "Any") {
+            badges.push(`<span class="hud-badge ${i.phase ? 'match-green' : 'unknown'}">${i.phase ? i.phase + 'PH' : '? PH'}</span>`);
+        }
+        if (crit.hp !== "Any") {
+            badges.push(`<span class="hud-badge ${i.hp ? 'match-green' : 'unknown'}">${i.hp ? i.hp + ' HP' : '? HP'}</span>`);
+        }
+        if (crit.enc !== "Any" && i.enc) {
+            badges.push(`<span class="hud-badge match-green">${i.enc}</span>`);
+        }
+
+        // Keyword badges
+        if (crit.kw && crit.kw.length > 0) {
+            crit.kw.forEach(k => {
+                // avoid duplicating the mfg badge if the kw == mfg
+                if (!(crit.mfg !== "Any" && i.mfg === k.toUpperCase())) {
+                    badges.push(`<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`);
+                }
+            });
+        }
+
+        // No-PDF badge
+        if (isMissingPdf) {
+            badges.push(`<span class="hud-badge no-pdf">NO PDF</span>`);
+        }
+
+        const c = document.createElement('div'); 
+        c.className = `record-card ${isMissingPdf ? 'no-pdf-card' : ''} ${!i.p ? 'varied-result' : ''}`; 
+        c.innerHTML = `
+            <div class="panel-name">${i.displayId || i.id}</div>
+            <div class="badge-row">${badges.join(' ') || '<span class="hud-badge unknown">NO MATCH</span>'}</div>
+            <div class="card-actions">
+                <button class="thumb-btn up" onclick="FeedbackService.up('${i.id}', this, ${JSON.stringify(crit)})">👍</button>
+                <button class="thumb-btn down" onclick="FeedbackService.down('${i.id}', this, ${JSON.stringify(crit)})">👎</button>
+            </div>
+        `; 
+
+        if (!isMissingPdf) {
+            c.onclick = () => { 
+                document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
+                c.classList.add('active-view'); 
+                PdfController.load(i.id, i.pdfUrl); 
+            };
+        } else {
+            c.title = 'No PDF attached in Airtable';
+            c.style.cursor = 'not-allowed';
+            c.style.opacity = '0.75';
+        }
+        a.appendChild(c); 
+    }); 
 }
 
 window.UI = UI;
@@ -3270,4 +3196,5 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("System failed to initialize. Please clear cache and reload.");
     }
 });
+
 
