@@ -393,55 +393,32 @@ function extractSpecsStrict(t) {
     
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
-            const r = new RegExp(`(?<!(FOR|FITS|REPLACES|COMPATIBLE|LIKE|WITH)\\s+)\\b${alias}\\b`, 'i');
+            const r = new RegExp(`(?<=[^A-Z0-9]|^)${alias}(?=[^A-Z0-9]|$)`, 'i');
             if (r.test(t)) { s.mfg = mfgKey; break; }
         }
         if (s.mfg) break;
     }
 
-    if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,100}(?:4XSS|STAINLESS|304|316)/i.test(t)) s.enc = '4XSS';
-    else if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,100}(?:POLY|POLYCARBONATE)/i.test(t)) s.enc = 'POLY';
-    else if (/(?:ENCLOSURE|MATL|MATERIAL|TYPE).{0,100}(?:FIBERGLASS|FRP|NON-METALLIC|4XFG)/i.test(t)) s.enc = '4XFG';
-    
-    if (!s.enc) {
-        if (/\b(POLY|POLYCARBONATE)\b/i.test(t)) s.enc = 'POLY';
-        else if (/\b(FIBERGLASS|FRP|NON-METALLIC|4XFG)\b/i.test(t) || t.includes('NEMA 4X')) s.enc = '4XFG';
-        else {
-            const ssMatch = t.match(/\b(4XSS|STAINLESS|304|316|NEMA 4X SS|SS)\b/i);
-            if (ssMatch) {
-                const idx = ssMatch.index;
-                const context = t.substring(Math.max(0, idx - 100), idx + 100);
-                // Only reject if clearly hardware-related (not table context)
-                if (!/SCREW|LATCH|HARDWARE|NAMEPLATE|HINGE|MOUNT|FEET/i.test(context)) s.enc = '4XSS';
-            }
+    let maxHP = 0;
+    const hpRegex = /\b(\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?|\d+\/\d+)\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
+    let match;
+    while ((match = hpRegex.exec(t)) !== null) {
+        let raw = match[1]; let val = 0;
+        if (match[2] && match[2].toUpperCase().includes('KW')) val = parseFloat(raw) * 1.341;
+        else if (raw.includes('-') && raw.includes('/')) {
+            // Skip weird mixed formats like 5-1/2 HP
+            continue;
+        } else if (raw.includes('-')) {
+            const parts = raw.split('-').filter(Boolean);
+            const nums = parts.map(p => parseFloat(p)).filter(x => !isNaN(x));
+            if (nums.length) val = Math.max(...nums);
+        } else if (raw.includes('/')) {
+            const [num, den] = raw.split('/');
+            val = parseFloat(num) / parseFloat(den);
+        } else {
+            val = parseFloat(raw);
         }
-    }
-
-    let maxHP = 0; let m;
-    const hpPatterns = [
-        /\b(\d+)\s+(\d+\/\d+)\s*(?:HP|H\.P\.|HORSEPOWER|KW)\b/gi, 
-        /(?:^|[^0-9a-z\/\.-])((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\s*(?:HP|H\.P\.|HORSEPOWER|KW)\b/gi, 
-        /\b(?:HP|H\.P\.|HORSEPOWER)\s*[:\-|]?\s*((?:\d*\.)?\d+(?:[\/-]\d+)?(?:\/\d+)?)\b/gi 
-    ];
-
-    for (const regex of hpPatterns) {
-        for (const match of t.matchAll(regex)) {
-            let raw = match[1]; let val = 0;
-            if (match.length > 2 && match[2]) {
-                const [num, den] = match[2].split('/');
-                val = parseFloat(raw) + (parseFloat(num) / parseFloat(den));
-            } else if (raw.includes('-')) {
-                const parts = raw.split('-'); 
-                if (parts[1] && parts[1].includes('/')) {
-                    const frac = parts[1].split('/'); val = parseFloat(parts[0]) + (parseFloat(frac[0]) / parseFloat(frac[1])); 
-                } else { val = parseFloat(parts[1] || parts[0]); }
-            } else if (raw.includes('/')) {
-                const parts = raw.split('/'); val = parseFloat(parts[0]) / parseFloat(parts[1]);
-            } else { val = parseFloat(raw); }
-            
-            if (match[0].toUpperCase().includes('KW')) val *= 1.341;
-            if (!isNaN(val) && val >= 0.1 && val <= 500 && val > maxHP) maxHP = val;
-        }
+        if (!isNaN(val) && val >= 0.1 && val <= 500 && val > maxHP) maxHP = val;
     }
     if (maxHP > 0) s.hp = (Math.round(maxHP * 10) / 10).toString();
 
@@ -679,9 +656,21 @@ export default {
                         if (overrides.category) finalCategory = overrides.category;
                     }
 
+                    const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
+                    const pdfStatus = pdfUrl ? "present" : "missing";
+
                     return {
-                        id: cleanId, displayId: "CP-" + cleanId, desc: fullDesc, pdfUrl: r.fields['Control Panel PDF']?.[0]?.url || "",
-                        mfg: finalMfg, hp: finalHp, volt: finalVolt, phase: finalPhase, enc: finalEnc, category: finalCategory,
+                        id: cleanId,
+                        displayId: "CP-" + cleanId,
+                        desc: fullDesc,
+                        pdfUrl,
+                        pdfStatus,
+                        mfg: finalMfg,
+                        hp: finalHp,
+                        volt: finalVolt,
+                        phase: finalPhase,
+                        enc: finalEnc,
+                        category: finalCategory,
                         reject_keywords: overrides ? (overrides.reject_keywords || []) : []
                     };
                 });
