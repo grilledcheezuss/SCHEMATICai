@@ -291,6 +291,15 @@ input[type=range] { accent-color: var(--lsu-purple); }
 .record-card { background: var(--bg-card); padding: 6px 8px; border-radius: 4px; border: 1px solid var(--border-color); border-left: 4px solid var(--app-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; transition: all 0.2s; display: flex; flex-direction: column; gap: 4px; } 
 .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); } 
 .record-card.active-view { background: rgba(70, 29, 124, 0.1); border-color: var(--app-primary); }
+.record-card.no-pdf-card { 
+    opacity: 0.6; 
+    border-left-color: #9ca3af; 
+    cursor: not-allowed !important; 
+} 
+.record-card.no-pdf-card:hover { 
+    transform: none; 
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+}
 .panel-name { font-size: 14px; font-weight: 800; color: var(--app-primary); margin: 0; letter-spacing: -0.3px; line-height: 1.1; } 
 .badge-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; }
 
@@ -299,7 +308,8 @@ input[type=range] { accent-color: var(--lsu-purple); }
 .hud-badge.match-orange { background: var(--match-orange-bg); color: var(--match-orange-text); }
 .hud-badge.match-red { background: var(--match-red-bg); color: var(--match-red-text); } 
 .hud-badge.match-keyword { background: var(--match-keyword-bg); color: var(--match-keyword-text); } 
-.hud-badge.no-pdf { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; } 
+.hud-badge.no-pdf { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 900; } 
+body.dark-mode .hud-badge.no-pdf { background: #7f1d1d; color: #fecaca; border: 1px solid #991b1b; }
 .hud-badge.unknown { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
 
 .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; } 

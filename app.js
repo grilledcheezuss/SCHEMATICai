@@ -2075,10 +2075,16 @@ class SearchEngine {
                 w+=10; 
             }
 
-            if(!r.pdfUrl) w -= 1000000; 
             r.w=w; r.p=p; r.hpV=hpV; res.push(r);
         });
+        
+        // Sort by weight first
         res.sort((a,b) => { if(a.w !== b.w) return b.w - a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
+        
+        // Segregate results: with-PDF first, then no-PDF, preserving intra-group order
+        const withPdf = res.filter(r => r.pdfUrl || r.pdfStatus === "present");
+        const noPdf = res.filter(r => !r.pdfUrl && r.pdfStatus !== "present");
+        res = [...withPdf, ...noPdf];
         
         this.currentResults = res;
         this.currentPage = 1;
@@ -3183,10 +3189,16 @@ class UI {
                     b += `<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`; 
                 }); 
             } 
-            if(!i.pdfUrl) b += `<span class="hud-badge no-pdf">NO PDF</span>`; 
+            
+            // Check if PDF is missing (using both pdfUrl and pdfStatus for robustness)
+            const hasPdf = i.pdfUrl || i.pdfStatus === "present";
+            if(!hasPdf) b += `<span class="hud-badge no-pdf">NO PDF</span>`; 
             
             const c = document.createElement('div'); 
-            c.className = `record-card ${!i.p?'varied-result':''}`; 
+            c.className = `record-card ${!i.p?'varied-result':''} ${!hasPdf?'no-pdf-card':''}`; 
+            if (!hasPdf) {
+                c.title = "PDF not available for this panel";
+            }
             c.innerHTML = `
                 <div class="panel-name">${i.displayId || i.id}</div>
                 <div class="badge-row">${b}</div>
@@ -3196,12 +3208,15 @@ class UI {
                 </div>
             `; 
             
-            c.onclick = () => { 
-                document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
-                c.classList.add('active-view'); 
-                PdfController.load(i.id, i.pdfUrl); 
-            }; 
-            a.appendChild(c); 
+            // Only wire onclick for cards with PDF
+            if (hasPdf) {
+                c.onclick = () => { 
+                    document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
+                    c.classList.add('active-view'); 
+                    PdfController.load(i.id, i.pdfUrl); 
+                };
+            }
+            a.appendChild(c);
         }); 
     }
 }
