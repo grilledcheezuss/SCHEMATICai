@@ -241,9 +241,7 @@ class DataLoader {
         console.log("🚀 Starting Preload...");
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "⏳ INITIALIZING...";
         
-        const loads = [
-            fetch('cover_sheet_template.pdf').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.TEMPLATE_BYTES=b; console.log("✅ PDF Template Loaded");}).catch(e=>console.warn("⚠️ PDF Template Missing"))
-        ];
+        const loads = [];
         await Promise.allSettled(loads);
 
         btn.innerText = "🔒 PREPARING...";
