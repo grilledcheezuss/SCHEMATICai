@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.3 (PDF Viewing/Redaction & Worker Hardening) ---
-const APP_VERSION = "v2.5.3";
+// --- SCHEMATICA ai v2.5.5 (Authentication Recovery & PDF Loading) ---
+const APP_VERSION = "v2.5.5";
 const VERSION_HISTORY = {
+    "v2.5.5": "Authentication recovery: session expiry handling, pre-sync verification, PDF loading by panel ID improvements",
     "v2.5.3": "PDF viewing/redaction improvements: preview step, overlay visibility, OCR lazy-load, export fixes; Worker hardening: secret keys, host allowlist, SSRF guards",
     "v2.5.2": "Fixed Control Panel tabs organization, CSS for redaction boxes, version sync",
     "v2.5.1": "Fixed Control Panel: redaction boxes now appear, page dropdown works, added tabbed UI",
@@ -216,6 +217,24 @@ class AuthService {
     static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
+    static handleExpiredSession() {
+        console.warn("🔒 Session expired - clearing credentials");
+        
+        // Clear storage
+        localStorage.removeItem('cox_user');
+        localStorage.removeItem('cox_pass');
+        sessionStorage.clear();
+        
+        // Update UI
+        document.documentElement.classList.remove('logged-in');
+        document.getElementById('auth-overlay').classList.add('active-modal');
+        
+        // Reset sync attempts
+        localStorage.setItem('cox_sync_attempts', '0');
+        
+        // User feedback
+        alert("Your session has expired. Please login again.");
+    }
 }
 
 class NetworkService {
@@ -260,6 +279,26 @@ class DataLoader {
             if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; } else { btn.innerText = "⬇️ RESUMING..."; } 
         } else { btn.innerText = "⏳ INITIALIZING SYNC..."; await new Promise(r => setTimeout(r, 200)); btn.innerText = "⬇️ SYNCING..."; }
         
+        // Pre-sync auth verification
+        btn.innerText = "🔐 VERIFYING CREDENTIALS...";
+        try {
+            const testAuth = await NetworkService.fetch('MAIN', '&pageSize=1');
+            if (testAuth.status === 401) {
+                console.error("🔒 Pre-sync auth check failed");
+                AuthService.handleExpiredSession();
+                btn.innerText = "LOGIN REQUIRED";
+                btn.disabled = false;
+                btn.classList.add('error');
+                return;
+            }
+        } catch(e) {
+            console.error("🔒 Pre-sync auth verification error:", e);
+            btn.innerText = "⚠️ CONNECTION ERROR";
+            btn.disabled = false;
+            btn.classList.add('warning');
+            return;
+        }
+        
         await this.fetchPartition('desc', btn);
         if(!btn.classList.contains('error')) { 
             btn.innerText = "✅ FINALIZING..."; 
@@ -300,7 +339,14 @@ class DataLoader {
                     throw e; 
                 }
 
-                if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
+                if(r.status===401) { 
+                    console.error("🔒 Mid-sync authentication failed");
+                    AuthService.handleExpiredSession();
+                    btn.classList.add('error'); 
+                    btn.innerText = "LOGIN REQUIRED"; 
+                    btn.disabled = false;
+                    break; 
+                }
                 
                 if(r.status!==200) { 
                     console.warn(`🔥 Server returned ${r.status}. Pausing to let network breathe...`);

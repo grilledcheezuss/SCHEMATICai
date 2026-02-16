@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.4 (Enhanced Error Handling & Logging)
+// 🧠 SCHEMATICA ai WORKER v2.5.5 (Authentication Recovery & PDF Loading)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
