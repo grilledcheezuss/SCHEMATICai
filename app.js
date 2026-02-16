@@ -2082,8 +2082,16 @@ class SearchEngine {
         res.sort((a,b) => { if(a.w !== b.w) return b.w - a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
         
         // Segregate results: with-PDF first, then no-PDF, preserving intra-group order
-        const withPdf = res.filter(r => r.pdfUrl || r.pdfStatus === "present");
-        const noPdf = res.filter(r => !r.pdfUrl && r.pdfStatus !== "present");
+        // Use single iteration for efficiency
+        const withPdf = [];
+        const noPdf = [];
+        res.forEach(r => {
+            if (r.pdfUrl || r.pdfStatus === "present") {
+                withPdf.push(r);
+            } else {
+                noPdf.push(r);
+            }
+        });
         res = [...withPdf, ...noPdf];
         
         this.currentResults = res;
@@ -3190,9 +3198,11 @@ class UI {
                 }); 
             } 
             
-            // Check if PDF is missing (using both pdfUrl and pdfStatus for robustness)
+            // Check if PDF is available
+            // pdfUrl: backward compatibility with existing data
+            // pdfStatus: new field from worker (v2.5.3+)
             const hasPdf = i.pdfUrl || i.pdfStatus === "present";
-            if(!hasPdf) b += `<span class="hud-badge no-pdf">NO PDF</span>`; 
+            if(!hasPdf) b += `<span class="hud-badge no-pdf">NO PDF</span>`;
             
             const c = document.createElement('div'); 
             c.className = `record-card ${!i.p?'varied-result':''} ${!hasPdf?'no-pdf-card':''}`; 
