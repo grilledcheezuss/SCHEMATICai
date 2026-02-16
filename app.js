@@ -2350,6 +2350,13 @@ function isPdfBuffer(arrayBuffer) {
     return header.every((byte, i) => byte === pdfMagic[i]);
 }
 
+// Helper function to convert bytes to hex string for diagnostics
+function bytesToHex(arrayBuffer, maxLength = 16) {
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) return '';
+    const preview = new Uint8Array(arrayBuffer.slice(0, Math.min(maxLength, arrayBuffer.byteLength)));
+    return Array.from(preview).map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+
 // Enhanced PDF validation with content-type, size and magic bytes
 function validatePdfResponse(resp, arrayBuffer, context = '') {
     const MIN_PDF_SIZE = 1024; // 1KB minimum
@@ -2374,8 +2381,7 @@ function validatePdfResponse(resp, arrayBuffer, context = '') {
         
         // Log first bytes as hex for diagnostics
         if (arrayBuffer && arrayBuffer.byteLength > 0) {
-            const preview = new Uint8Array(arrayBuffer.slice(0, Math.min(16, arrayBuffer.byteLength)));
-            const hexPreview = Array.from(preview).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            const hexPreview = bytesToHex(arrayBuffer);
             console.error(`[${context}] First bytes (hex): ${hexPreview}`);
         }
         
@@ -2384,8 +2390,7 @@ function validatePdfResponse(resp, arrayBuffer, context = '') {
     
     // Check PDF magic number
     if (!isPdfBuffer(arrayBuffer)) {
-        const preview = new Uint8Array(arrayBuffer.slice(0, Math.min(16, arrayBuffer.byteLength)));
-        const hexPreview = Array.from(preview).map(b => b.toString(16).padStart(2, '0')).join(' ');
+        const hexPreview = bytesToHex(arrayBuffer);
         console.error(`[${context}] Missing PDF magic bytes. First bytes (hex): ${hexPreview}`);
         return { valid: false, reason: 'Missing %PDF- magic bytes' };
     }
@@ -2400,6 +2405,8 @@ class PdfViewer {
     static currentRenderToken = 0;
     static loadingTask = null;
     static isPrinting = false;
+    static PRINT_CLEANUP_TIMEOUT_MS = 5000; // 5 seconds to allow for print dialog interaction
+    static PRINT_MAX_TIMEOUT_MS = 10000; // 10 second maximum timeout
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -2717,13 +2724,12 @@ class PdfViewer {
                 iframe.contentWindow.print();
                 
                 // Keep iframe alive through print dialog, then remove
-                // Longer timeout to ensure print dialog completes
                 setTimeout(() => {
                     if (iframe.parentNode) {
                         document.body.removeChild(iframe);
                     }
                     this.isPrinting = false;
-                }, 5000); // 5 seconds to allow for print dialog interaction
+                }, this.PRINT_CLEANUP_TIMEOUT_MS);
             } catch (e) {
                 console.error('Print error:', e);
                 if (iframe.parentNode) {
@@ -2739,7 +2745,7 @@ class PdfViewer {
                 document.body.removeChild(iframe);
             }
             this.isPrinting = false;
-        }, 10000); // 10 second maximum timeout
+        }, this.PRINT_MAX_TIMEOUT_MS);
     }
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); 
