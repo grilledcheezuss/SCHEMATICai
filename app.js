@@ -240,9 +240,6 @@ class DataLoader {
 
         console.log("🚀 Starting Preload...");
         const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "⏳ INITIALIZING...";
-        
-        const loads = [];
-        await Promise.allSettled(loads);
 
         btn.innerText = "🔒 PREPARING...";
         await new Promise(r => setTimeout(r, 100)); 
