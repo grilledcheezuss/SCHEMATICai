@@ -527,8 +527,8 @@ export default {
                 // Search for the record in the main database using a single OR() query
                 try {
                     console.log('[PDF_BY_ID] Searching all variants:', variations.join(', '));
-                    // Escape double quotes in variant names to prevent formula injection
-                    const formula = `OR(${variations.map(v => `{Control Panel Name}="${v.replace(/"/g, '\\"')}"`).join(',')})`;
+                    // Escape double quotes in variant names for Airtable formula (use "" not \")
+                    const formula = `OR(${variations.map(v => `{Control Panel Name}="${v.replace(/"/g, '""')}"`).join(',')})`;
                     const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
                                     `filterByFormula=${encodeURIComponent(formula)}` +
                                     `&fields%5B%5D=Control%20Panel%20PDF`;
