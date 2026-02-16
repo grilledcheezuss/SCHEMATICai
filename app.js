@@ -2336,7 +2336,6 @@ class PdfViewer {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
-                this.setLoadingState();
                 document.getElementById('pdf-placeholder-text').style.display = 'none';
                 document.getElementById('pdf-fallback').style.display = 'block';
                 // Set fallback link to the cached URL if available
@@ -2463,7 +2462,6 @@ class PdfViewer {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
-                this.setLoadingState();
                 document.getElementById('pdf-placeholder-text').style.display = 'none';
                 document.getElementById('pdf-fallback').style.display = 'block';
                 document.getElementById('pdf-fallback-link').href = url;
