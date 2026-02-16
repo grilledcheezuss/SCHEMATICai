@@ -2677,7 +2677,7 @@ class PdfController {
                     if (!this.isPreloading) break;
                     
                     // Validate PDF magic number before caching
-                    if (arrayBuffer && arrayBuffer.byteLength > 0 && isPdfBuffer(arrayBuffer)) {
+                    if (isPdfBuffer(arrayBuffer)) {
                         this.pdfCache.set(result.id, {
                             arrayBuffer: arrayBuffer,
                             blob: new Blob([arrayBuffer], { type: "application/pdf" }),
@@ -2761,7 +2761,13 @@ class UI {
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
     static clearPdfCache() { 
         const count = PdfController.clearAllCache(); 
-        alert(`Cleared ${count} cached PDF${count !== 1 ? 's' : ''}. Cache is now empty.`); 
+        console.log(`✓ User cleared ${count} cached PDF${count !== 1 ? 's' : ''}`);
+        // Use a simple console-based notification instead of blocking alert
+        // Future enhancement: add a toast/snackbar UI component for better UX
+        const msg = `Cleared ${count} cached PDF${count !== 1 ? 's' : ''}. Cache is now empty.`;
+        console.log(msg);
+        // Temporary alert for user feedback - should be replaced with toast notification
+        alert(msg);
     }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
