@@ -1238,6 +1238,9 @@ class SmartScanner {
         
         console.log(`🔍 Starting scan of ${numPages} pages...`);
         
+        // Capture current fetchId to detect if PDF changes during scan
+        const scanFetchId = PdfViewer.currentFetchId;
+        
         const btn = document.querySelector('button[onclick="SmartScanner.scanAllPages()"]');
         const origText = btn ? btn.innerText : "";
         if(btn) { btn.innerText = "🔍 INITIALIZING..."; btn.disabled = true; }
@@ -1248,6 +1251,12 @@ class SmartScanner {
         try {
             console.log(`📄 Scanning ${numPages} pages...`);
             for(let i = 1; i <= numPages; i++) {
+                // Check if PDF has changed (user switched to different PDF)
+                if (PdfViewer.currentFetchId !== scanFetchId) {
+                    console.log('[scanAllPages] Scan cancelled - PDF changed during scan');
+                    break;
+                }
+                
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
                 if(!wrapper) continue;
                 
@@ -1255,13 +1264,53 @@ class SmartScanner {
                 
                 // Validate document is still valid before getPage()
                 if(!PdfViewer.isDocumentValid()) {
-                    console.warn('PDF document became invalid during scan');
+                    console.warn('[scanAllPages] PDF document became invalid during scan');
                     break;
                 }
                 
-                // Try fast path first
-                const page = await PdfViewer.doc.getPage(i);
-                const textContent = await page.getTextContent();
+                // Wrap getPage in try/catch
+                let page;
+                try {
+                    page = await PdfViewer.doc.getPage(i);
+                } catch (pageError) {
+                    console.error(`[scanAllPages] Failed to get page ${i}:`, pageError);
+                    // Check for destroyed transport
+                    if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
+                        console.error('[scanAllPages] Transport destroyed - stopping scan');
+                        break;
+                    }
+                    continue; // Skip this page
+                }
+                
+                if (!page) {
+                    console.warn(`[scanAllPages] Page ${i} is null, skipping`);
+                    continue;
+                }
+                
+                // Check again if PDF changed after await
+                if (PdfViewer.currentFetchId !== scanFetchId) {
+                    console.log('[scanAllPages] Scan cancelled - PDF changed after getPage');
+                    break;
+                }
+                
+                // Wrap getTextContent in try/catch
+                let textContent;
+                try {
+                    textContent = await page.getTextContent();
+                } catch (textError) {
+                    console.error(`[scanAllPages] Failed to get text content for page ${i}:`, textError);
+                    if (textError.message?.includes('destroyed')) {
+                        console.error('[scanAllPages] Transport destroyed - stopping scan');
+                        break;
+                    }
+                    continue; // Skip this page
+                }
+                
+                // Check again if PDF changed after await
+                if (PdfViewer.currentFetchId !== scanFetchId) {
+                    console.log('[scanAllPages] Scan cancelled - PDF changed after getTextContent');
+                    break;
+                }
                 
                 let detectedZones = null;
                 let scanConfidence = 'low';
@@ -1282,6 +1331,12 @@ class SmartScanner {
                         scanConfidence = 'medium';
                         ocrPages++;
                     }
+                }
+                
+                // Check again if PDF changed after processing
+                if (PdfViewer.currentFetchId !== scanFetchId) {
+                    console.log('[scanAllPages] Scan cancelled - PDF changed after zone detection');
+                    break;
                 }
                 
                 // Apply detected zones or fallback to layout rules
@@ -1309,7 +1364,7 @@ class SmartScanner {
                 setTimeout(() => { btn.innerText = origText; }, 3000);
             }
         } catch(e) { 
-            console.error(e); 
+            console.error('[scanAllPages] Scan error:', e); 
             if(btn) btn.innerText = "❌ SCAN FAILED";
         } finally {
             if(btn) btn.disabled = false;
@@ -1614,9 +1669,12 @@ class SmartScanner {
     
     static async rescanPage(pageNum) {
         if(!PdfViewer.isDocumentValid()) {
-            console.warn('Cannot rescan: PDF document is not loaded or invalid');
+            console.warn('[rescanPage] Cannot rescan: PDF document is not loaded or invalid');
             return;
         }
+        
+        // Capture current fetchId to detect if PDF changes during rescan
+        const scanFetchId = PdfViewer.currentFetchId;
         
         const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${pageNum}"]`);
         if(!wrapper) return;
@@ -1632,13 +1690,51 @@ class SmartScanner {
             
             // Validate document is still valid before getPage()
             if(!PdfViewer.isDocumentValid()) {
-                console.warn('PDF document is invalid, cannot rescan');
+                console.warn('[rescanPage] PDF document is invalid, cannot rescan');
                 return;
             }
             
-            // Run smart scan on this page only
-            const page = await PdfViewer.doc.getPage(pageNum);
-            const textContent = await page.getTextContent();
+            // Wrap getPage in try/catch
+            let page;
+            try {
+                page = await PdfViewer.doc.getPage(pageNum);
+            } catch (pageError) {
+                console.error(`[rescanPage] Failed to get page ${pageNum}:`, pageError);
+                // Check for destroyed transport
+                if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
+                    console.error('[rescanPage] Transport destroyed - cannot rescan');
+                }
+                return;
+            }
+            
+            if (!page) {
+                console.warn(`[rescanPage] Page ${pageNum} is null, cannot rescan`);
+                return;
+            }
+            
+            // Check if PDF changed after await
+            if (PdfViewer.currentFetchId !== scanFetchId) {
+                console.log('[rescanPage] Rescan cancelled - PDF changed');
+                return;
+            }
+            
+            // Wrap getTextContent in try/catch
+            let textContent;
+            try {
+                textContent = await page.getTextContent();
+            } catch (textError) {
+                console.error(`[rescanPage] Failed to get text content for page ${pageNum}:`, textError);
+                if (textError.message?.includes('destroyed')) {
+                    console.error('[rescanPage] Transport destroyed - cannot rescan');
+                }
+                return;
+            }
+            
+            // Check if PDF changed after await
+            if (PdfViewer.currentFetchId !== scanFetchId) {
+                console.log('[rescanPage] Rescan cancelled - PDF changed after getTextContent');
+                return;
+            }
             
             let detectedZones = null;
             let scanConfidence = 'low';
@@ -1651,6 +1747,12 @@ class SmartScanner {
                 if(detectedZones && detectedZones.length > 0) scanConfidence = 'medium';
             }
             
+            // Check if PDF changed after processing
+            if (PdfViewer.currentFetchId !== scanFetchId) {
+                console.log('[rescanPage] Rescan cancelled - PDF changed after zone detection');
+                return;
+            }
+            
             if(detectedZones && detectedZones.length > 0) {
                 this.applyDetectedZones(wrapper, detectedZones);
             } else {
@@ -1660,7 +1762,7 @@ class SmartScanner {
             this.addConfidenceIndicator(wrapper, scanConfidence);
             RedactionManager.refreshContent();
         } catch(e) {
-            console.error('Rescan failed:', e);
+            console.error('[rescanPage] Rescan failed:', e);
         } finally {
             if(btn) btn.innerHTML = origText;
         }
@@ -2248,10 +2350,71 @@ function isPdfBuffer(arrayBuffer) {
     return header.every((byte, i) => byte === pdfMagic[i]);
 }
 
+/**
+ * Converts the first N bytes of an ArrayBuffer to a space-separated hex string for diagnostic logging
+ * @param {ArrayBuffer} arrayBuffer - The buffer to convert
+ * @param {number} maxLength - Maximum number of bytes to convert (default: 16)
+ * @returns {string} Space-separated hex string (e.g., "25 50 44 46 2d" for "%PDF-")
+ * @example
+ * // Returns "25 50 44 46 2d 31 2e 37"
+ * bytesToHex(pdfArrayBuffer, 8)
+ */
+function bytesToHex(arrayBuffer, maxLength = 16) {
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) return '';
+    const preview = new Uint8Array(arrayBuffer.slice(0, Math.min(maxLength, arrayBuffer.byteLength)));
+    return Array.from(preview).map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+
+// Enhanced PDF validation with content-type, size and magic bytes
+function validatePdfResponse(resp, arrayBuffer, context = '') {
+    const MIN_PDF_SIZE = 1024; // 1KB minimum
+    
+    // Check response status
+    if (!resp || !resp.ok) {
+        console.error(`[${context}] Invalid response status: ${resp?.status || 'unknown'}`);
+        return { valid: false, reason: `HTTP ${resp?.status || 'unknown'}` };
+    }
+    
+    // Check content-type header
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().includes('pdf')) {
+        console.error(`[${context}] Invalid content-type: ${contentType}`);
+        return { valid: false, reason: `Invalid content-type: ${contentType}` };
+    }
+    
+    // Check minimum size
+    if (!arrayBuffer || arrayBuffer.byteLength < MIN_PDF_SIZE) {
+        const size = arrayBuffer?.byteLength || 0;
+        console.error(`[${context}] PDF too small: ${size} bytes (min ${MIN_PDF_SIZE})`);
+        
+        // Log first bytes as hex for diagnostics
+        if (arrayBuffer && arrayBuffer.byteLength > 0) {
+            const hexPreview = bytesToHex(arrayBuffer);
+            console.error(`[${context}] First bytes (hex): ${hexPreview}`);
+        }
+        
+        return { valid: false, reason: `Size too small: ${size} bytes` };
+    }
+    
+    // Check PDF magic number
+    if (!isPdfBuffer(arrayBuffer)) {
+        const hexPreview = bytesToHex(arrayBuffer);
+        console.error(`[${context}] Missing PDF magic bytes. First bytes (hex): ${hexPreview}`);
+        return { valid: false, reason: 'Missing %PDF- magic bytes' };
+    }
+    
+    // All checks passed
+    return { valid: true };
+}
+
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
+    static currentRenderToken = 0;
     static loadingTask = null;
+    static isPrinting = false;
+    static PRINT_CLEANUP_TIMEOUT_MS = 5000; // 5 seconds to allow for print dialog interaction
+    static PRINT_MAX_TIMEOUT_MS = 10000; // 10 second maximum timeout
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -2298,20 +2461,50 @@ class PdfViewer {
             
             const arrayBuffer = await resp.arrayBuffer();
 
-            if (this.currentFetchId !== fetchId) return; 
+            if (this.currentFetchId !== fetchId) {
+                console.log(`PDF load cancelled (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
+                return;
+            }
 
-            // Validate PDF magic number before attempting to load
-            if (!isPdfBuffer(arrayBuffer)) {
-                console.error(`Invalid PDF response for panel ${panelId} (status: ${resp.status}, content-type: ${resp.headers.get('content-type')})`);
-                throw new Error('Response is not a valid PDF');
+            // Enhanced validation with diagnostics
+            const validation = validatePdfResponse(resp, arrayBuffer, `loadById[${panelId}]`);
+            if (!validation.valid) {
+                console.error(`[loadById] Invalid PDF for panel ${panelId}: ${validation.reason}`);
+                document.getElementById('pdf-placeholder-text').style.display = 'none';
+                document.getElementById('pdf-fallback').style.display = 'block';
+                if (fallbackUrl) {
+                    document.getElementById('pdf-fallback-link').href = fallbackUrl;
+                }
+                return;
             }
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(blob);
             
-            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-            this.doc = await this.loadingTask.promise;
+            // Wrap pdfjsLib.getDocument in try/catch
+            try {
+                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+                this.doc = await this.loadingTask.promise;
+            } catch (pdfError) {
+                console.error(`[loadById] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
+                // Check for InvalidPDFException
+                if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
+                    console.error(`[loadById] InvalidPDFException detected - PDF is malformed`);
+                }
+                throw pdfError; // Re-throw to outer catch
+            }
+
+            // Check if document is valid after loading
+            if (!this.isDocumentValid()) {
+                throw new Error('Loaded PDF document is null or destroyed after loading');
+            }
+
+            // Check staleness again before rendering
+            if (this.currentFetchId !== fetchId) {
+                console.log(`PDF load cancelled after document load (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
+                return;
+            }
 
             if (window.innerWidth < 768) {
                  this.currentScale = 0.8;
@@ -2347,14 +2540,14 @@ class PdfViewer {
         // Load PDF from preloaded cache
         // Validate cached data structure
         if (!cached || !cached.arrayBuffer || !cached.blob) {
-            console.warn('Invalid cached PDF data structure, falling back to network load');
+            console.warn('[loadFromCache] Invalid cached PDF data structure, falling back to network load');
             PdfController.evictFromCache(panelId);
             return this.loadById(panelId, fallbackUrl);
         }
         
         // Validate PDF magic number in cached buffer
         if (!isPdfBuffer(cached.arrayBuffer)) {
-            console.error(`Cached entry for panel ${panelId} is not a valid PDF - evicting and reloading from network`);
+            console.error(`[loadFromCache] Cached entry for panel ${panelId} is not a valid PDF - evicting and reloading from network`);
             PdfController.evictFromCache(panelId);
             return this.loadById(panelId, fallbackUrl);
         }
@@ -2379,12 +2572,31 @@ class PdfViewer {
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(cached.blob);
             
-            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
-            this.doc = await this.loadingTask.promise; 
+            // Wrap pdfjsLib.getDocument in try/catch
+            try {
+                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
+                this.doc = await this.loadingTask.promise;
+            } catch (pdfError) {
+                console.error(`[loadFromCache] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
+                // Check for InvalidPDFException
+                if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
+                    console.error(`[loadFromCache] InvalidPDFException detected - evicting bad cache entry`);
+                    PdfController.evictFromCache(panelId);
+                }
+                throw pdfError; // Re-throw to outer catch
+            }
 
             // Verify document is valid before continuing
             if (!this.isDocumentValid()) {
+                console.error('[loadFromCache] Loaded PDF document is null or destroyed after loading from cache');
+                PdfController.evictFromCache(panelId);
                 throw new Error('Loaded PDF document is null or destroyed after loading from cache');
+            }
+
+            // Check staleness before rendering
+            if (this.currentFetchId !== fetchId) {
+                console.log(`[loadFromCache] Load cancelled (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
+                return;
             }
 
             if (window.innerWidth < 768) {
@@ -2401,7 +2613,7 @@ class PdfViewer {
             await this.renderStack();
             console.log('✓ Loaded from cache'); 
         } catch(e) {
-            console.error("Cache Load Error:", e);
+            console.error("[loadFromCache] Cache Load Error:", e);
             // Evict bad cache entry and fall back to network loading
             PdfController.evictFromCache(panelId);
             this.loadById(panelId, fallbackUrl);
@@ -2435,14 +2647,48 @@ class PdfViewer {
             
             const arrayBuffer = await resp.arrayBuffer();
 
-            if (this.currentFetchId !== fetchId) return; 
+            if (this.currentFetchId !== fetchId) {
+                console.log(`[load] PDF load cancelled (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
+                return;
+            }
+
+            // Enhanced validation with diagnostics
+            const validation = validatePdfResponse(resp, arrayBuffer, `load[${url}]`);
+            if (!validation.valid) {
+                console.error(`[load] Invalid PDF from URL ${url}: ${validation.reason}`);
+                document.getElementById('pdf-placeholder-text').style.display = 'none';
+                document.getElementById('pdf-fallback').style.display = 'block';
+                document.getElementById('pdf-fallback-link').href = url;
+                return;
+            }
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(blob);
             
-            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-            this.doc = await this.loadingTask.promise; 
+            // Wrap pdfjsLib.getDocument in try/catch
+            try {
+                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+                this.doc = await this.loadingTask.promise;
+            } catch (pdfError) {
+                console.error(`[load] pdfjsLib.getDocument failed for URL ${url}:`, pdfError);
+                // Check for InvalidPDFException
+                if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
+                    console.error(`[load] InvalidPDFException detected - PDF is malformed`);
+                }
+                throw pdfError; // Re-throw to outer catch
+            }
+
+            // Check if document is valid after loading
+            if (!this.isDocumentValid()) {
+                throw new Error('Loaded PDF document is null or destroyed after loading');
+            }
+
+            // Check staleness again before rendering
+            if (this.currentFetchId !== fetchId) {
+                console.log(`[load] PDF load cancelled after document load (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
+                return;
+            }
 
             if (window.innerWidth < 768) {
                  this.currentScale = 0.8;
@@ -2469,8 +2715,48 @@ class PdfViewer {
     }
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
-        const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = this.currentBlobUrl; document.body.appendChild(iframe);
-        iframe.onload = () => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => { document.body.removeChild(iframe); }, 2000); };
+        
+        // Immediately set flag to prevent concurrent prints (before any async operations)
+        if (this.isPrinting) {
+            console.warn('Print already in progress, ignoring duplicate print request');
+            return;
+        }
+        this.isPrinting = true;
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = this.currentBlobUrl;
+        document.body.appendChild(iframe);
+        
+        let fallbackTimeoutId = null;
+        
+        const cleanup = () => {
+            if (fallbackTimeoutId) {
+                clearTimeout(fallbackTimeoutId);
+                fallbackTimeoutId = null;
+            }
+            // More precise cleanup validation - check parent is document.body
+            if (iframe.parentNode === document.body) {
+                document.body.removeChild(iframe);
+            }
+            this.isPrinting = false;
+        };
+        
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                
+                // Keep iframe alive through print dialog, then cleanup
+                setTimeout(cleanup, this.PRINT_CLEANUP_TIMEOUT_MS);
+            } catch (e) {
+                console.error('Print error:', e);
+                cleanup();
+            }
+        };
+        
+        // Fallback cleanup in case onload never fires
+        fallbackTimeoutId = setTimeout(cleanup, this.PRINT_MAX_TIMEOUT_MS);
     }
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); 
@@ -2486,6 +2772,9 @@ class PdfViewer {
             return;
         }
         
+        // Capture render token to detect if rendering is superseded
+        const renderToken = ++this.currentRenderToken;
+        
         let coverDoc = this.doc;
         if (window.TEMPLATE_BYTES) {
              const tTask = pdfjsLib.getDocument(window.TEMPLATE_BYTES.slice(0));
@@ -2493,11 +2782,43 @@ class PdfViewer {
         }
 
         for (let i = 1; i <= this.doc.numPages; i++) {
+            // Check if render has been superseded
+            if (this.currentRenderToken !== renderToken) {
+                console.log(`[renderStack] Render cancelled (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
+                return;
+            }
+            
+            // Check if document is still valid
+            if (!this.isDocumentValid()) {
+                console.warn('[renderStack] Document became invalid during rendering');
+                return;
+            }
+            
             await new Promise(r => setTimeout(r, 10)); 
             let page; let isTemplate = false;
-            if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) { page = await coverDoc.getPage(1); isTemplate = true; } else { page = await this.doc.getPage(i); }
+            
+            // Wrap getPage in try/catch
+            try {
+                if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) {
+                    page = await coverDoc.getPage(1);
+                    isTemplate = true;
+                } else {
+                    page = await this.doc.getPage(i);
+                }
+            } catch (pageError) {
+                console.error(`[renderStack] Failed to get page ${i}:`, pageError);
+                // Check for destroyed transport or InvalidPDFException
+                if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
+                    console.error('[renderStack] Transport destroyed - stopping render');
+                    return;
+                }
+                continue; // Skip this page and continue with others
+            }
 
-            if (!page) continue; // Skip if page couldn't be loaded
+            if (!page) {
+                console.warn(`[renderStack] Page ${i} is null, skipping`);
+                continue;
+            }
             
             const viewport = page.getViewport({ scale: this.currentScale });
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
@@ -2557,13 +2878,24 @@ class PdfViewer {
             console.log(`  - Container: ${contentContainer.offsetWidth}x${contentContainer.offsetHeight}`);
             console.log(`  - Redaction layer: ${rLayer.offsetWidth}x${rLayer.offsetHeight}`);
 
-            // Add null check for canvas context
+            // Check again if render has been superseded before rendering canvas
+            if (this.currentRenderToken !== renderToken) {
+                console.log(`[renderStack] Render cancelled before canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
+                return;
+            }
+
+            // Add null check for canvas context and wrap render in try/catch
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 try {
                     await page.render({ canvasContext: ctx, viewport }).promise;
-                } catch (e) {
-                    console.warn(`Failed to render page ${i}:`, e);
+                } catch (renderError) {
+                    console.warn(`[renderStack] Failed to render page ${i}:`, renderError);
+                    // Check for destroyed transport
+                    if (renderError.message?.includes('destroyed') || renderError.message?.includes('Transport destroyed')) {
+                        console.error('[renderStack] Transport destroyed during render - stopping');
+                        return;
+                    }
                 }
             }
         }
@@ -2661,7 +2993,7 @@ class PdfController {
                 const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
                 
                 if (resp.status === 404) {
-                    console.warn(`Skipping preload: PDF not found for ${result.displayId || result.id}`);
+                    console.warn(`[preload] Skipping: PDF not found for ${result.displayId || result.id}`);
                     continue; // Skip this one, continue with others
                 }
                 
@@ -2671,22 +3003,26 @@ class PdfController {
                     // Check if still preloading (might have been cancelled)
                     if (!this.isPreloading) break;
                     
-                    // Validate PDF magic number before caching
-                    if (isPdfBuffer(arrayBuffer)) {
-                        this.pdfCache.set(result.id, {
-                            arrayBuffer: arrayBuffer,
-                            blob: new Blob([arrayBuffer], { type: "application/pdf" }),
-                            timestamp: Date.now()
-                        });
-                        console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
-                    } else {
-                        console.warn(`Skipping preload: Invalid PDF response for ${result.displayId || result.id} (status: ${resp.status}, content-type: ${resp.headers.get('content-type')})`);
+                    // Enhanced validation with content-type and size checks
+                    const validation = validatePdfResponse(resp, arrayBuffer, `preload[${result.displayId || result.id}]`);
+                    if (!validation.valid) {
+                        console.warn(`[preload] Skipping invalid PDF for ${result.displayId || result.id}: ${validation.reason}`);
+                        // Do not cache invalid PDFs - quarantine by skipping
+                        continue;
                     }
+                    
+                    // Cache valid PDF
+                    this.pdfCache.set(result.id, {
+                        arrayBuffer: arrayBuffer,
+                        blob: new Blob([arrayBuffer], { type: "application/pdf" }),
+                        timestamp: Date.now()
+                    });
+                    console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
                 } else {
-                    console.warn(`Skipping preload: Response not OK for ${result.displayId || result.id} (status: ${resp.status})`);
+                    console.warn(`[preload] Skipping: Response not OK for ${result.displayId || result.id} (status: ${resp.status})`);
                 }
             } catch (e) {
-                console.warn(`Failed to preload PDF ${result.id}:`, e);
+                console.warn(`[preload] Failed to preload PDF ${result.id}:`, e);
                 // Continue preloading other PDFs even if one fails
             }
             
