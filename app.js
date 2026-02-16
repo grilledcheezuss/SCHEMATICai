@@ -216,6 +216,50 @@ class AuthService {
     static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
+    
+    static async verifyAuth() {
+        const u = localStorage.getItem('cox_user');
+        const p = localStorage.getItem('cox_pass');
+        
+        if (!u || !p) {
+            return { valid: false, reason: 'missing_credentials' };
+        }
+        
+        // Lightweight auth check - fetch 1 record from MAIN
+        try {
+            const resp = await NetworkService.fetch('MAIN', '&pageSize=1');
+            if (resp.status === 401) {
+                return { valid: false, reason: 'invalid_credentials' };
+            }
+            if (!resp.ok) {
+                return { valid: false, reason: 'network_error' };
+            }
+            return { valid: true };
+        } catch (e) {
+            console.error('Auth verification failed:', e);
+            return { valid: false, reason: 'network_error' };
+        }
+    }
+    
+    static clearAuth() {
+        localStorage.removeItem('cox_user');
+        localStorage.removeItem('cox_pass');
+        document.documentElement.classList.remove('logged-in');
+    }
+    
+    static showLoginModal(message = null) {
+        const modal = document.getElementById('auth-overlay');
+        const messageEl = document.getElementById('auth-message');
+        
+        if (message && messageEl) {
+            messageEl.textContent = message;
+            messageEl.style.display = 'block';
+        } else if (messageEl) {
+            messageEl.style.display = 'none';
+        }
+        
+        modal.classList.add('active-modal');
+    }
 }
 
 class NetworkService {
@@ -245,6 +289,22 @@ class DataLoader {
             fetch('cover_sheet_template.pdf').then(r=>{if(!r.ok)throw new Error('404'); return r.arrayBuffer();}).then(b=>{window.TEMPLATE_BYTES=b; console.log("✅ PDF Template Loaded");}).catch(e=>console.warn("⚠️ PDF Template Missing"))
         ];
         await Promise.allSettled(loads);
+
+        // Pre-sync auth verification
+        btn.innerText = "🔐 VERIFYING AUTH...";
+        const authCheck = await AuthService.verifyAuth();
+        
+        if (!authCheck.valid) {
+            console.warn('Auth verification failed:', authCheck.reason);
+            btn.innerText = "⚠️ SESSION EXPIRED";
+            btn.classList.add('warning');
+            btn.disabled = false;
+            btn.onclick = () => {
+                AuthService.clearAuth();
+                AuthService.showLoginModal("Your session has expired. Please log in again.");
+            };
+            return; // Stop preload, don't attempt sync
+        }
 
         btn.innerText = "🔒 PREPARING...";
         await new Promise(r => setTimeout(r, 100)); 
@@ -300,7 +360,24 @@ class DataLoader {
                     throw e; 
                 }
 
-                if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
+                if(r.status===401) { 
+                    console.error("❌ Auth failed during sync (401)");
+                    
+                    // Clear auth state
+                    AuthService.clearAuth();
+                    
+                    // Update UI
+                    btn.classList.remove('error');
+                    btn.classList.add('warning');
+                    btn.innerText = "⚠️ SESSION EXPIRED";
+                    btn.disabled = false;
+                    btn.onclick = () => {
+                        AuthService.showLoginModal("Your session expired during sync. Please log in again.");
+                    };
+                    
+                    console.groupEnd();
+                    return; // Exit sync gracefully
+                }
                 
                 if(r.status!==200) { 
                     console.warn(`🔥 Server returned ${r.status}. Pausing to let network breathe...`);

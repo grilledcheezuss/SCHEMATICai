@@ -20,6 +20,9 @@
 
 <div id="auth-overlay" class="active-modal">
     <div class="auth-card">
+        <!-- Message container for session expiry, etc. -->
+        <div id="auth-message" style="display: none; background: var(--match-orange-bg); color: var(--match-orange-text); padding: 8px; border-radius: 4px; margin-bottom: 15px; font-size: 12px;"></div>
+        
         <h2 style="color:var(--app-primary);">SCHEMATICA ai</h2>
         <form onsubmit="event.preventDefault(); AuthService.login();">
             <input type="text" id="auth-user" class="cox-input" placeholder="Username" style="margin-bottom:10px;" autocomplete="username">
