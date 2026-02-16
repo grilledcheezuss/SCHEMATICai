@@ -2354,7 +2354,10 @@ function isPdfBuffer(arrayBuffer) {
  * Converts the first N bytes of an ArrayBuffer to a space-separated hex string for diagnostic logging
  * @param {ArrayBuffer} arrayBuffer - The buffer to convert
  * @param {number} maxLength - Maximum number of bytes to convert (default: 16)
- * @returns {string} Space-separated hex string (e.g., "25 50 44 46 2d")
+ * @returns {string} Space-separated hex string (e.g., "25 50 44 46 2d" for "%PDF-")
+ * @example
+ * // Returns "25 50 44 46 2d 31 2e 37"
+ * bytesToHex(pdfArrayBuffer, 8)
  */
 function bytesToHex(arrayBuffer, maxLength = 16) {
     if (!arrayBuffer || arrayBuffer.byteLength === 0) return '';
@@ -2732,7 +2735,8 @@ class PdfViewer {
                 clearTimeout(fallbackTimeoutId);
                 fallbackTimeoutId = null;
             }
-            if (iframe.parentNode) {
+            // More precise cleanup validation - check parent is document.body
+            if (iframe.parentNode === document.body) {
                 document.body.removeChild(iframe);
             }
             this.isPrinting = false;
