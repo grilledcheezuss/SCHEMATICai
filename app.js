@@ -2098,10 +2098,10 @@ class SearchEngine {
             }, PRELOAD_START_DELAY_MS);
         }
     }
+}
 
-
-    
-    }
+class PdfExporter {
+    static previewPdfBytes = null;
     
     static async confirmExport() {
         if (!this.previewPdfBytes) {
@@ -3147,6 +3147,7 @@ static render(res, crit, totalCount) {
         }
         a.appendChild(c); 
     }); 
+}
 }
 
 window.UI = UI;
