@@ -3111,42 +3111,46 @@ class UI {
     static toggleSearch(e) { const c = document.getElementById('search-controls'); if(!c) return; if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
     static toggleMenu() { document.getElementById('main-menu').classList.toggle('visible'); }
     
-    static pop() { 
-        // Save current filter values before repopulating
-        const m = document.getElementById('mfgInput'); const cv = m.value; 
-        const savedValues = {
-            hp: document.getElementById('hpInput').value,
-            volt: document.getElementById('voltInput').value,
-            phase: document.getElementById('phaseInput').value,
-            enc: document.getElementById('encInput').value,
-            cat: document.getElementById('catInput').value,
-            keyword: document.getElementById('keywordInput').value
-        };
-        
-        // Use found manufacturers if available, otherwise use training data
-        const cleanList = window.FOUND_MFGS.size > 0 
+static pop() { 
+    // Preserve current selections before repopulating
+    const savedValues = {
+        mfg: document.getElementById('mfgInput')?.value,
+        hp: document.getElementById('hpInput')?.value,
+        volt: document.getElementById('voltInput')?.value,
+        phase: document.getElementById('phaseInput')?.value,
+        enc: document.getElementById('encInput')?.value,
+        cat: document.getElementById('catInput')?.value,
+        keyword: document.getElementById('keywordInput')?.value
+    };
+
+    // Manufacturer list: use found manufacturers when available, fall back to training data
+    const m = document.getElementById('mfgInput');
+    if (m) {
+        const cleanList = window.FOUND_MFGS.size > 0
             ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
             : [...AI_TRAINING_DATA.MANUFACTURERS].sort();
-        
-        m.innerHTML='Any'; 
-        cleanList.forEach(v=>m.add(new Option(v,v))); 
-        m.value=cv; 
-        
-        ['hp','volt','phase','enc'].forEach(k=>{ 
-            const s=document.getElementById(k+'Input'); 
-            if(!s)return; 
-            const d = (k==='enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()];
-            s.innerHTML='Any'; 
-            d.forEach(v=>s.add(new Option(v,v))); 
-            // Restore saved value
-            if(savedValues[k]) s.value = savedValues[k];
-        }); 
-        
-        // Restore category and keyword (these don't get repopulated, but restore just in case)
-        if(savedValues.cat) document.getElementById('catInput').value = savedValues.cat;
-        if(savedValues.keyword) document.getElementById('keywordInput').value = savedValues.keyword;
+
+        m.innerHTML = '';
+        m.add(new Option('Any', 'Any'));
+        cleanList.forEach(v => m.add(new Option(v, v)));
+        m.value = savedValues.mfg && cleanList.includes(savedValues.mfg) ? savedValues.mfg : 'Any';
     }
 
+    // HP / Volt / Phase / Enclosure
+    ['hp', 'volt', 'phase', 'enc'].forEach(k => {
+        const s = document.getElementById(k + 'Input');
+        if (!s) return;
+        const data = (k === 'enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()];
+        s.innerHTML = '';
+        s.add(new Option('Any', 'Any'));
+        data.forEach(v => s.add(new Option(v, v)));
+        s.value = (savedValues[k] && data.includes(savedValues[k])) ? savedValues[k] : 'Any';
+    });
+
+    // Restore category and keywords (if present)
+    if (savedValues.cat) document.getElementById('catInput').value = savedValues.cat;
+    if (savedValues.keyword) document.getElementById('keywordInput').value = savedValues.keyword;
+}
     static render(res, crit, totalCount) { 
         const a = document.getElementById('results-area'); 
         a.innerHTML = `Found ${totalCount || res.length} records`; 
@@ -3266,3 +3270,4 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("System failed to initialize. Please clear cache and reload.");
     }
 });
+
