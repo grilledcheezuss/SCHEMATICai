@@ -2252,6 +2252,13 @@ class PdfViewer {
         return this.doc && !this.doc.destroyed;
     }
 
+    static updateBlobUrl(blob) {
+        // Helper method to safely update blob URL
+        const newBlobUrl = URL.createObjectURL(blob);
+        if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+        this.currentBlobUrl = newBlobUrl;
+    }
+
     static async loadById(panelId, fallbackUrl) {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
@@ -2296,9 +2303,7 @@ class PdfViewer {
             if (this.currentFetchId !== fetchId) return; 
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-            const newBlobUrl = URL.createObjectURL(blob);
-            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentBlobUrl = newBlobUrl;
+            this.updateBlobUrl(blob);
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
             this.doc = await this.loadingTask.promise; 
@@ -2358,9 +2363,7 @@ class PdfViewer {
                 this.loadingTask = null;
             }
 
-            const newBlobUrl = URL.createObjectURL(cached.blob);
-            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentBlobUrl = newBlobUrl;
+            this.updateBlobUrl(cached.blob);
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
             this.doc = await this.loadingTask.promise; 
@@ -2420,9 +2423,7 @@ class PdfViewer {
             if (this.currentFetchId !== fetchId) return; 
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-            const newBlobUrl = URL.createObjectURL(blob);
-            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentBlobUrl = newBlobUrl;
+            this.updateBlobUrl(blob);
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
             this.doc = await this.loadingTask.promise; 
