@@ -2261,7 +2261,6 @@ class PdfViewer {
     static setReadyState() {
         const viewer = document.getElementById('custom-pdf-viewer');
         if (viewer) {
-            viewer.classList.remove('pdf-loading');
             viewer.classList.add('pdf-ready');
         }
     }
