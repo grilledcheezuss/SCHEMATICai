@@ -524,41 +524,38 @@ export default {
                 let pdfUrl = null;
                 let foundVariant = null;
                 
-                // Search for the record in the main database
-                for (const variant of variations) {
-                    try {
-                        console.log('[PDF_BY_ID] Trying variant:', variant);
-                        const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
-                                        `filterByFormula=${encodeURIComponent(`{Control Panel Name}="${variant}"`)}` +
-                                        `&fields%5B%5D=Control%20Panel%20PDF`;
-                        
-                        const searchResp = await fetch(searchUrl, { 
-                            headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
-                        });
-                        
-                        if (!searchResp.ok) {
-                            console.error('[PDF_BY_ID] Search failed for variant:', variant, 'Status:', searchResp.status);
-                            continue;
-                        }
-                        
-                        const searchData = await searchResp.json();
-                        if (searchData.records && searchData.records.length > 0) {
-                            const record = searchData.records[0];
-                            pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
-                            if (pdfUrl) {
-                                foundVariant = variant;
-                                console.log('[PDF_BY_ID] Found record with variant:', variant, 'PDF URL:', pdfUrl);
-                                break;
-                            } else {
-                                console.log('[PDF_BY_ID] Record found for variant:', variant, 'but no PDF URL attached');
-                            }
-                        } else {
-                            console.log('[PDF_BY_ID] No records found for variant:', variant);
-                        }
-                    } catch (error) {
-                        console.error('[PDF_BY_ID] Error searching variant:', variant, 'Error:', error.message);
-                        // Continue to next variant on error
+                // Search for the record in the main database using a single OR() query
+                try {
+                    console.log('[PDF_BY_ID] Searching all variants:', variations.join(', '));
+                    const formula = `OR(${variations.map(v => `{Control Panel Name}="${v}"`).join(',')})`;
+                    const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
+                                    `filterByFormula=${encodeURIComponent(formula)}` +
+                                    `&fields%5B%5D=Control%20Panel%20PDF`;
+                    
+                    const searchResp = await fetch(searchUrl, { 
+                        headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
+                    });
+                    
+                    if (!searchResp.ok) {
+                        console.error('[PDF_BY_ID] Search failed. Status:', searchResp.status);
+                        throw new Error(`Airtable search failed with status ${searchResp.status}`);
                     }
+                    
+                    const searchData = await searchResp.json();
+                    if (searchData.records && searchData.records.length > 0) {
+                        const record = searchData.records[0];
+                        pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
+                        foundVariant = record.fields['Control Panel Name'];
+                        if (pdfUrl) {
+                            console.log('[PDF_BY_ID] Found record with variant:', foundVariant, 'PDF URL:', pdfUrl);
+                        } else {
+                            console.log('[PDF_BY_ID] Record found for variant:', foundVariant, 'but no PDF URL attached');
+                        }
+                    } else {
+                        console.log('[PDF_BY_ID] No records found for any variant');
+                    }
+                } catch (error) {
+                    console.error('[PDF_BY_ID] Error searching variants:', error.message);
                 }
                 
                 // Null-URL validation

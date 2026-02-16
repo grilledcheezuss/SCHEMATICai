@@ -2245,6 +2245,7 @@ class PdfExporter {
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
+    static _fetchCounter = 0;
     static loadingTask = null;
 
     static isDocumentValid() {
@@ -2252,6 +2253,9 @@ class PdfViewer {
     }
 
     static async loadById(panelId, fallbackUrl) {
+        // Cancel any active OCR tasks when loading a new PDF
+        SmartScanner.cancelAllOcrTasks();
+        
         // Load PDF by panel ID via worker (fetches fresh attachment URL from Airtable)
         this.url = fallbackUrl || "";
         document.getElementById('pdf-fallback').style.display = 'none'; 
@@ -2261,7 +2265,7 @@ class PdfViewer {
         document.getElementById('pdf-placeholder-text').style.display = 'flex';
         document.getElementById('pdf-placeholder-text').innerText = "⏳ DOWNLOADING PDF...";
 
-        const fetchId = Date.now();
+        const fetchId = ++PdfViewer._fetchCounter;
         this.currentFetchId = fetchId;
 
         try {
@@ -2292,8 +2296,9 @@ class PdfViewer {
             if (this.currentFetchId !== fetchId) return; 
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+            const newBlobUrl = URL.createObjectURL(blob);
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentBlobUrl = URL.createObjectURL(blob);
+            this.currentBlobUrl = newBlobUrl;
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
             this.doc = await this.loadingTask.promise; 
@@ -2326,6 +2331,9 @@ class PdfViewer {
     }
 
     static async loadFromCache(cached, panelId, fallbackUrl) {
+        // Cancel any active OCR tasks when loading a new PDF
+        SmartScanner.cancelAllOcrTasks();
+        
         // Load PDF from preloaded cache
         // Validate cached data
         if (!cached || !cached.arrayBuffer || !cached.blob) {
@@ -2341,7 +2349,7 @@ class PdfViewer {
         document.getElementById('pdf-placeholder-text').style.display = 'flex';
         document.getElementById('pdf-placeholder-text').innerText = "⚡ LOADING FROM CACHE...";
 
-        const fetchId = Date.now();
+        const fetchId = ++PdfViewer._fetchCounter;
         this.currentFetchId = fetchId;
 
         try {
@@ -2350,8 +2358,9 @@ class PdfViewer {
                 this.loadingTask = null;
             }
 
+            const newBlobUrl = URL.createObjectURL(cached.blob);
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentBlobUrl = URL.createObjectURL(cached.blob);
+            this.currentBlobUrl = newBlobUrl;
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
             this.doc = await this.loadingTask.promise; 
@@ -2393,7 +2402,7 @@ class PdfViewer {
         document.getElementById('pdf-placeholder-text').style.display = 'flex';
         document.getElementById('pdf-placeholder-text').innerText = "⏳ DOWNLOADING PDF...";
 
-        const fetchId = Date.now();
+        const fetchId = ++PdfViewer._fetchCounter;
         this.currentFetchId = fetchId;
 
         try {
@@ -2411,8 +2420,9 @@ class PdfViewer {
             if (this.currentFetchId !== fetchId) return; 
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+            const newBlobUrl = URL.createObjectURL(blob);
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentBlobUrl = URL.createObjectURL(blob);
+            this.currentBlobUrl = newBlobUrl;
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
             this.doc = await this.loadingTask.promise; 
