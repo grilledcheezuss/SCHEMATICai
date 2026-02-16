@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.3
+## Version: v2.5.5
 
 ## Overview
 
@@ -8,7 +8,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ---
 
-## Security Features (v2.5.3)
+## Security Features (v2.5.5)
 
 ### Environment Secrets
 API keys are now read from Worker environment secrets instead of hardcoded values:
@@ -284,6 +284,8 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.5**: Auth recovery: Session expiry now forces clean reload for guaranteed state reset
+- **v2.5.4**: Enhanced Error Handling & Logging for PDF operations
 - **v2.5.3**: Security hardening, SSRF guards, environment secrets
 - **v2.4.4**: Instant sync, background ML training
 - Previous versions: See VERSION_HISTORY in app.js
