@@ -681,7 +681,7 @@ export default {
 
                     const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
                     const pdfStatus = pdfUrl ? "present" : "missing";
-                    
+
                     return {
                         id: cleanId, displayId: "CP-" + cleanId, desc: fullDesc, pdfUrl: pdfUrl, pdfStatus: pdfStatus,
                         mfg: finalMfg, hp: finalHp, volt: finalVolt, phase: finalPhase, enc: finalEnc, category: finalCategory,
