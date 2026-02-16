@@ -894,7 +894,7 @@ class RedactionManager {
     
     static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14, text = null, decoration = null, type = null, fontWeight = 'normal', transparent = false, rotation = 0, fontFamily = null, textAlign = 'center') {
         let container = wrapper.querySelector('.pdf-content-container');
-        if (!container && wrapper.classList.contains('pdf-content-container')) container = wrapper;
+        if (!container && wrapper.classList.contains('.pdf-content-container')) container = wrapper;
         if (!container) {
             console.error('❌ Container not found for zone creation');
             return;
@@ -1127,7 +1127,7 @@ class RedactionManager {
             
             const span = box.querySelector('span'); 
             if(span) span.innerText = text; 
-            else box.innerHTML = `<span>${text}</span><div class="redaction-resize-handle"></div>`;
+            else box.innerHTML = `${text}`;
             
             if(box.dataset.decoration === 'underline') { 
                 box.style.textDecoration = 'underline'; 
@@ -1808,35 +1808,35 @@ class LayoutScanner {
         selects.forEach(select => {
             const currentVal = select.value;
             let html = `
-                <option value="AUTO">✨ Auto (Detected)</option>
-                <optgroup label="Title & Cover Sheets">
-                    <option value="TITLE">🏷️ Title Sheet (Standard)</option>
-                    <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
-                    <option value="COX_COVER">🏢 Cox Cover Sheet</option>
-                    <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
-                    <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
-                </optgroup>
-                <optgroup label="Info & Notes">
-                    <option value="INFO">📝 Info / Notes (Standard)</option>
-                    <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
-                </optgroup>
-                <optgroup label="Schematics">
-                    <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
-                    <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
-                    <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
-                    <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
-                </optgroup>
-                <optgroup label="Special">
-                    <option value="DOOR_DRAWING">🚪 Door Drawing</option>
-                    <option value="GENERAL">📐 General</option>
-                </optgroup>
+                ✨ Auto (Detected)
+                
+                    🏷️ Title Sheet (Standard)
+                    📋 Title Sheet (As-Built)
+                    🏢 Cox Cover Sheet
+                    🔷 Delta Cover Sheet
+                    📄 3rd Party Cover
+                
+                
+                    📝 Info / Notes (Standard)
+                    🖼️ Info (Borderless)
+                
+                
+                    📄 Schematic (Portrait)
+                    🖼️ Schematic (Portrait Borderless)
+                    🔄 Schematic (Landscape)
+                    🖼️ Schematic (Landscape Borderless)
+                
+                
+                    🚪 Door Drawing
+                    📐 General
+                
             `;
             if (Object.keys(customProfiles).length > 0) {
-                html += '<optgroup label="Custom Profiles">';
+                html += '';
                 for (const [name, _] of Object.entries(customProfiles)) {
-                    html += `<option value="CUSTOM:${name}">⭐ ${name}</option>`;
+                    html += `⭐ ${name}`;
                 }
-                html += '</optgroup>';
+                html += '';
             }
             select.innerHTML = html;
             select.value = currentVal;
@@ -1916,7 +1916,7 @@ class FeedbackService {
 
     static setupInput(elId, data, paramKey) { 
         const el = document.getElementById(elId); 
-        el.innerHTML = '<option value="" disabled selected>Select Correct...</option><option value="Varied">Varied / Multiple</option>'; 
+        el.innerHTML = 'Select Correct...Varied / Multiple'; 
         data.forEach(d => el.add(new Option(d, d))); 
         if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } 
     }
@@ -2075,12 +2075,15 @@ class SearchEngine {
                 w+=10; 
             }
 
-            if(!r.pdfUrl) w -= 1000000; 
+            // Removed huge no-PDF penalty; handled via post-sort segregation
             r.w=w; r.p=p; r.hpV=hpV; res.push(r);
         });
         res.sort((a,b) => { if(a.w !== b.w) return b.w - a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
         
-        this.currentResults = res;
+        // Partition: with PDF first, then no-PDF, preserving intra-group order
+        const withPdf = res.filter(r => r.pdfUrl);
+        const noPdf = res.filter(r => !r.pdfUrl);
+        this.currentResults = [...withPdf, ...noPdf];
         this.currentPage = 1;
         this.renderCurrentPage(crit);
         
@@ -2157,13 +2160,13 @@ class PdfExporter {
             // Show preview modal
             const modal = document.getElementById('pdf-preview-modal');
             const container = document.getElementById('pdf-preview-container');
-            container.innerHTML = '<p style="text-align:center; padding:20px;">Loading preview...</p>';
+            container.innerHTML = '<p>Loading preview...</p>';
             modal.style.display = 'block';
             
             // Render preview
             const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
             const previewUrl = URL.createObjectURL(blob);
-            container.innerHTML = `<iframe src="${previewUrl}" style="width:100%; height:600px; border:none;"></iframe>`;
+            container.innerHTML = `<iframe src="${previewUrl}" style="width:100%; height:80vh; border:none;"></iframe>`;
         } catch (e) {
             console.error(e);
             alert("Preview Failed: " + e.message);
@@ -2829,32 +2832,32 @@ class PdfViewer {
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
             toolbar.innerHTML = `
-                <span>PAGE ${i}</span>
-                <select class="page-profile-select" onchange="LayoutScanner.updatePageProfile(${i}, this.value)">
-                    <option value="AUTO">✨ Auto (Detected)</option>
-                    <optgroup label="Title & Cover Sheets">
-                        <option value="TITLE">🏷️ Title Sheet (Standard)</option>
-                        <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
-                        <option value="COX_COVER">🏢 Cox Cover Sheet</option>
-                        <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
-                        <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
-                    </optgroup>
-                    <optgroup label="Info & Notes">
-                        <option value="INFO">📝 Info / Notes (Standard)</option>
-                        <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
-                    </optgroup>
-                    <optgroup label="Schematics">
-                        <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
-                        <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
-                        <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
-                        <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
-                    </optgroup>
-                    <optgroup label="Special">
-                        <option value="DOOR_DRAWING">🚪 Door Drawing</option>
-                        <option value="GENERAL">📐 General</option>
-                    </optgroup>
-                </select>
-                <button class="rescan-page-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
+                PAGE ${i}
+                
+                    ✨ Auto (Detected)
+                    
+                        🏷️ Title Sheet (Standard)
+                        📋 Title Sheet (As-Built)
+                        🏢 Cox Cover Sheet
+                        🔷 Delta Cover Sheet
+                        📄 3rd Party Cover
+                    
+                    
+                        📝 Info / Notes (Standard)
+                        🖼️ Info (Borderless)
+                    
+                    
+                        📄 Schematic (Portrait)
+                        🖼️ Schematic (Portrait Borderless)
+                        🔄 Schematic (Landscape)
+                        🖼️ Schematic (Landscape Borderless)
+                    
+                    
+                        🚪 Door Drawing
+                        📐 General
+                    
+                
+                🔄
             `;
             wrapper.appendChild(toolbar);
 
@@ -3125,7 +3128,7 @@ class UI {
             ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
             : [...AI_TRAINING_DATA.MANUFACTURERS].sort();
         
-        m.innerHTML='<option value="Any">Any</option>'; 
+        m.innerHTML='Any'; 
         cleanList.forEach(v=>m.add(new Option(v,v))); 
         m.value=cv; 
         
@@ -3133,7 +3136,7 @@ class UI {
             const s=document.getElementById(k+'Input'); 
             if(!s)return; 
             const d = (k==='enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()];
-            s.innerHTML='<option value="Any">Any</option>'; 
+            s.innerHTML='Any'; 
             d.forEach(v=>s.add(new Option(v,v))); 
             // Restore saved value
             if(savedValues[k]) s.value = savedValues[k];
@@ -3146,61 +3149,71 @@ class UI {
 
     static render(res, crit, totalCount) { 
         const a = document.getElementById('results-area'); 
-        a.innerHTML = `<div style="padding:5px;font-size:12px;opacity:0.7;">Found ${totalCount || res.length} records</div>`; 
-        const critJson = JSON.stringify(crit).replace(/"/g, '&quot;'); 
+        a.innerHTML = `Found ${totalCount || res.length} records`; 
+        const critJson = JSON.stringify(crit).replace(/"/g, '"'); 
         
         res.forEach(i => { 
+            const isMissingPdf = !i.pdfUrl || i.pdfStatus === "missing";
             let b = ''; 
-            if(i.category === 'low_voltage') b+=`<span class="hud-badge match-orange">LOW VOLT</span>`; 
+            if(i.category === 'low_voltage') b+=`LOW VOLT`; 
             
             if (crit.mfg !== "Any" && i.mfg) { 
                 const isMatch = (i.mfg === crit.mfg); 
                 const style = isMatch ? 'match-green' : 'match-orange'; 
-                b += `<span class="hud-badge ${style}">${i.mfg}</span>`; 
+                b += `${i.mfg}`; 
             } 
             if(crit.volt !== "Any") { 
-                if(i.volt) b+=`<span class="hud-badge match-green">${i.volt}V</span>`; 
-                else b+=`<span class="hud-badge match-orange">? V</span>`; 
+                if(i.volt) b+=`${i.volt}V`; 
+                else b+=`? V`; 
             } 
             if(crit.phase !== "Any") { 
-                if(i.phase) b+=`<span class="hud-badge match-green">${i.phase}PH</span>`; 
-                else b+=`<span class="hud-badge match-orange">? PH</span>`; 
+                if(i.phase) b+=`${i.phase}PH`; 
+                else b+=`? PH`; 
             } 
             if(crit.hp !== "Any") { 
                 if(i.hp) { 
-                    if (parseFloat(i.hp) === parseFloat(crit.hp)) b+=`<span class="hud-badge match-green">${i.hp} HP</span>`; 
-                    else b+=`<span class="hud-badge match-orange">${i.hp} HP</span>`; 
+                    if (parseFloat(i.hp) === parseFloat(crit.hp)) b+=`${i.hp} HP`; 
+                    else b+=`${i.hp} HP`; 
                 } else { 
-                    b+=`<span class="hud-badge match-orange">? HP</span>`; 
+                    b+=`? HP`; 
                 } 
             } 
             if(crit.enc !== "Any" && i.enc) { 
-                b+=`<span class="hud-badge match-green">${i.enc}</span>`; 
+                b+=`${i.enc}`; 
             } 
             if(crit.kw && crit.kw.length > 0) { 
                 crit.kw.forEach(k => { 
                     if(crit.mfg !== "Any" && i.mfg === k.toUpperCase()) return; 
-                    b += `<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`; 
+                    b += `${k.toUpperCase()}`; 
                 }); 
             } 
-            if(!i.pdfUrl) b += `<span class="hud-badge no-pdf">NO PDF</span>`; 
+            if(isMissingPdf) b += `NO PDF`; 
             
             const c = document.createElement('div'); 
-            c.className = `record-card ${!i.p?'varied-result':''}`; 
+            c.className = `record-card ${isMissingPdf ? 'no-pdf-card' : ''} ${!i.p?'varied-result':''}`; 
             c.innerHTML = `
                 <div class="panel-name">${i.displayId || i.id}</div>
-                <div class="badge-row">${b}</div>
+                <div class="badge-row">
+                    ${b}
+                    ${isMissingPdf ? '<span class="hud-badge no-pdf">NO PDF</span>' : ''}
+                </div>
                 <div class="card-actions">
-                    <button class="thumb-btn up" onclick="event.stopPropagation();FeedbackService.up('${i.id}',this, ${critJson})">👍</button>
-                    <button class="thumb-btn down" onclick="event.stopPropagation();FeedbackService.down('${i.id}',this)">👎</button>
+                    <button class="thumb-btn up" title="Correct" onclick="event.stopPropagation(); FeedbackService.up('${i.id}', this, ${critJson});">👍</button>
+                    <button class="thumb-btn down" title="Report Inaccuracy" onclick="event.stopPropagation(); FeedbackService.down('${i.id}', this, ${critJson});">👎</button>
                 </div>
             `; 
             
-            c.onclick = () => { 
-                document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
-                c.classList.add('active-view'); 
-                PdfController.load(i.id, i.pdfUrl); 
-            }; 
+            if (!isMissingPdf) {
+                c.onclick = () => { 
+                    document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
+                    c.classList.add('active-view'); 
+                    PdfController.load(i.id, i.pdfUrl); 
+                };
+            } else {
+                c.title = 'No PDF attached in Airtable';
+                c.style.cursor = 'not-allowed';
+                c.style.opacity = '0.75';
+            }
             a.appendChild(c); 
         }); 
     }
