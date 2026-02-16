@@ -233,7 +233,7 @@ class AuthService {
         localStorage.setItem('cox_sync_attempts', '0');
         
         // User feedback
-        alert("Your session has expired. Please login again.");
+        alert("Your session has expired. Please log in again.");
     }
 }
 
