@@ -2350,7 +2350,12 @@ function isPdfBuffer(arrayBuffer) {
     return header.every((byte, i) => byte === pdfMagic[i]);
 }
 
-// Helper function to convert bytes to hex string for diagnostics
+/**
+ * Converts the first N bytes of an ArrayBuffer to a space-separated hex string for diagnostic logging
+ * @param {ArrayBuffer} arrayBuffer - The buffer to convert
+ * @param {number} maxLength - Maximum number of bytes to convert (default: 16)
+ * @returns {string} Space-separated hex string (e.g., "25 50 44 46 2d")
+ */
 function bytesToHex(arrayBuffer, maxLength = 16) {
     if (!arrayBuffer || arrayBuffer.byteLength === 0) return '';
     const preview = new Uint8Array(arrayBuffer.slice(0, Math.min(maxLength, arrayBuffer.byteLength)));
@@ -2707,45 +2712,47 @@ class PdfViewer {
     }
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
+        
+        // Immediately set flag to prevent concurrent prints (before any async operations)
         if (this.isPrinting) {
             console.warn('Print already in progress, ignoring duplicate print request');
             return;
         }
-        
         this.isPrinting = true;
+        
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
         iframe.src = this.currentBlobUrl;
         document.body.appendChild(iframe);
+        
+        let fallbackTimeoutId = null;
+        
+        const cleanup = () => {
+            if (fallbackTimeoutId) {
+                clearTimeout(fallbackTimeoutId);
+                fallbackTimeoutId = null;
+            }
+            if (iframe.parentNode) {
+                document.body.removeChild(iframe);
+            }
+            this.isPrinting = false;
+        };
         
         iframe.onload = () => {
             try {
                 iframe.contentWindow.focus();
                 iframe.contentWindow.print();
                 
-                // Keep iframe alive through print dialog, then remove
-                setTimeout(() => {
-                    if (iframe.parentNode) {
-                        document.body.removeChild(iframe);
-                    }
-                    this.isPrinting = false;
-                }, this.PRINT_CLEANUP_TIMEOUT_MS);
+                // Keep iframe alive through print dialog, then cleanup
+                setTimeout(cleanup, this.PRINT_CLEANUP_TIMEOUT_MS);
             } catch (e) {
                 console.error('Print error:', e);
-                if (iframe.parentNode) {
-                    document.body.removeChild(iframe);
-                }
-                this.isPrinting = false;
+                cleanup();
             }
         };
         
         // Fallback cleanup in case onload never fires
-        setTimeout(() => {
-            if (iframe.parentNode) {
-                document.body.removeChild(iframe);
-            }
-            this.isPrinting = false;
-        }, this.PRINT_MAX_TIMEOUT_MS);
+        fallbackTimeoutId = setTimeout(cleanup, this.PRINT_MAX_TIMEOUT_MS);
     }
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); 
