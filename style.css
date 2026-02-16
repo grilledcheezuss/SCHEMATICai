@@ -259,6 +259,7 @@ input[type=range] { accent-color: var(--lsu-purple); }
 .search-btn:hover { filter: brightness(1.2); }
 .search-btn:disabled { background-color: #9ca3af !important; opacity: 0.7; filter: none; cursor: default !important; } 
 .search-btn.error { background-color: #991b1b !important; border-color: #7f1d1d !important; }
+.search-btn.warning { background-color: var(--match-orange-bg) !important; border-color: #c2410c !important; cursor: pointer !important; }
 
 .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; } 
 
