@@ -2251,9 +2251,29 @@ class PdfViewer {
         return this.doc && !this.doc.destroyed;
     }
 
+    static setLoadingState() {
+        const viewer = document.getElementById('custom-pdf-viewer');
+        if (viewer) {
+            viewer.classList.add('pdf-loading');
+            viewer.classList.remove('pdf-ready');
+        }
+    }
+
+    static setReadyState() {
+        const viewer = document.getElementById('custom-pdf-viewer');
+        if (viewer) {
+            viewer.classList.remove('pdf-loading');
+            viewer.classList.add('pdf-ready');
+        }
+    }
+
     static async loadById(panelId, fallbackUrl) {
+        // Cancel any active OCR tasks when loading a new PDF
+        SmartScanner.cancelAllOcrTasks();
+        
         // Load PDF by panel ID via worker (fetches fresh attachment URL from Airtable)
         this.url = fallbackUrl || "";
+        this.setLoadingState();
         document.getElementById('pdf-fallback').style.display = 'none'; 
         document.getElementById('pdf-toolbar').style.display = 'none';
         document.getElementById('custom-pdf-viewer').style.display = 'none'; 
@@ -2309,12 +2329,14 @@ class PdfViewer {
             document.getElementById('pdf-toolbar').style.display = 'flex';
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
 
-            await this.renderStack(); 
+            await this.renderStack();
+            this.setReadyState();
         } catch(e) {
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
+                this.setLoadingState();
                 document.getElementById('pdf-placeholder-text').style.display = 'none';
                 document.getElementById('pdf-fallback').style.display = 'block';
                 // Set fallback link to the cached URL if available
@@ -2326,6 +2348,9 @@ class PdfViewer {
     }
 
     static async loadFromCache(cached, panelId, fallbackUrl) {
+        // Cancel any active OCR tasks when loading a new PDF
+        SmartScanner.cancelAllOcrTasks();
+        
         // Load PDF from preloaded cache
         // Validate cached data
         if (!cached || !cached.arrayBuffer || !cached.blob) {
@@ -2334,6 +2359,7 @@ class PdfViewer {
         }
         
         this.url = fallbackUrl || "";
+        this.setLoadingState();
         document.getElementById('pdf-fallback').style.display = 'none'; 
         document.getElementById('pdf-toolbar').style.display = 'none';
         document.getElementById('custom-pdf-viewer').style.display = 'none'; 
@@ -2373,6 +2399,7 @@ class PdfViewer {
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
 
             await this.renderStack();
+            this.setReadyState();
             console.log('✓ Loaded from cache'); 
         } catch(e) {
             console.error("Cache Load Error:", e);
@@ -2386,6 +2413,7 @@ class PdfViewer {
         SmartScanner.cancelAllOcrTasks();
         
         this.url = url;
+        this.setLoadingState();
         document.getElementById('pdf-fallback').style.display = 'none'; 
         document.getElementById('pdf-toolbar').style.display = 'none';
         document.getElementById('custom-pdf-viewer').style.display = 'none'; 
@@ -2428,12 +2456,14 @@ class PdfViewer {
             document.getElementById('pdf-toolbar').style.display = 'flex';
             document.getElementById('custom-pdf-viewer').style.display = 'flex';
 
-            await this.renderStack(); 
+            await this.renderStack();
+            this.setReadyState();
         } catch(e) {
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
+                this.setLoadingState();
                 document.getElementById('pdf-placeholder-text').style.display = 'none';
                 document.getElementById('pdf-fallback').style.display = 'block';
                 document.getElementById('pdf-fallback-link').href = url;
@@ -2446,6 +2476,9 @@ class PdfViewer {
         iframe.onload = () => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => { document.body.removeChild(iframe); }, 2000); };
     }
     static async renderStack() {
+        // Capture current fetchId at start to detect stale renders
+        const renderFetchId = this.currentFetchId;
+        
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
@@ -2459,6 +2492,12 @@ class PdfViewer {
             return;
         }
         
+        // Validate document before starting render
+        if (!this.isDocumentValid()) {
+            console.warn('Cannot render: document is null or destroyed');
+            return;
+        }
+        
         let coverDoc = this.doc;
         if (window.TEMPLATE_BYTES) {
              const tTask = pdfjsLib.getDocument(window.TEMPLATE_BYTES.slice(0));
@@ -2466,9 +2505,37 @@ class PdfViewer {
         }
 
         for (let i = 1; i <= this.doc.numPages; i++) {
+            // Check if a newer load has superseded this render
+            if (this.currentFetchId !== renderFetchId) {
+                console.log('Render cancelled: newer document load detected');
+                return;
+            }
+            
+            // Validate document is still valid before each page
+            if (!this.isDocumentValid()) {
+                console.warn('Render stopped: document destroyed during rendering');
+                return;
+            }
+            
             await new Promise(r => setTimeout(r, 10)); 
             let page; let isTemplate = false;
-            if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) { page = await coverDoc.getPage(1); isTemplate = true; } else { page = await this.doc.getPage(i); }
+            
+            try {
+                if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) { 
+                    page = await coverDoc.getPage(1); 
+                    isTemplate = true; 
+                } else { 
+                    page = await this.doc.getPage(i); 
+                }
+            } catch (e) {
+                // Check if superseded or destroyed
+                if (this.currentFetchId !== renderFetchId || !this.isDocumentValid()) {
+                    console.log('getPage cancelled: document superseded or destroyed');
+                    return;
+                }
+                console.warn(`Failed to get page ${i}:`, e);
+                continue;
+            }
 
             if (!page) continue; // Skip if page couldn't be loaded
             
@@ -2534,8 +2601,19 @@ class PdfViewer {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 try {
+                    // Check if superseded before rendering
+                    if (this.currentFetchId !== renderFetchId || !this.isDocumentValid()) {
+                        console.log('Render cancelled before page.render: document superseded or destroyed');
+                        return;
+                    }
+                    
                     await page.render({ canvasContext: ctx, viewport }).promise;
                 } catch (e) {
+                    // Check if superseded or destroyed
+                    if (this.currentFetchId !== renderFetchId || !this.isDocumentValid()) {
+                        console.log('page.render cancelled: document superseded or destroyed');
+                        return;
+                    }
                     console.warn(`Failed to render page ${i}:`, e);
                 }
             }
