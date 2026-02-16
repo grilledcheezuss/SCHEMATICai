@@ -302,6 +302,16 @@ input[type=range] { accent-color: var(--lsu-purple); }
 .hud-badge.no-pdf { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; } 
 .hud-badge.unknown { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
 
+.record-card.no-pdf-card {
+    opacity: 0.65;
+    cursor: not-allowed;
+    border-left-color: #9ca3af;
+}
+.record-card.no-pdf-card:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 .card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; } 
 
 .thumb-btn { 
