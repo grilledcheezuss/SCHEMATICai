@@ -1227,6 +1227,15 @@ class SmartScanner {
     static HORIZONTAL_TOLERANCE = 20;
     static FONT_SIZE_ESTIMATE_FACTOR = 0.8; // OCR font size estimation adjustment
     
+    // Helper method to check if error indicates PDF was destroyed
+    static isPdfDestroyedError(error) {
+        if (!error) return false;
+        const msg = error.message || '';
+        return msg.includes('destroyed') || 
+               msg.includes('sendWithPromise') || 
+               error.name === 'RenderingCancelledException';
+    }
+    
     static async scanAllPages() {
         console.log('🔍 Auto-scanning PDF pages...');
         RedactionManager.clearAll(); 
@@ -1292,7 +1301,7 @@ class SmartScanner {
                         return;
                     }
                 } catch(e) {
-                    if(e.message?.includes('destroyed') || e.message?.includes('null')) {
+                    if(this.isPdfDestroyedError(e)) {
                         console.log('Scan aborted: PDF was destroyed');
                         return;
                     }
@@ -1721,7 +1730,7 @@ class SmartScanner {
                     return;
                 }
             } catch(e) {
-                if(e.message?.includes('destroyed') || e.message?.includes('null')) {
+                if(this.isPdfDestroyedError(e)) {
                     console.log('Rescan aborted: PDF was destroyed');
                     return;
                 }
@@ -2606,41 +2615,53 @@ class PdfViewer {
         document.body.appendChild(iframe);
         this.printIframe = iframe;
         
+        // Cleanup function to remove iframe and reset state
+        const performCleanup = () => {
+            if (this.printIframe && document.body.contains(this.printIframe)) {
+                // Small delay to ensure dialog stays open during adjustments
+                setTimeout(() => {
+                    if (this.printIframe && document.body.contains(this.printIframe)) {
+                        document.body.removeChild(this.printIframe);
+                    }
+                    this.printIframe = null;
+                    this.isPrinting = false;
+                }, 1000);
+            } else {
+                this.printIframe = null;
+                this.isPrinting = false;
+            }
+        };
+        
         iframe.onload = () => { 
             iframe.contentWindow.focus(); 
             iframe.contentWindow.print(); 
             
-            // Keep iframe alive longer to prevent dialog from closing during adjustments
-            // Use longer timeout and listen for afterprint event if available
-            const cleanup = () => {
-                setTimeout(() => {
-                    if (this.printIframe && document.body.contains(this.printIframe)) {
-                        document.body.removeChild(this.printIframe);
-                        this.printIframe = null;
-                    }
-                    this.isPrinting = false;
-                }, 1000);
-            };
-            
-            // Listen for afterprint event (modern browsers)
+            // Listen for print media query changes (modern browsers)
+            // This detects when print dialog is closed
             if (iframe.contentWindow.matchMedia) {
                 const printMediaQuery = iframe.contentWindow.matchMedia('print');
                 const handlePrintChange = (e) => {
                     if (!e.matches) {
                         // Print dialog closed
-                        cleanup();
                         printMediaQuery.removeEventListener('change', handlePrintChange);
+                        performCleanup();
                     }
                 };
                 printMediaQuery.addEventListener('change', handlePrintChange);
+                
+                // Fallback timeout (30 seconds) in case print media query events don't fire
+                // This handles edge cases where the event listener may not work
+                setTimeout(() => {
+                    if (this.isPrinting) {
+                        printMediaQuery.removeEventListener('change', handlePrintChange);
+                        performCleanup();
+                    }
+                }, 30000);
+            } else {
+                // Fallback for browsers without matchMedia support
+                // Use shorter timeout since we can't detect dialog close
+                setTimeout(performCleanup, 5000);
             }
-            
-            // Fallback timeout if events don't fire
-            setTimeout(() => {
-                if (this.isPrinting) {
-                    cleanup();
-                }
-            }, 60000); // 60 second fallback timeout
         };
     }
     static async renderStack() {
