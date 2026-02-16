@@ -2082,8 +2082,8 @@ class SearchEngine {
         res.sort((a,b) => { if(a.w !== b.w) return b.w - a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
         
         // Partition: with-PDF first, then no-PDF (preserving intra-group order)
-        const withPdf = res.filter(r => r.pdfUrl || r.pdfStatus === "present");
-        const noPdf = res.filter(r => !r.pdfUrl && r.pdfStatus !== "present");
+        const withPdf = res.filter(r => r.pdfStatus === "present");
+        const noPdf = res.filter(r => r.pdfStatus !== "present");
         res = [...withPdf, ...noPdf];
         
         this.currentResults = res;
@@ -3191,8 +3191,8 @@ class UI {
             } 
             
             // Detect missing PDF
-            const hasPdf = i.pdfUrl && i.pdfStatus !== "missing";
-            if(!hasPdf) b += `<span class="hud-badge no-pdf">NO PDF</span>`; 
+            const hasPdf = i.pdfStatus === "present";
+            if(!hasPdf) b += `<span class="hud-badge no-pdf">NO PDF</span>`;
             
             const c = document.createElement('div'); 
             c.className = `record-card ${!i.p?'varied-result':''} ${!hasPdf?'no-pdf-card':''}`; 
