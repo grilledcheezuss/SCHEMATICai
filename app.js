@@ -2242,6 +2242,17 @@ class PdfExporter {
     }
 }
 
+// PDF Validation Utility
+function isPdfBuffer(arrayBuffer) {
+    // Check for PDF magic number: %PDF- at the start of the buffer
+    if (!arrayBuffer || arrayBuffer.byteLength < 5) {
+        return false;
+    }
+    const header = new Uint8Array(arrayBuffer.slice(0, 5));
+    const pdfMagic = [0x25, 0x50, 0x44, 0x46, 0x2D]; // %PDF-
+    return header.every((byte, i) => byte === pdfMagic[i]);
+}
+
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
@@ -2252,6 +2263,9 @@ class PdfViewer {
     }
 
     static async loadById(panelId, fallbackUrl) {
+        // Cancel any active OCR tasks when loading a new PDF
+        SmartScanner.cancelAllOcrTasks();
+        
         // Load PDF by panel ID via worker (fetches fresh attachment URL from Airtable)
         this.url = fallbackUrl || "";
         document.getElementById('pdf-fallback').style.display = 'none'; 
@@ -2291,12 +2305,18 @@ class PdfViewer {
 
             if (this.currentFetchId !== fetchId) return; 
 
+            // Validate PDF magic number before attempting to load
+            if (!isPdfBuffer(arrayBuffer)) {
+                console.error(`Invalid PDF response for panel ${panelId} (status: ${resp.status}, content-type: ${resp.headers.get('content-type')})`);
+                throw new Error('Response is not a valid PDF');
+            }
+
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(blob);
             
             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-            this.doc = await this.loadingTask.promise; 
+            this.doc = await this.loadingTask.promise;
 
             if (window.innerWidth < 768) {
                  this.currentScale = 0.8;
@@ -2326,10 +2346,21 @@ class PdfViewer {
     }
 
     static async loadFromCache(cached, panelId, fallbackUrl) {
+        // Cancel any active OCR tasks when loading a new PDF
+        SmartScanner.cancelAllOcrTasks();
+        
         // Load PDF from preloaded cache
-        // Validate cached data
+        // Validate cached data structure
         if (!cached || !cached.arrayBuffer || !cached.blob) {
-            console.warn('Invalid cached PDF data, falling back to regular load');
+            console.warn('Invalid cached PDF data structure, falling back to network load');
+            PdfController.evictFromCache(panelId);
+            return this.loadById(panelId, fallbackUrl);
+        }
+        
+        // Validate PDF magic number in cached buffer
+        if (!isPdfBuffer(cached.arrayBuffer)) {
+            console.error(`Cached entry for panel ${panelId} is not a valid PDF - evicting and reloading from network`);
+            PdfController.evictFromCache(panelId);
             return this.loadById(panelId, fallbackUrl);
         }
         
@@ -2376,7 +2407,8 @@ class PdfViewer {
             console.log('✓ Loaded from cache'); 
         } catch(e) {
             console.error("Cache Load Error:", e);
-            // Fall back to regular loading
+            // Evict bad cache entry and fall back to network loading
+            PdfController.evictFromCache(panelId);
             this.loadById(panelId, fallbackUrl);
         }
     }
@@ -2644,15 +2676,19 @@ class PdfController {
                     // Check if still preloading (might have been cancelled)
                     if (!this.isPreloading) break;
                     
-                    // Validate arrayBuffer before caching
-                    if (arrayBuffer && arrayBuffer.byteLength > 0) {
+                    // Validate PDF magic number before caching
+                    if (isPdfBuffer(arrayBuffer)) {
                         this.pdfCache.set(result.id, {
                             arrayBuffer: arrayBuffer,
                             blob: new Blob([arrayBuffer], { type: "application/pdf" }),
                             timestamp: Date.now()
                         });
                         console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
+                    } else {
+                        console.warn(`Skipping preload: Invalid PDF response for ${result.displayId || result.id} (status: ${resp.status}, content-type: ${resp.headers.get('content-type')})`);
                     }
+                } else {
+                    console.warn(`Skipping preload: Response not OK for ${result.displayId || result.id} (status: ${resp.status})`);
                 }
             } catch (e) {
                 console.warn(`Failed to preload PDF ${result.id}:`, e);
@@ -2673,6 +2709,22 @@ class PdfController {
     static stopPreloading() {
         this.isPreloading = false;
         this.preloadQueue = [];
+    }
+
+    static evictFromCache(id) {
+        // Remove a specific entry from cache
+        if (this.pdfCache.has(id)) {
+            this.pdfCache.delete(id);
+            console.log(`Evicted cached PDF: ${id}`);
+        }
+    }
+
+    static clearAllCache() {
+        // Clear all cached PDFs immediately (for user-initiated cache clear)
+        const count = this.pdfCache.size;
+        this.pdfCache.clear();
+        console.log(`Cleared all cached PDFs (${count} entries)`);
+        return count;
     }
 
     static clearCache() {
@@ -2707,6 +2759,16 @@ class PdfController {
 class UI {
     static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
     static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
+    static clearPdfCache() { 
+        const count = PdfController.clearAllCache(); 
+        console.log(`✓ User cleared ${count} cached PDF${count !== 1 ? 's' : ''}`);
+        // Use a simple console-based notification instead of blocking alert
+        // Future enhancement: add a toast/snackbar UI component for better UX
+        const msg = `Cleared ${count} cached PDF${count !== 1 ? 's' : ''}. Cache is now empty.`;
+        console.log(msg);
+        // Temporary alert for user feedback - should be replaced with toast notification
+        alert(msg);
+    }
     static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
     static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
     static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
