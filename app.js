@@ -2254,7 +2254,6 @@ class PdfViewer {
     static setLoadingState() {
         const viewer = document.getElementById('custom-pdf-viewer');
         if (viewer) {
-            viewer.classList.add('pdf-loading');
             viewer.classList.remove('pdf-ready');
         }
     }
@@ -2474,9 +2473,6 @@ class PdfViewer {
         iframe.onload = () => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => { document.body.removeChild(iframe); }, 2000); };
     }
     static async renderStack() {
-        // Capture current fetchId at start to detect stale renders
-        const renderFetchId = this.currentFetchId;
-        
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
@@ -2495,6 +2491,9 @@ class PdfViewer {
             console.warn('Cannot render: document is null or destroyed');
             return;
         }
+        
+        // Capture current fetchId after validation to detect stale renders
+        const renderFetchId = this.currentFetchId;
         
         let coverDoc = this.doc;
         if (window.TEMPLATE_BYTES) {
