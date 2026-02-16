@@ -1241,6 +1241,9 @@ class SmartScanner {
             return;
         }
         
+        // Capture currentFetchId at start to detect superseded loads
+        const scanFetchId = PdfViewer.currentFetchId;
+        
         console.log(`🔍 Starting scan of ${numPages} pages...`);
         
         const btn = document.querySelector('button[onclick="SmartScanner.scanAllPages()"]');
@@ -1253,6 +1256,12 @@ class SmartScanner {
         try {
             console.log(`📄 Scanning ${numPages} pages...`);
             for(let i = 1; i <= numPages; i++) {
+                // Check if load was superseded
+                if(PdfViewer.currentFetchId !== scanFetchId) {
+                    console.log('Scan aborted: PDF load was superseded');
+                    return;
+                }
+                
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
                 if(!wrapper) continue;
                 
@@ -1261,12 +1270,35 @@ class SmartScanner {
                 // Validate document is still valid before getPage()
                 if(!PdfViewer.isDocumentValid()) {
                     console.warn('PDF document became invalid during scan');
-                    break;
+                    return;
                 }
                 
-                // Try fast path first
-                const page = await PdfViewer.doc.getPage(i);
-                const textContent = await page.getTextContent();
+                // Try fast path first with error handling
+                let page, textContent;
+                try {
+                    page = await PdfViewer.doc.getPage(i);
+                    
+                    // Recheck after await
+                    if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                        console.log('Scan aborted: PDF changed during getPage');
+                        return;
+                    }
+                    
+                    textContent = await page.getTextContent();
+                    
+                    // Recheck after await
+                    if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                        console.log('Scan aborted: PDF changed during getTextContent');
+                        return;
+                    }
+                } catch(e) {
+                    if(e.message?.includes('destroyed') || e.message?.includes('null')) {
+                        console.log('Scan aborted: PDF was destroyed');
+                        return;
+                    }
+                    console.error(`Error getting page ${i}:`, e);
+                    continue;
+                }
                 
                 let detectedZones = null;
                 let scanConfidence = 'low';
@@ -1275,6 +1307,13 @@ class SmartScanner {
                 if(textContent.items.length > 10) {
                     if(btn) btn.innerText = `🔍 TEXT SCAN PAGE ${i}/${PdfViewer.doc.numPages}...`;
                     detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
+                    
+                    // Recheck after await
+                    if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                        console.log('Scan aborted: PDF changed during text extraction');
+                        return;
+                    }
+                    
                     if(detectedZones && detectedZones.length > 0) {
                         scanConfidence = 'high';
                         textPages++;
@@ -1283,6 +1322,13 @@ class SmartScanner {
                     // Fallback to OCR for scanned/image PDFs
                     if(btn) btn.innerText = `🔍 OCR PAGE ${i}/${PdfViewer.doc.numPages}...`;
                     detectedZones = await this.ocrBasedZones(page, wrapper);
+                    
+                    // Recheck after await - OCR may be cancelled, handle gracefully
+                    if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                        console.log('Scan aborted: PDF changed during OCR');
+                        return;
+                    }
+                    
                     if(detectedZones && detectedZones.length > 0) {
                         scanConfidence = 'medium';
                         ocrPages++;
@@ -1296,10 +1342,22 @@ class SmartScanner {
                     // Fallback to existing LAYOUT_RULES
                     scanConfidence = 'low';
                     await this.fallbackToLayoutRules(wrapper, i, page, textContent);
+                    
+                    // Recheck after await
+                    if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                        console.log('Scan aborted: PDF changed during layout rules');
+                        return;
+                    }
                 }
                 
                 // Add scan confidence indicator to toolbar
                 this.addConfidenceIndicator(wrapper, scanConfidence);
+            }
+            
+            // Final check before refreshing
+            if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                console.log('Scan aborted: PDF changed before refresh');
+                return;
             }
             
             RedactionManager.refreshContent();
@@ -1623,6 +1681,9 @@ class SmartScanner {
             return;
         }
         
+        // Capture currentFetchId at start to detect superseded loads
+        const scanFetchId = PdfViewer.currentFetchId;
+        
         const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${pageNum}"]`);
         if(!wrapper) return;
         
@@ -1641,18 +1702,54 @@ class SmartScanner {
                 return;
             }
             
-            // Run smart scan on this page only
-            const page = await PdfViewer.doc.getPage(pageNum);
-            const textContent = await page.getTextContent();
+            // Run smart scan on this page only with error handling
+            let page, textContent;
+            try {
+                page = await PdfViewer.doc.getPage(pageNum);
+                
+                // Recheck after await
+                if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                    console.log('Rescan aborted: PDF changed during getPage');
+                    return;
+                }
+                
+                textContent = await page.getTextContent();
+                
+                // Recheck after await
+                if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                    console.log('Rescan aborted: PDF changed during getTextContent');
+                    return;
+                }
+            } catch(e) {
+                if(e.message?.includes('destroyed') || e.message?.includes('null')) {
+                    console.log('Rescan aborted: PDF was destroyed');
+                    return;
+                }
+                throw e;
+            }
             
             let detectedZones = null;
             let scanConfidence = 'low';
             
             if(textContent.items.length > 10) {
                 detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
+                
+                // Recheck after await
+                if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                    console.log('Rescan aborted: PDF changed during text extraction');
+                    return;
+                }
+                
                 if(detectedZones && detectedZones.length > 0) scanConfidence = 'high';
             } else {
                 detectedZones = await this.ocrBasedZones(page, wrapper);
+                
+                // Recheck after await
+                if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                    console.log('Rescan aborted: PDF changed during OCR');
+                    return;
+                }
+                
                 if(detectedZones && detectedZones.length > 0) scanConfidence = 'medium';
             }
             
@@ -1660,6 +1757,18 @@ class SmartScanner {
                 this.applyDetectedZones(wrapper, detectedZones);
             } else {
                 await this.fallbackToLayoutRules(wrapper, pageNum, page, textContent);
+                
+                // Recheck after await
+                if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                    console.log('Rescan aborted: PDF changed during layout rules');
+                    return;
+                }
+            }
+            
+            // Final check before applying results
+            if(PdfViewer.currentFetchId !== scanFetchId || !PdfViewer.isDocumentValid()) {
+                console.log('Rescan aborted: PDF changed before applying results');
+                return;
             }
             
             this.addConfidenceIndicator(wrapper, scanConfidence);
@@ -2257,6 +2366,8 @@ class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
     static loadingTask = null;
+    static isPrinting = false; // Track printing state to prevent concurrent triggers
+    static printIframe = null; // Keep reference to print iframe
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -2474,8 +2585,63 @@ class PdfViewer {
     }
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
-        const iframe = document.createElement('iframe'); iframe.style.display = 'none'; iframe.src = this.currentBlobUrl; document.body.appendChild(iframe);
-        iframe.onload = () => { iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => { document.body.removeChild(iframe); }, 2000); };
+        
+        // Prevent concurrent print triggers
+        if (this.isPrinting) {
+            console.log('Print already in progress, ignoring duplicate request');
+            return;
+        }
+        
+        this.isPrinting = true;
+        
+        // Clean up any existing print iframe first
+        if (this.printIframe && document.body.contains(this.printIframe)) {
+            document.body.removeChild(this.printIframe);
+            this.printIframe = null;
+        }
+        
+        const iframe = document.createElement('iframe'); 
+        iframe.style.display = 'none'; 
+        iframe.src = this.currentBlobUrl; 
+        document.body.appendChild(iframe);
+        this.printIframe = iframe;
+        
+        iframe.onload = () => { 
+            iframe.contentWindow.focus(); 
+            iframe.contentWindow.print(); 
+            
+            // Keep iframe alive longer to prevent dialog from closing during adjustments
+            // Use longer timeout and listen for afterprint event if available
+            const cleanup = () => {
+                setTimeout(() => {
+                    if (this.printIframe && document.body.contains(this.printIframe)) {
+                        document.body.removeChild(this.printIframe);
+                        this.printIframe = null;
+                    }
+                    this.isPrinting = false;
+                }, 1000);
+            };
+            
+            // Listen for afterprint event (modern browsers)
+            if (iframe.contentWindow.matchMedia) {
+                const printMediaQuery = iframe.contentWindow.matchMedia('print');
+                const handlePrintChange = (e) => {
+                    if (!e.matches) {
+                        // Print dialog closed
+                        cleanup();
+                        printMediaQuery.removeEventListener('change', handlePrintChange);
+                    }
+                };
+                printMediaQuery.addEventListener('change', handlePrintChange);
+            }
+            
+            // Fallback timeout if events don't fire
+            setTimeout(() => {
+                if (this.isPrinting) {
+                    cleanup();
+                }
+            }, 60000); // 60 second fallback timeout
+        };
     }
     static async renderStack() {
         const container = document.getElementById('pdf-main-view'); 
