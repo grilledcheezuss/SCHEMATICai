@@ -274,7 +274,7 @@ class DataLoader {
                 localStorage.removeItem('cox_pass');
                 localStorage.removeItem('cox_sync_attempts');
                 
-                // Force clean reload to reset auth state
+                // Force clean reload to reset auth state (100ms delay allows UI updates to render)
                 setTimeout(() => {
                     location.reload();
                 }, 100);
@@ -341,7 +341,7 @@ class DataLoader {
                     document.documentElement.classList.remove('logged-in');
                     document.getElementById('auth-overlay').classList.add('active-modal');
                     
-                    // Force clean reload to reset auth state
+                    // Force clean reload to reset auth state (100ms delay allows UI updates to render)
                     setTimeout(() => {
                         location.reload();
                     }, 100);
