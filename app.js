@@ -2145,10 +2145,10 @@ class SearchEngine {
             document.getElementById('results-scroll-area').scrollTop = 0;
         }
     }
+}
 
-
-    
-    }
+class PdfExporter {
+    static previewPdfBytes = null;
     
     static async confirmExport() {
         if (!this.previewPdfBytes) {
@@ -3207,6 +3207,8 @@ static render(res, crit, totalCount) {
         }
         a.appendChild(c); 
     }); 
+}
+
 }
 
 window.UI = UI;
