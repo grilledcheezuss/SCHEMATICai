@@ -2199,7 +2199,8 @@ class SearchEngine {
                     w += 10000; 
                 } else if (r.desc && r.desc.includes(crit.mfg)) { 
                     w += 1000;
-                    mfgV = true; // Fuzzy description match = varied
+                    // Mark as varied when matched via description (fuzzy/uncertain match)
+                    mfgV = true;
                 } else { 
                     return; 
                 } 

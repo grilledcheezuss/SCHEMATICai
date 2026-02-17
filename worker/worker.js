@@ -454,6 +454,8 @@ function extractSpecsStrict(t) {
     }
 
     // Detect multiple voltages
+    // NOTE: Unlike original code which broke on first match, we now check all patterns
+    // to detect multiple voltages (e.g., "240V/480V" should be marked as varied)
     const foundVolts = new Set();
     for (const v of VOLT_PRIORITY) { 
         if (v.match.test(t)) { 

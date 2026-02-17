@@ -164,7 +164,6 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
 - `mfgV`, `hpV`, `voltV`, `phaseV`, `encV`: Boolean flags indicating if multiple/ambiguous values were detected for a parameter
 - When `true`, UI displays orange badges to indicate uncertainty
 - When `false`, UI displays green badges for strict, clean matches
-```
 
 **Processing Pipeline**:
 1. **Regex Extraction**: Strict keyword-based extraction (35+ manufacturer patterns)
