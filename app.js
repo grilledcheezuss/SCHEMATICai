@@ -2228,7 +2228,7 @@ class SearchEngine {
                     // Strict field match (HP_STRICT_WEIGHT = 5000) - force green badge
                     hpV = false;
                 }
-                // Note: If neither strict nor fuzzy match, preserve worker's hpV flag
+                // If weight is neither strict (5000) nor fuzzy (2000), hpV retains worker's original value
             }
             
             // Volt/Phase/Enclosure filters
