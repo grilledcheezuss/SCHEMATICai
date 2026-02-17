@@ -1,8 +1,19 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.9)
+CLOUDFLARE WORKER SCRIPT (v2.5.10)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.9):
+RECENT UPDATES (v2.5.10):
+
+Varied Parameter Detection:
+- Implemented detection of ambiguous/multiple parameter values across all fields (mfg, hp, volt, phase, enc)
+- Worker now tracks varied flags (mfgV, hpV, voltV, phaseV, encV) when multiple distinct values found in description
+- Orange badges displayed for any parameter with varied/uncertain values (similar to existing HP variance)
+- Green badges reserved for strict, clean matches with single definitive value
+- Improves transparency when panel data contains multiple or conflicting parameter values
+- Helps users identify records that may require manual verification (e.g., CP-7688 with empty/varied table entries)
+- Version strings aligned to v2.5.10 across all files
+
+PREVIOUS UPDATES (v2.5.9):
 
 HP Matching Boundary Fix:
 - Fixed HP search boundary issue: searching "0.5 HP" no longer matches panels with "1.5 HP" or "10.5 HP"

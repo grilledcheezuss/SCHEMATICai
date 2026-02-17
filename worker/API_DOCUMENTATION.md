@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.9
+## Version: v2.5.10
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.10**: Varied parameter badges: orange badges for ambiguous/multiple values in mfg, hp, volt, phase, enc fields
 - **v2.5.9**: Fixed HP matching boundaries: 0.5 HP searches no longer match 1.5 HP (numeric boundary guards)
 - **v2.5.8**: Feedback modal defaults to empty selection; improved HP parsing for mixed fractions (7 1/2, 7-1/2, 7½)
 - **v2.5.7**: Fixed feedback button interactions (thumbs down onclick handler)
@@ -140,18 +141,29 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
       "displayId": "CP-1234",
       "desc": "CONTROL PANEL DESCRIPTION",
       "pdfUrl": "https://...",
+      "pdfStatus": "present",
       "mfg": "GORMAN RUPP",
       "hp": "7.5",
       "volt": "480",
       "phase": "3",
       "enc": "NEMA4X",
       "category": null,
-      "reject_keywords": []
+      "reject_keywords": [],
+      "mfgV": false,
+      "hpV": false,
+      "voltV": false,
+      "phaseV": false,
+      "encV": false
     }
   ],
   "offset": "next_page_offset_or_null"
 }
 ```
+
+**Varied Flags (v2.5.10)**:
+- `mfgV`, `hpV`, `voltV`, `phaseV`, `encV`: Boolean flags indicating if multiple/ambiguous values were detected for a parameter
+- When `true`, UI displays orange badges to indicate uncertainty
+- When `false`, UI displays green badges for strict, clean matches
 
 **Processing Pipeline**:
 1. **Regex Extraction**: Strict keyword-based extraction (35+ manufacturer patterns)
