@@ -1,12 +1,17 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.5
+## Version: v2.5.6
 
 ## Overview
 
 The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-computing backend for the SCHEMATICA ai application. It handles data processing, PDF proxying, authentication, and feedback management.
 
 ---
+
+## Version History
+
+- **v2.5.6**: Client-side code refactoring and optimization (no API changes)
+- **v2.5.5**: PDF_BY_ID relaxed REGEX lookup for revision suffixes, improved error handling
 
 ## Security Features (v2.5.3)
 
