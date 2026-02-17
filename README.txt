@@ -4,7 +4,14 @@ The purpose of this script is to allow pristine program functionality while prov
 
 RECENT UPDATES (v2.5.4):
 
-Enhanced Error Handling and Logging:
+Frontend Performance & UX Optimizations:
+- Search results now limited to 25 cards per page (improved from 50) for better performance
+- Implemented missing pagination methods (prevPage, nextPage, renderCurrentPage) for proper page navigation
+- PDF preloading now skips records flagged as missing PDFs (pdfStatus === "missing" or empty pdfUrl)
+- Reduced 404 noise in console by filtering out records without PDFs before attempting preload
+- All version strings aligned across app.js, index.html, worker.js, and documentation
+
+Worker Error Handling and Logging:
 - Added comprehensive error handling in fetchPdfWithGuards and PDF_BY_ID methods to prevent unhandled rejections
 - Detailed debug logs output for all PDF fetch operations, including specific errors and attempted variations
 - Contextual error logging for each failure case to improve debugging capabilities

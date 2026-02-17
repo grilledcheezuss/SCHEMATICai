@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.3 (PDF Viewing/Redaction & Worker Hardening) ---
-const APP_VERSION = "v2.5.3";
+// --- SCHEMATICA ai v2.5.4 (Performance & UX Optimizations) ---
+const APP_VERSION = "v2.5.4";
 const VERSION_HISTORY = {
+    "v2.5.4": "Performance optimizations: skip PDF preloading for missing PDFs, limit search results to 25 per page, implement pagination UI",
     "v2.5.3": "PDF viewing/redaction improvements: preview step, overlay visibility, OCR lazy-load, export fixes; Worker hardening: secret keys, host allowlist, SSRF guards",
     "v2.5.2": "Fixed Control Panel tabs organization, CSS for redaction boxes, version sync",
     "v2.5.1": "Fixed Control Panel: redaction boxes now appear, page dropdown works, added tabbed UI",
@@ -1985,7 +1986,8 @@ class FeedbackService {
 class SearchEngine {
     static currentResults = [];
     static currentPage = 1;
-    static pageSize = 50;
+    static pageSize = 25;
+    static lastCriteria = null;
 
     static perform() {
         // CRITICAL: Stop any running preload from previous search
@@ -2085,7 +2087,8 @@ class SearchEngine {
         const noPdf = res.filter(r => !r.pdfUrl);
         this.currentResults = [...withPdf, ...noPdf];
         this.currentPage = 1;
-        this.renderCurrentPage(crit);
+        this.lastCriteria = crit;
+        this.renderCurrentPage();
         
         document.getElementById('pagination-footer').style.display = res.length > 0 ? 'flex' : 'none';
         
@@ -2099,9 +2102,53 @@ class SearchEngine {
         }
     }
 
-
-    
+    static renderCurrentPage() {
+        const start = (this.currentPage - 1) * this.pageSize;
+        const end = start + this.pageSize;
+        const pageResults = this.currentResults.slice(start, end);
+        const totalPages = Math.ceil(this.currentResults.length / this.pageSize);
+        
+        // Render the page results
+        UI.render(pageResults, this.lastCriteria, this.currentResults.length);
+        
+        // Update pagination controls
+        const pageInfo = document.getElementById('page-info');
+        const prevBtn = document.getElementById('page-prev');
+        const nextBtn = document.getElementById('page-next');
+        
+        if (pageInfo) {
+            pageInfo.textContent = `Page ${this.currentPage} of ${totalPages}`;
+        }
+        
+        if (prevBtn) {
+            prevBtn.disabled = this.currentPage === 1;
+        }
+        
+        if (nextBtn) {
+            nextBtn.disabled = this.currentPage >= totalPages;
+        }
     }
+
+    static prevPage() {
+        if (this.currentPage > 1) {
+            this.currentPage--;
+            this.renderCurrentPage();
+            document.getElementById('results-scroll-area').scrollTop = 0;
+        }
+    }
+
+    static nextPage() {
+        const totalPages = Math.ceil(this.currentResults.length / this.pageSize);
+        if (this.currentPage < totalPages) {
+            this.currentPage++;
+            this.renderCurrentPage();
+            document.getElementById('results-scroll-area').scrollTop = 0;
+        }
+    }
+}
+
+class PdfExporter {
+    static previewPdfBytes = null;
     
     static async confirmExport() {
         if (!this.previewPdfBytes) {
@@ -2904,14 +2951,27 @@ class PdfController {
         }
         
         // Preload first page of search results (top to bottom)
-        this.preloadQueue = results.slice(0, SearchEngine.pageSize).filter(r => r && r.id && !this.pdfCache.has(r.id));
+        // Skip records that are flagged as missing PDFs (pdfStatus === "missing" or empty pdfUrl)
+        this.preloadQueue = results.slice(0, SearchEngine.pageSize)
+            .filter(r => {
+                // Skip if result doesn't have valid data
+                if (!r || !r.id) return false;
+                
+                // Skip if already cached
+                if (this.pdfCache.has(r.id)) return false;
+                
+                // Skip if PDF is flagged as missing or URL is empty
+                if (!r.pdfUrl || r.pdfStatus === "missing") {
+                    console.log(`[preload] Skipping ${r.displayId || r.id}: PDF not available (pdfUrl: ${!!r.pdfUrl}, pdfStatus: ${r.pdfStatus})`);
+                    return false;
+                }
+                
+                return true;
+            });
         this.isPreloading = true;
         
         for (const result of this.preloadQueue) {
             if (!this.isPreloading) break; // Allow cancellation
-            
-            // Validate result object
-            if (!result || !result.id) continue;
             
             try {
                 const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(result.id)}`;
@@ -3147,6 +3207,8 @@ static render(res, crit, totalCount) {
         }
         a.appendChild(c); 
     }); 
+}
+
 }
 
 window.UI = UI;

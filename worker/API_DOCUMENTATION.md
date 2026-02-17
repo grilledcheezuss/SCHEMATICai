@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.3
+## Version: v2.5.4
 
 ## Overview
 
