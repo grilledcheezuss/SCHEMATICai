@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.8 (Feedback Modal Defaults & HP Mixed Fractions) ---
-const APP_VERSION = "v2.5.8";
+// --- SCHEMATICA ai v2.5.9 (HP Boundary Fix) ---
+const APP_VERSION = "v2.5.9";
 const VERSION_HISTORY = {
+    "v2.5.9": "Fixed HP matching boundaries: 0.5 HP searches no longer match 1.5 HP (numeric boundary guards)",
     "v2.5.8": "Feedback modal defaults to empty selection; improved HP parsing for mixed fractions (7 1/2, 7-1/2, 7½)",
     "v2.5.7": "Fixed feedback button interactions: corrected thumbs down onclick handler to call FeedbackService.down with proper parameters",
     "v2.5.6": "Code optimizations: DOM cache, centralized PDF UI transitions, deduplicated fallback logic, extracted search helpers, reorganized large functions",

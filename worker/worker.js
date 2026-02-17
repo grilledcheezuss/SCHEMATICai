@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.8 (Feedback Modal Defaults & HP Mixed Fractions)
+// 🧠 SCHEMATICA ai WORKER v2.5.9 (HP Boundary Fix)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
