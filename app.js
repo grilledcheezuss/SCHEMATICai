@@ -2147,68 +2147,103 @@ class SearchEngine {
      * Voltage equivalency groups for search matching (v2.5.21)
      * Each key is a search voltage, value contains patterns to match and exclude
      * Follows NEC/IEC standards for voltage tolerances and naming conventions
+     * 
+     * fieldPatterns: Lenient patterns for structured volt field (e.g., "240", "120/240")
+     * descPatterns: Strict patterns for free-text descriptions (require voltage suffix)
+     * excludePatterns: Patterns to exclude from matches
      */
     static VOLTAGE_EQUIVALENTS = {
-        // 120V Group - matches 120V, 115V, 110V
+        // 120V Group - matches 120V, 115V, 110V (NOT dual-voltage like 120/240V)
         '120': {
-            patterns: [
-                /\b120(?:\s*V|VAC)?\b/i,
-                /\b115(?:\s*V|VAC)?\b/i,
-                /\b110(?:\s*V|VAC)?\b/i
+            fieldPatterns: [
+                /^120$/i,      // Exact "120"
+                /^115$/i,      // Exact "115"
+                /^110$/i       // Exact "110"
             ],
-            excludePatterns: [] // Don't exclude 120/240 - see 240V group
+            descPatterns: [
+                /\b120\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b115\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b110\s*(?:V|VAC|VOLT|PH)\b/i
+            ],
+            excludePatterns: [
+                /\b120\s*[\/\-]\s*\d+/i  // Exclude 120/240, 120/208, etc.
+            ]
         },
         
         // 240V Group - matches 240V, 230V, 220V, AND 120/240V, 120/230V
         '240': {
-            patterns: [
-                /\b240(?:\s*V|VAC)?\b/i,
-                /\b230(?:\s*V|VAC)?\b/i,
-                /\b220(?:\s*V|VAC)?\b/i,
-                /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Dual-voltage: 120/240V
-                /\b120\s*[\/\-]\s*230(?:\s*V|VAC)?\b/i   // Dual-voltage: 120/230V
+            fieldPatterns: [
+                /^240$/i,
+                /^230$/i,
+                /^220$/i,
+                /^120\s*[\/\-]\s*240$/i,  // Dual-voltage: 120/240
+                /^120\s*[\/\-]\s*230$/i   // Dual-voltage: 120/230
             ],
-            excludePatterns: [] // 120/240V IS a 240V panel
+            descPatterns: [
+                /\b240\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b230\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b220\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b120\s*[\/\-]\s*240(?:\s*(?:V|VAC|VOLT|PH))?\b/i,
+                /\b120\s*[\/\-]\s*230(?:\s*(?:V|VAC|VOLT|PH))?\b/i
+            ],
+            excludePatterns: []
         },
         
         // 208V Group - matches 208V and 120/208V
         '208': {
-            patterns: [
-                /\b208(?:\s*V|VAC)?\b/i,
-                /\b120\s*[\/\-]\s*208(?:\s*V|VAC)?\b/i   // Dual-voltage: 120/208V
+            fieldPatterns: [
+                /^208$/i,
+                /^120\s*[\/\-]\s*208$/i
+            ],
+            descPatterns: [
+                /\b208\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b120\s*[\/\-]\s*208(?:\s*(?:V|VAC|VOLT|PH))?\b/i
             ],
             excludePatterns: []
         },
         
         // 277V Group - matches only 277V (single-phase from 480V wye)
         '277': {
-            patterns: [
-                /\b277(?:\s*V|VAC)?\b/i
+            fieldPatterns: [
+                /^277$/i
+            ],
+            descPatterns: [
+                /\b277\s*(?:V|VAC|VOLT|PH)\b/i
             ],
             excludePatterns: [
-                /\b277\s*[\/\-]\s*480(?:\s*V|VAC)?\b/i  // Exclude 277/480 (that's a 480V search)
+                /\b277\s*[\/\-]\s*480/i  // Exclude 277/480 (that's a 480V search)
             ]
         },
         
         // 480V Group - matches 480V, 460V, 440V, AND 277/480V
         '480': {
-            patterns: [
-                /\b480(?:\s*V|VAC)?\b/i,
-                /\b460(?:\s*V|VAC)?\b/i,  // Motor nameplate voltage
-                /\b440(?:\s*V|VAC)?\b/i,  // Legacy 3-phase
-                /\b277\s*[\/\-]\s*480(?:\s*V|VAC)?\b/i   // Dual-voltage: 277/480V 3-phase wye
+            fieldPatterns: [
+                /^480$/i,
+                /^460$/i,      // Motor nameplate voltage
+                /^440$/i,      // Legacy 3-phase
+                /^277\s*[\/\-]\s*480$/i   // Dual-voltage: 277/480
+            ],
+            descPatterns: [
+                /\b480\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b460\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b440\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b277\s*[\/\-]\s*480(?:\s*(?:V|VAC|VOLT|PH))?\b/i
             ],
             excludePatterns: [
-                /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude 120/240 (not a 480V panel)
-                /\b120\s*[\/\-]\s*230(?:\s*V|VAC)?\b/i   // Exclude 120/230 (not a 480V panel)
+                /\b120\s*[\/\-]\s*240/i,  // Exclude 120/240 (not a 480V panel)
+                /\b120\s*[\/\-]\s*230/i   // Exclude 120/230 (not a 480V panel)
             ]
         },
         
         // 575V Group (Canadian standard)
         '575': {
-            patterns: [
-                /\b575(?:\s*V|VAC)?\b/i,
-                /\b600(?:\s*V|VAC)?\b/i   // Industrial variant
+            fieldPatterns: [
+                /^575$/i,
+                /^600$/i
+            ],
+            descPatterns: [
+                /\b575\s*(?:V|VAC|VOLT|PH)\b/i,
+                /\b600\s*(?:V|VAC|VOLT|PH)\b/i
             ],
             excludePatterns: []
         }
@@ -2415,8 +2450,8 @@ class SearchEngine {
                     
                     // === STEP 1: Check volt field for equivalents ===
                     if (r.volt) {
-                        // Check if volt field matches any equivalent pattern
-                        for (const pattern of voltConfig.patterns) {
+                        // Check if volt field matches any equivalent pattern (use lenient field patterns)
+                        for (const pattern of voltConfig.fieldPatterns) {
                             if (pattern.test(r.volt)) {
                                 matched = true;
                                 isFieldMatch = true;
@@ -2436,8 +2471,8 @@ class SearchEngine {
                     
                     // === STEP 2: If no field match, check description ===
                     if (!matched && r.desc) {
-                        // Check if description matches any equivalent pattern
-                        for (const pattern of voltConfig.patterns) {
+                        // Check if description matches any equivalent pattern (use strict desc patterns)
+                        for (const pattern of voltConfig.descPatterns) {
                             if (pattern.test(r.desc)) {
                                 matched = true;
                                 break;
