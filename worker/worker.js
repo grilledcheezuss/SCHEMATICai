@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.18 (Profile Dropdown Population Fix, Feedback Lockout Enforcement)
+// 🧠 SCHEMATICA ai WORKER v2.5.19 (480V False Positive Fix)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -472,6 +472,20 @@ function extractSpecsStrict(t) {
             foundVolts.add(v.id);
         } 
     }
+    
+    // CRITICAL FIX: Remove lower voltage from foundVolts for canonical pairs
+    // This prevents dual-voltage panels (e.g., "120/240V") from being extracted with both
+    // voltages in their metadata, which would cause incorrect matches during search
+    if (foundVolts.size === 2) {
+        const voltArray = [...foundVolts];
+        const canonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(pair => 
+            voltArray.includes(pair.low) && voltArray.includes(pair.high)
+        );
+        if (canonicalPair) {
+            foundVolts.delete(canonicalPair.low); // Remove lower voltage
+        }
+    }
+    
     if (foundVolts.size === 1) {
         s.volt = [...foundVolts][0];
     } else if (foundVolts.size > 1) {

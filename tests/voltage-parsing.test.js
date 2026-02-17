@@ -56,7 +56,7 @@ function extractVoltageOld(t) {
     return { volt: null, voltV: false };
 }
 
-// Test version of extractSpecsStrict (voltage parsing only) - AFTER fix
+// Test version of extractSpecsStrict (voltage parsing only) - AFTER fix (v2.5.19)
 function extractVoltageNew(t) {
     if (!t || typeof t !== 'string') return { volt: null, voltV: false };
     
@@ -67,6 +67,18 @@ function extractVoltageNew(t) {
         if (v.match.test(t)) { 
             foundVolts.add(v.id);
         } 
+    }
+    
+    // CRITICAL FIX: Remove lower voltage from foundVolts for canonical pairs
+    // This prevents dual-voltage panels (e.g., "120/240V") from matching both voltages in search
+    if (foundVolts.size === 2) {
+        const voltArray = [...foundVolts];
+        const canonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(pair => 
+            voltArray.includes(pair.low) && voltArray.includes(pair.high)
+        );
+        if (canonicalPair) {
+            foundVolts.delete(canonicalPair.low); // Remove lower voltage
+        }
     }
     
     if (foundVolts.size === 1) {
@@ -178,7 +190,7 @@ const testCases = [
 let passed = 0;
 let failed = 0;
 
-console.log('\n🧪 Voltage Parsing Tests - v2.5.11\n');
+console.log('\n🧪 Voltage Parsing Tests - v2.5.19\n');
 console.log('Testing dual-voltage normalization...\n');
 
 console.log('='.repeat(60));
