@@ -1,8 +1,17 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.11)
+CLOUDFLARE WORKER SCRIPT (v2.5.12)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.11):
+RECENT UPDATES (v2.5.12):
+
+Badge Filter Suppression & Vercel Cleanup:
+- Fixed badge rendering to only show parameter badges when actively filtered (criteria not "Any")
+- Manufacturer badges no longer appear when mfg filter is set to "Any"
+- Keyword badges and NO PDF badge continue to display regardless of filter state
+- Removed .vercel/ entry from .gitignore (Vercel platform no longer in use)
+- Version strings aligned to v2.5.12 across all files
+
+PREVIOUS UPDATES (v2.5.11):
 
 Dual-Voltage Normalization:
 - Fixed voltage parsing for split-phase dual-voltage entries (120/240, 277/480)

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.11 (Dual-Voltage Normalization) ---
-const APP_VERSION = "v2.5.11";
+// --- SCHEMATICA ai v2.5.12 (Badge Filter Suppression & Vercel Cleanup) ---
+const APP_VERSION = "v2.5.12";
 const VERSION_HISTORY = {
+    "v2.5.12": "Badge suppression for unfiltered parameters: badges only shown for actively filtered criteria (not 'Any'); Vercel cleanup",
     "v2.5.11": "Dual-voltage normalization: 120/240 and 277/480 split-phase pairs now use higher voltage with green badge instead of orange varied badge",
     "v2.5.10": "Varied parameter badges: orange badges for ambiguous/multiple values in mfg, hp, volt, phase, enc fields",
     "v2.5.9": "Fixed HP matching boundaries: 0.5 HP searches no longer match 1.5 HP (numeric boundary guards)",
@@ -3488,13 +3489,10 @@ static _generateBadges(record, criteria) {
         badges.push(`<span class="hud-badge match-orange">LOW VOLT</span>`);
     }
 
-    // Manufacturer badge
+    // Manufacturer badge - only show when actively filtering
     if (criteria.mfg !== "Any" && record.mfg) {
         const isMatch = (record.mfg === criteria.mfg);
         const badgeClass = record.mfgV ? 'match-orange' : (isMatch ? 'match-green' : 'match-orange');
-        badges.push(`<span class="hud-badge ${badgeClass}">${record.mfg}</span>`);
-    } else if (record.mfg) {
-        const badgeClass = record.mfgV ? 'match-orange' : 'match-green';
         badges.push(`<span class="hud-badge ${badgeClass}">${record.mfg}</span>`);
     }
 

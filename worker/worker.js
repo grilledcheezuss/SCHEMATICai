@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.11 (Dual-Voltage Normalization)
+// 🧠 SCHEMATICA ai WORKER v2.5.12 (Badge Filter Suppression & Vercel Cleanup)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
