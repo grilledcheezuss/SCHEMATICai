@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.20 (Critical Bug Fixes) ---
-const APP_VERSION = "v2.5.20";
+// --- SCHEMATICA ai v2.5.21 (Comprehensive Voltage Matching) ---
+const APP_VERSION = "v2.5.21";
 const VERSION_HISTORY = {
+    "v2.5.21": "Comprehensive voltage equivalency matching: 240V now matches 230V/220V/120-240V; 480V matches 460V/440V/277-480V per NEC standards; fixed dual-voltage inclusion logic",
     "v2.5.20": "Fixed 480V false positives (exclude 120/240V panels from 480V searches); simplified positive feedback (removed flawed implicit corrections); profile dropdown population timing fix",
     "v2.5.19": "Fixed 480V false positives (strict voltage boundaries + dual-voltage exclusion in search); voltage extraction now removes lower voltage from canonical pairs (120/240, 277/480) to prevent dual-voltage panels matching both voltages",
     "v2.5.18": "Profile dropdown population fix (populate immediately after each toolbar created); positive feedback lockout enforcement (persist across searches, prevent race conditions)",
@@ -2142,12 +2143,75 @@ class SearchEngine {
     static pageSize = 25;
     static lastCriteria = null;
     
-    // Voltage filtering constants (v2.5.19)
-    static DUAL_VOLT_EXCLUSIONS = {
-        '120': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
-        '240': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude "120/240" when searching 240V (already dual-voltage)
-        '277': /\b277\s*[\/\-]\s*480(?:\s*V|VAC)?\b/i,  // Exclude "277/480" when searching 277V (277 is lower)
-        '480': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i   // Exclude "120/240" when searching 480V (not a 480V panel)
+    /**
+     * Voltage equivalency groups for search matching (v2.5.21)
+     * Each key is a search voltage, value contains patterns to match and exclude
+     * Follows NEC/IEC standards for voltage tolerances and naming conventions
+     */
+    static VOLTAGE_EQUIVALENTS = {
+        // 120V Group - matches 120V, 115V, 110V
+        '120': {
+            patterns: [
+                /\b120(?:\s*V|VAC)?\b/i,
+                /\b115(?:\s*V|VAC)?\b/i,
+                /\b110(?:\s*V|VAC)?\b/i
+            ],
+            excludePatterns: [] // Don't exclude 120/240 - see 240V group
+        },
+        
+        // 240V Group - matches 240V, 230V, 220V, AND 120/240V, 120/230V
+        '240': {
+            patterns: [
+                /\b240(?:\s*V|VAC)?\b/i,
+                /\b230(?:\s*V|VAC)?\b/i,
+                /\b220(?:\s*V|VAC)?\b/i,
+                /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Dual-voltage: 120/240V
+                /\b120\s*[\/\-]\s*230(?:\s*V|VAC)?\b/i   // Dual-voltage: 120/230V
+            ],
+            excludePatterns: [] // 120/240V IS a 240V panel
+        },
+        
+        // 208V Group - matches 208V and 120/208V
+        '208': {
+            patterns: [
+                /\b208(?:\s*V|VAC)?\b/i,
+                /\b120\s*[\/\-]\s*208(?:\s*V|VAC)?\b/i   // Dual-voltage: 120/208V
+            ],
+            excludePatterns: []
+        },
+        
+        // 277V Group - matches only 277V (single-phase from 480V wye)
+        '277': {
+            patterns: [
+                /\b277(?:\s*V|VAC)?\b/i
+            ],
+            excludePatterns: [
+                /\b277\s*[\/\-]\s*480(?:\s*V|VAC)?\b/i  // Exclude 277/480 (that's a 480V search)
+            ]
+        },
+        
+        // 480V Group - matches 480V, 460V, 440V, AND 277/480V
+        '480': {
+            patterns: [
+                /\b480(?:\s*V|VAC)?\b/i,
+                /\b460(?:\s*V|VAC)?\b/i,  // Motor nameplate voltage
+                /\b440(?:\s*V|VAC)?\b/i,  // Legacy 3-phase
+                /\b277\s*[\/\-]\s*480(?:\s*V|VAC)?\b/i   // Dual-voltage: 277/480V 3-phase wye
+            ],
+            excludePatterns: [
+                /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude 120/240 (not a 480V panel)
+                /\b120\s*[\/\-]\s*230(?:\s*V|VAC)?\b/i   // Exclude 120/230 (not a 480V panel)
+            ]
+        },
+        
+        // 575V Group (Canadian standard)
+        '575': {
+            patterns: [
+                /\b575(?:\s*V|VAC)?\b/i,
+                /\b600(?:\s*V|VAC)?\b/i   // Industrial variant
+            ],
+            excludePatterns: []
+        }
     };
 
     /**
@@ -2290,11 +2354,6 @@ class SearchEngine {
             enc: DOM_CACHE.get('encInput')?.value || 'Any'
         };
         
-        // Pre-compile voltage pattern regex if voltage filter is active (v2.5.19 optimization)
-        const voltStrictPattern = crit.volt !== "Any" 
-            ? new RegExp(`\\b${crit.volt}\\s*(?:V\\b|VAC|VOLT|PH)`, 'i')
-            : null;
-        
         // === FILTER AND SCORE RESULTS ===
         let res = [];
         window.LOCAL_DB.forEach(r => {
@@ -2339,42 +2398,76 @@ class SearchEngine {
             }
             
             // Volt/Phase/Enclosure filters
-            if(crit.volt!=="Any") { 
-                // CRITICAL FIX: Check for dual-voltage exclusion in volt field BEFORE field match
-                // This prevents "120/240V" from matching searches for "120", "240", or "480"
-                const exclusionPattern = SearchEngine.DUAL_VOLT_EXCLUSIONS[crit.volt];
-                const fieldHasDualVolt = r.volt && exclusionPattern && exclusionPattern.test(r.volt);
+            if(crit.volt !== "Any") { 
+                const voltConfig = SearchEngine.VOLTAGE_EQUIVALENTS[crit.volt];
                 
-                // If volt field contains excluded dual-voltage pattern, skip this record
-                if (fieldHasDualVolt) {
-                    return; // Exclude this record
-                }
-                
-                // Check for strict field match (green badge) vs fuzzy description match (orange badge)
-                if(r.volt && r.volt.includes(crit.volt)) {
-                    // Strict field match - override worker variance flag for green badge
-                    voltV = false;
-                    w += 500;
-                } else if(r.desc) {
-                    // Check description for dual-voltage exclusion (only if no field match)
-                    const descHasDualVolt = exclusionPattern && exclusionPattern.test(r.desc);
-                    
-                    if (descHasDualVolt) {
-                        return; // Exclude this record
-                    }
-                    
-                    // Use pre-compiled voltage pattern (created once per search, not per record)
-                    const hasStrictMatch = voltStrictPattern && voltStrictPattern.test(r.desc);
-                    
-                    if (hasStrictMatch) {
-                        // Fuzzy description match - mark as varied for orange badge
-                        voltV = true;
-                        w += 100;
+                if (!voltConfig) {
+                    // Fallback for unknown voltage values - exact match only
+                    if(r.volt && r.volt.includes(crit.volt)) {
+                        voltV = false;
+                        w += 500;
                     } else {
-                        return; // No match - exclude this record
+                        return;
                     }
                 } else {
-                    return;
+                    let matched = false;
+                    let isFieldMatch = false;
+                    
+                    // === STEP 1: Check volt field for equivalents ===
+                    if (r.volt) {
+                        // Check if volt field matches any equivalent pattern
+                        for (const pattern of voltConfig.patterns) {
+                            if (pattern.test(r.volt)) {
+                                matched = true;
+                                isFieldMatch = true;
+                                break;
+                            }
+                        }
+                        
+                        // If matched, check exclusion patterns
+                        if (matched) {
+                            for (const excludePattern of voltConfig.excludePatterns) {
+                                if (excludePattern.test(r.volt)) {
+                                    return; // Excluded - skip this record
+                                }
+                            }
+                        }
+                    }
+                    
+                    // === STEP 2: If no field match, check description ===
+                    if (!matched && r.desc) {
+                        // Check if description matches any equivalent pattern
+                        for (const pattern of voltConfig.patterns) {
+                            if (pattern.test(r.desc)) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                        
+                        // If matched, check exclusion patterns
+                        if (matched) {
+                            for (const excludePattern of voltConfig.excludePatterns) {
+                                if (excludePattern.test(r.desc)) {
+                                    return; // Excluded - skip this record
+                                }
+                            }
+                        }
+                    }
+                    
+                    // === STEP 3: Apply scoring ===
+                    if (!matched) {
+                        return; // No match - exclude record
+                    }
+                    
+                    if (isFieldMatch) {
+                        // Strict field match - green badge
+                        voltV = false;
+                        w += 500;
+                    } else {
+                        // Fuzzy description match - orange badge
+                        voltV = true;
+                        w += 100;
+                    }
                 }
             }
             if(crit.phase!=="Any") { 
