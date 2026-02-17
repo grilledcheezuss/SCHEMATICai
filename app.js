@@ -78,6 +78,8 @@ const PDF_UI_STATE = {
 };
 
 // DOM cache for frequently accessed elements
+// Note: Cache can become stale if elements are removed/replaced
+// Call DOM_CACHE.clear() or DOM_CACHE.invalidate(id) if needed
 const DOM_CACHE = {
     _cache: new Map(),
     get(id) {
@@ -89,6 +91,9 @@ const DOM_CACHE = {
             return element;
         }
         return this._cache.get(id);
+    },
+    invalidate(id) {
+        this._cache.delete(id);
     },
     clear() {
         this._cache.clear();
@@ -2059,8 +2064,8 @@ class SearchEngine {
         const hpPattern = `${BOUNDARY_START}(?:${searchHp}|${searchHp}\\.0)\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
         
         // Fractional pattern for values < 1 HP (e.g., 1/2 HP, 1/4 HP)
-        // Guard against division by zero
-        const fractionalPattern = (searchHpNum > 0 && searchHpNum < 1) 
+        // Guard against division by zero and very small values
+        const fractionalPattern = (searchHpNum > 0.001 && searchHpNum < 1) 
             ? `1/${Math.round(1/searchHpNum)}\\s*${HP_UNIT_PATTERN}` 
             : null;
         
@@ -3490,7 +3495,7 @@ static _generateBadges(record, criteria) {
     return badges;
 }
 
-static render(res, crit, totalCount) { 
+static render(res, crit, totalCount) {
     const a = DOM_CACHE.get('results-area');
     if (!a) return;
     
