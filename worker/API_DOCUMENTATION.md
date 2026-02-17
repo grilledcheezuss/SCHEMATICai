@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.4
+## Version: v2.5.5
 
 ## Overview
 
@@ -284,6 +284,8 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.5**: PDF_BY_ID relaxed REGEX lookup for revision suffixes, improved error handling
+- **v2.5.4**: Enhanced error handling and logging
 - **v2.5.3**: Security hardening, SSRF guards, environment secrets
 - **v2.4.4**: Instant sync, background ML training
 - Previous versions: See VERSION_HISTORY in app.js
