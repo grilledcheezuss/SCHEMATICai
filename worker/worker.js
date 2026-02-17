@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.6 (Code Refactoring & Optimization)
+// 🧠 SCHEMATICA ai WORKER v2.5.7 (Feedback Interaction Fix)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets

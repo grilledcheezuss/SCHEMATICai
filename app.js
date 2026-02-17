@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.6 (Code Refactoring & Optimization) ---
-const APP_VERSION = "v2.5.6";
+// --- SCHEMATICA ai v2.5.7 (Feedback Interaction Fix) ---
+const APP_VERSION = "v2.5.7";
 const VERSION_HISTORY = {
+    "v2.5.7": "Fixed feedback button interactions: corrected thumbs down onclick handler to call FeedbackService.down with proper parameters",
     "v2.5.6": "Code optimizations: DOM cache, centralized PDF UI transitions, deduplicated fallback logic, extracted search helpers, reorganized large functions",
     "v2.5.5": "PDF load fixes: fallback to direct pdfUrl on 404, mark missing PDFs, relaxed worker lookup; HP variance badges now show orange for fuzzy matches",
     "v2.5.4": "Performance optimizations: skip PDF preloading for missing PDFs, limit search results to 25 per page, implement pagination UI",
@@ -3512,9 +3513,9 @@ static render(res, crit, totalCount) {
             <div class="badge-row">${badges.join(' ') || '<span class="hud-badge unknown">NO MATCH</span>'}</div>
             <div class="card-actions">
                 <button class="thumb-btn up" onclick="FeedbackService.up('${i.id}', this, ${JSON.stringify(crit)})">👍</button>
-                <button class="thumb-btn down" onclick="FeedbackService.down('${i.id}', this, ${JSON.stringify(crit)})">👎</button>
+                <button class="thumb-btn down" onclick="FeedbackService.down('${i.id}', this)">👎</button>
             </div>
-        `; 
+        `;
 
         if (!isMissingPdf) {
             c.onclick = () => { 
