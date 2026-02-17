@@ -512,8 +512,13 @@ function extractSpecsStrict(t) {
     const foundEnclosures = new Set();
     // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
     // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
-    if (/\b4X(?:SS)?\b/i.test(t)) foundEnclosures.add("4XSS");
+    // Priority: Check for fiberglass first, then stainless, to avoid misclassification
     if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
+    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XFG");
+    if (/\b(STAINLESS|SS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XSS");
+    if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
+    // Only assign 4XSS for bare "4X" if no fiberglass keywords present
+    if (/\b4X\b/i.test(t) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && foundEnclosures.size === 0) foundEnclosures.add("4XSS");
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
     
     if (foundEnclosures.size === 1) {

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.13 (Feedback Lockout, HP Badge, Enclosure Parsing Fixes) ---
-const APP_VERSION = "v2.5.13";
+// --- SCHEMATICA ai v2.5.14 (4XSS/4XFG Enclosure Fix, Feedback Date Recording) ---
+const APP_VERSION = "v2.5.14";
 const VERSION_HISTORY = {
+    "v2.5.14": "Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions",
     "v2.5.13": "Fixed feedback lockout enforcement for thumbs up; HP badge now green for strict matches; enclosure parsing for 4XSS/4XFG/POLY",
     "v2.5.12": "Badge suppression for unfiltered parameters: badges only shown for actively filtered criteria (not 'Any'); Vercel cleanup",
     "v2.5.11": "Dual-voltage normalization: 120/240 and 277/480 split-phase pairs now use higher voltage with green badge instead of orange varied badge",
@@ -1950,7 +1951,7 @@ class FeedbackService {
         btn.classList.add('voted-up'); 
         // Add to lockout set
         this.lockout.add(`${id}:up`);
-        const implicit = {}; if(crit && crit.mfg !== 'Any') implicit.mfg = crit.mfg; if(crit && crit.hp !== 'Any') implicit.hp = crit.hp; if(crit && crit.volt !== 'Any') implicit.volt = crit.volt; if(crit && crit.phase !== 'Any') implicit.phase = crit.phase; if(crit && crit.enc !== 'Any') implicit.enc = crit.enc; const payload = { records: [{ fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(implicit) } }] }; await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
+        const implicit = {}; if(crit && crit.mfg !== 'Any') implicit.mfg = crit.mfg; if(crit && crit.hp !== 'Any') implicit.hp = crit.hp; if(crit && crit.volt !== 'Any') implicit.volt = crit.volt; if(crit && crit.phase !== 'Any') implicit.phase = crit.phase; if(crit && crit.enc !== 'Any') implicit.enc = crit.enc; const today = new Date().toISOString().split('T')[0]; const payload = { records: [{ fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(implicit), 'Date': today } }] }; await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
     
     static down(id, btn) { 
         this.currentId = id; 
@@ -2022,7 +2023,8 @@ class FeedbackService {
         if (Object.keys(corrections).length === 0) return alert("Please select a correction."); 
         
         // Prepare payload for submission
-        const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections) } }] }; 
+        const today = new Date().toISOString().split('T')[0];
+        const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections), 'Date': today } }] };
         
         // Show instant UI feedback
         if(this.currentDownBtn) this.currentDownBtn.classList.add('voted-down');

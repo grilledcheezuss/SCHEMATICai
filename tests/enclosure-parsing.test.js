@@ -1,4 +1,4 @@
-// Test enclosure parsing functionality (v2.5.13)
+// Test enclosure parsing functionality (v2.5.14)
 
 // Simple test framework
 function assertEquals(actual, expected, message) {
@@ -20,8 +20,13 @@ function extractEnclosure(text) {
     const foundEnclosures = new Set();
     // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
     // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
-    if (/\b4X(?:SS)?\b/i.test(text)) foundEnclosures.add("4XSS");
+    // Priority: Check for fiberglass first, then stainless, to avoid misclassification
     if (/\b4XFG\b/i.test(text)) foundEnclosures.add("4XFG");
+    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(text) && /\b4X\b/i.test(text)) foundEnclosures.add("4XFG");
+    if (/\b(STAINLESS|SS)\b/i.test(text) && /\b4X\b/i.test(text)) foundEnclosures.add("4XSS");
+    if (/\b4XSS\b/i.test(text)) foundEnclosures.add("4XSS");
+    // Only assign 4XSS for bare "4X" if no fiberglass keywords present
+    if (/\b4X\b/i.test(text) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(text) && foundEnclosures.size === 0) foundEnclosures.add("4XSS");
     if (/\bPOLY(?:CARBONATE)?\b/i.test(text)) foundEnclosures.add("POLY");
     
     if (foundEnclosures.size === 1) {
@@ -35,7 +40,7 @@ function extractEnclosure(text) {
     return result;
 }
 
-console.log('🧪 Enclosure Parsing Tests - v2.5.13\n');
+console.log('🧪 Enclosure Parsing Tests - v2.5.14\n');
 console.log('Testing enclosure extraction...\n');
 
 let passed = 0;
@@ -46,7 +51,7 @@ const tests = [
     {
         input: "NEMA 4X ENCLOSURE STAINLESS STEEL",
         expected: { enc: "4XSS", encV: false },
-        name: "4X enclosure (should normalize to 4XSS)"
+        name: "4X enclosure with explicit stainless steel"
     },
     {
         input: "CONTROL PANEL 4XSS RATED",
@@ -57,6 +62,16 @@ const tests = [
         input: "FIBERGLASS NEMA 4XFG ENCLOSURE",
         expected: { enc: "4XFG", encV: false },
         name: "4XFG fiberglass enclosure"
+    },
+    {
+        input: "NEMA 4X FIBERGLASS ENCLOSURE",
+        expected: { enc: "4XFG", encV: false },
+        name: "4X fiberglass (should map to 4XFG, not 4XSS)"
+    },
+    {
+        input: "FIBERGLASS ENCLOSURE MATERIAL NEMA 4X",
+        expected: { enc: "4XFG", encV: false },
+        name: "Fiberglass with 4X rating (CP-8106 case)"
     },
     {
         input: "POLYCARBONATE ENCLOSURE IP65",
@@ -76,11 +91,21 @@ const tests = [
     {
         input: "4x stainless steel panel",
         expected: { enc: "4XSS", encV: false },
-        name: "Lowercase 4x (case insensitive)"
+        name: "Lowercase 4x with stainless (case insensitive)"
     },
     {
-        input: "4X AND 4XFG MIXED ENCLOSURES",
-        expected: { enc: "4XSS", encV: true },
+        input: "4X ENCLOSURE",
+        expected: { enc: "4XSS", encV: false },
+        name: "Bare 4X without material (defaults to 4XSS)"
+    },
+    {
+        input: "4X SS ENCLOSURE",
+        expected: { enc: "4XSS", encV: false },
+        name: "4X with SS abbreviation"
+    },
+    {
+        input: "4X STAINLESS AND 4XFG MIXED ENCLOSURES",
+        expected: { enc: "4XFG", encV: true },
         name: "Multiple enclosure types (marked varied)"
     },
     {
@@ -92,6 +117,11 @@ const tests = [
         input: "4XSS ENCLOSURE WITH POLY BACKUP",
         expected: { enc: "4XSS", encV: true },
         name: "Mixed 4XSS and POLY (marked varied)"
+    },
+    {
+        input: "FIBER GLASS ENCLOSURE 4X RATED",
+        expected: { enc: "4XFG", encV: false },
+        name: "Fiber glass (two words) with 4X"
     }
 ];
 
