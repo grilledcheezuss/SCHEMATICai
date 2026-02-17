@@ -1644,7 +1644,7 @@ class SmartScanner {
                 fontSize: (word.bbox.y1 - word.bbox.y0) * scaleY * this.FONT_SIZE_ESTIMATE_FACTOR
             })).filter(item => {
                 // Filter out boxes that are too small to prevent tesseract "too small to scale" errors
-                return item.width >= this.MIN_OCR_BOX_WIDTH && item.height >= this.MIN_OCR_BOX_HEIGHT;
+                return (item.width >= this.MIN_OCR_BOX_WIDTH) && (item.height >= this.MIN_OCR_BOX_HEIGHT);
             });
             
             // Use same detection logic as text extraction
