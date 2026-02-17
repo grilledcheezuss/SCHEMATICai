@@ -1,8 +1,21 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.5)
+CLOUDFLARE WORKER SCRIPT (v2.5.6)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing them to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.5):
+RECENT UPDATES (v2.5.6):
+
+Code Refactoring & Optimization (Client-side):
+- Added DOM cache for frequently accessed elements to reduce repeated getElementById calls
+- Centralized PDF UI state transitions with helper function for cleaner code
+- Deduplicated PDF fallback fetch logic shared between loadById and preloadSearchResults
+- Consolidated PDF validation helpers with consistent diagnostic context
+- Extracted HP and keyword matching helpers in SearchEngine for better organization
+- Isolated badge rendering logic in UI.render into internal helper function
+- Reorganized large functions with clear section comments for readability
+- Replaced magic strings with constants (PDF_STATUS, PDF_UI_STATE)
+- No functional changes - purely code quality improvements
+
+PREVIOUS UPDATES (v2.5.5):
 
 PDF Load Fixes:
 - Added robust fallback when PDF_BY_ID returns 404: tries direct pdfUrl via PDF proxy target

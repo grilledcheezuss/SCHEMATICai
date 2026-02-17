@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.5 (PDF Fallback & Relaxed Lookup)
+// 🧠 SCHEMATICA ai WORKER v2.5.6 (Code Refactoring & Optimization)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.5 (PDF Fallback & HP Variance Badges) ---
-const APP_VERSION = "v2.5.5";
+// --- SCHEMATICA ai v2.5.6 (Code Refactoring & Optimization) ---
+const APP_VERSION = "v2.5.6";
 const VERSION_HISTORY = {
+    "v2.5.6": "Code optimizations: DOM cache, centralized PDF UI transitions, deduplicated fallback logic, extracted search helpers, reorganized large functions",
     "v2.5.5": "PDF load fixes: fallback to direct pdfUrl on 404, mark missing PDFs, relaxed worker lookup; HP variance badges now show orange for fuzzy matches",
     "v2.5.4": "Performance optimizations: skip PDF preloading for missing PDFs, limit search results to 25 per page, implement pagination UI",
     "v2.5.3": "PDF viewing/redaction improvements: preview step, overlay visibility, OCR lazy-load, export fixes; Worker hardening: secret keys, host allowlist, SSRF guards",
@@ -59,6 +60,45 @@ const REDACTION_CHECKBOX_IDS = [
 
 // Preloading configuration
 const PRELOAD_START_DELAY_MS = 500; // Delay before starting preload after search completes
+
+// PDF status constants
+const PDF_STATUS = {
+    MISSING: 'missing',
+    READY: 'ready',
+    LOADING: 'loading',
+    ERROR: 'error'
+};
+
+// PDF UI display states
+const PDF_UI_STATE = {
+    LOADING: 'loading',
+    READY: 'ready',
+    FALLBACK: 'fallback',
+    HIDDEN: 'hidden'
+};
+
+// DOM cache for frequently accessed elements
+// Note: Cache can become stale if elements are removed/replaced
+// Call DOM_CACHE.clear() or DOM_CACHE.invalidate(id) if needed
+const DOM_CACHE = {
+    _cache: new Map(),
+    get(id) {
+        if (!this._cache.has(id)) {
+            const element = document.getElementById(id);
+            if (element) {
+                this._cache.set(id, element);
+            }
+            return element;
+        }
+        return this._cache.get(id);
+    },
+    invalidate(id) {
+        this._cache.delete(id);
+    },
+    clear() {
+        this._cache.clear();
+    }
+};
 
 window.TEMPLATE_BYTES = null;
 
@@ -1990,13 +2030,104 @@ class SearchEngine {
     static pageSize = 25;
     static lastCriteria = null;
 
-    static perform() {
-        // CRITICAL: Stop any running preload from previous search
-        PdfController.stopPreloading();
+    /**
+     * Helper: Match HP value in record (strict field or fuzzy description)
+     * @param {Object} record - Database record
+     * @param {string} searchHp - HP value to search for
+     * @returns {Object} {matches: boolean, isVariant: boolean, weight: number}
+     * @private
+     */
+    static _matchHp(record, searchHp) {
+        const HP_TOLERANCE = 0.1; // 10% tolerance for fuzzy matching
+        const HP_STRICT_WEIGHT = 5000;
+        const HP_FUZZY_WEIGHT = 2000;
         
+        const searchHpNum = parseFloat(searchHp);
+        
+        // === STRICT FIELD MATCH ===
+        const strictMatch = record.hp && Math.abs(parseFloat(record.hp) - searchHpNum) < HP_TOLERANCE;
+        if (strictMatch) {
+            return { matches: true, isVariant: false, weight: HP_STRICT_WEIGHT };
+        }
+        
+        // === FUZZY DESCRIPTION MATCH ===
+        if (!record.desc) {
+            return { matches: false, isVariant: false, weight: 0 };
+        }
+        
+        // Enhanced safety regex for various formats
+        // Pattern matches: word boundary + HP value + optional decimal + HP unit + word boundary
+        // Examples: "5 HP", "5HP", "5H.P", "5 H.P.", "5KW", "5.0HP"
+        const HP_UNIT_PATTERN = '(?:HP|H\\.P\\.|H\\.P|KW|kW|HORSEPOWER)';
+        const BOUNDARY_START = '(?:^|\\s|\\(|,)';
+        const BOUNDARY_END = '(?:\\s|\\)|,|$)';
+        const hpPattern = `${BOUNDARY_START}(?:${searchHp}|${searchHp}\\.0)\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
+        
+        // Fractional pattern for values < 1 HP (e.g., 1/2 HP, 1/4 HP)
+        // Guard against division by zero and very small values
+        const fractionalPattern = (searchHpNum > 0.001 && searchHpNum < 1) 
+            ? `1/${Math.round(1/searchHpNum)}\\s*${HP_UNIT_PATTERN}` 
+            : null;
+        
+        const safetyMatch = new RegExp(hpPattern, 'i').test(record.desc);
+        const fractionalMatch = fractionalPattern && new RegExp(fractionalPattern, 'i').test(record.desc);
+        
+        // Table/header format: "HP: 5", "HP | 5", "HP 5", "Horsepower 5" or "Motor HP 5"
+        const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${searchHp}\\b`;
+        const tableMatch = new RegExp(tablePattern, 'i').test(record.desc);
+        
+        if (safetyMatch || fractionalMatch || tableMatch) {
+            return { matches: true, isVariant: true, weight: HP_FUZZY_WEIGHT };
+        }
+        
+        return { matches: false, isVariant: false, weight: 0 };
+    }
+    
+    /**
+     * Helper: Match keywords in record with alias expansion and reject logic
+     * @param {Object} record - Database record
+     * @param {Array} rawKeywords - Raw keywords from user input
+     * @param {Array} expandedKeywords - Keywords expanded with aliases
+     * @returns {boolean} True if all keyword groups match
+     * @private
+     */
+    static _matchKeywords(record, rawKeywords, expandedKeywords) {
+        const KEYWORD_WEIGHT = 10;
+        
+        if (!expandedKeywords || expandedKeywords.length === 0) {
+            return true; // No keyword filter
+        }
+        
+        const text = (record.id + " " + (record.desc || "")).toUpperCase();
+        
+        // === CHECK REJECT KEYWORDS ===
+        if (record.reject_keywords && record.reject_keywords.length > 0) {
+            const isRejected = rawKeywords.some(kw => record.reject_keywords.includes(kw));
+            if (isRejected) return false;
+        }
+
+        // === CHECK ALL KEYWORD GROUPS MATCH ===
+        const allGroupsMatch = expandedKeywords.every(group => {
+            return group.some(alias => {
+                const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+                
+                // CRITICAL FIX: Safe word-boundary regex to prevent partial acronym matches
+                const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
+                return regex.test(text); 
+            });
+        });
+
+        return allGroupsMatch;
+    }
+
+    static perform() {
+        // === STOP PREVIOUS PRELOADING ===
+        PdfController.stopPreloading();
         FeedbackService.resetLockout();
 
-        const rawKeywords = document.getElementById('keywordInput').value.split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length);
+        // === GATHER SEARCH CRITERIA ===
+        const keywordInputEl = DOM_CACHE.get('keywordInput');
+        const rawKeywords = (keywordInputEl?.value || '').split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length);
         const expandedKeywords = rawKeywords.map(k => {
             for (const [key, group] of Object.entries(AI_TRAINING_DATA.ALIASES)) {
                 if (group.includes(k)) return group; 
@@ -2004,85 +2135,63 @@ class SearchEngine {
             return [k]; 
         });
 
-        const cat = document.getElementById('catInput').value; 
-        const crit = { kw: rawKeywords, mfg: document.getElementById('mfgInput').value, hp: document.getElementById('hpInput').value, volt: document.getElementById('voltInput').value, phase: document.getElementById('phaseInput').value, enc: document.getElementById('encInput').value };
+        const catInputEl = DOM_CACHE.get('catInput');
+        const cat = catInputEl?.value || 'Any';
+        
+        const crit = { 
+            kw: rawKeywords, 
+            mfg: DOM_CACHE.get('mfgInput')?.value || 'Any', 
+            hp: DOM_CACHE.get('hpInput')?.value || 'Any', 
+            volt: DOM_CACHE.get('voltInput')?.value || 'Any', 
+            phase: DOM_CACHE.get('phaseInput')?.value || 'Any', 
+            enc: DOM_CACHE.get('encInput')?.value || 'Any'
+        };
+        
+        // === FILTER AND SCORE RESULTS ===
         let res = [];
         window.LOCAL_DB.forEach(r => {
-            let w = 0, p = true, hpV = false, miss = 0;
-            if (cat === 'Standard') { if (r.category === 'low_voltage') return; } 
-            else if (cat === 'LowVoltage') { if (r.category !== 'low_voltage') return; }
+            let w = 0, p = true, hpV = false;
             
-            if(crit.mfg !== "Any") { if (r.mfg === crit.mfg) { w += 10000; } else if (r.desc && r.desc.includes(crit.mfg)) { w += 1000; } else { return; } }
-            if(crit.hp !== "Any") { 
-                // Normalize HP value for comparison
-                const searchHP = parseFloat(crit.hp);
-                const tolerance = 0.1; // 10% tolerance for fuzzy matching
-                
-                // Strict field match
-                const strictMatch = r.hp && Math.abs(parseFloat(r.hp) - searchHP) < tolerance;
-                
-                // Enhanced safety regex for various formats
-                // Pattern matches: word boundary + HP value + optional decimal + HP unit + word boundary
-                // Examples: "5 HP", "5HP", "5H.P", "5 H.P.", "5KW", "5.0HP"
-                const HP_UNIT_PATTERN = '(?:HP|H\\.P\\.|H\\.P|KW|kW|HORSEPOWER)';
-                const BOUNDARY_START = '(?:^|\\s|\\(|,)';
-                const BOUNDARY_END = '(?:\\s|\\)|,|$)';
-                const hpPattern = `${BOUNDARY_START}(?:${crit.hp}|${crit.hp}\\.0)\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
-                
-                // Fractional pattern for values < 1 HP (e.g., 1/2 HP, 1/4 HP)
-                // Guard against division by zero
-                const fractionalPattern = (searchHP > 0 && searchHP < 1) 
-                    ? `1/${Math.round(1/searchHP)}\\s*${HP_UNIT_PATTERN}` 
-                    : null;
-                
-                const safetyRegex = new RegExp(hpPattern, 'i');
-                const safetyMatch = r.desc && safetyRegex.test(r.desc);
-                
-                const fractionalMatch = fractionalPattern && r.desc && new RegExp(fractionalPattern, 'i').test(r.desc);
-                
-                // Table/header format: "HP: 5", "HP | 5", "HP 5", "Horsepower 5" or "Motor HP 5"
-                const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${crit.hp}\\b`;
-                const tableMatch = r.desc && new RegExp(tablePattern, 'i').test(r.desc);
-                
-                if (strictMatch) { 
-                    w += 5000; 
-                } else if (safetyMatch || fractionalMatch || tableMatch) { 
-                    w += 2000; 
-                    hpV = true; // Mark as varied/fuzzy HP match
+            // Category filter
+            if (cat === 'Standard' && r.category === 'low_voltage') return;
+            if (cat === 'LowVoltage' && r.category !== 'low_voltage') return;
+            
+            // Manufacturer filter
+            if(crit.mfg !== "Any") { 
+                if (r.mfg === crit.mfg) { 
+                    w += 10000; 
+                } else if (r.desc && r.desc.includes(crit.mfg)) { 
+                    w += 1000; 
                 } else { 
                     return; 
-                }
+                } 
             }
+            
+            // HP filter using helper
+            if(crit.hp !== "Any") {
+                const hpMatch = this._matchHp(r, crit.hp);
+                if (!hpMatch.matches) return;
+                w += hpMatch.weight;
+                hpV = hpMatch.isVariant;
+            }
+            
+            // Volt/Phase/Enclosure filters
             if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; w += 500; }
             if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; w += 500; }
             if(crit.enc!=="Any") { if(r.enc!==crit.enc) return; w += 500; }
             
-            if(expandedKeywords.length) { 
-                const text = (r.id + " " + (r.desc || "")).toUpperCase();
-                
-                if (r.reject_keywords && r.reject_keywords.length > 0) {
-                    const isRejected = rawKeywords.some(kw => r.reject_keywords.includes(kw));
-                    if (isRejected) return; 
-                }
+            // Keyword filter using helper
+            if(!this._matchKeywords(r, rawKeywords, expandedKeywords)) return;
+            if(expandedKeywords.length) w += 10;
 
-                const allGroupsMatch = expandedKeywords.every(group => {
-                    return group.some(alias => {
-                        const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-                        
-                        // CRITICAL FIX: Safe word-boundary regex to prevent partial acronym matches
-                        const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
-                        return regex.test(text); 
-                    });
-                });
-
-                if(!allGroupsMatch) return; 
-                w+=10; 
-            }
-
-            // Removed huge no-PDF penalty; handled via post-sort segregation
             r.w=w; r.p=p; r.hpV=hpV; res.push(r);
         });
-        res.sort((a,b) => { if(a.w !== b.w) return b.w - a.w; return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); });
+        
+        // === SORT AND PARTITION RESULTS ===
+        res.sort((a,b) => { 
+            if(a.w !== b.w) return b.w - a.w; 
+            return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); 
+        });
         
         // Partition: with PDF first, then no-PDF, preserving intra-group order
         const withPdf = res.filter(r => r.pdfUrl);
@@ -2092,11 +2201,15 @@ class SearchEngine {
         this.lastCriteria = crit;
         this.renderCurrentPage();
         
-        document.getElementById('pagination-footer').style.display = res.length > 0 ? 'flex' : 'none';
+        // === UPDATE UI ===
+        const paginationFooter = DOM_CACHE.get('pagination-footer');
+        if (paginationFooter) {
+            paginationFooter.style.display = res.length > 0 ? 'flex' : 'none';
+        }
         
         UI.toggleSearch(false);
 
-        // Preload PDFs for first page of results (in background)
+        // === PRELOAD PDFs ===
         if (res.length > 0) {
             setTimeout(() => {
                 PdfController.preloadSearchResults(res);
@@ -2110,13 +2223,13 @@ class SearchEngine {
         const pageResults = this.currentResults.slice(start, end);
         const totalPages = Math.ceil(this.currentResults.length / this.pageSize);
         
-        // Render the page results
+        // === RENDER PAGE RESULTS ===
         UI.render(pageResults, this.lastCriteria, this.currentResults.length);
         
-        // Update pagination controls
-        const pageInfo = document.getElementById('page-info');
-        const prevBtn = document.getElementById('page-prev');
-        const nextBtn = document.getElementById('page-next');
+        // === UPDATE PAGINATION CONTROLS ===
+        const pageInfo = DOM_CACHE.get('page-info');
+        const prevBtn = DOM_CACHE.get('page-prev');
+        const nextBtn = DOM_CACHE.get('page-next');
         
         if (pageInfo) {
             pageInfo.textContent = `Page ${this.currentPage} of ${totalPages}`;
@@ -2135,7 +2248,8 @@ class SearchEngine {
         if (this.currentPage > 1) {
             this.currentPage--;
             this.renderCurrentPage();
-            document.getElementById('results-scroll-area').scrollTop = 0;
+            const resultsScroll = DOM_CACHE.get('results-scroll-area');
+            if (resultsScroll) resultsScroll.scrollTop = 0;
         }
     }
 
@@ -2144,7 +2258,8 @@ class SearchEngine {
         if (this.currentPage < totalPages) {
             this.currentPage++;
             this.renderCurrentPage();
-            document.getElementById('results-scroll-area').scrollTop = 0;
+            const resultsScroll = DOM_CACHE.get('results-scroll-area');
+            if (resultsScroll) resultsScroll.scrollTop = 0;
         }
     }
 }
@@ -2381,6 +2496,112 @@ function validatePdfResponse(resp, arrayBuffer, context = '') {
     return { valid: true };
 }
 
+/**
+ * Wrapper function to standardize PDF validation with consistent diagnostic context
+ * @param {Response} resp - Fetch response
+ * @param {ArrayBuffer} arrayBuffer - PDF data buffer
+ * @param {string} location - Location identifier (e.g., 'loadById', 'preload')
+ * @param {string} id - Panel or resource ID
+ * @returns {Object} Validation result with {valid, reason}
+ */
+function validatePdfWithContext(resp, arrayBuffer, location, id = '') {
+    const context = id ? `${location}[${id}]` : location;
+    return validatePdfResponse(resp, arrayBuffer, context);
+}
+
+/**
+ * Centralized PDF UI state transition function
+ * Manages visibility of PDF viewer elements based on state
+ * @param {string} state - One of PDF_UI_STATE values
+ * @param {string} loadingMessage - Optional custom loading message
+ * @param {string} fallbackUrl - Optional fallback URL for direct PDF link
+ */
+function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbackUrl = '') {
+    const elements = {
+        placeholder: DOM_CACHE.get('pdf-placeholder-text'),
+        toolbar: DOM_CACHE.get('pdf-toolbar'),
+        viewer: DOM_CACHE.get('custom-pdf-viewer'),
+        fallback: DOM_CACHE.get('pdf-fallback'),
+        fallbackLink: DOM_CACHE.get('pdf-fallback-link'),
+        frame: DOM_CACHE.get('pdf-viewer-frame')
+    };
+    
+    // Reset all states
+    if (elements.placeholder) elements.placeholder.style.display = 'none';
+    if (elements.toolbar) elements.toolbar.style.display = 'none';
+    if (elements.viewer) elements.viewer.style.display = 'none';
+    if (elements.fallback) elements.fallback.style.display = 'none';
+    if (elements.frame) elements.frame.style.display = 'none';
+    
+    // Apply specific state
+    switch (state) {
+        case PDF_UI_STATE.LOADING:
+            if (elements.placeholder) {
+                elements.placeholder.style.display = 'flex';
+                elements.placeholder.innerText = loadingMessage;
+            }
+            break;
+        case PDF_UI_STATE.READY:
+            if (elements.placeholder) elements.placeholder.style.display = 'none';
+            if (elements.toolbar) elements.toolbar.style.display = 'flex';
+            if (elements.viewer) elements.viewer.style.display = 'flex';
+            break;
+        case PDF_UI_STATE.FALLBACK:
+            if (elements.placeholder) elements.placeholder.style.display = 'none';
+            if (elements.fallback) elements.fallback.style.display = 'block';
+            if (fallbackUrl && elements.fallbackLink) {
+                elements.fallbackLink.href = fallbackUrl;
+            }
+            break;
+        case PDF_UI_STATE.HIDDEN:
+        default:
+            // All elements already hidden
+            break;
+    }
+}
+
+/**
+ * Attempts to fetch PDF using fallback URL when primary fetch fails
+ * Shared logic between PdfViewer.loadById and PdfController.preloadSearchResults
+ * @param {string} fallbackUrl - Direct PDF URL to try
+ * @param {string} panelId - Panel identifier for logging
+ * @param {Function} headers - Function to get auth headers
+ * @returns {Object|null} {arrayBuffer, blob, resp} on success, null on failure
+ */
+async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
+    if (!fallbackUrl) {
+        console.warn(`[fallback] No fallback URL provided for ${panelId}`);
+        return null;
+    }
+    
+    try {
+        console.log(`[fallback] Attempting fallback fetch for ${panelId}`);
+        const fallbackProxyUrl = `${WORKER_URL}?target=PDF&url=${encodeURIComponent(fallbackUrl)}`;
+        const fallbackResp = await fetch(fallbackProxyUrl, { headers: headers() });
+        
+        if (!fallbackResp.ok) {
+            console.warn(`[fallback] Fetch failed for ${panelId}: status ${fallbackResp.status}`);
+            return null;
+        }
+        
+        const fallbackArrayBuffer = await fallbackResp.arrayBuffer();
+        
+        // Validate fallback PDF
+        const fallbackValidation = validatePdfWithContext(fallbackResp, fallbackArrayBuffer, 'fallback', panelId);
+        if (!fallbackValidation.valid) {
+            console.warn(`[fallback] PDF validation failed for ${panelId}: ${fallbackValidation.reason}`);
+            return null;
+        }
+        
+        console.log(`[fallback] Success for ${panelId}`);
+        const blob = new Blob([fallbackArrayBuffer], { type: "application/pdf" });
+        return { arrayBuffer: fallbackArrayBuffer, blob, resp: fallbackResp };
+    } catch (error) {
+        console.warn(`[fallback] Exception for ${panelId}:`, error);
+        return null;
+    }
+}
+
 class PdfViewer {
     static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
@@ -2398,119 +2619,81 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         
-        // Load PDF by panel ID via worker (fetches fresh attachment URL from Airtable)
+        // === INITIALIZATION ===
         this.url = fallbackUrl || "";
-        document.getElementById('pdf-fallback').style.display = 'none'; 
-        document.getElementById('pdf-toolbar').style.display = 'none';
-        document.getElementById('custom-pdf-viewer').style.display = 'none'; 
-        document.getElementById('pdf-viewer-frame').style.display = 'none';
-        document.getElementById('pdf-placeholder-text').style.display = 'flex';
-        document.getElementById('pdf-placeholder-text').innerText = "⏳ DOWNLOADING PDF...";
+        setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
 
         const fetchId = Date.now();
         this.currentFetchId = fetchId;
 
         try {
+            // === CLEANUP PREVIOUS LOADING TASK ===
             if (this.loadingTask) {
                 await this.loadingTask.destroy().catch(()=>{});
                 this.loadingTask = null;
             }
 
-            // Use the new PDF_BY_ID endpoint
+            // === PRIMARY FETCH: PDF_BY_ID ===
             const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(panelId)}`;
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             
             if (!resp.ok) {
+                // === HANDLE 404: ATTEMPT FALLBACK ===
                 if (resp.status === 404) {
                     console.warn(`PDF_BY_ID returned 404 for panel ${panelId}`);
                     
-                    // Attempt fallback using direct pdfUrl if available
-                    if (fallbackUrl) {
-                        console.log(`[loadById] Attempting fallback fetch with direct pdfUrl for panel ${panelId}`);
+                    const fallbackResult = await attemptPdfFallbackFetch(fallbackUrl, panelId, AuthService.headers);
+                    if (fallbackResult) {
+                        // === FALLBACK SUCCESS: LOAD AND RENDER ===
+                        if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+                        this.currentBlobUrl = URL.createObjectURL(fallbackResult.blob);
+                        
                         try {
-                            const fallbackProxyUrl = `${WORKER_URL}?target=PDF&url=${encodeURIComponent(fallbackUrl)}`;
-                            const fallbackResp = await fetch(fallbackProxyUrl, { headers: AuthService.headers() });
-                            
-                            if (fallbackResp.ok) {
-                                const fallbackArrayBuffer = await fallbackResp.arrayBuffer();
-                                
-                                // Validate fallback PDF
-                                const fallbackValidation = validatePdfResponse(fallbackResp, fallbackArrayBuffer, `loadById-fallback[${panelId}]`);
-                                if (fallbackValidation.valid) {
-                                    console.log(`[loadById] Fallback fetch succeeded for panel ${panelId}`);
-                                    
-                                    // Use the fallback PDF - continue with normal flow
-                                    const blob = new Blob([fallbackArrayBuffer], { type: "application/pdf" });
-                                    if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-                                    this.currentBlobUrl = URL.createObjectURL(blob);
-                                    
-                                    try {
-                                        this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fallbackArrayBuffer) });
-                                        this.doc = await this.loadingTask.promise;
-                                    } catch (pdfError) {
-                                        console.error(`[loadById-fallback] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
-                                        throw pdfError;
-                                    }
-                                    
-                                    // Cache the fallback PDF
-                                    PdfController.pdfCache.set(panelId, {
-                                        arrayBuffer: fallbackArrayBuffer,
-                                        blob: blob,
-                                        timestamp: Date.now()
-                                    });
-                                    
-                                    // Continue to rendering (skip to after validation)
-                                    if (!this.isDocumentValid()) {
-                                        throw new Error('Loaded PDF document is null or destroyed after loading');
-                                    }
-                                    
-                                    if (this.currentFetchId !== fetchId) {
-                                        console.log(`PDF load cancelled after document load (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
-                                        return;
-                                    }
-                                    
-                                    if (window.innerWidth < 768) {
-                                         this.currentScale = 0.8;
-                                         UI.toggleSearch(true); 
-                                    } else {
-                                         this.currentScale = 1.1;
-                                    }
-                                    
-                                    document.getElementById('pdf-placeholder-text').style.display = 'none';
-                                    document.getElementById('pdf-toolbar').style.display = 'flex';
-                                    document.getElementById('custom-pdf-viewer').style.display = 'flex';
-                                    
-                                    await this.renderStack();
-                                    return; // Success - exit early
-                                } else {
-                                    console.warn(`[loadById] Fallback PDF validation failed for panel ${panelId}: ${fallbackValidation.reason}`);
-                                }
-                            } else {
-                                console.warn(`[loadById] Fallback fetch failed for panel ${panelId}: status ${fallbackResp.status}`);
-                            }
-                        } catch (fallbackError) {
-                            console.warn(`[loadById] Fallback fetch error for panel ${panelId}:`, fallbackError);
+                            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fallbackResult.arrayBuffer) });
+                            this.doc = await this.loadingTask.promise;
+                        } catch (pdfError) {
+                            console.error(`[loadById-fallback] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
+                            throw pdfError;
                         }
+                        
+                        // Cache the fallback PDF
+                        PdfController.pdfCache.set(panelId, {
+                            arrayBuffer: fallbackResult.arrayBuffer,
+                            blob: fallbackResult.blob,
+                            timestamp: Date.now()
+                        });
+                        
+                        // Validate and render
+                        if (!this.isDocumentValid()) {
+                            throw new Error('Loaded PDF document is null or destroyed after loading');
+                        }
+                        
+                        if (this.currentFetchId !== fetchId) {
+                            console.log(`PDF load cancelled after document load (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
+                            return;
+                        }
+                        
+                        this._setScaleForDevice();
+                        setPdfUiState(PDF_UI_STATE.READY);
+                        await this.renderStack();
+                        return; // Success - exit early
                     }
                     
-                    // Both PDF_BY_ID and fallback failed - mark as missing
+                    // === FALLBACK FAILED: MARK AS MISSING ===
                     console.error(`[loadById] All fetch attempts failed for panel ${panelId} - marking as missing`);
                     const rec = window.ID_MAP.get(panelId);
                     if (rec) {
-                        rec.pdfStatus = "missing";
+                        rec.pdfStatus = PDF_STATUS.MISSING;
                         console.log(`[loadById] Marked panel ${panelId} as missing PDF`);
                     }
                     
-                    document.getElementById('pdf-placeholder-text').style.display = 'none';
-                    document.getElementById('pdf-fallback').style.display = 'block';
-                    if (fallbackUrl) {
-                        document.getElementById('pdf-fallback-link').href = fallbackUrl;
-                    }
+                    setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
                     return; // Exit gracefully
                 }
                 throw new Error(`Failed to fetch PDF by ID: ${resp.status}`);
             }
             
+            // === PRIMARY FETCH SUCCESS: VALIDATE AND LOAD ===
             const arrayBuffer = await resp.arrayBuffer();
 
             if (this.currentFetchId !== fetchId) {
@@ -2518,15 +2701,10 @@ class PdfViewer {
                 return;
             }
 
-            // Enhanced validation with diagnostics
-            const validation = validatePdfResponse(resp, arrayBuffer, `loadById[${panelId}]`);
+            const validation = validatePdfWithContext(resp, arrayBuffer, 'loadById', panelId);
             if (!validation.valid) {
                 console.error(`[loadById] Invalid PDF for panel ${panelId}: ${validation.reason}`);
-                document.getElementById('pdf-placeholder-text').style.display = 'none';
-                document.getElementById('pdf-fallback').style.display = 'block';
-                if (fallbackUrl) {
-                    document.getElementById('pdf-fallback-link').href = fallbackUrl;
-                }
+                setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
                 return;
             }
 
@@ -2534,54 +2712,51 @@ class PdfViewer {
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(blob);
             
-            // Wrap pdfjsLib.getDocument in try/catch
             try {
                 this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
                 this.doc = await this.loadingTask.promise;
             } catch (pdfError) {
                 console.error(`[loadById] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
-                // Check for InvalidPDFException
                 if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
                     console.error(`[loadById] InvalidPDFException detected - PDF is malformed`);
                 }
-                throw pdfError; // Re-throw to outer catch
+                throw pdfError;
             }
 
-            // Check if document is valid after loading
+            // === VALIDATE AND RENDER ===
             if (!this.isDocumentValid()) {
                 throw new Error('Loaded PDF document is null or destroyed after loading');
             }
 
-            // Check staleness again before rendering
             if (this.currentFetchId !== fetchId) {
                 console.log(`PDF load cancelled after document load (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
                 return;
             }
 
-            if (window.innerWidth < 768) {
-                 this.currentScale = 0.8;
-                 UI.toggleSearch(true); 
-            } else {
-                 this.currentScale = 1.1;
-            }
-
-            document.getElementById('pdf-placeholder-text').style.display = 'none';
-            document.getElementById('pdf-toolbar').style.display = 'flex';
-            document.getElementById('custom-pdf-viewer').style.display = 'flex';
-
+            this._setScaleForDevice();
+            setPdfUiState(PDF_UI_STATE.READY);
             await this.renderStack(); 
         } catch(e) {
+            // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
-                document.getElementById('pdf-placeholder-text').style.display = 'none';
-                document.getElementById('pdf-fallback').style.display = 'block';
-                // Set fallback link to the cached URL if available
-                if (fallbackUrl) {
-                    document.getElementById('pdf-fallback-link').href = fallbackUrl;
-                }
+                setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
             }
+        }
+    }
+    
+    /**
+     * Helper: Set appropriate scale based on device width
+     * @private
+     */
+    static _setScaleForDevice() {
+        if (window.innerWidth < 768) {
+            this.currentScale = 0.8;
+            UI.toggleSearch(true); 
+        } else {
+            this.currentScale = 1.1;
         }
     }
 
@@ -2589,84 +2764,67 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         
-        // Load PDF from preloaded cache
-        // Validate cached data structure
+        // === VALIDATE CACHED DATA ===
         if (!cached || !cached.arrayBuffer || !cached.blob) {
             console.warn('[loadFromCache] Invalid cached PDF data structure, falling back to network load');
             PdfController.evictFromCache(panelId);
             return this.loadById(panelId, fallbackUrl);
         }
         
-        // Validate PDF magic number in cached buffer
         if (!isPdfBuffer(cached.arrayBuffer)) {
             console.error(`[loadFromCache] Cached entry for panel ${panelId} is not a valid PDF - evicting and reloading from network`);
             PdfController.evictFromCache(panelId);
             return this.loadById(panelId, fallbackUrl);
         }
         
+        // === INITIALIZATION ===
         this.url = fallbackUrl || "";
-        document.getElementById('pdf-fallback').style.display = 'none'; 
-        document.getElementById('pdf-toolbar').style.display = 'none';
-        document.getElementById('custom-pdf-viewer').style.display = 'none'; 
-        document.getElementById('pdf-viewer-frame').style.display = 'none';
-        document.getElementById('pdf-placeholder-text').style.display = 'flex';
-        document.getElementById('pdf-placeholder-text').innerText = "⚡ LOADING FROM CACHE...";
+        setPdfUiState(PDF_UI_STATE.LOADING, '⚡ LOADING FROM CACHE...');
 
         const fetchId = Date.now();
         this.currentFetchId = fetchId;
 
         try {
+            // === CLEANUP PREVIOUS LOADING TASK ===
             if (this.loadingTask) {
                 await this.loadingTask.destroy().catch(()=>{});
                 this.loadingTask = null;
             }
 
+            // === LOAD FROM CACHE ===
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(cached.blob);
             
-            // Wrap pdfjsLib.getDocument in try/catch
             try {
                 this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
                 this.doc = await this.loadingTask.promise;
             } catch (pdfError) {
                 console.error(`[loadFromCache] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
-                // Check for InvalidPDFException
                 if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
                     console.error(`[loadFromCache] InvalidPDFException detected - evicting bad cache entry`);
                     PdfController.evictFromCache(panelId);
                 }
-                throw pdfError; // Re-throw to outer catch
+                throw pdfError;
             }
 
-            // Verify document is valid before continuing
+            // === VALIDATE AND RENDER ===
             if (!this.isDocumentValid()) {
                 console.error('[loadFromCache] Loaded PDF document is null or destroyed after loading from cache');
                 PdfController.evictFromCache(panelId);
                 throw new Error('Loaded PDF document is null or destroyed after loading from cache');
             }
 
-            // Check staleness before rendering
             if (this.currentFetchId !== fetchId) {
                 console.log(`[loadFromCache] Load cancelled (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
                 return;
             }
 
-            if (window.innerWidth < 768) {
-                 this.currentScale = 0.8;
-                 UI.toggleSearch(true); 
-            } else {
-                 this.currentScale = 1.1;
-            }
-
-            document.getElementById('pdf-placeholder-text').style.display = 'none';
-            document.getElementById('pdf-toolbar').style.display = 'flex';
-            document.getElementById('custom-pdf-viewer').style.display = 'flex';
-
+            this._setScaleForDevice();
+            setPdfUiState(PDF_UI_STATE.READY);
             await this.renderStack();
             console.log('✓ Loaded from cache'); 
         } catch(e) {
             console.error("[loadFromCache] Cache Load Error:", e);
-            // Evict bad cache entry and fall back to network loading
             PdfController.evictFromCache(panelId);
             this.loadById(panelId, fallbackUrl);
         }
@@ -2676,23 +2834,21 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         
+        // === INITIALIZATION ===
         this.url = url;
-        document.getElementById('pdf-fallback').style.display = 'none'; 
-        document.getElementById('pdf-toolbar').style.display = 'none';
-        document.getElementById('custom-pdf-viewer').style.display = 'none'; 
-        document.getElementById('pdf-viewer-frame').style.display = 'none';
-        document.getElementById('pdf-placeholder-text').style.display = 'flex';
-        document.getElementById('pdf-placeholder-text').innerText = "⏳ DOWNLOADING PDF...";
+        setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
 
         const fetchId = Date.now();
         this.currentFetchId = fetchId;
 
         try {
+            // === CLEANUP PREVIOUS LOADING TASK ===
             if (this.loadingTask) {
                 await this.loadingTask.destroy().catch(()=>{});
                 this.loadingTask = null;
             }
 
+            // === FETCH PDF ===
             const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
@@ -2704,64 +2860,50 @@ class PdfViewer {
                 return;
             }
 
-            // Enhanced validation with diagnostics
-            const validation = validatePdfResponse(resp, arrayBuffer, `load[${url}]`);
+            // === VALIDATE PDF ===
+            const validation = validatePdfWithContext(resp, arrayBuffer, 'load', url);
             if (!validation.valid) {
                 console.error(`[load] Invalid PDF from URL ${url}: ${validation.reason}`);
-                document.getElementById('pdf-placeholder-text').style.display = 'none';
-                document.getElementById('pdf-fallback').style.display = 'block';
-                document.getElementById('pdf-fallback-link').href = url;
+                setPdfUiState(PDF_UI_STATE.FALLBACK, '', url);
                 return;
             }
 
+            // === LOAD PDF ===
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
             this.currentBlobUrl = URL.createObjectURL(blob);
             
-            // Wrap pdfjsLib.getDocument in try/catch
             try {
                 this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
                 this.doc = await this.loadingTask.promise;
             } catch (pdfError) {
                 console.error(`[load] pdfjsLib.getDocument failed for URL ${url}:`, pdfError);
-                // Check for InvalidPDFException
                 if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
                     console.error(`[load] InvalidPDFException detected - PDF is malformed`);
                 }
-                throw pdfError; // Re-throw to outer catch
+                throw pdfError;
             }
 
-            // Check if document is valid after loading
+            // === VALIDATE AND RENDER ===
             if (!this.isDocumentValid()) {
                 throw new Error('Loaded PDF document is null or destroyed after loading');
             }
 
-            // Check staleness again before rendering
             if (this.currentFetchId !== fetchId) {
                 console.log(`[load] PDF load cancelled after document load (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
                 return;
             }
 
-            if (window.innerWidth < 768) {
-                 this.currentScale = 0.8;
-                 UI.toggleSearch(true); 
-            } else {
-                 this.currentScale = 1.1;
-            }
-
-            document.getElementById('pdf-placeholder-text').style.display = 'none';
-            document.getElementById('pdf-toolbar').style.display = 'flex';
-            document.getElementById('custom-pdf-viewer').style.display = 'flex';
-
+            this._setScaleForDevice();
+            setPdfUiState(PDF_UI_STATE.READY);
             await this.renderStack(); 
         } catch(e) {
+            // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
-                document.getElementById('pdf-placeholder-text').style.display = 'none';
-                document.getElementById('pdf-fallback').style.display = 'block';
-                document.getElementById('pdf-fallback-link').href = url;
+                setPdfUiState(PDF_UI_STATE.FALLBACK, '', url);
             }
         }
     }
@@ -3000,23 +3142,26 @@ class PdfController {
     static CACHE_MAX_SIZE = 20; // Maximum number of PDFs to cache
 
     static load(id, url) {
-        document.getElementById('pdf-placeholder-text').style.display = 'none';
-        const rec = window.ID_MAP.get(id);
-        if(rec && rec.displayId) { document.getElementById('demo-panel-id').value = rec.displayId; }
+        const placeholderEl = DOM_CACHE.get('pdf-placeholder-text');
+        if (placeholderEl) placeholderEl.style.display = 'none';
         
-        // Load PDF by panel ID via worker (Option 1)
-        if (!id) { 
-            document.getElementById('pdf-fallback').style.display = 'block'; 
-            if (url) document.getElementById('pdf-fallback-link').href = url;
+        const rec = window.ID_MAP.get(id);
+        if(rec && rec.displayId) {
+            const panelIdEl = DOM_CACHE.get('demo-panel-id');
+            if (panelIdEl) panelIdEl.value = rec.displayId;
+        }
+        
+        // === VALIDATE ID ===
+        if (!id) {
+            setPdfUiState(PDF_UI_STATE.FALLBACK, '', url);
             return; 
         }
         
-        // Check cache first
+        // === CHECK CACHE FIRST ===
         const cached = this.pdfCache.get(id);
         if (cached) {
             PdfViewer.loadFromCache(cached, id, url);
         } else {
-            // Pass panel ID and fallback URL to PdfViewer
             PdfViewer.loadById(id, url);
         }
     }
@@ -3025,92 +3170,65 @@ class PdfController {
         // Stop any in-progress preloading first
         this.stopPreloading();
         
-        // Validate inputs
+        // === VALIDATE INPUTS ===
         if (!results || !Array.isArray(results) || results.length === 0) {
             return;
         }
         
+        // === FILTER PRELOAD QUEUE ===
         // Preload first page of search results (top to bottom)
-        // Skip records that are flagged as missing PDFs (pdfStatus === "missing" or empty pdfUrl)
+        // Skip records that are flagged as missing PDFs or already cached
         this.preloadQueue = results.slice(0, SearchEngine.pageSize)
             .filter(r => {
-                // Skip if result doesn't have valid data
                 if (!r || !r.id) return false;
-                
-                // Skip if already cached
                 if (this.pdfCache.has(r.id)) return false;
-                
-                // Skip if PDF is flagged as missing or URL is empty
-                if (!r.pdfUrl || r.pdfStatus === "missing") {
+                if (!r.pdfUrl || r.pdfStatus === PDF_STATUS.MISSING) {
                     console.log(`[preload] Skipping ${r.displayId || r.id}: PDF not available (pdfUrl: ${!!r.pdfUrl}, pdfStatus: ${r.pdfStatus})`);
                     return false;
                 }
-                
                 return true;
             });
         this.isPreloading = true;
         
+        // === PROCESS PRELOAD QUEUE ===
         for (const result of this.preloadQueue) {
-            if (!this.isPreloading) break; // Allow cancellation
+            if (!this.isPreloading) break;
             
             try {
                 const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(result.id)}`;
                 const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
                 
+                // === HANDLE 404: ATTEMPT FALLBACK ===
                 if (resp.status === 404) {
                     console.warn(`[preload] PDF_BY_ID returned 404 for ${result.displayId || result.id}`);
                     
-                    // Attempt fallback using direct pdfUrl if available
-                    if (result.pdfUrl) {
-                        try {
-                            const fallbackProxyUrl = `${WORKER_URL}?target=PDF&url=${encodeURIComponent(result.pdfUrl)}`;
-                            const fallbackResp = await fetch(fallbackProxyUrl, { headers: AuthService.headers() });
-                            
-                            if (fallbackResp.ok) {
-                                const fallbackArrayBuffer = await fallbackResp.arrayBuffer();
-                                
-                                if (!this.isPreloading) break;
-                                
-                                const fallbackValidation = validatePdfResponse(fallbackResp, fallbackArrayBuffer, `preload-fallback[${result.displayId || result.id}]`);
-                                if (fallbackValidation.valid) {
-                                    console.log(`[preload] Fallback fetch succeeded for ${result.displayId || result.id}`);
-                                    
-                                    // Cache the fallback PDF
-                                    this.pdfCache.set(result.id, {
-                                        arrayBuffer: fallbackArrayBuffer,
-                                        blob: new Blob([fallbackArrayBuffer], { type: "application/pdf" }),
-                                        timestamp: Date.now()
-                                    });
-                                    console.log(`✓ Preloaded PDF (via fallback): ${result.displayId || result.id}`);
-                                    continue; // Success - move to next
-                                } else {
-                                    console.warn(`[preload] Fallback PDF validation failed for ${result.displayId || result.id}: ${fallbackValidation.reason}`);
-                                }
-                            } else {
-                                console.warn(`[preload] Fallback fetch failed for ${result.displayId || result.id}: status ${fallbackResp.status}`);
-                            }
-                        } catch (fallbackError) {
-                            console.warn(`[preload] Fallback fetch error for ${result.displayId || result.id}:`, fallbackError);
-                        }
+                    const fallbackResult = await attemptPdfFallbackFetch(result.pdfUrl, result.displayId || result.id, AuthService.headers);
+                    if (fallbackResult && this.isPreloading) {
+                        // Cache the fallback PDF
+                        this.pdfCache.set(result.id, {
+                            arrayBuffer: fallbackResult.arrayBuffer,
+                            blob: fallbackResult.blob,
+                            timestamp: Date.now()
+                        });
+                        console.log(`✓ Preloaded PDF (via fallback): ${result.displayId || result.id}`);
+                        continue; // Success - move to next
                     }
                     
-                    // Both PDF_BY_ID and fallback failed - mark as missing to prevent repeated attempts
-                    result.pdfStatus = "missing";
+                    // Fallback failed - mark as missing to prevent repeated attempts
+                    result.pdfStatus = PDF_STATUS.MISSING;
                     console.log(`[preload] Marked ${result.displayId || result.id} as missing PDF`);
                     continue; // Skip this one, continue with others
                 }
                 
+                // === PRIMARY FETCH SUCCESS: VALIDATE AND CACHE ===
                 if (resp && resp.ok) {
                     const arrayBuffer = await resp.arrayBuffer();
                     
-                    // Check if still preloading (might have been cancelled)
                     if (!this.isPreloading) break;
                     
-                    // Enhanced validation with content-type and size checks
-                    const validation = validatePdfResponse(resp, arrayBuffer, `preload[${result.displayId || result.id}]`);
+                    const validation = validatePdfWithContext(resp, arrayBuffer, 'preload', result.displayId || result.id);
                     if (!validation.valid) {
                         console.warn(`[preload] Skipping invalid PDF for ${result.displayId || result.id}: ${validation.reason}`);
-                        // Do not cache invalid PDFs - quarantine by skipping
                         continue;
                     }
                     
@@ -3126,11 +3244,9 @@ class PdfController {
                 }
             } catch (e) {
                 console.warn(`[preload] Failed to preload PDF ${result.id}:`, e);
-                // Continue preloading other PDFs even if one fails
             }
             
-            // Small delay between requests to avoid overwhelming the browser
-            // Check if still preloading before delay
+            // === DELAY BETWEEN REQUESTS ===
             if (this.isPreloading) {
                 await new Promise(resolve => setTimeout(resolve, this.PRELOAD_DELAY_MS));
             }
@@ -3191,40 +3307,99 @@ class PdfController {
 }
 
 class UI {
-    static init() { if(localStorage.getItem('cox_theme') === 'dark') { document.body.classList.add('dark-mode'); } window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); window.addEventListener('mouseup', () => RedactionManager.endDrag()); document.addEventListener('click', (e) => { const menu = document.getElementById('main-menu'); const btn = document.querySelector('.menu-btn'); if (menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { menu.classList.remove('visible'); } }); }
-    static toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
+    static init() { 
+        if(localStorage.getItem('cox_theme') === 'dark') { 
+            document.body.classList.add('dark-mode'); 
+        } 
+        window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
+        window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
+        document.addEventListener('click', (e) => { 
+            const menu = DOM_CACHE.get('main-menu'); 
+            const btn = document.querySelector('.menu-btn'); 
+            if (menu && menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { 
+                menu.classList.remove('visible'); 
+            } 
+        }); 
+    }
+    
+    static toggleDarkMode() { 
+        document.body.classList.toggle('dark-mode'); 
+        localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); 
+    }
+    
     static clearPdfCache() { 
         const count = PdfController.clearAllCache(); 
         console.log(`✓ User cleared ${count} cached PDF${count !== 1 ? 's' : ''}`);
-        // Use a simple console-based notification instead of blocking alert
-        // Future enhancement: add a toast/snackbar UI component for better UX
         const msg = `Cleared ${count} cached PDF${count !== 1 ? 's' : ''}. Cache is now empty.`;
         console.log(msg);
-        // Temporary alert for user feedback - should be replaced with toast notification
         alert(msg);
     }
-    static handleEnter(e) { if(e.key==='Enter') SearchEngine.perform(); }
-    static resetSearch() { document.querySelectorAll('select').forEach(s=>s.value="Any"); document.getElementById('keywordInput').value=''; this.toggleSearch(true); }
-    static closeMobilePreview() { document.body.classList.remove('viewing-pdf'); }
-    static toggleLeftSidebar() { document.getElementById('sidebar-left').classList.toggle('collapsed'); document.getElementById('toggle-left').innerText = document.getElementById('sidebar-left').classList.contains('collapsed') ? '›' : '‹'; }
-    static toggleRightSidebar() { const el = document.getElementById('sidebar-right'); el.classList.toggle('collapsed'); document.getElementById('toggle-right').innerText = el.classList.contains('collapsed') ? '⚙️' : '›'; }
-    static toggleSearch(e) { const c = document.getElementById('search-controls'); if(!c) return; if(e) { c.classList.remove('collapsed'); document.getElementById('refine-btn-area').classList.remove('visible'); } else { c.classList.add('collapsed'); document.getElementById('refine-btn-area').classList.add('visible'); } }
-    static toggleMenu() { document.getElementById('main-menu').classList.toggle('visible'); }
+    
+    static handleEnter(e) { 
+        if(e.key==='Enter') SearchEngine.perform(); 
+    }
+    
+    static resetSearch() { 
+        document.querySelectorAll('select').forEach(s=>s.value="Any"); 
+        const keywordInput = DOM_CACHE.get('keywordInput');
+        if (keywordInput) keywordInput.value=''; 
+        this.toggleSearch(true); 
+    }
+    
+    static closeMobilePreview() { 
+        document.body.classList.remove('viewing-pdf'); 
+    }
+    
+    static toggleLeftSidebar() { 
+        const sidebar = DOM_CACHE.get('sidebar-left');
+        const toggle = DOM_CACHE.get('toggle-left');
+        if (sidebar && toggle) {
+            sidebar.classList.toggle('collapsed'); 
+            toggle.innerText = sidebar.classList.contains('collapsed') ? '›' : '‹';
+        }
+    }
+    
+    static toggleRightSidebar() { 
+        const el = DOM_CACHE.get('sidebar-right'); 
+        const toggle = DOM_CACHE.get('toggle-right');
+        if (el && toggle) {
+            el.classList.toggle('collapsed'); 
+            toggle.innerText = el.classList.contains('collapsed') ? '⚙️' : '›';
+        }
+    }
+    
+    static toggleSearch(e) { 
+        const c = DOM_CACHE.get('search-controls'); 
+        const refineBtn = DOM_CACHE.get('refine-btn-area');
+        if(!c) return; 
+        if(e) { 
+            c.classList.remove('collapsed'); 
+            if (refineBtn) refineBtn.classList.remove('visible'); 
+        } else { 
+            c.classList.add('collapsed'); 
+            if (refineBtn) refineBtn.classList.add('visible'); 
+        } 
+    }
+    
+    static toggleMenu() { 
+        const menu = DOM_CACHE.get('main-menu');
+        if (menu) menu.classList.toggle('visible'); 
+    }
     
 static pop() { 
-    // Preserve current selections before repopulating
+    // === PRESERVE CURRENT SELECTIONS ===
     const savedValues = {
-        mfg: document.getElementById('mfgInput')?.value,
-        hp: document.getElementById('hpInput')?.value,
-        volt: document.getElementById('voltInput')?.value,
-        phase: document.getElementById('phaseInput')?.value,
-        enc: document.getElementById('encInput')?.value,
-        cat: document.getElementById('catInput')?.value,
-        keyword: document.getElementById('keywordInput')?.value
+        mfg: DOM_CACHE.get('mfgInput')?.value,
+        hp: DOM_CACHE.get('hpInput')?.value,
+        volt: DOM_CACHE.get('voltInput')?.value,
+        phase: DOM_CACHE.get('phaseInput')?.value,
+        enc: DOM_CACHE.get('encInput')?.value,
+        cat: DOM_CACHE.get('catInput')?.value,
+        keyword: DOM_CACHE.get('keywordInput')?.value
     };
 
-    // Manufacturer list: use found manufacturers when available, fall back to training data
-    const m = document.getElementById('mfgInput');
+    // === MANUFACTURER LIST ===
+    const m = DOM_CACHE.get('mfgInput');
     if (m) {
         const cleanList = window.FOUND_MFGS.size > 0
             ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
@@ -3236,9 +3411,9 @@ static pop() {
         m.value = savedValues.mfg && cleanList.includes(savedValues.mfg) ? savedValues.mfg : 'Any';
     }
 
-    // HP / Volt / Phase / Enclosure
+    // === HP / VOLT / PHASE / ENCLOSURE ===
     ['hp', 'volt', 'phase', 'enc'].forEach(k => {
-        const s = document.getElementById(k + 'Input');
+        const s = DOM_CACHE.get(k + 'Input');
         if (!s) return;
         const data = (k === 'enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()];
         s.innerHTML = '';
@@ -3248,60 +3423,87 @@ static pop() {
     });
 
     // Restore category and keywords (if present)
-    if (savedValues.cat) document.getElementById('catInput').value = savedValues.cat;
-    if (savedValues.keyword) document.getElementById('keywordInput').value = savedValues.keyword;
+    if (savedValues.cat) {
+        const catInput = DOM_CACHE.get('catInput');
+        if (catInput) catInput.value = savedValues.cat;
+    }
+    if (savedValues.keyword) {
+        const keywordInput = DOM_CACHE.get('keywordInput');
+        if (keywordInput) keywordInput.value = savedValues.keyword;
+    }
 }
-static render(res, crit, totalCount) { 
-    const a = document.getElementById('results-area'); 
+
+/**
+ * Helper: Generate badges for a search result
+ * @param {Object} record - Database record
+ * @param {Object} criteria - Search criteria
+ * @returns {Array} Array of badge HTML strings
+ * @private
+ */
+static _generateBadges(record, criteria) {
+    const badges = [];
+    const isMissingPdf = !record.pdfUrl || record.pdfStatus === PDF_STATUS.MISSING;
+    
+    // Category badge
+    if (record.category === 'low_voltage') {
+        badges.push(`<span class="hud-badge match-orange">LOW VOLT</span>`);
+    }
+
+    // Manufacturer badge
+    if (criteria.mfg !== "Any" && record.mfg) {
+        const isMatch = (record.mfg === criteria.mfg);
+        badges.push(`<span class="hud-badge ${isMatch ? 'match-green' : 'match-orange'}">${record.mfg}</span>`);
+    } else if (record.mfg) {
+        badges.push(`<span class="hud-badge match-green">${record.mfg}</span>`);
+    }
+
+    // Voltage badge
+    if (criteria.volt !== "Any") {
+        badges.push(`<span class="hud-badge ${record.volt ? 'match-green' : 'unknown'}">${record.volt ? record.volt + 'V' : '? V'}</span>`);
+    }
+    
+    // Phase badge
+    if (criteria.phase !== "Any") {
+        badges.push(`<span class="hud-badge ${record.phase ? 'match-green' : 'unknown'}">${record.phase ? record.phase + 'PH' : '? PH'}</span>`);
+    }
+    
+    // HP badge (orange for varied/fuzzy matches, green for strict)
+    if (criteria.hp !== "Any") {
+        const hpBadgeClass = record.hpV ? 'match-orange' : (record.hp ? 'match-green' : 'unknown');
+        badges.push(`<span class="hud-badge ${hpBadgeClass}">${record.hp ? record.hp + ' HP' : '? HP'}</span>`);
+    }
+    
+    // Enclosure badge
+    if (criteria.enc !== "Any" && record.enc) {
+        badges.push(`<span class="hud-badge match-green">${record.enc}</span>`);
+    }
+
+    // Keyword badges (avoid duplicating mfg badge)
+    if (criteria.kw && criteria.kw.length > 0) {
+        criteria.kw.forEach(k => {
+            if (!(criteria.mfg !== "Any" && record.mfg === k.toUpperCase())) {
+                badges.push(`<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`);
+            }
+        });
+    }
+
+    // No-PDF badge
+    if (isMissingPdf) {
+        badges.push(`<span class="hud-badge no-pdf">NO PDF</span>`);
+    }
+    
+    return badges;
+}
+
+static render(res, crit, totalCount) {
+    const a = DOM_CACHE.get('results-area');
+    if (!a) return;
+    
     a.innerHTML = `Found ${totalCount || res.length} records`; 
     
     res.forEach(i => { 
-        const isMissingPdf = !i.pdfUrl || i.pdfStatus === "missing";
-        const badges = [];
-
-        // Category badge
-        if (i.category === 'low_voltage') {
-            badges.push(`<span class="hud-badge match-orange">LOW VOLT</span>`);
-        }
-
-        // Manufacturer badge
-        if (crit.mfg !== "Any" && i.mfg) {
-            const isMatch = (i.mfg === crit.mfg);
-            badges.push(`<span class="hud-badge ${isMatch ? 'match-green' : 'match-orange'}">${i.mfg}</span>`);
-        } else if (i.mfg) {
-            badges.push(`<span class="hud-badge match-green">${i.mfg}</span>`);
-        }
-
-        // Voltage / Phase / HP / Enclosure
-        if (crit.volt !== "Any") {
-            badges.push(`<span class="hud-badge ${i.volt ? 'match-green' : 'unknown'}">${i.volt ? i.volt + 'V' : '? V'}</span>`);
-        }
-        if (crit.phase !== "Any") {
-            badges.push(`<span class="hud-badge ${i.phase ? 'match-green' : 'unknown'}">${i.phase ? i.phase + 'PH' : '? PH'}</span>`);
-        }
-        if (crit.hp !== "Any") {
-            // Use orange badge for varied/fuzzy HP matches, green for strict field matches
-            const hpBadgeClass = i.hpV ? 'match-orange' : (i.hp ? 'match-green' : 'unknown');
-            badges.push(`<span class="hud-badge ${hpBadgeClass}">${i.hp ? i.hp + ' HP' : '? HP'}</span>`);
-        }
-        if (crit.enc !== "Any" && i.enc) {
-            badges.push(`<span class="hud-badge match-green">${i.enc}</span>`);
-        }
-
-        // Keyword badges
-        if (crit.kw && crit.kw.length > 0) {
-            crit.kw.forEach(k => {
-                // avoid duplicating the mfg badge if the kw == mfg
-                if (!(crit.mfg !== "Any" && i.mfg === k.toUpperCase())) {
-                    badges.push(`<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`);
-                }
-            });
-        }
-
-        // No-PDF badge
-        if (isMissingPdf) {
-            badges.push(`<span class="hud-badge no-pdf">NO PDF</span>`);
-        }
+        const isMissingPdf = !i.pdfUrl || i.pdfStatus === PDF_STATUS.MISSING;
+        const badges = this._generateBadges(i, crit);
 
         const c = document.createElement('div'); 
         c.className = `record-card ${isMissingPdf ? 'no-pdf-card' : ''} ${!i.p ? 'varied-result' : ''}`; 
