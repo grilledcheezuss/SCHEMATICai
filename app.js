@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.15 (Sorting Priority for Perfect Matches, Per-Parameter Feedback Lockout) ---
-const APP_VERSION = "v2.5.15";
+// --- SCHEMATICA ai v2.5.16 (Feedback Lockout Restoration, Voltage Badge Fix, Page Classifier Enhancements, OCR Guards) ---
+const APP_VERSION = "v2.5.16";
 const VERSION_HISTORY = {
+    "v2.5.16": "Restored positive feedback lockout enforcement; voltage/phase/enc badge strictness fix (green for exact field matches, orange for fuzzy); page toolbar cleanup; OCR min-size guard for tiny boxes; smarter page classification with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control)",
     "v2.5.15": "Sorting: perfect matches (no varied flags) prioritized above varied results when weights equal; Feedback: removed thumbs-down lockout to allow multiple per-parameter corrections per panel per search",
     "v2.5.14": "Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions",
     "v2.5.13": "Fixed feedback lockout enforcement for thumbs up; HP badge now green for strict matches; enclosure parsing for 4XSS/4XFG/POLY",
@@ -1202,6 +1203,9 @@ class PageClassifier {
         const DOOR_TERMS = ['DOOR', 'FRONT VIEW', 'PANEL FRONT', 'DOOR LAYOUT', 'FACE PLATE'];
         const COX_TERMS = ['COX RESEARCH', 'COX'];
         const DELTA_TERMS = ['DELTA', 'DELTA CONTROLS'];
+        const ENCLOSURE_TERMS = ['ENCLOSURE', 'ELECTRICAL DATA', 'PANEL DATA'];
+        const POWER_TERMS = ['POWER', 'ONE LINE', 'ONELINE', 'SINGLE LINE'];
+        const CONTROL_TERMS = ['CONTROL', 'LOGIC', 'SEQUENCE'];
         
         let schematicScore = 0;
         let infoScore = 0;
@@ -1210,6 +1214,9 @@ class PageClassifier {
         let doorScore = 0;
         let coxScore = 0;
         let deltaScore = 0;
+        let enclosureScore = 0;
+        let powerScore = 0;
+        let controlScore = 0;
         
         SCHEMATIC_TERMS.forEach(term => { if(text.includes(term)) schematicScore += 10; });
         INFO_TERMS.forEach(term => { if(text.includes(term)) infoScore += 15; });
@@ -1218,6 +1225,9 @@ class PageClassifier {
         DOOR_TERMS.forEach(term => { if(text.includes(term)) doorScore += 25; });
         COX_TERMS.forEach(term => { if(text.includes(term)) coxScore += 15; });
         DELTA_TERMS.forEach(term => { if(text.includes(term)) deltaScore += 15; });
+        ENCLOSURE_TERMS.forEach(term => { if(text.includes(term)) enclosureScore += 10; });
+        POWER_TERMS.forEach(term => { if(text.includes(term)) powerScore += 15; });
+        CONTROL_TERMS.forEach(term => { if(text.includes(term)) controlScore += 15; });
         
         // Text density as secondary signal
         if(itemCount < 50 && titleScore > 0) titleScore += 20;
@@ -1226,15 +1236,46 @@ class PageClassifier {
         const hasBorderIndicators = text.includes('BORDER') || text.includes('FRAME') || text.includes('TITLE BLOCK');
         const isBorderless = !hasBorderIndicators && itemCount > 20;
         
-        // Door drawing detection
+        // === PAGE NUMBER HEURISTICS FOR BETTER CLASSIFICATION ===
+        // Typical PDF ordering: Page 1 = Title, Page 2 = Info, Pages 3/4 = Power/Control schematics,
+        // Near end = Enclosure drawing, then BOM
+        
+        // Door drawing detection (high confidence)
         if(doorScore > 20) return 'DOOR_DRAWING';
         
-        // Cover sheet detection
-        if(pageNumber === 1 || titleScore > 25) {
+        // Page 1: Almost always a title/cover sheet
+        if(pageNumber === 1) {
             if(asBuiltScore > 15) return 'TITLE_ASBUILT';
             if(coxScore > 10) return 'COX_COVER';
             if(deltaScore > 10) return 'DELTA_COVER';
             if(titleScore > 25 && itemCount < 100) return 'THIRD_PARTY_COVER';
+            return 'TITLE';
+        }
+        
+        // Page 2: Usually info/notes
+        if(pageNumber === 2) {
+            if(infoScore > 10 || itemCount > 100) {
+                return isBorderless ? 'INFO_BORDERLESS' : 'INFO';
+            }
+        }
+        
+        // Pages 3-4: Usually power/control schematics
+        if(pageNumber === 3 || pageNumber === 4) {
+            if(schematicScore > 20 || powerScore > 10 || controlScore > 10) {
+                const isLandscape = aspectRatio && aspectRatio > 1;
+                if(isBorderless) {
+                    return isLandscape ? 'SCHEMATIC_LANDSCAPE_BORDERLESS' : 'SCHEMATIC_PORTRAIT_BORDERLESS';
+                }
+                return isLandscape ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
+            }
+        }
+        
+        // Cover sheet detection (fallback for page 1 without strong signals)
+        if(titleScore > 25) {
+            if(asBuiltScore > 15) return 'TITLE_ASBUILT';
+            if(coxScore > 10) return 'COX_COVER';
+            if(deltaScore > 10) return 'DELTA_COVER';
+            if(itemCount < 100) return 'THIRD_PARTY_COVER';
             return 'TITLE';
         }
         
@@ -1272,6 +1313,8 @@ class SmartScanner {
     static VERTICAL_TOLERANCE = 10;
     static HORIZONTAL_TOLERANCE = 20;
     static FONT_SIZE_ESTIMATE_FACTOR = 0.8; // OCR font size estimation adjustment
+    static MIN_OCR_BOX_WIDTH = 20; // Minimum width in pixels to avoid "too small to scale" errors
+    static MIN_OCR_BOX_HEIGHT = 10; // Minimum height in pixels to avoid "too small to scale" errors
     
     static async scanAllPages() {
         console.log('🔍 Auto-scanning PDF pages...');
@@ -1440,7 +1483,10 @@ class SmartScanner {
             width: item.width * scaleX,
             height: item.height * scaleY,
             fontSize: Math.abs(item.transform[0]) * scaleY
-        }));
+        })).filter(item => {
+            // Filter out boxes that are too small to prevent processing errors
+            return item.width >= this.MIN_OCR_BOX_WIDTH && item.height >= this.MIN_OCR_BOX_HEIGHT;
+        });
         
         // Detect title block region (typically bottom-right for landscape, bottom for portrait)
         const aspectRatio = viewport.width / viewport.height;
@@ -1596,7 +1642,10 @@ class SmartScanner {
                 width: (word.bbox.x1 - word.bbox.x0) * scaleX,
                 height: (word.bbox.y1 - word.bbox.y0) * scaleY,
                 fontSize: (word.bbox.y1 - word.bbox.y0) * scaleY * this.FONT_SIZE_ESTIMATE_FACTOR
-            }));
+            })).filter(item => {
+                // Filter out boxes that are too small to prevent tesseract "too small to scale" errors
+                return item.width >= this.MIN_OCR_BOX_WIDTH && item.height >= this.MIN_OCR_BOX_HEIGHT;
+            });
             
             // Use same detection logic as text extraction
             const aspectRatio = viewport.width / viewport.height;
@@ -1674,17 +1723,12 @@ class SmartScanner {
         let profileKey = manualSelect ? manualSelect.value : null;
         
         if (!profileKey || profileKey === "AUTO") {
-            // Enhanced classification using content
+            // Enhanced classification using content and page number heuristics
             const viewport = page.getViewport({ scale: 1.0 });
             const aspectRatio = viewport.width / viewport.height;
             
-            if (pageNum === 1) {
-                profileKey = 'TITLE';
-            } else if (pageNum === 2) {
-                profileKey = 'INFO';
-            } else {
-                profileKey = PageClassifier.classify(textContent, aspectRatio);
-            }
+            // Use enhanced PageClassifier with page number support
+            profileKey = PageClassifier.classify(textContent, aspectRatio, pageNum);
             
             if(manualSelect) manualSelect.value = profileKey;
         }
@@ -2235,9 +2279,42 @@ class SearchEngine {
             }
             
             // Volt/Phase/Enclosure filters
-            if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; w += 500; }
-            if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; w += 500; }
-            if(crit.enc!=="Any") { if(r.enc!==crit.enc) return; w += 500; }
+            if(crit.volt!=="Any") { 
+                // Check for strict field match (green badge) vs fuzzy description match (orange badge)
+                if(r.volt && r.volt.includes(crit.volt)) {
+                    // Strict field match - override worker variance flag for green badge
+                    voltV = false;
+                    w += 500;
+                } else if(r.desc && r.desc.includes(crit.volt)) {
+                    // Fuzzy description match - mark as varied for orange badge
+                    voltV = true;
+                    w += 100;
+                } else {
+                    return;
+                }
+            }
+            if(crit.phase!=="Any") { 
+                if(r.phase===crit.phase) {
+                    // Strict field match - override worker variance flag for green badge
+                    phaseV = false;
+                    w += 500;
+                } else if(r.desc && r.desc.includes(crit.phase)) {
+                    // Fuzzy description match
+                    phaseV = true;
+                    w += 100;
+                } else {
+                    return;
+                }
+            }
+            if(crit.enc!=="Any") { 
+                if(r.enc===crit.enc) {
+                    // Strict field match - override worker variance flag
+                    encV = false;
+                    w += 500;
+                } else {
+                    return;
+                }
+            }
             
             // Keyword filter using helper
             if(!this._matchKeywords(r, rawKeywords, expandedKeywords)) return;
@@ -3100,32 +3177,32 @@ class PdfViewer {
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
             toolbar.innerHTML = `
-                PAGE ${i}
-                
-                    ✨ Auto (Detected)
-                    
-                        🏷️ Title Sheet (Standard)
-                        📋 Title Sheet (As-Built)
-                        🏢 Cox Cover Sheet
-                        🔷 Delta Cover Sheet
-                        📄 3rd Party Cover
-                    
-                    
-                        📝 Info / Notes (Standard)
-                        🖼️ Info (Borderless)
-                    
-                    
-                        📄 Schematic (Portrait)
-                        🖼️ Schematic (Portrait Borderless)
-                        🔄 Schematic (Landscape)
-                        🖼️ Schematic (Landscape Borderless)
-                    
-                    
-                        🚪 Door Drawing
-                        📐 General
-                    
-                
-                🔄
+                <span style="font-weight:600;">PAGE ${i}</span>
+                <select class="page-profile-select" onchange="LayoutScanner.applyProfileToPage(${i}, this.value)">
+                    <option value="AUTO">✨ Auto (Detected)</option>
+                    <optgroup label="📁 Title &amp; Cover Sheets">
+                        <option value="TITLE">🏷️ Title Sheet (Standard)</option>
+                        <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
+                        <option value="COX_COVER">🏢 Cox Cover Sheet</option>
+                        <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
+                        <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
+                    </optgroup>
+                    <optgroup label="📁 Info &amp; Notes">
+                        <option value="INFO">📝 Info / Notes (Standard)</option>
+                        <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
+                    </optgroup>
+                    <optgroup label="📁 Schematics">
+                        <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
+                        <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
+                        <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
+                        <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
+                    </optgroup>
+                    <optgroup label="📁 Special">
+                        <option value="DOOR_DRAWING">🚪 Door Drawing</option>
+                        <option value="GENERAL">📐 General</option>
+                    </optgroup>
+                </select>
+                <button class="rescan-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
             `;
             wrapper.appendChild(toolbar);
 
