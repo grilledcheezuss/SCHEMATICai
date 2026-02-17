@@ -385,6 +385,7 @@ function validatePageSize(pageSizeParam) {
 }
 
 function extractSpecsStrict(t) {
+    // Return object: parameter values with variance flags (suffix 'V' indicates varied/ambiguous)
     const s = { 
         mfg: null, hp: null, volt: null, phase: null, enc: null,
         mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false
@@ -449,7 +450,8 @@ function extractSpecsStrict(t) {
         s.hp = [...foundHPs][0];
     } else if (foundHPs.size > 1) {
         // Multiple HP values found - mark as varied
-        s.hp = [...foundHPs].sort((a, b) => parseFloat(b) - parseFloat(a))[0]; // Pick largest
+        // Pick largest to match typical use case (max motor HP in multi-motor panels)
+        s.hp = [...foundHPs].sort((a, b) => parseFloat(b) - parseFloat(a))[0];
         s.hpV = true;
     }
 
@@ -466,7 +468,8 @@ function extractSpecsStrict(t) {
         s.volt = [...foundVolts][0];
     } else if (foundVolts.size > 1) {
         // Multiple voltages found - mark as varied
-        s.volt = [...foundVolts][0]; // Pick first (highest priority)
+        // Pick first from VOLT_PRIORITY (lines 59-67: 575→480→415→277→240→208→120)
+        s.volt = [...foundVolts][0];
         s.voltV = true;
     }
     

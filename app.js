@@ -2199,8 +2199,7 @@ class SearchEngine {
                     w += 10000; 
                 } else if (r.desc && r.desc.includes(crit.mfg)) { 
                     w += 1000;
-                    // Mark as varied when matched via description (fuzzy/uncertain match)
-                    mfgV = true;
+                    mfgV = true; // Mark as varied when matched via description (fuzzy/uncertain match)
                 } else { 
                     return; 
                 } 
@@ -2211,7 +2210,7 @@ class SearchEngine {
                 const hpMatch = this._matchHp(r, crit.hp);
                 if (!hpMatch.matches) return;
                 w += hpMatch.weight;
-                hpV = hpV || hpMatch.isVariant; // Combine worker variance with match variance
+                hpV = hpV || hpMatch.isVariant; // Combine worker variance with app-side match variance
             }
             
             // Volt/Phase/Enclosure filters
