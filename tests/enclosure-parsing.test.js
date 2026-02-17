@@ -25,8 +25,10 @@ function extractEnclosure(text) {
     if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(text) && /\b4X\b/i.test(text)) foundEnclosures.add("4XFG");
     if (/\b(STAINLESS|SS)\b/i.test(text) && /\b4X\b/i.test(text)) foundEnclosures.add("4XSS");
     if (/\b4XSS\b/i.test(text)) foundEnclosures.add("4XSS");
-    // Only assign 4XSS for bare "4X" if no fiberglass keywords present
-    if (/\b4X\b/i.test(text) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(text) && foundEnclosures.size === 0) foundEnclosures.add("4XSS");
+    // Default: bare "4X" without material keywords defaults to stainless steel (4XSS)
+    if (/\b4X\b/i.test(text) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(text) && !foundEnclosures.has("4XSS")) {
+        foundEnclosures.add("4XSS");
+    }
     if (/\bPOLY(?:CARBONATE)?\b/i.test(text)) foundEnclosures.add("POLY");
     
     if (foundEnclosures.size === 1) {
@@ -51,7 +53,7 @@ const tests = [
     {
         input: "NEMA 4X ENCLOSURE STAINLESS STEEL",
         expected: { enc: "4XSS", encV: false },
-        name: "4X enclosure with explicit stainless steel"
+        name: "4X with stainless steel keyword"
     },
     {
         input: "CONTROL PANEL 4XSS RATED",

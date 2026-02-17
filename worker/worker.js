@@ -517,8 +517,10 @@ function extractSpecsStrict(t) {
     if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XFG");
     if (/\b(STAINLESS|SS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XSS");
     if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
-    // Only assign 4XSS for bare "4X" if no fiberglass keywords present
-    if (/\b4X\b/i.test(t) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && foundEnclosures.size === 0) foundEnclosures.add("4XSS");
+    // Default: bare "4X" without material keywords defaults to stainless steel (4XSS)
+    if (/\b4X\b/i.test(t) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && !foundEnclosures.has("4XSS")) {
+        foundEnclosures.add("4XSS");
+    }
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
     
     if (foundEnclosures.size === 1) {
