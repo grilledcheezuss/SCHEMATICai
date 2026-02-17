@@ -491,7 +491,7 @@ function extractSpecsStrict(t) {
         } else {
             // Multiple voltages found - mark as varied
             // Pick first from VOLT_PRIORITY (lines 59-67: 575→480→415→277→240→208→120)
-            s.volt = [...foundVolts][0];
+            s.volt = voltArray[0];
             s.voltV = true;
         }
     }

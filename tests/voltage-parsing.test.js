@@ -181,7 +181,7 @@ let failed = 0;
 console.log('\n🧪 Voltage Parsing Tests - v2.5.11\n');
 console.log('Testing dual-voltage normalization...\n');
 
-console.log('=' .repeat(60));
+console.log('='.repeat(60));
 console.log('Comparing OLD vs NEW implementation:\n');
 
 testCases.forEach((test, index) => {
