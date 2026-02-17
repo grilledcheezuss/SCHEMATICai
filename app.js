@@ -1960,7 +1960,8 @@ class FeedbackService {
 
     static setupInput(elId, data, paramKey) { 
         const el = document.getElementById(elId); 
-        el.innerHTML = ''; 
+        // Clear existing options safely
+        while (el.firstChild) el.removeChild(el.firstChild);
         el.add(new Option('Select Correct...', '')); 
         el.add(new Option('Varied / Multiple', 'Varied / Multiple')); 
         data.forEach(d => el.add(new Option(d, d))); 
@@ -2075,16 +2076,17 @@ class SearchEngine {
             : null;
         
         // Mixed fraction pattern for values with fractional parts (e.g., 7.5 HP should match "7 1/2 HP", "7-1/2 HP", "7½ HP")
+        const FRACTIONAL_TOLERANCE = 0.01; // Tolerance for fractional comparison
         let mixedFractionPattern = null;
         if (searchHpNum > 1) {
             const whole = Math.floor(searchHpNum);
             const fractional = searchHpNum - whole;
             // Common fractions: 0.5 = 1/2, 0.25 = 1/4, 0.75 = 3/4, 0.33 = 1/3, 0.67 = 2/3
-            if (Math.abs(fractional - 0.5) < 0.01) {
+            if (Math.abs(fractional - 0.5) < FRACTIONAL_TOLERANCE) {
                 mixedFractionPattern = `${whole}[-\\s]?(?:1/2|½)\\s*${HP_UNIT_PATTERN}`;
-            } else if (Math.abs(fractional - 0.25) < 0.01) {
+            } else if (Math.abs(fractional - 0.25) < FRACTIONAL_TOLERANCE) {
                 mixedFractionPattern = `${whole}[-\\s]?(?:1/4|¼)\\s*${HP_UNIT_PATTERN}`;
-            } else if (Math.abs(fractional - 0.75) < 0.01) {
+            } else if (Math.abs(fractional - 0.75) < FRACTIONAL_TOLERANCE) {
                 mixedFractionPattern = `${whole}[-\\s]?(?:3/4|¾)\\s*${HP_UNIT_PATTERN}`;
             }
         }
