@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Feedback Modal Test - v2.5.8</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        select { padding: 5px; margin: 10px 0; width: 200px; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        .pass { color: green; font-weight: bold; }
+        .fail { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Feedback Modal Defaults Test - v2.5.8</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Feedback Modal Dropdowns</h2>
+        <p>Expected behavior: All dropdowns should default to empty "Select Correct..." option</p>
+        
+        <div>
+            <label>Mfg:</label><br>
+            <select id="fb-mfg"></select>
+        </div>
+        
+        <div>
+            <label>HP:</label><br>
+            <select id="fb-hp"></select>
+        </div>
+        
+        <div>
+            <label>Volt:</label><br>
+            <select id="fb-volt"></select>
+        </div>
+        
+        <div>
+            <label>Phase:</label><br>
+            <select id="fb-phase"></select>
+        </div>
+        
+        <div>
+            <label>Enclosure:</label><br>
+            <select id="fb-enc"></select>
+        </div>
+        
+        <button onclick="setupFeedbackModal()">Setup Feedback Modal</button>
+        <button onclick="checkDefaults()">Check Defaults</button>
+        
+        <div id="results" class="result" style="display:none;"></div>
+    </div>
+    
+    <script>
+        // Mock data (same as in app.js)
+        const AI_TRAINING_DATA = {
+            MANUFACTURERS: ['ABB', 'EATON', 'SIEMENS', 'SQUARE D', 'GE'],
+            DATA: {
+                HP: [0.5, 0.75, 1, 1.5, 2, 3, 5, 7.5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100],
+                VOLT: [120, 208, 240, 480, 575],
+                PHASE: [1, 3]
+            }
+        };
+        
+        // Mock FeedbackService.setupInput (v2.5.8 version)
+        function setupInput(elId, data, paramKey) {
+            const el = document.getElementById(elId);
+            el.innerHTML = '';
+            el.add(new Option('Select Correct...', ''));
+            el.add(new Option('Varied / Multiple', 'Varied / Multiple'));
+            data.forEach(d => el.add(new Option(d, d)));
+            el.value = ''; // Ensure empty option is selected by default
+        }
+        
+        function setupFeedbackModal() {
+            setupInput('fb-mfg', [...AI_TRAINING_DATA.MANUFACTURERS].sort(), 'mfg');
+            setupInput('fb-hp', AI_TRAINING_DATA.DATA.HP, 'hp');
+            setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt');
+            setupInput('fb-phase', AI_TRAINING_DATA.DATA.PHASE, 'phase');
+            setupInput('fb-enc', ['4XSS', '4XFG', 'POLY'], 'enc');
+            
+            alert('Feedback modal setup complete! Check the dropdowns.');
+        }
+        
+        function checkDefaults() {
+            const results = document.getElementById('results');
+            results.style.display = 'block';
+            
+            const checks = [
+                { id: 'fb-mfg', name: 'Manufacturer' },
+                { id: 'fb-hp', name: 'HP' },
+                { id: 'fb-volt', name: 'Voltage' },
+                { id: 'fb-phase', name: 'Phase' },
+                { id: 'fb-enc', name: 'Enclosure' }
+            ];
+            
+            let allPass = true;
+            let html = '<h3>Test Results:</h3>';
+            
+            checks.forEach(check => {
+                const el = document.getElementById(check.id);
+                const value = el.value;
+                const selectedText = el.options[el.selectedIndex].text;
+                const isDefault = value === '' && selectedText === 'Select Correct...';
+                
+                if (isDefault) {
+                    html += `<div class="pass">✅ ${check.name}: Default to empty (value="${value}", text="${selectedText}")</div>`;
+                } else {
+                    html += `<div class="fail">❌ ${check.name}: NOT default (value="${value}", text="${selectedText}")</div>`;
+                    allPass = false;
+                }
+            });
+            
+            if (allPass) {
+                html += '<h3 class="pass">🎉 All tests passed! Feedback modal defaults are correct.</h3>';
+            } else {
+                html += '<h3 class="fail">⚠️ Some tests failed!</h3>';
+            }
+            
+            results.innerHTML = html;
+        }
+        
+        // Auto-setup on load
+        window.onload = function() {
+            setupFeedbackModal();
+        };
+    </script>
+</body>
+</html>
