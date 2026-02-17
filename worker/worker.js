@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.4 (Enhanced Error Handling & Logging)
+// 🧠 SCHEMATICA ai WORKER v2.5.5 (PDF Fallback & Relaxed Lookup)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -535,6 +535,50 @@ export default {
                     } catch (error) {
                         console.error('[PDF_BY_ID] Error searching variant:', variant, 'Error:', error.message);
                         // Continue to next variant on error
+                    }
+                }
+                
+                // If exact matches failed, try relaxed regex lookup for revision suffixes
+                if (!pdfUrl) {
+                    console.log('[PDF_BY_ID] Exact matches failed, attempting relaxed REGEX lookup for panel:', cleanId);
+                    try {
+                        // Escape special regex characters in cleanId for safe interpolation
+                        const escapedId = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        
+                        // Use REGEX_MATCH to handle revision suffixes like r1, -REV, A, etc.
+                        // This matches: CP-4167, CP-4167r1, CP-4167-REV, CP-4167 A, etc.
+                        const regexPattern = `^CP-${escapedId}(?:[rR]\\d+|-REV|-rev|\\s*[A-Z])?(?:\\.dwg|\\.pdf)?$`;
+                        const regexFormula = `REGEX_MATCH({Control Panel Name}, "${regexPattern}")`;
+                        const regexSearchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
+                                              `filterByFormula=${encodeURIComponent(regexFormula)}` +
+                                              `&fields%5B%5D=Control%20Panel%20PDF&fields%5B%5D=Control%20Panel%20Name`;
+                        
+                        console.log('[PDF_BY_ID] Trying REGEX pattern:', regexPattern);
+                        const regexResp = await fetch(regexSearchUrl, { 
+                            headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
+                        });
+                        
+                        if (regexResp.ok) {
+                            const regexData = await regexResp.json();
+                            if (regexData.records && regexData.records.length > 0) {
+                                // Use first match from regex search
+                                const record = regexData.records[0];
+                                pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
+                                if (pdfUrl) {
+                                    foundVariant = record.fields['Control Panel Name'] || 'regex-match';
+                                    console.log('[PDF_BY_ID] REGEX match found:', foundVariant, 'PDF URL:', pdfUrl);
+                                } else {
+                                    console.log('[PDF_BY_ID] REGEX matched record but no PDF URL attached');
+                                }
+                            } else {
+                                console.log('[PDF_BY_ID] No REGEX matches found for pattern:', regexPattern);
+                            }
+                        } else {
+                            console.warn('[PDF_BY_ID] REGEX search failed with status:', regexResp.status);
+                        }
+                    } catch (regexError) {
+                        console.error('[PDF_BY_ID] REGEX lookup error:', regexError.message);
+                        // Fall through to 404
                     }
                 }
                 

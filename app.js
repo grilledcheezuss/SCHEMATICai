@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.4 (Performance & UX Optimizations) ---
-const APP_VERSION = "v2.5.4";
+// --- SCHEMATICA ai v2.5.5 (PDF Fallback & HP Variance Badges) ---
+const APP_VERSION = "v2.5.5";
 const VERSION_HISTORY = {
+    "v2.5.5": "PDF load fixes: fallback to direct pdfUrl on 404, mark missing PDFs, relaxed worker lookup; HP variance badges now show orange for fuzzy matches",
     "v2.5.4": "Performance optimizations: skip PDF preloading for missing PDFs, limit search results to 25 per page, implement pagination UI",
     "v2.5.3": "PDF viewing/redaction improvements: preview step, overlay visibility, OCR lazy-load, export fixes; Worker hardening: secret keys, host allowlist, SSRF guards",
     "v2.5.2": "Fixed Control Panel tabs organization, CSS for redaction boxes, version sync",
@@ -2047,9 +2048,10 @@ class SearchEngine {
                     w += 5000; 
                 } else if (safetyMatch || fractionalMatch || tableMatch) { 
                     w += 2000; 
+                    hpV = true; // Mark as varied/fuzzy HP match
                 } else { 
                     return; 
-                } 
+                }
             }
             if(crit.volt!=="Any") { if(!r.volt || !r.volt.includes(crit.volt)) return; w += 500; }
             if(crit.phase!=="Any") { if(r.phase!==crit.phase) return; w += 500; }
@@ -2420,7 +2422,85 @@ class PdfViewer {
             
             if (!resp.ok) {
                 if (resp.status === 404) {
-                    console.warn(`PDF not found for panel ${panelId} (404)`);
+                    console.warn(`PDF_BY_ID returned 404 for panel ${panelId}`);
+                    
+                    // Attempt fallback using direct pdfUrl if available
+                    if (fallbackUrl) {
+                        console.log(`[loadById] Attempting fallback fetch with direct pdfUrl for panel ${panelId}`);
+                        try {
+                            const fallbackProxyUrl = `${WORKER_URL}?target=PDF&url=${encodeURIComponent(fallbackUrl)}`;
+                            const fallbackResp = await fetch(fallbackProxyUrl, { headers: AuthService.headers() });
+                            
+                            if (fallbackResp.ok) {
+                                const fallbackArrayBuffer = await fallbackResp.arrayBuffer();
+                                
+                                // Validate fallback PDF
+                                const fallbackValidation = validatePdfResponse(fallbackResp, fallbackArrayBuffer, `loadById-fallback[${panelId}]`);
+                                if (fallbackValidation.valid) {
+                                    console.log(`[loadById] Fallback fetch succeeded for panel ${panelId}`);
+                                    
+                                    // Use the fallback PDF - continue with normal flow
+                                    const blob = new Blob([fallbackArrayBuffer], { type: "application/pdf" });
+                                    if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+                                    this.currentBlobUrl = URL.createObjectURL(blob);
+                                    
+                                    try {
+                                        this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fallbackArrayBuffer) });
+                                        this.doc = await this.loadingTask.promise;
+                                    } catch (pdfError) {
+                                        console.error(`[loadById-fallback] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
+                                        throw pdfError;
+                                    }
+                                    
+                                    // Cache the fallback PDF
+                                    PdfController.pdfCache.set(panelId, {
+                                        arrayBuffer: fallbackArrayBuffer,
+                                        blob: blob,
+                                        timestamp: Date.now()
+                                    });
+                                    
+                                    // Continue to rendering (skip to after validation)
+                                    if (!this.isDocumentValid()) {
+                                        throw new Error('Loaded PDF document is null or destroyed after loading');
+                                    }
+                                    
+                                    if (this.currentFetchId !== fetchId) {
+                                        console.log(`PDF load cancelled after document load (fetchId mismatch): ${fetchId} != ${this.currentFetchId}`);
+                                        return;
+                                    }
+                                    
+                                    if (window.innerWidth < 768) {
+                                         this.currentScale = 0.8;
+                                         UI.toggleSearch(true); 
+                                    } else {
+                                         this.currentScale = 1.1;
+                                    }
+                                    
+                                    document.getElementById('pdf-placeholder-text').style.display = 'none';
+                                    document.getElementById('pdf-toolbar').style.display = 'flex';
+                                    document.getElementById('custom-pdf-viewer').style.display = 'flex';
+                                    
+                                    await this.renderStack();
+                                    return; // Success - exit early
+                                } else {
+                                    console.warn(`[loadById] Fallback PDF validation failed for panel ${panelId}: ${fallbackValidation.reason}`);
+                                }
+                            } else {
+                                console.warn(`[loadById] Fallback fetch failed for panel ${panelId}: status ${fallbackResp.status}`);
+                            }
+                        } catch (fallbackError) {
+                            console.warn(`[loadById] Fallback fetch error for panel ${panelId}:`, fallbackError);
+                        }
+                    }
+                    
+                    // Both PDF_BY_ID and fallback failed - mark as missing
+                    console.error(`[loadById] All fetch attempts failed for panel ${panelId} - marking as missing`);
+                    const rec = window.ID_MAP.get(panelId);
+                    if (rec) {
+                        rec.pdfStatus = "missing";
+                        console.log(`[loadById] Marked panel ${panelId} as missing PDF`);
+                    }
+                    
                     document.getElementById('pdf-placeholder-text').style.display = 'none';
                     document.getElementById('pdf-fallback').style.display = 'block';
                     if (fallbackUrl) {
@@ -2978,7 +3058,45 @@ class PdfController {
                 const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
                 
                 if (resp.status === 404) {
-                    console.warn(`[preload] Skipping: PDF not found for ${result.displayId || result.id}`);
+                    console.warn(`[preload] PDF_BY_ID returned 404 for ${result.displayId || result.id}`);
+                    
+                    // Attempt fallback using direct pdfUrl if available
+                    if (result.pdfUrl) {
+                        try {
+                            const fallbackProxyUrl = `${WORKER_URL}?target=PDF&url=${encodeURIComponent(result.pdfUrl)}`;
+                            const fallbackResp = await fetch(fallbackProxyUrl, { headers: AuthService.headers() });
+                            
+                            if (fallbackResp.ok) {
+                                const fallbackArrayBuffer = await fallbackResp.arrayBuffer();
+                                
+                                if (!this.isPreloading) break;
+                                
+                                const fallbackValidation = validatePdfResponse(fallbackResp, fallbackArrayBuffer, `preload-fallback[${result.displayId || result.id}]`);
+                                if (fallbackValidation.valid) {
+                                    console.log(`[preload] Fallback fetch succeeded for ${result.displayId || result.id}`);
+                                    
+                                    // Cache the fallback PDF
+                                    this.pdfCache.set(result.id, {
+                                        arrayBuffer: fallbackArrayBuffer,
+                                        blob: new Blob([fallbackArrayBuffer], { type: "application/pdf" }),
+                                        timestamp: Date.now()
+                                    });
+                                    console.log(`✓ Preloaded PDF (via fallback): ${result.displayId || result.id}`);
+                                    continue; // Success - move to next
+                                } else {
+                                    console.warn(`[preload] Fallback PDF validation failed for ${result.displayId || result.id}: ${fallbackValidation.reason}`);
+                                }
+                            } else {
+                                console.warn(`[preload] Fallback fetch failed for ${result.displayId || result.id}: status ${fallbackResp.status}`);
+                            }
+                        } catch (fallbackError) {
+                            console.warn(`[preload] Fallback fetch error for ${result.displayId || result.id}:`, fallbackError);
+                        }
+                    }
+                    
+                    // Both PDF_BY_ID and fallback failed - mark as missing to prevent repeated attempts
+                    result.pdfStatus = "missing";
+                    console.log(`[preload] Marked ${result.displayId || result.id} as missing PDF`);
                     continue; // Skip this one, continue with others
                 }
                 
@@ -3162,7 +3280,9 @@ static render(res, crit, totalCount) {
             badges.push(`<span class="hud-badge ${i.phase ? 'match-green' : 'unknown'}">${i.phase ? i.phase + 'PH' : '? PH'}</span>`);
         }
         if (crit.hp !== "Any") {
-            badges.push(`<span class="hud-badge ${i.hp ? 'match-green' : 'unknown'}">${i.hp ? i.hp + ' HP' : '? HP'}</span>`);
+            // Use orange badge for varied/fuzzy HP matches, green for strict field matches
+            const hpBadgeClass = i.hpV ? 'match-orange' : (i.hp ? 'match-green' : 'unknown');
+            badges.push(`<span class="hud-badge ${hpBadgeClass}">${i.hp ? i.hp + ' HP' : '? HP'}</span>`);
         }
         if (crit.enc !== "Any" && i.enc) {
             badges.push(`<span class="hud-badge match-green">${i.enc}</span>`);

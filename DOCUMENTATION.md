@@ -14,7 +14,7 @@
 
 ## Overview
 
-SCHEMATICA ai v2.4.4+ features a comprehensive schematic redaction and profile system designed to automatically detect and redact sensitive information from electrical panel schematics, drawings, and documentation.
+SCHEMATICA ai v2.5.5 features a comprehensive schematic redaction and profile system designed to automatically detect and redact sensitive information from electrical panel schematics, drawings, and documentation.
 
 **Key Features:**
 - **Unique Layout Profiles**: 11+ built-in profiles covering all common schematic layouts
@@ -470,6 +470,18 @@ The system now supports **fuzzy, tolerant HP matching**:
 ---
 
 ## Version History
+
+**v2.5.5** - PDF Fallback & HP Variance Badges
+- Added robust PDF fallback: tries direct pdfUrl when PDF_BY_ID returns 404
+- Worker: relaxed REGEX lookup for panel ID variations (handles revisions like r1, -REV, A)
+- Fixed HP variance badge colors: orange for fuzzy/regex/fractional matches, green for strict
+- Prevents repeated 404s by marking missing PDFs
+- Version aligned across all files
+
+**v2.5.4** - Performance & UX Optimizations
+- Search results limited to 25 per page with pagination
+- Skip PDF preloading for missing PDFs
+- Enhanced error handling and logging
 
 **v2.4.4** - PDF Loading by Panel ID
 - Added worker endpoint `target=PDF_BY_ID` for fresh PDF fetching

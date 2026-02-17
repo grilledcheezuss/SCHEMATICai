@@ -1,8 +1,33 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.4)
+CLOUDFLARE WORKER SCRIPT (v2.5.5)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing them to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.4):
+RECENT UPDATES (v2.5.5):
+
+PDF Load Fixes:
+- Added robust fallback when PDF_BY_ID returns 404: tries direct pdfUrl via PDF proxy target
+- Both interactive load and preload now attempt fallback before showing "PDF Link Not Found"
+- Records marked as missing (pdfStatus = "missing") after all attempts fail to prevent repeated 404s
+- Preload respects missing markers and skips flagged records
+
+Worker Relaxed Lookup:
+- PDF_BY_ID now includes relaxed REGEX_MATCH fallback after exact variations fail
+- Handles revision suffixes: CP-4167r1, CP-4167-REV, CP-4167 A, etc.
+- Uses filterByFormula with regex pattern anchored on clean ID
+- Safe and limited fallback only when exact matches don't work
+
+HP Variance Badge Restoration:
+- Search logic now sets hpV flag for non-strict HP matches (regex/table/fractional)
+- Badge rendering uses orange for varied HP matches (i.hpV === true)
+- Strict field matches remain green as expected
+- Fixes issue where all HP badges showed green regardless of match type
+
+Version Alignment:
+- All version strings bumped to v2.5.5 across app.js, index.html, worker.js, and documentation
+- VERSION_HISTORY updated with concise v2.5.5 entry
+- Worker requires manual deployment to Cloudflare
+
+Previous Updates (v2.5.4):
 
 Frontend Performance & UX Optimizations:
 - Search results now limited to 25 cards per page (improved from 50) for better performance
