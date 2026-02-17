@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.18 (Profile Dropdown Population Fix, Feedback Lockout Enforcement) ---
-const APP_VERSION = "v2.5.18";
+// --- SCHEMATICA ai v2.5.19 (480V False Positive Fix) ---
+const APP_VERSION = "v2.5.19";
 const VERSION_HISTORY = {
+    "v2.5.19": "Fixed 480V false positives (strict voltage boundaries + dual-voltage exclusion in search); voltage extraction now removes lower voltage from canonical pairs (120/240, 277/480) to prevent dual-voltage panels matching both voltages",
     "v2.5.18": "Profile dropdown population fix (populate immediately after each toolbar created); positive feedback lockout enforcement (persist across searches, prevent race conditions)",
     "v2.5.17": "Profile dropdown population fix; positive feedback lockout enforcement across search sessions",
     "v2.5.16": "Restored positive feedback lockout enforcement; voltage/phase/enc badge strictness fix (green for exact field matches, orange for fuzzy); page toolbar cleanup; OCR min-size guard for tiny boxes; smarter page classification with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control)",
@@ -2298,10 +2299,31 @@ class SearchEngine {
                     // Strict field match - override worker variance flag for green badge
                     voltV = false;
                     w += 500;
-                } else if(r.desc && r.desc.includes(crit.volt)) {
-                    // Fuzzy description match - mark as varied for orange badge
-                    voltV = true;
-                    w += 100;
+                } else if(r.desc) {
+                    // CRITICAL FIX: Strict voltage boundary checks to prevent false positives
+                    // Exclude canonical dual-voltage pairs ONLY when searching for the LOWER voltage
+                    // Example: "277/480V" should match "480V" searches (480 is primary)
+                    // Example: "120/240V" should match "240V" searches (240 is primary)
+                    // Example: "120/240V" should NOT match "120V" searches (120 is secondary)
+                    const DUAL_VOLT_EXCLUSIONS = {
+                        '120': /\b120\s*[\/\-]\s*240\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
+                        '277': /\b277\s*[\/\-]\s*480\b/i   // Exclude "277/480" when searching 277V (277 is lower)
+                    };
+                    
+                    const exclusionPattern = DUAL_VOLT_EXCLUSIONS[crit.volt];
+                    const hasDualVoltExclusion = exclusionPattern && exclusionPattern.test(r.desc);
+                    
+                    // Strict word-boundary voltage match (prevents "480" matching in "4800" or "CP-480")
+                    const strictVoltPattern = new RegExp(`\\b${crit.volt}\\s*(?:V\\b|VAC|VOLT|PH)`, 'i');
+                    const hasStrictMatch = strictVoltPattern.test(r.desc);
+                    
+                    if (hasStrictMatch && !hasDualVoltExclusion) {
+                        // Fuzzy description match - mark as varied for orange badge
+                        voltV = true;
+                        w += 100;
+                    } else {
+                        return; // No match - exclude this record
+                    }
                 } else {
                     return;
                 }
