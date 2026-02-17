@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.9 (HP Boundary Fix) ---
-const APP_VERSION = "v2.5.9";
+// --- SCHEMATICA ai v2.5.10 (Varied Parameter Detection) ---
+const APP_VERSION = "v2.5.10";
 const VERSION_HISTORY = {
+    "v2.5.10": "Varied parameter badges: orange badges for ambiguous/multiple values in mfg, hp, volt, phase, enc fields",
     "v2.5.9": "Fixed HP matching boundaries: 0.5 HP searches no longer match 1.5 HP (numeric boundary guards)",
     "v2.5.8": "Feedback modal defaults to empty selection; improved HP parsing for mixed fractions (7 1/2, 7-1/2, 7½)",
     "v2.5.7": "Fixed feedback button interactions: corrected thumbs down onclick handler to call FeedbackService.down with proper parameters",
@@ -2180,7 +2181,13 @@ class SearchEngine {
         // === FILTER AND SCORE RESULTS ===
         let res = [];
         window.LOCAL_DB.forEach(r => {
-            let w = 0, p = true, hpV = false;
+            let w = 0, p = true;
+            // Preserve varied flags from worker, may be overridden by fuzzy matching
+            let mfgV = r.mfgV || false;
+            let hpV = r.hpV || false;
+            let voltV = r.voltV || false;
+            let phaseV = r.phaseV || false;
+            let encV = r.encV || false;
             
             // Category filter
             if (cat === 'Standard' && r.category === 'low_voltage') return;
@@ -2191,7 +2198,8 @@ class SearchEngine {
                 if (r.mfg === crit.mfg) { 
                     w += 10000; 
                 } else if (r.desc && r.desc.includes(crit.mfg)) { 
-                    w += 1000; 
+                    w += 1000;
+                    mfgV = true; // Fuzzy description match = varied
                 } else { 
                     return; 
                 } 
@@ -2202,7 +2210,7 @@ class SearchEngine {
                 const hpMatch = this._matchHp(r, crit.hp);
                 if (!hpMatch.matches) return;
                 w += hpMatch.weight;
-                hpV = hpMatch.isVariant;
+                hpV = hpV || hpMatch.isVariant; // Combine worker variance with match variance
             }
             
             // Volt/Phase/Enclosure filters
@@ -2214,7 +2222,7 @@ class SearchEngine {
             if(!this._matchKeywords(r, rawKeywords, expandedKeywords)) return;
             if(expandedKeywords.length) w += 10;
 
-            r.w=w; r.p=p; r.hpV=hpV; res.push(r);
+            r.w=w; r.p=p; r.mfgV=mfgV; r.hpV=hpV; r.voltV=voltV; r.phaseV=phaseV; r.encV=encV; res.push(r);
         });
         
         // === SORT AND PARTITION RESULTS ===
@@ -3482,19 +3490,23 @@ static _generateBadges(record, criteria) {
     // Manufacturer badge
     if (criteria.mfg !== "Any" && record.mfg) {
         const isMatch = (record.mfg === criteria.mfg);
-        badges.push(`<span class="hud-badge ${isMatch ? 'match-green' : 'match-orange'}">${record.mfg}</span>`);
+        const badgeClass = record.mfgV ? 'match-orange' : (isMatch ? 'match-green' : 'match-orange');
+        badges.push(`<span class="hud-badge ${badgeClass}">${record.mfg}</span>`);
     } else if (record.mfg) {
-        badges.push(`<span class="hud-badge match-green">${record.mfg}</span>`);
+        const badgeClass = record.mfgV ? 'match-orange' : 'match-green';
+        badges.push(`<span class="hud-badge ${badgeClass}">${record.mfg}</span>`);
     }
 
     // Voltage badge
     if (criteria.volt !== "Any") {
-        badges.push(`<span class="hud-badge ${record.volt ? 'match-green' : 'unknown'}">${record.volt ? record.volt + 'V' : '? V'}</span>`);
+        const badgeClass = record.voltV ? 'match-orange' : (record.volt ? 'match-green' : 'unknown');
+        badges.push(`<span class="hud-badge ${badgeClass}">${record.volt ? record.volt + 'V' : '? V'}</span>`);
     }
     
     // Phase badge
     if (criteria.phase !== "Any") {
-        badges.push(`<span class="hud-badge ${record.phase ? 'match-green' : 'unknown'}">${record.phase ? record.phase + 'PH' : '? PH'}</span>`);
+        const badgeClass = record.phaseV ? 'match-orange' : (record.phase ? 'match-green' : 'unknown');
+        badges.push(`<span class="hud-badge ${badgeClass}">${record.phase ? record.phase + 'PH' : '? PH'}</span>`);
     }
     
     // HP badge (orange for varied/fuzzy matches, green for strict)
@@ -3505,7 +3517,8 @@ static _generateBadges(record, criteria) {
     
     // Enclosure badge
     if (criteria.enc !== "Any" && record.enc) {
-        badges.push(`<span class="hud-badge match-green">${record.enc}</span>`);
+        const badgeClass = record.encV ? 'match-orange' : 'match-green';
+        badges.push(`<span class="hud-badge ${badgeClass}">${record.enc}</span>`);
     }
 
     // Keyword badges (avoid duplicating mfg badge)

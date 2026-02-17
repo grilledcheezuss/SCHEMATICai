@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.9 (HP Boundary Fix)
+// 🧠 SCHEMATICA ai WORKER v2.5.10 (Varied Parameter Detection)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -385,37 +385,48 @@ function validatePageSize(pageSizeParam) {
 }
 
 function extractSpecsStrict(t) {
-    const s = { mfg: null, hp: null, volt: null, phase: null, enc: null };
+    const s = { 
+        mfg: null, hp: null, volt: null, phase: null, enc: null,
+        mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false
+    };
     if (!t || typeof t !== 'string') return s;
     
     // Normalize CAD control codes before parsing
     t = normalizeCADText(t);
     
+    // Detect multiple manufacturers
+    const foundMfgs = new Set();
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
             const r = new RegExp(`(?<=[^A-Z0-9]|^)${alias}(?=[^A-Z0-9]|$)`, 'i');
-            if (r.test(t)) { s.mfg = mfgKey; break; }
+            if (r.test(t)) { 
+                foundMfgs.add(mfgKey);
+                break;
+            }
         }
-        if (s.mfg) break;
+    }
+    if (foundMfgs.size === 1) {
+        s.mfg = [...foundMfgs][0];
+    } else if (foundMfgs.size > 1) {
+        s.mfg = [...foundMfgs][0]; // Pick first, but mark as varied
+        s.mfgV = true;
     }
 
-    let maxHP = 0;
+    // Detect multiple HP values
+    const foundHPs = new Set();
     // Enhanced regex to match mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP"
-    // Also handle Unicode fraction characters
     const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
     let match;
     while ((match = hpRegex.exec(t)) !== null) {
         let raw = match[1]; let val = 0;
         if (match[2] && match[2].toUpperCase().includes('KW')) val = parseFloat(raw) * 1.341;
         else if (/(\d+)[-\s](\d+)\/(\d+)/.test(raw)) {
-            // Mixed fraction format: "7 1/2" or "7-1/2"
             const mixedMatch = raw.match(/(\d+)[-\s](\d+)\/(\d+)/);
             const whole = parseFloat(mixedMatch[1]);
             const num = parseFloat(mixedMatch[2]);
             const den = parseFloat(mixedMatch[3]);
             val = whole + (num / den);
         } else if (/(\d+)([¼½¾])/.test(raw)) {
-            // Unicode fraction format: "7½"
             const unicodeMatch = raw.match(/(\d+)([¼½¾])/);
             const whole = parseFloat(unicodeMatch[1]);
             const fractionMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
@@ -430,13 +441,44 @@ function extractSpecsStrict(t) {
         } else {
             val = parseFloat(raw);
         }
-        if (!isNaN(val) && val >= 0.1 && val <= 500 && val > maxHP) maxHP = val;
+        if (!isNaN(val) && val >= 0.1 && val <= 500) {
+            foundHPs.add((Math.round(val * 10) / 10).toString());
+        }
     }
-    if (maxHP > 0) s.hp = (Math.round(maxHP * 10) / 10).toString();
+    if (foundHPs.size === 1) {
+        s.hp = [...foundHPs][0];
+    } else if (foundHPs.size > 1) {
+        // Multiple HP values found - mark as varied
+        s.hp = [...foundHPs].sort((a, b) => parseFloat(b) - parseFloat(a))[0]; // Pick largest
+        s.hpV = true;
+    }
 
-    for (const v of VOLT_PRIORITY) { if (v.match.test(t)) { s.volt = v.id; break; } }
-    if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*3)\b/i.test(t)) s.phase = "3"; 
-    else if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*1)\b/i.test(t)) s.phase = "1"; 
+    // Detect multiple voltages
+    const foundVolts = new Set();
+    for (const v of VOLT_PRIORITY) { 
+        if (v.match.test(t)) { 
+            foundVolts.add(v.id);
+        } 
+    }
+    if (foundVolts.size === 1) {
+        s.volt = [...foundVolts][0];
+    } else if (foundVolts.size > 1) {
+        // Multiple voltages found - mark as varied
+        s.volt = [...foundVolts][0]; // Pick first (highest priority)
+        s.voltV = true;
+    }
+    
+    // Detect multiple phases
+    const foundPhases = new Set();
+    if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*3)\b/i.test(t)) foundPhases.add("3");
+    if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*1)\b/i.test(t)) foundPhases.add("1");
+    if (foundPhases.size === 1) {
+        s.phase = [...foundPhases][0];
+    } else if (foundPhases.size > 1) {
+        // Multiple phases found - mark as varied
+        s.phase = "3"; // Default to 3-phase if both present
+        s.phaseV = true;
+    }
 
     return s;
 }
@@ -727,7 +769,12 @@ export default {
                         phase: finalPhase,
                         enc: finalEnc,
                         category: finalCategory,
-                        reject_keywords: overrides ? (overrides.reject_keywords || []) : []
+                        reject_keywords: overrides ? (overrides.reject_keywords || []) : [],
+                        mfgV: explicit.mfgV || false,
+                        hpV: explicit.hpV || false,
+                        voltV: explicit.voltV || false,
+                        phaseV: explicit.phaseV || false,
+                        encV: explicit.encV || false
                     };
                 });
 
