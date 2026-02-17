@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.17 (Profile Dropdown Population Fix, Feedback Lockout Enforcement)
+// 🧠 SCHEMATICA ai WORKER v2.5.18 (Profile Dropdown Population Fix, Feedback Lockout Enforcement)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets

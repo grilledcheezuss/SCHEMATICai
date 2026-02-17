@@ -1,8 +1,8 @@
 /**
- * Test for v2.5.15 Feedback Lockout Changes
+ * Test for v2.5.18 Feedback Lockout Changes
  * 
- * Tests that the feedback lockout allows multiple submissions per parameter
- * per panel per search.
+ * Tests that positive feedback (thumbs up) persists across searches
+ * while negative feedback (thumbs down) lockouts are reset per search.
  */
 
 // Mock FeedbackService lockout behavior
@@ -11,7 +11,15 @@ class MockFeedbackService {
     static currentId = null;
     
     static resetLockout() {
-        this.lockout.clear();
+        // Only reset negative feedback lockouts (per-parameter, keywords, category)
+        // Keep positive feedback lockouts (:up) to persist across searches
+        const toDelete = [];
+        for (const key of this.lockout) {
+            if (!key.includes(':up')) {
+                toDelete.push(key);
+            }
+        }
+        toDelete.forEach(key => this.lockout.delete(key));
     }
     
     static canSubmitParameter(panelId, paramKey) {
@@ -174,7 +182,7 @@ function testPositiveFeedbackLockout() {
 }
 
 function testLockoutReset() {
-    console.log('Testing Lockout Reset on New Search...\n');
+    console.log('Testing Selective Lockout Reset on New Search...\n');
     
     MockFeedbackService.resetLockout();
     const panelId = 'CP-12345';
@@ -197,28 +205,34 @@ function testLockoutReset() {
     }
     console.log('  ✓ Lockout active for all submissions');
     
-    // Simulate new search (reset lockout)
+    // Simulate new search (reset lockout - but keep positive feedback)
     MockFeedbackService.resetLockout();
-    console.log('  ✓ New search initiated (lockout reset)');
+    console.log('  ✓ New search initiated (selective lockout reset)');
     
-    // Verify all can be submitted again
+    // Verify negative feedback can be submitted again
     if (!MockFeedbackService.canSubmitParameter(panelId, 'hp') ||
         !MockFeedbackService.canSubmitParameter(panelId, 'enc') ||
-        !MockFeedbackService.canSubmitKeyword(panelId, 'MOTOR') ||
-        !MockFeedbackService.canSubmitUp(panelId)) {
-        console.log('✗ FAIL: Should be able to submit all feedback after reset');
+        !MockFeedbackService.canSubmitKeyword(panelId, 'MOTOR')) {
+        console.log('✗ FAIL: Should be able to submit negative feedback after reset');
         return false;
     }
-    console.log('  ✓ All feedback can be submitted again');
+    console.log('  ✓ Negative feedback can be submitted again');
     
-    console.log('✅ PASS: Lockout reset works correctly\n');
+    // Verify positive feedback CANNOT be submitted again (persists across searches)
+    if (MockFeedbackService.canSubmitUp(panelId)) {
+        console.log('✗ FAIL: Positive feedback should persist across searches');
+        return false;
+    }
+    console.log('  ✓ Positive feedback lockout persists across searches');
+    
+    console.log('✅ PASS: Selective lockout reset works correctly\n');
     
     return true;
 }
 
 // Run all tests
 console.log('='.repeat(60));
-console.log('v2.5.15 Feedback Lockout Tests');
+console.log('v2.5.18 Feedback Lockout Tests');
 console.log('='.repeat(60) + '\n');
 
 const test1 = testPerParameterLockout();

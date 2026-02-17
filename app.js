@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.17 (Profile Dropdown Population Fix, Feedback Lockout Enforcement) ---
-const APP_VERSION = "v2.5.17";
+// --- SCHEMATICA ai v2.5.18 (Profile Dropdown Population Fix, Feedback Lockout Enforcement) ---
+const APP_VERSION = "v2.5.18";
 const VERSION_HISTORY = {
+    "v2.5.18": "Profile dropdown population fix (populate immediately after each toolbar created); positive feedback lockout enforcement (persist across searches, prevent race conditions)",
     "v2.5.17": "Profile dropdown population fix; positive feedback lockout enforcement across search sessions",
     "v2.5.16": "Restored positive feedback lockout enforcement; voltage/phase/enc badge strictness fix (green for exact field matches, orange for fuzzy); page toolbar cleanup; OCR min-size guard for tiny boxes; smarter page classification with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control)",
     "v2.5.15": "Sorting: perfect matches (no varied flags) prioritized above varied results when weights equal; Feedback: removed thumbs-down lockout to allow multiple per-parameter corrections per panel per search",
@@ -1993,10 +1994,11 @@ class FeedbackService {
     static async up(id, btn, crit) { 
         // Check lockout to prevent duplicate positive feedback
         if(this.lockout.has(`${id}:up`)) return;
+        // Check CSS class as secondary guard
         if(btn.classList.contains('voted-up')) return; 
-        btn.classList.add('voted-up'); 
-        // Add to lockout set
+        // Add to lockout IMMEDIATELY to prevent race conditions (before async operations)
         this.lockout.add(`${id}:up`);
+        btn.classList.add('voted-up');
         const implicit = {}; if(crit && crit.mfg !== 'Any') implicit.mfg = crit.mfg; if(crit && crit.hp !== 'Any') implicit.hp = crit.hp; if(crit && crit.volt !== 'Any') implicit.volt = crit.volt; if(crit && crit.phase !== 'Any') implicit.phase = crit.phase; if(crit && crit.enc !== 'Any') implicit.enc = crit.enc; const today = new Date().toISOString().split('T')[0]; const payload = { records: [{ fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(implicit), 'Date': today } }] }; await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
     
     static down(id, btn) { 
@@ -2086,7 +2088,17 @@ class FeedbackService {
             keepalive: true  // Ensures request completes even if page is navigating away
         }).catch(e => console.warn('Feedback submission failed:', e));
     }
-    static resetLockout() { this.lockout.clear(); }
+    static resetLockout() { 
+        // Only reset negative feedback lockouts (per-parameter, keywords, category)
+        // Keep positive feedback lockouts (:up) to persist across searches
+        const toDelete = [];
+        for (const key of this.lockout) {
+            if (!key.includes(':up')) {
+                toDelete.push(key);
+            }
+        }
+        toDelete.forEach(key => this.lockout.delete(key));
+    }
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
 }
 
