@@ -2067,12 +2067,16 @@ class SearchEngine {
         const HP_UNIT_PATTERN = '(?:HP|H\\.P\\.|H\\.P|KW|kW|HORSEPOWER)';
         const BOUNDARY_START = '(?:^|\\s|\\(|,)';
         const BOUNDARY_END = '(?:\\s|\\)|,|$)';
-        const hpPattern = `${BOUNDARY_START}(?:${searchHp}|${searchHp}\\.0)\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
+        // Numeric boundary guards: prevent digits or decimals immediately before/after HP value
+        // This prevents "0.5" from matching in "1.5" or "10.5"
+        const NUMERIC_BOUNDARY_BEFORE = '(?<![\\.\\d])'; // Negative lookbehind: no digit or decimal before
+        const NUMERIC_BOUNDARY_AFTER = '(?![\\.\\d])'; // Negative lookahead: no digit or decimal after
+        const hpPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}(?:${searchHp}|${searchHp}\\.0)${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
         
         // Fractional pattern for values < 1 HP (e.g., 1/2 HP, 1/4 HP)
         // Guard against division by zero and very small values
         const fractionalPattern = (searchHpNum > 0.001 && searchHpNum < 1) 
-            ? `1/${Math.round(1/searchHpNum)}\\s*${HP_UNIT_PATTERN}` 
+            ? `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}1/${Math.round(1/searchHpNum)}${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}` 
             : null;
         
         // Mixed fraction pattern for values with fractional parts (e.g., 7.5 HP should match "7 1/2 HP", "7-1/2 HP", "7½ HP")
@@ -2082,12 +2086,13 @@ class SearchEngine {
             const whole = Math.floor(searchHpNum);
             const fractional = searchHpNum - whole;
             // Common fractions: 0.5 = 1/2, 0.25 = 1/4, 0.75 = 3/4, 0.33 = 1/3, 0.67 = 2/3
+            // Numeric boundary guard applied to whole number to prevent "7.5" matching "17.5"
             if (Math.abs(fractional - 0.5) < FRACTIONAL_TOLERANCE) {
-                mixedFractionPattern = `${whole}[-\\s]?(?:1/2|½)\\s*${HP_UNIT_PATTERN}`;
+                mixedFractionPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}${whole}[-\\s]?(?:1/2|½)${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
             } else if (Math.abs(fractional - 0.25) < FRACTIONAL_TOLERANCE) {
-                mixedFractionPattern = `${whole}[-\\s]?(?:1/4|¼)\\s*${HP_UNIT_PATTERN}`;
+                mixedFractionPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}${whole}[-\\s]?(?:1/4|¼)${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
             } else if (Math.abs(fractional - 0.75) < FRACTIONAL_TOLERANCE) {
-                mixedFractionPattern = `${whole}[-\\s]?(?:3/4|¾)\\s*${HP_UNIT_PATTERN}`;
+                mixedFractionPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}${whole}[-\\s]?(?:3/4|¾)${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
             }
         }
         
@@ -2096,7 +2101,8 @@ class SearchEngine {
         const mixedMatch = mixedFractionPattern && new RegExp(mixedFractionPattern, 'i').test(record.desc);
         
         // Table/header format: "HP: 5", "HP | 5", "HP 5", "Horsepower 5" or "Motor HP 5"
-        const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${searchHp}\\b`;
+        // Add numeric boundary guards to prevent substring matching in table format too
+        const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${NUMERIC_BOUNDARY_BEFORE}${searchHp}${NUMERIC_BOUNDARY_AFTER}(?:\\s|\\)|,|$)`;
         const tableMatch = new RegExp(tablePattern, 'i').test(record.desc);
         
         if (safetyMatch || fractionalMatch || mixedMatch || tableMatch) {
