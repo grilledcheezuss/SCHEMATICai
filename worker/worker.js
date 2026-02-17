@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.12 (Badge Filter Suppression & Vercel Cleanup)
+// 🧠 SCHEMATICA ai WORKER v2.5.13 (Feedback Lockout, HP Badge, Enclosure Parsing Fixes)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -506,6 +506,22 @@ function extractSpecsStrict(t) {
         // Multiple phases found - mark as varied
         s.phase = "3"; // Default to 3-phase if both present
         s.phaseV = true;
+    }
+
+    // Detect enclosure types
+    const foundEnclosures = new Set();
+    // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
+    // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
+    if (/\b4X(?:SS)?\b/i.test(t)) foundEnclosures.add("4XSS");
+    if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
+    if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
+    
+    if (foundEnclosures.size === 1) {
+        s.enc = [...foundEnclosures][0];
+    } else if (foundEnclosures.size > 1) {
+        // Multiple enclosure types found - mark as varied
+        s.enc = [...foundEnclosures][0];
+        s.encV = true;
     }
 
     return s;
