@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.7 (Feedback Interaction Fix) ---
-const APP_VERSION = "v2.5.7";
+// --- SCHEMATICA ai v2.5.8 (Feedback Modal Defaults & HP Mixed Fractions) ---
+const APP_VERSION = "v2.5.8";
 const VERSION_HISTORY = {
+    "v2.5.8": "Feedback modal defaults to empty selection; improved HP parsing for mixed fractions (7 1/2, 7-1/2, 7½)",
     "v2.5.7": "Fixed feedback button interactions: corrected thumbs down onclick handler to call FeedbackService.down with proper parameters",
     "v2.5.6": "Code optimizations: DOM cache, centralized PDF UI transitions, deduplicated fallback logic, extracted search helpers, reorganized large functions",
     "v2.5.5": "PDF load fixes: fallback to direct pdfUrl on 404, mark missing PDFs, relaxed worker lookup; HP variance badges now show orange for fuzzy matches",
@@ -1959,8 +1960,11 @@ class FeedbackService {
 
     static setupInput(elId, data, paramKey) { 
         const el = document.getElementById(elId); 
-        el.innerHTML = 'Select Correct...Varied / Multiple'; 
+        el.innerHTML = ''; 
+        el.add(new Option('Select Correct...', '')); 
+        el.add(new Option('Varied / Multiple', 'Varied / Multiple')); 
         data.forEach(d => el.add(new Option(d, d))); 
+        el.value = ''; // Ensure empty option is selected by default
         if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } 
     }
 
@@ -2070,14 +2074,30 @@ class SearchEngine {
             ? `1/${Math.round(1/searchHpNum)}\\s*${HP_UNIT_PATTERN}` 
             : null;
         
+        // Mixed fraction pattern for values with fractional parts (e.g., 7.5 HP should match "7 1/2 HP", "7-1/2 HP", "7½ HP")
+        let mixedFractionPattern = null;
+        if (searchHpNum > 1) {
+            const whole = Math.floor(searchHpNum);
+            const fractional = searchHpNum - whole;
+            // Common fractions: 0.5 = 1/2, 0.25 = 1/4, 0.75 = 3/4, 0.33 = 1/3, 0.67 = 2/3
+            if (Math.abs(fractional - 0.5) < 0.01) {
+                mixedFractionPattern = `${whole}[-\\s]?(?:1/2|½)\\s*${HP_UNIT_PATTERN}`;
+            } else if (Math.abs(fractional - 0.25) < 0.01) {
+                mixedFractionPattern = `${whole}[-\\s]?(?:1/4|¼)\\s*${HP_UNIT_PATTERN}`;
+            } else if (Math.abs(fractional - 0.75) < 0.01) {
+                mixedFractionPattern = `${whole}[-\\s]?(?:3/4|¾)\\s*${HP_UNIT_PATTERN}`;
+            }
+        }
+        
         const safetyMatch = new RegExp(hpPattern, 'i').test(record.desc);
         const fractionalMatch = fractionalPattern && new RegExp(fractionalPattern, 'i').test(record.desc);
+        const mixedMatch = mixedFractionPattern && new RegExp(mixedFractionPattern, 'i').test(record.desc);
         
         // Table/header format: "HP: 5", "HP | 5", "HP 5", "Horsepower 5" or "Motor HP 5"
         const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${searchHp}\\b`;
         const tableMatch = new RegExp(tablePattern, 'i').test(record.desc);
         
-        if (safetyMatch || fractionalMatch || tableMatch) {
+        if (safetyMatch || fractionalMatch || mixedMatch || tableMatch) {
             return { matches: true, isVariant: true, weight: HP_FUZZY_WEIGHT };
         }
         
