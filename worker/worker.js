@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.19 (480V False Positive Fix)
+// 🧠 SCHEMATICA ai WORKER v2.5.20 (Critical Bug Fixes)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets

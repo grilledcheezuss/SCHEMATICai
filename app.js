@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.19 (480V False Positive Fix) ---
-const APP_VERSION = "v2.5.19";
+// --- SCHEMATICA ai v2.5.20 (Critical Bug Fixes) ---
+const APP_VERSION = "v2.5.20";
 const VERSION_HISTORY = {
+    "v2.5.20": "Fixed 480V false positives (exclude 120/240V panels from 480V searches); simplified positive feedback (removed flawed implicit corrections); profile dropdown population timing fix",
     "v2.5.19": "Fixed 480V false positives (strict voltage boundaries + dual-voltage exclusion in search); voltage extraction now removes lower voltage from canonical pairs (120/240, 277/480) to prevent dual-voltage panels matching both voltages",
     "v2.5.18": "Profile dropdown population fix (populate immediately after each toolbar created); positive feedback lockout enforcement (persist across searches, prevent race conditions)",
     "v2.5.17": "Profile dropdown population fix; positive feedback lockout enforcement across search sessions",
@@ -1995,12 +1996,44 @@ class FeedbackService {
     static async up(id, btn, crit) { 
         // Check lockout to prevent duplicate positive feedback
         if(this.lockout.has(`${id}:up`)) return;
+        
+        // Add to lockout IMMEDIATELY (before any async operations)
+        this.lockout.add(`${id}:up`);
+        
         // Check CSS class as secondary guard
         if(btn.classList.contains('voted-up')) return; 
-        // Add to lockout IMMEDIATELY to prevent race conditions (before async operations)
-        this.lockout.add(`${id}:up`);
+        
+        // Apply visual feedback
         btn.classList.add('voted-up');
-        const implicit = {}; if(crit && crit.mfg !== 'Any') implicit.mfg = crit.mfg; if(crit && crit.hp !== 'Any') implicit.hp = crit.hp; if(crit && crit.volt !== 'Any') implicit.volt = crit.volt; if(crit && crit.phase !== 'Any') implicit.phase = crit.phase; if(crit && crit.enc !== 'Any') implicit.enc = crit.enc; const today = new Date().toISOString().split('T')[0]; const payload = { records: [{ fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(implicit), 'Date': today } }] }; await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
+        
+        // CRITICAL FIX: Don't try to infer corrections from search criteria
+        // Positive feedback = "This result is relevant to my search"
+        // It does NOT mean "This panel's specs match my search filters"
+        const today = new Date().toISOString().split('T')[0]; 
+        const payload = { 
+            records: [{ 
+                fields: { 
+                    'Panel ID': id, 
+                    'Vote': 'Up', 
+                    'User': localStorage.getItem('cox_user'), 
+                    'Date': today
+                    // NO Corrections field - positive feedback doesn't provide corrections
+                } 
+            }] 
+        };
+        
+        // Submit feedback
+        try {
+            await fetch(`${WORKER_URL}?target=FEEDBACK`, { 
+                method: 'POST', 
+                headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payload) 
+            });
+            console.log(`✓ Positive feedback submitted for ${id}`);
+        } catch (e) {
+            console.error('Positive feedback submission failed:', e);
+        }
+    }
     
     static down(id, btn) { 
         this.currentId = id; 
@@ -2111,8 +2144,10 @@ class SearchEngine {
     
     // Voltage filtering constants (v2.5.19)
     static DUAL_VOLT_EXCLUSIONS = {
-        '120': /\b120\s*[\/\-]\s*240\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
-        '277': /\b277\s*[\/\-]\s*480\b/i   // Exclude "277/480" when searching 277V (277 is lower)
+        '120': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
+        '240': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude "120/240" when searching 240V (already dual-voltage)
+        '277': /\b277\s*[\/\-]\s*480(?:\s*V|VAC)?\b/i,  // Exclude "277/480" when searching 277V (277 is lower)
+        '480': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i   // Exclude "120/240" when searching 480V (not a 480V panel)
     };
 
     /**
@@ -2305,25 +2340,33 @@ class SearchEngine {
             
             // Volt/Phase/Enclosure filters
             if(crit.volt!=="Any") { 
+                // CRITICAL FIX: Check for dual-voltage exclusion in volt field BEFORE field match
+                // This prevents "120/240V" from matching searches for "120", "240", or "480"
+                const exclusionPattern = SearchEngine.DUAL_VOLT_EXCLUSIONS[crit.volt];
+                const fieldHasDualVolt = r.volt && exclusionPattern && exclusionPattern.test(r.volt);
+                
+                // If volt field contains excluded dual-voltage pattern, skip this record
+                if (fieldHasDualVolt) {
+                    return; // Exclude this record
+                }
+                
                 // Check for strict field match (green badge) vs fuzzy description match (orange badge)
                 if(r.volt && r.volt.includes(crit.volt)) {
                     // Strict field match - override worker variance flag for green badge
                     voltV = false;
                     w += 500;
                 } else if(r.desc) {
-                    // CRITICAL FIX: Strict voltage boundary checks to prevent false positives
-                    // Exclude canonical dual-voltage pairs ONLY when searching for the LOWER voltage
-                    // Example: "277/480V" should match "480V" searches (480 is primary)
-                    // Example: "120/240V" should match "240V" searches (240 is primary)
-                    // Example: "120/240V" should NOT match "120V" searches (120 is secondary)
+                    // Check description for dual-voltage exclusion (only if no field match)
+                    const descHasDualVolt = exclusionPattern && exclusionPattern.test(r.desc);
                     
-                    const exclusionPattern = SearchEngine.DUAL_VOLT_EXCLUSIONS[crit.volt];
-                    const hasDualVoltExclusion = exclusionPattern && exclusionPattern.test(r.desc);
+                    if (descHasDualVolt) {
+                        return; // Exclude this record
+                    }
                     
                     // Use pre-compiled voltage pattern (created once per search, not per record)
                     const hasStrictMatch = voltStrictPattern && voltStrictPattern.test(r.desc);
                     
-                    if (hasStrictMatch && !hasDualVoltExclusion) {
+                    if (hasStrictMatch) {
                         // Fuzzy description match - mark as varied for orange badge
                         voltV = true;
                         w += 100;
@@ -3246,9 +3289,6 @@ class PdfViewer {
                 <button class="rescan-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
             `;
             wrapper.appendChild(toolbar);
-            
-            // Populate profile options immediately after toolbar is created
-            LayoutScanner.refreshProfileOptions();
 
             const contentContainer = document.createElement('div');
             contentContainer.className = 'pdf-content-container';
@@ -3265,6 +3305,10 @@ class PdfViewer {
             contentContainer.appendChild(rLayer); 
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
+            
+            // CRITICAL FIX: Populate profile dropdown immediately after wrapper is appended to DOM
+            // Must be called AFTER container.appendChild(wrapper) so querySelectorAll can find the select element
+            LayoutScanner.refreshProfileOptions();
             
             console.log(`📄 Created layer structure for page ${i}`);
             console.log(`  - Container: ${contentContainer.offsetWidth}x${contentContainer.offsetHeight}`);
