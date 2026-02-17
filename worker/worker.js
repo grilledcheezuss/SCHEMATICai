@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.10 (Varied Parameter Detection)
+// 🧠 SCHEMATICA ai WORKER v2.5.11 (Dual-Voltage Normalization)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -64,6 +64,13 @@ const VOLT_PRIORITY = [
     { id: '240', match: /\b(?:240|230|220)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:240|230|220)\b/i },
     { id: '208', match: /\b(?:208)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:208)\b/i },
     { id: '120', match: /\b(?:120|115|110)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:120|115|110)\b/i }
+];
+
+// Canonical dual-voltage pairs (split-phase configurations)
+// These should NOT be marked as varied - use the higher voltage as the primary value
+const CANONICAL_DUAL_VOLTAGE_PAIRS = [
+    { low: '120', high: '240' },   // Common residential/light commercial split-phase
+    { low: '277', high: '480' }    // Common commercial/industrial split-phase
 ];
 
 const STOP_WORDS = new Set(['PANEL','CONTROL','PUMP','MOTOR','VOLT','VAC','PHASE','HP','ALARM','RELAY','SWITCH','FLOAT','NEMA','ENCLOSURE']);
@@ -458,6 +465,7 @@ function extractSpecsStrict(t) {
     // Detect multiple voltages
     // NOTE: Unlike original code which broke on first match, we now check all patterns
     // to detect multiple voltages (e.g., "240V/480V" should be marked as varied)
+    // HOWEVER: Canonical dual-voltage pairs (120/240, 277/480) are NOT marked as varied
     const foundVolts = new Set();
     for (const v of VOLT_PRIORITY) { 
         if (v.match.test(t)) { 
@@ -467,10 +475,25 @@ function extractSpecsStrict(t) {
     if (foundVolts.size === 1) {
         s.volt = [...foundVolts][0];
     } else if (foundVolts.size > 1) {
-        // Multiple voltages found - mark as varied
-        // Pick first from VOLT_PRIORITY (lines 59-67: 575→480→415→277→240→208→120)
-        s.volt = [...foundVolts][0];
-        s.voltV = true;
+        // Check if this is a canonical dual-voltage pair (split-phase configuration)
+        const voltArray = [...foundVolts];
+        const isCanonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.some(pair => {
+            return (voltArray.includes(pair.low) && voltArray.includes(pair.high) && voltArray.length === 2);
+        });
+        
+        if (isCanonicalPair) {
+            // Canonical split-phase pair - use higher voltage, don't mark as varied
+            const pair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(p => 
+                voltArray.includes(p.low) && voltArray.includes(p.high)
+            );
+            s.volt = pair.high;
+            s.voltV = false;
+        } else {
+            // Multiple voltages found - mark as varied
+            // Pick first from VOLT_PRIORITY (lines 59-67: 575→480→415→277→240→208→120)
+            s.volt = [...foundVolts][0];
+            s.voltV = true;
+        }
     }
     
     // Detect multiple phases

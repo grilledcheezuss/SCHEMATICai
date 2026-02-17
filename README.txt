@@ -1,8 +1,17 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.10)
+CLOUDFLARE WORKER SCRIPT (v2.5.11)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.10):
+RECENT UPDATES (v2.5.11):
+
+Dual-Voltage Normalization:
+- Fixed voltage parsing for split-phase dual-voltage entries (120/240, 277/480)
+- These canonical pairs now normalize to the higher voltage value (240, 480) with green badge
+- Prevents false "varied" (orange) badges on standard split-phase panel configurations
+- Truly conflicting voltages (e.g., 240/480, 208/240) still marked as varied
+- Improves search accuracy: 240V search now returns 120/240 panels with green voltage badges
+
+PREVIOUS UPDATES (v2.5.10):
 
 Varied Parameter Detection:
 - Implemented detection of ambiguous/multiple parameter values across all fields (mfg, hp, volt, phase, enc)

@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.10
+## Version: v2.5.11
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.11**: Dual-voltage normalization: 120/240 and 277/480 split-phase pairs now use higher voltage with green badge instead of orange varied badge
 - **v2.5.10**: Varied parameter badges: orange badges for ambiguous/multiple values in mfg, hp, volt, phase, enc fields
 - **v2.5.9**: Fixed HP matching boundaries: 0.5 HP searches no longer match 1.5 HP (numeric boundary guards)
 - **v2.5.8**: Feedback modal defaults to empty selection; improved HP parsing for mixed fractions (7 1/2, 7-1/2, 7½)
