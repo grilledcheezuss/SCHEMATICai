@@ -2028,7 +2028,7 @@ class FeedbackService {
         const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections), 'Date': today } }] };
         
         // Close modal (no voted-down class to allow re-opening for additional parameter corrections)
-        // Each parameter can be submitted once per panel per search (enforced by lockout set)
+        // Each parameter can be submitted once per panel per search (enforced in setupInput() line 1982 and submit() lines 2011-2015)
         this.close();
         alert("Thank you! System will learn from this.");
         
