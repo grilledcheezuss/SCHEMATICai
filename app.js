@@ -2108,6 +2108,12 @@ class SearchEngine {
     static currentPage = 1;
     static pageSize = 25;
     static lastCriteria = null;
+    
+    // Voltage filtering constants (v2.5.19)
+    static DUAL_VOLT_EXCLUSIONS = {
+        '120': /\b120\s*[\/\-]\s*240\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
+        '277': /\b277\s*[\/\-]\s*480\b/i   // Exclude "277/480" when searching 277V (277 is lower)
+    };
 
     /**
      * Helper: Match HP value in record (strict field or fuzzy description)
@@ -2249,6 +2255,11 @@ class SearchEngine {
             enc: DOM_CACHE.get('encInput')?.value || 'Any'
         };
         
+        // Pre-compile voltage pattern regex if voltage filter is active (v2.5.19 optimization)
+        const voltStrictPattern = crit.volt !== "Any" 
+            ? new RegExp(`\\b${crit.volt}\\s*(?:V\\b|VAC|VOLT|PH)`, 'i')
+            : null;
+        
         // === FILTER AND SCORE RESULTS ===
         let res = [];
         window.LOCAL_DB.forEach(r => {
@@ -2305,17 +2316,12 @@ class SearchEngine {
                     // Example: "277/480V" should match "480V" searches (480 is primary)
                     // Example: "120/240V" should match "240V" searches (240 is primary)
                     // Example: "120/240V" should NOT match "120V" searches (120 is secondary)
-                    const DUAL_VOLT_EXCLUSIONS = {
-                        '120': /\b120\s*[\/\-]\s*240\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
-                        '277': /\b277\s*[\/\-]\s*480\b/i   // Exclude "277/480" when searching 277V (277 is lower)
-                    };
                     
-                    const exclusionPattern = DUAL_VOLT_EXCLUSIONS[crit.volt];
+                    const exclusionPattern = SearchEngine.DUAL_VOLT_EXCLUSIONS[crit.volt];
                     const hasDualVoltExclusion = exclusionPattern && exclusionPattern.test(r.desc);
                     
-                    // Strict word-boundary voltage match (prevents "480" matching in "4800" or "CP-480")
-                    const strictVoltPattern = new RegExp(`\\b${crit.volt}\\s*(?:V\\b|VAC|VOLT|PH)`, 'i');
-                    const hasStrictMatch = strictVoltPattern.test(r.desc);
+                    // Use pre-compiled voltage pattern (created once per search, not per record)
+                    const hasStrictMatch = voltStrictPattern && voltStrictPattern.test(r.desc);
                     
                     if (hasStrictMatch && !hasDualVoltExclusion) {
                         // Fuzzy description match - mark as varied for orange badge

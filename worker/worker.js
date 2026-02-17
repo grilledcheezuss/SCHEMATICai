@@ -474,7 +474,8 @@ function extractSpecsStrict(t) {
     }
     
     // CRITICAL FIX: Remove lower voltage from foundVolts for canonical pairs
-    // This prevents dual-voltage panels (e.g., "120/240V") from matching both voltages in search
+    // This prevents dual-voltage panels (e.g., "120/240V") from being extracted with both
+    // voltages in their metadata, which would cause incorrect matches during search
     if (foundVolts.size === 2) {
         const voltArray = [...foundVolts];
         const canonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(pair => 
