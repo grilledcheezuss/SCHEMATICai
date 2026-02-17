@@ -542,9 +542,12 @@ export default {
                 if (!pdfUrl) {
                     console.log('[PDF_BY_ID] Exact matches failed, attempting relaxed REGEX lookup for panel:', cleanId);
                     try {
+                        // Escape special regex characters in cleanId for safe interpolation
+                        const escapedId = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        
                         // Use REGEX_MATCH to handle revision suffixes like r1, -REV, A, etc.
                         // This matches: CP-4167, CP-4167r1, CP-4167-REV, CP-4167 A, etc.
-                        const regexPattern = `^CP-${cleanId}(?:[rR]\\d+|-REV|-rev|\\s*[A-Z])?(?:\\.dwg|\\.pdf)?$`;
+                        const regexPattern = `^CP-${escapedId}(?:[rR]\\d+|-REV|-rev|\\s*[A-Z])?(?:\\.dwg|\\.pdf)?$`;
                         const regexFormula = `REGEX_MATCH({Control Panel Name}, "${regexPattern}")`;
                         const regexSearchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
                                               `filterByFormula=${encodeURIComponent(regexFormula)}` +
