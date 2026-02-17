@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.13
+## Version: v2.5.14
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.14**: Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions
 - **v2.5.13**: Fixed feedback lockout enforcement for thumbs up; HP badge now green for strict matches; enclosure parsing for 4XSS/4XFG/POLY
 - **v2.5.12**: Badge suppression for unfiltered parameters: badges only shown for actively filtered criteria (not 'Any'); Vercel cleanup
 - **v2.5.11**: Dual-voltage normalization: 120/240 and 277/480 split-phase pairs now use higher voltage with green badge instead of orange varied badge
