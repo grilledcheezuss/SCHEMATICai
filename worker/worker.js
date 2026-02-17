@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.13 (Feedback Lockout, HP Badge, Enclosure Parsing Fixes)
+// 🧠 SCHEMATICA ai WORKER v2.5.15 (Sorting Priority for Perfect Matches, Per-Parameter Feedback Lockout)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets

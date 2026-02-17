@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.14 (4XSS/4XFG Enclosure Fix, Feedback Date Recording) ---
-const APP_VERSION = "v2.5.14";
+// --- SCHEMATICA ai v2.5.15 (Sorting Priority for Perfect Matches, Per-Parameter Feedback Lockout) ---
+const APP_VERSION = "v2.5.15";
 const VERSION_HISTORY = {
+    "v2.5.15": "Sorting: perfect matches (no varied flags) prioritized above varied results when weights equal; Feedback: removed thumbs-down lockout to allow multiple per-parameter corrections per panel per search",
     "v2.5.14": "Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions",
     "v2.5.13": "Fixed feedback lockout enforcement for thumbs up; HP badge now green for strict matches; enclosure parsing for 4XSS/4XFG/POLY",
     "v2.5.12": "Badge suppression for unfiltered parameters: badges only shown for actively filtered criteria (not 'Any'); Vercel cleanup",
@@ -2026,9 +2027,8 @@ class FeedbackService {
         const today = new Date().toISOString().split('T')[0];
         const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections), 'Date': today } }] };
         
-        // Show instant UI feedback
-        if(this.currentDownBtn) this.currentDownBtn.classList.add('voted-down');
-        this.close(); 
+        // Close modal (no voted-down class to allow multiple submissions per parameter)
+        this.close();
         alert("Thank you! System will learn from this.");
         
         // Submit in background - fire and forget for instant UI response
@@ -2247,7 +2247,25 @@ class SearchEngine {
         
         // === SORT AND PARTITION RESULTS ===
         res.sort((a,b) => { 
-            if(a.w !== b.w) return b.w - a.w; 
+            if(a.w !== b.w) return b.w - a.w;
+            
+            // When weights are equal, prioritize non-varied (perfect) matches
+            // Count varied flags only for actively filtered parameters
+            const aVariedCount = 
+                (crit.mfg !== 'Any' && a.mfgV ? 1 : 0) +
+                (crit.hp !== 'Any' && a.hpV ? 1 : 0) +
+                (crit.volt !== 'Any' && a.voltV ? 1 : 0) +
+                (crit.phase !== 'Any' && a.phaseV ? 1 : 0) +
+                (crit.enc !== 'Any' && a.encV ? 1 : 0);
+            const bVariedCount = 
+                (crit.mfg !== 'Any' && b.mfgV ? 1 : 0) +
+                (crit.hp !== 'Any' && b.hpV ? 1 : 0) +
+                (crit.volt !== 'Any' && b.voltV ? 1 : 0) +
+                (crit.phase !== 'Any' && b.phaseV ? 1 : 0) +
+                (crit.enc !== 'Any' && b.encV ? 1 : 0);
+            
+            if(aVariedCount !== bVariedCount) return aVariedCount - bVariedCount; // Fewer varied flags = better
+            
             return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); 
         });
         

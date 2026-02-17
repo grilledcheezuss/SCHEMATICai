@@ -1,8 +1,19 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.14)
+CLOUDFLARE WORKER SCRIPT (v2.5.15)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.14):
+RECENT UPDATES (v2.5.15):
+
+Sorting Priority for Perfect Matches, Per-Parameter Feedback Lockout:
+- Sorting: perfect (non-varied) matches now prioritized above varied results when weights are equal
+- Varied flags only counted for actively filtered parameters (mfg/hp/volt/phase/enc)
+- Feedback: removed thumbs-down button lockout to allow multiple per-parameter corrections
+- Users can now submit HP correction, then separately submit Enclosure correction on same panel
+- Each parameter (mfg/hp/volt/phase/enc/category) and keyword can be submitted once per panel per search
+- Lockout resets on new search (existing behavior preserved)
+- Version strings aligned to v2.5.15 across all files
+
+PREVIOUS UPDATES (v2.5.14):
 
 4XSS/4XFG Enclosure Fix, Feedback Date Recording:
 - Fixed 4XSS enclosure parsing: fiberglass panels now correctly mapped to 4XFG (not 4XSS)
