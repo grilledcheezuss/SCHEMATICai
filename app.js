@@ -2027,7 +2027,8 @@ class FeedbackService {
         const today = new Date().toISOString().split('T')[0];
         const payload = { records: [{ fields: { 'Panel ID': this.currentId, 'Vote': 'Down', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(corrections), 'Date': today } }] };
         
-        // Close modal (no voted-down class to allow multiple submissions per parameter)
+        // Close modal (no voted-down class to allow re-opening for additional parameter corrections)
+        // Each parameter can be submitted once per panel per search (enforced by lockout set)
         this.close();
         alert("Thank you! System will learn from this.");
         
