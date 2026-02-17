@@ -2144,10 +2144,10 @@ class SearchEngine {
     
     // Voltage filtering constants (v2.5.19)
     static DUAL_VOLT_EXCLUSIONS = {
-        '120': /\b120\s*[\/\-]\s*240\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
-        '240': /\b120\s*[\/\-]\s*240\b/i,  // Exclude "120/240" when searching 240V (already dual-voltage)
-        '277': /\b277\s*[\/\-]\s*480\b/i,  // Exclude "277/480" when searching 277V (277 is lower)
-        '480': /\b120\s*[\/\-]\s*240\b/i   // Exclude "120/240" when searching 480V (not a 480V panel)
+        '120': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude "120/240" when searching 120V (120 is lower)
+        '240': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i,  // Exclude "120/240" when searching 240V (already dual-voltage)
+        '277': /\b277\s*[\/\-]\s*480(?:\s*V|VAC)?\b/i,  // Exclude "277/480" when searching 277V (277 is lower)
+        '480': /\b120\s*[\/\-]\s*240(?:\s*V|VAC)?\b/i   // Exclude "120/240" when searching 480V (not a 480V panel)
     };
 
     /**
@@ -2340,25 +2340,26 @@ class SearchEngine {
             
             // Volt/Phase/Enclosure filters
             if(crit.volt!=="Any") { 
+                // CRITICAL FIX: Check for dual-voltage exclusion in volt field BEFORE field match
+                // This prevents "120/240V" from matching searches for "120", "240", or "480"
+                const exclusionPattern = SearchEngine.DUAL_VOLT_EXCLUSIONS[crit.volt];
+                const fieldHasDualVolt = r.volt && exclusionPattern && exclusionPattern.test(r.volt);
+                
+                // If volt field contains excluded dual-voltage pattern, skip this record
+                if (fieldHasDualVolt) {
+                    return; // Exclude this record
+                }
+                
                 // Check for strict field match (green badge) vs fuzzy description match (orange badge)
                 if(r.volt && r.volt.includes(crit.volt)) {
                     // Strict field match - override worker variance flag for green badge
                     voltV = false;
                     w += 500;
                 } else if(r.desc) {
-                    // CRITICAL FIX: Strict voltage boundary checks to prevent false positives
-                    // Exclude canonical dual-voltage pairs when searching for specific voltages
-                    // Example: "480V" search should NOT match "120/240V" panels
-                    // Example: "240V" search should NOT match "120/240V" panels (already dual-voltage)
+                    // Check description for dual-voltage exclusion (only if no field match)
+                    const descHasDualVolt = exclusionPattern && exclusionPattern.test(r.desc);
                     
-                    const exclusionPattern = SearchEngine.DUAL_VOLT_EXCLUSIONS[crit.volt];
-                    const hasDualVoltExclusion = exclusionPattern && exclusionPattern.test(r.desc);
-                    
-                    // CRITICAL FIX: Also check if record.volt field contains excluded dual-voltage pattern
-                    const fieldHasDualVolt = r.volt && exclusionPattern && exclusionPattern.test(r.volt);
-                    
-                    // If either description OR volt field has excluded dual-voltage pattern, skip this record
-                    if (hasDualVoltExclusion || fieldHasDualVolt) {
+                    if (descHasDualVolt) {
                         return; // Exclude this record
                     }
                     
