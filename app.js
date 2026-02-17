@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.16 (Feedback Lockout Restoration, Voltage Badge Fix, Page Classifier Enhancements, OCR Guards) ---
-const APP_VERSION = "v2.5.16";
+// --- SCHEMATICA ai v2.5.17 (Profile Dropdown Population Fix, Feedback Lockout Enforcement) ---
+const APP_VERSION = "v2.5.17";
 const VERSION_HISTORY = {
+    "v2.5.17": "Profile dropdown population fix; positive feedback lockout enforcement across search sessions",
     "v2.5.16": "Restored positive feedback lockout enforcement; voltage/phase/enc badge strictness fix (green for exact field matches, orange for fuzzy); page toolbar cleanup; OCR min-size guard for tiny boxes; smarter page classification with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control)",
     "v2.5.15": "Sorting: perfect matches (no varied flags) prioritized above varied results when weights equal; Feedback: removed thumbs-down lockout to allow multiple per-parameter corrections per panel per search",
     "v2.5.14": "Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions",
@@ -3205,6 +3206,9 @@ class PdfViewer {
                 <button class="rescan-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
             `;
             wrapper.appendChild(toolbar);
+            
+            // Populate profile options immediately after toolbar is created
+            LayoutScanner.refreshProfileOptions();
 
             const contentContainer = document.createElement('div');
             contentContainer.className = 'pdf-content-container';
@@ -3265,10 +3269,9 @@ class PdfViewer {
             PageContext.setActivePage(1);
             
             setTimeout(() => {
-                LayoutScanner.refreshProfileOptions();
                 console.log('🔍 Auto-scanning PDF pages...');
                 SmartScanner.scanAllPages();
-            }, 500); 
+            }, 500);
         } else {
             // Auto-scan if any redaction checkboxes are enabled
             setTimeout(() => {

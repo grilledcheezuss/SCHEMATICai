@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.16 (Feedback Lockout Restoration, Voltage Badge Fix, Page Classifier Enhancements, OCR Guards)
+// 🧠 SCHEMATICA ai WORKER v2.5.17 (Profile Dropdown Population Fix, Feedback Lockout Enforcement)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
