@@ -1994,9 +1994,10 @@ class FeedbackService {
     static async up(id, btn, crit) { 
         // Check lockout to prevent duplicate positive feedback
         if(this.lockout.has(`${id}:up`)) return;
-        // Add to lockout IMMEDIATELY to prevent race conditions
-        this.lockout.add(`${id}:up`);
+        // Check CSS class as secondary guard
         if(btn.classList.contains('voted-up')) return; 
+        // Add to lockout IMMEDIATELY to prevent race conditions (before async operations)
+        this.lockout.add(`${id}:up`);
         btn.classList.add('voted-up');
         const implicit = {}; if(crit && crit.mfg !== 'Any') implicit.mfg = crit.mfg; if(crit && crit.hp !== 'Any') implicit.hp = crit.hp; if(crit && crit.volt !== 'Any') implicit.volt = crit.volt; if(crit && crit.phase !== 'Any') implicit.phase = crit.phase; if(crit && crit.enc !== 'Any') implicit.enc = crit.enc; const today = new Date().toISOString().split('T')[0]; const payload = { records: [{ fields: { 'Panel ID': id, 'Vote': 'Up', 'User': localStorage.getItem('cox_user'), 'Corrections': JSON.stringify(implicit), 'Date': today } }] }; await fetch(`${WORKER_URL}?target=FEEDBACK`, { method: 'POST', headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
     
