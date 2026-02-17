@@ -1,8 +1,18 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.7)
+CLOUDFLARE WORKER SCRIPT (v2.5.8)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.7):
+RECENT UPDATES (v2.5.8):
+
+Feedback Modal Defaults & HP Mixed Fractions:
+- Feedback modal dropdowns now default to empty/unselected option ("Select Correct...")
+- Added support for HP mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP" now parse as 7.5 HP
+- Enhanced HP extraction regex to handle space-separated and hyphen-separated mixed fractions
+- Updated SearchEngine HP matching to recognize Unicode fraction characters (¼, ½, ¾)
+- Prevents false 0.5 HP results when panels actually show 7 1/2 HP in tables
+- Version strings aligned to v2.5.8 across all files
+
+PREVIOUS UPDATES (v2.5.7):
 
 Feedback Interaction Fix:
 - Fixed thumbs down button onclick handler in UI.render to call FeedbackService.down with correct parameters (id, btn)

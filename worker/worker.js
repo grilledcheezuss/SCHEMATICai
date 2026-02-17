@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.7 (Feedback Interaction Fix)
+// 🧠 SCHEMATICA ai WORKER v2.5.8 (Feedback Modal Defaults & HP Mixed Fractions)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -400,14 +400,26 @@ function extractSpecsStrict(t) {
     }
 
     let maxHP = 0;
-    const hpRegex = /\b(\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?|\d+\/\d+)\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
+    // Enhanced regex to match mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP"
+    // Also handle Unicode fraction characters
+    const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
     let match;
     while ((match = hpRegex.exec(t)) !== null) {
         let raw = match[1]; let val = 0;
         if (match[2] && match[2].toUpperCase().includes('KW')) val = parseFloat(raw) * 1.341;
-        else if (raw.includes('-') && raw.includes('/')) {
-            // Skip weird mixed formats like 5-1/2 HP
-            continue;
+        else if (/(\d+)[-\s](\d+)\/(\d+)/.test(raw)) {
+            // Mixed fraction format: "7 1/2" or "7-1/2"
+            const mixedMatch = raw.match(/(\d+)[-\s](\d+)\/(\d+)/);
+            const whole = parseFloat(mixedMatch[1]);
+            const num = parseFloat(mixedMatch[2]);
+            const den = parseFloat(mixedMatch[3]);
+            val = whole + (num / den);
+        } else if (/(\d+)([¼½¾])/.test(raw)) {
+            // Unicode fraction format: "7½"
+            const unicodeMatch = raw.match(/(\d+)([¼½¾])/);
+            const whole = parseFloat(unicodeMatch[1]);
+            const fractionMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
+            val = whole + fractionMap[unicodeMatch[2]];
         } else if (raw.includes('-')) {
             const parts = raw.split('-').filter(Boolean);
             const nums = parts.map(p => parseFloat(p)).filter(x => !isNaN(x));

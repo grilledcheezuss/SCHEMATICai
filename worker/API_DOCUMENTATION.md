@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.7
+## Version: v2.5.8
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.8**: Feedback modal defaults to empty selection; improved HP parsing for mixed fractions (7 1/2, 7-1/2, 7½)
 - **v2.5.7**: Fixed feedback button interactions (thumbs down onclick handler)
 - **v2.5.6**: Client-side code refactoring and optimization (no API changes)
 - **v2.5.5**: PDF_BY_ID relaxed REGEX lookup for revision suffixes, improved error handling
