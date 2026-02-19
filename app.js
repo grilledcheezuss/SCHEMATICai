@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.22 (Refactored Search Engine) ---
-const APP_VERSION = "v2.5.22";
+// --- SCHEMATICA ai v2.5.23 (Feedback & Profile Fixes) ---
+const APP_VERSION = "v2.5.23";
 const VERSION_HISTORY = {
+    "v2.5.23": "Fixed positive feedback lockout persistence (lockout applied immediately, CSS class guard) and profile dropdown population (called once after all pages rendered)",
     "v2.5.22": "Refactored search engine into isolated, testable modules (Phase 1: VoltageMatcher, HorsepowerMatcher, KeywordMatcher) - no logic changes, pure reorganization to prevent future regressions",
     "v2.5.21": "Comprehensive voltage equivalency matching: 240V now matches 230V/220V/120-240V; 480V matches 460V/440V/277-480V per NEC standards; fixed dual-voltage inclusion logic",
     "v2.5.20": "Fixed 480V false positives (exclude 120/240V panels from 480V searches); simplified positive feedback (removed flawed implicit corrections); profile dropdown population timing fix",
@@ -1996,16 +1997,22 @@ class LayoutScanner {
 class FeedbackService {
     static currentId = null; static currentDownBtn = null; static lockout = new Set();
     static async up(id, btn, crit) { 
-        // Check lockout to prevent duplicate positive feedback
-        if(this.lockout.has(`${id}:up`)) return;
+        // DEFENSIVE GUARD 1: Check CSS class first (avoids re-voting on re-rendered cards in same session)
+        if(btn.classList.contains('voted-up')) {
+            console.log(`[FeedbackService.up] Button already voted (CSS class) for ${id}`);
+            return;
+        }
         
-        // Add to lockout IMMEDIATELY (before any async operations)
+        // DEFENSIVE GUARD 2: Check lockout set
+        if(this.lockout.has(`${id}:up`)) {
+            console.log(`[FeedbackService.up] Already in lockout set for ${id}`);
+            return;
+        }
+        
+        // CRITICAL: Add to lockout IMMEDIATELY (before any async operations or UI updates)
         this.lockout.add(`${id}:up`);
         
-        // Check CSS class as secondary guard
-        if(btn.classList.contains('voted-up')) return; 
-        
-        // Apply visual feedback
+        // CRITICAL: Apply CSS class IMMEDIATELY (persists in DOM)
         btn.classList.add('voted-up');
         
         // CRITICAL FIX: Don't try to infer corrections from search criteria
@@ -2034,6 +2041,7 @@ class FeedbackService {
             console.log(`✓ Positive feedback submitted for ${id}`);
         } catch (e) {
             console.error('Positive feedback submission failed:', e);
+            // NOTE: Do NOT remove lockout on failure - prevents spam retries
         }
     }
     
@@ -3452,10 +3460,6 @@ class PdfViewer {
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
             
-            // CRITICAL FIX: Populate profile dropdown immediately after wrapper is appended to DOM
-            // Must be called AFTER container.appendChild(wrapper) so querySelectorAll can find the select element
-            LayoutScanner.refreshProfileOptions();
-            
             console.log(`📄 Created layer structure for page ${i}`);
             console.log(`  - Container: ${contentContainer.offsetWidth}x${contentContainer.offsetHeight}`);
             console.log(`  - Redaction layer: ${rLayer.offsetWidth}x${rLayer.offsetHeight}`);
@@ -3481,6 +3485,9 @@ class PdfViewer {
                 }
             }
         }
+        // Populate ALL profile dropdowns ONCE after all pages are rendered
+        // This ensures all <select> elements exist in the DOM before population
+        LayoutScanner.refreshProfileOptions();
         if(DemoManager.isGeneratorActive) {
             // Populate page selector
             const pageSelector = document.getElementById('page-selector');
