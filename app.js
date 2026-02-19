@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.26 (Fix cover/template redaction zone placement + compact control panel + default-collapsed Project Context) ---
-const APP_VERSION = "v2.5.26";
+// --- SCHEMATICA ai v2.5.27 (Fix cover page redaction zones stacking + correct profile dropdown options markup) ---
+const APP_VERSION = "v2.5.27";
 const VERSION_HISTORY = {
+    "v2.5.27": "Fix cover page redaction zones stacking (createZoneOnWrapper now appends redaction-text span before resize handle; refreshContent never overwrites innerHTML, creates span if missing for legacy boxes); fix profile dropdown to use <option>/<optgroup> markup; version bump",
     "v2.5.26": "Fix cover/template redaction zone placement (pdf-content-container height: 100%, waitForLayoutStable RAF flush before applyRuleToWrapper); compact generator panel (295px, reduced padding/spacing); Project Context default-collapsed on every load; version bump",
     "v2.5.25": "Universal cover sheet template as page 1 for all PDFs; simplified layout profiles (added COVER_TEMPLATE, deprecated legacy title keys from UI); fixed profile dropdown onchange error (applyProfileToPage alias); cover template zones with bold/underline/font rules; page 1 dropdown disabled",
     "v2.5.24": "Fixed thumbs-up lockout rendering (buttons now respect FeedbackService.lockout Set during UI.render) and profile dropdown population (added defensive logging and timing fix)",
@@ -1001,6 +1002,7 @@ class RedactionManager {
             box.dataset.rotation = rotation;
         }
 
+        const textSpan = document.createElement('span'); textSpan.className = 'redaction-text'; box.appendChild(textSpan);
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
         box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box);
         
@@ -1197,9 +1199,9 @@ class RedactionManager {
             // Hide or show the box based on toggle state
             box.style.display = shouldShow ? '' : 'none';
             
-            const span = box.querySelector('span'); 
+            const span = box.querySelector('.redaction-text') || box.querySelector('span'); 
             if(span) span.innerText = text; 
-            else box.innerHTML = `${text}`;
+            else { const s = document.createElement('span'); s.className = 'redaction-text'; s.innerText = text; box.insertBefore(s, box.firstChild); }
             
             if(box.dataset.decoration === 'underline') { 
                 box.style.textDecoration = 'underline'; 
