@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.24 (Thumbs-Up Rendering & Profile Dropdown Fix) ---
-const APP_VERSION = "v2.5.24";
+// --- SCHEMATICA ai v2.5.25 (Cover Sheet Template, Dropdown Simplification, Profile Fix) ---
+const APP_VERSION = "v2.5.25";
 const VERSION_HISTORY = {
+    "v2.5.25": "Implemented universal cover sheet template as Page 1; fixed applyProfileToPage error (renamed to updatePageProfile); simplified profile dropdown (removed legacy title layouts, added COVER_TEMPLATE); added underline support in layout zones; bumped version",
     "v2.5.24": "Fixed thumbs-up lockout rendering (buttons now respect FeedbackService.lockout Set during UI.render) and profile dropdown population (added defensive logging and timing fix)",
     "v2.5.23": "Fixed positive feedback lockout persistence (lockout applied immediately, CSS class guard) and profile dropdown population (called once after all pages rendered)",
     "v2.5.22": "Refactored search engine into isolated, testable modules (Phase 1: VoltageMatcher, HorsepowerMatcher, KeywordMatcher) - no logic changes, pure reorganization to prevent future regressions",
@@ -203,6 +204,14 @@ const LAYOUT_RULES = {
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+    ],
+    COVER_TEMPLATE: [
+        { map: "cust",  x: 0.15, y: 0.42,  w: 0.7,  h: 0.04, fontSize: 24, transparent: false, fontFamily: "'Times New Roman', serif",  textAlign: 'center' },
+        { map: "job",   x: 0.15, y: 0.502, w: 0.7,  h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center', decoration: 'underline' },
+        { map: "type",  x: 0.15, y: 0.541, w: 0.7,  h: 0.04, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center', decoration: 'underline' },
+        { map: "stage", x: 0.201,y: 0.69,  w: 0.6,  h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center', decoration: 'underline' },
+        { map: "date",  x: 0.25, y: 0.75,  w: 0.499,h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid",  x: 0.835,y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ]
 };
 
@@ -587,11 +596,7 @@ class PageContext {
     static getProfileDisplayName(profile) {
         const names = {
             'AUTO': 'Auto-Detect',
-            'TITLE': 'Title Sheet',
-            'TITLE_ASBUILT': 'As-Built Title',
-            'COX_COVER': 'Cox Cover',
-            'DELTA_COVER': 'Delta Cover',
-            'THIRD_PARTY_COVER': '3rd Party Cover',
+            'COVER_TEMPLATE': 'Cover Template',
             'INFO': 'Info/Notes',
             'INFO_BORDERLESS': 'Info (Borderless)',
             'SCHEMATIC_LANDSCAPE': 'Schematic (Landscape)',
@@ -608,11 +613,7 @@ class PageContext {
 class ControlPanelManager {
     // Define which fields are relevant for each profile
     static PROFILE_FIELDS = {
-        'TITLE': ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'company', 'address', 'phone', 'fax'],
-        'TITLE_ASBUILT': ['cust', 'job', 'cpid', 'date', 'company', 'address', 'phone'],
-        'COX_COVER': ['cust', 'job', 'date', 'cpid', 'company', 'address', 'phone', 'fax'],
-        'DELTA_COVER': ['cust', 'job', 'date', 'cpid'],
-        'THIRD_PARTY_COVER': ['cust', 'job', 'date', 'cpid'],
+        'COVER_TEMPLATE': ['cust', 'job', 'type', 'cpid', 'date', 'stage'],
         'INFO': ['cpid', 'date'],
         'INFO_BORDERLESS': ['cpid', 'date'],
         'SCHEMATIC_LANDSCAPE': ['cpid', 'date'],
@@ -1251,13 +1252,9 @@ class PageClassifier {
         // Door drawing detection (high confidence)
         if(doorScore > 20) return 'DOOR_DRAWING';
         
-        // Page 1: Almost always a title/cover sheet
+        // Page 1: Almost always a cover template
         if(pageNumber === 1) {
-            if(asBuiltScore > 15) return 'TITLE_ASBUILT';
-            if(coxScore > 10) return 'COX_COVER';
-            if(deltaScore > 10) return 'DELTA_COVER';
-            if(titleScore > 25 && itemCount < 100) return 'THIRD_PARTY_COVER';
-            return 'TITLE';
+            return 'COVER_TEMPLATE';
         }
         
         // Page 2: Usually info/notes
@@ -1278,13 +1275,9 @@ class PageClassifier {
             }
         }
         
-        // Cover sheet detection (fallback for page 1 without strong signals)
+        // Cover sheet detection (fallback for pages that look like covers)
         if(titleScore > 25) {
-            if(asBuiltScore > 15) return 'TITLE_ASBUILT';
-            if(coxScore > 10) return 'COX_COVER';
-            if(deltaScore > 10) return 'DELTA_COVER';
-            if(itemCount < 100) return 'THIRD_PARTY_COVER';
-            return 'TITLE';
+            return 'COVER_TEMPLATE';
         }
         
         // Info/Notes detection
@@ -1889,7 +1882,7 @@ class LayoutScanner {
                 let profileKey = manualSelect ? manualSelect.value : null;
 
                 if (!profileKey || profileKey === "AUTO") {
-                    if (i === 1) profileKey = 'TITLE';
+                    if (i === 1) profileKey = 'COVER_TEMPLATE';
                     else if (i === 2) profileKey = 'INFO';
                     else {
                         const w = container.offsetWidth; const h = container.offsetHeight;
@@ -1919,13 +1912,7 @@ class LayoutScanner {
             const currentVal = select.value;
             let html = `
                 <option value="AUTO">✨ Auto (Detected)</option>
-                <optgroup label="🏷️ Title Sheets">
-                    <option value="TITLE">🏷️ Title Sheet (Standard)</option>
-                    <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
-                    <option value="COX_COVER">🏢 Cox Cover Sheet</option>
-                    <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
-                    <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
-                </optgroup>
+                <option value="COVER_TEMPLATE">🏠 Cover Template</option>
                 <optgroup label="📝 Info Sheets">
                     <option value="INFO">📝 Info / Notes (Standard)</option>
                     <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
@@ -1970,7 +1957,7 @@ class LayoutScanner {
             rules = ProfileManager.getCustomProfiles()[name] || [];
         } else if (profileKey === "AUTO") {
              const w = container.offsetWidth; const h = container.offsetHeight;
-             if (pageNum === 1) profileKey = 'TITLE';
+             if (pageNum === 1) profileKey = 'COVER_TEMPLATE';
              else if (pageNum === 2) profileKey = 'INFO';
              else profileKey = (w > h) ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
              const select = wrapper.querySelector('.page-profile-select');
@@ -1998,7 +1985,7 @@ class LayoutScanner {
         const height = container.offsetHeight; 
         
         ruleSet.forEach(zone => { 
-            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize, zone.text, null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
+            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize, zone.text, zone.decoration || null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
         }); 
     }
 }
@@ -3395,7 +3382,7 @@ class PdfViewer {
             
             // Wrap getPage in try/catch
             try {
-                if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) {
+                if (i === 1 && window.TEMPLATE_BYTES) {
                     page = await coverDoc.getPage(1);
                     isTemplate = true;
                 } else {
@@ -3426,15 +3413,9 @@ class PdfViewer {
             toolbar.className = 'page-toolbar';
             toolbar.innerHTML = `
                 <span style="font-weight:600;">PAGE ${i}</span>
-                <select class="page-profile-select" onchange="LayoutScanner.applyProfileToPage(${i}, this.value)">
+                <select class="page-profile-select" onchange="LayoutScanner.updatePageProfile(${i}, this.value)">
                     <option value="AUTO">✨ Auto (Detected)</option>
-                    <optgroup label="📁 Title &amp; Cover Sheets">
-                        <option value="TITLE">🏷️ Title Sheet (Standard)</option>
-                        <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
-                        <option value="COX_COVER">🏢 Cox Cover Sheet</option>
-                        <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
-                        <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
-                    </optgroup>
+                    <option value="COVER_TEMPLATE">🏠 Cover Template</option>
                     <optgroup label="📁 Info &amp; Notes">
                         <option value="INFO">📝 Info / Notes (Standard)</option>
                         <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
@@ -3979,6 +3960,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (versionEl) {
             versionEl.textContent = APP_VERSION;
         }
+        
+        // Load cover sheet template for universal Page 1
+        fetch('cover_sheet_template.pdf')
+            .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.arrayBuffer(); })
+            .then(buf => { window.TEMPLATE_BYTES = buf; console.log('[Template] cover_sheet_template.pdf loaded successfully'); })
+            .catch(e => console.warn('[Template] cover_sheet_template.pdf could not be loaded (Page 1 will use original):', e));
         
         UI.init(); 
         if(AuthService.init()) { 
