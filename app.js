@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.23 (Feedback & Profile Fixes) ---
-const APP_VERSION = "v2.5.23";
+// --- SCHEMATICA ai v2.5.24 (Thumbs-Up Rendering & Profile Dropdown Fix) ---
+const APP_VERSION = "v2.5.24";
 const VERSION_HISTORY = {
+    "v2.5.24": "Fixed thumbs-up lockout rendering (buttons now respect FeedbackService.lockout Set during UI.render) and profile dropdown population (added defensive logging and timing fix)",
     "v2.5.23": "Fixed positive feedback lockout persistence (lockout applied immediately, CSS class guard) and profile dropdown population (called once after all pages rendered)",
     "v2.5.22": "Refactored search engine into isolated, testable modules (Phase 1: VoltageMatcher, HorsepowerMatcher, KeywordMatcher) - no logic changes, pure reorganization to prevent future regressions",
     "v2.5.21": "Comprehensive voltage equivalency matching: 240V now matches 230V/220V/120-240V; 480V matches 460V/440V/277-480V per NEC standards; fixed dual-voltage inclusion logic",
@@ -1905,43 +1906,51 @@ class LayoutScanner {
 
     static refreshProfileOptions() {
         const selects = document.querySelectorAll('.page-profile-select');
+        console.log(`[refreshProfileOptions] Found ${selects.length} profile dropdowns`);
+        
+        if (selects.length === 0) {
+            console.warn('[refreshProfileOptions] No .page-profile-select elements found in DOM');
+            return;
+        }
+        
         const customProfiles = ProfileManager.getCustomProfiles();
         
-        selects.forEach(select => {
+        selects.forEach((select, index) => {
             const currentVal = select.value;
             let html = `
-                ✨ Auto (Detected)
-                
-                    🏷️ Title Sheet (Standard)
-                    📋 Title Sheet (As-Built)
-                    🏢 Cox Cover Sheet
-                    🔷 Delta Cover Sheet
-                    📄 3rd Party Cover
-                
-                
-                    📝 Info / Notes (Standard)
-                    🖼️ Info (Borderless)
-                
-                
-                    📄 Schematic (Portrait)
-                    🖼️ Schematic (Portrait Borderless)
-                    🔄 Schematic (Landscape)
-                    🖼️ Schematic (Landscape Borderless)
-                
-                
-                    🚪 Door Drawing
-                    📐 General
-                
+                <option value="AUTO">✨ Auto (Detected)</option>
+                <optgroup label="🏷️ Title Sheets">
+                    <option value="TITLE">🏷️ Title Sheet (Standard)</option>
+                    <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
+                    <option value="COX_COVER">🏢 Cox Cover Sheet</option>
+                    <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
+                    <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
+                </optgroup>
+                <optgroup label="📝 Info Sheets">
+                    <option value="INFO">📝 Info / Notes (Standard)</option>
+                    <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
+                </optgroup>
+                <optgroup label="📐 Schematics">
+                    <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
+                    <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
+                    <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
+                    <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
+                </optgroup>
+                <optgroup label="📐 Other">
+                    <option value="DOOR_DRAWING">🚪 Door Drawing</option>
+                    <option value="GENERAL">📐 General</option>
+                </optgroup>
             `;
             if (Object.keys(customProfiles).length > 0) {
-                html += '';
+                html += '<optgroup label="⭐ Custom Profiles">';
                 for (const [name, _] of Object.entries(customProfiles)) {
-                    html += `⭐ ${name}`;
+                    html += `<option value="CUSTOM:${name}">⭐ ${name}</option>`;
                 }
-                html += '';
+                html += '</optgroup>';
             }
             select.innerHTML = html;
-            select.value = currentVal;
+            select.value = currentVal || 'AUTO';
+            console.log(`[refreshProfileOptions] Populated dropdown ${index + 1} with ${select.options.length} options`);
         });
     }
 
@@ -1996,7 +2005,8 @@ class LayoutScanner {
 
 class FeedbackService {
     static currentId = null; static currentDownBtn = null; static lockout = new Set();
-    static async up(id, btn, crit) { 
+    static async up(id, btn, event) { 
+        if (event) event.stopPropagation(); // Prevent card click
         // DEFENSIVE GUARD 1: Check CSS class first (avoids re-voting on re-rendered cards in same session)
         if(btn.classList.contains('voted-up')) {
             console.log(`[FeedbackService.up] Button already voted (CSS class) for ${id}`);
@@ -3487,7 +3497,10 @@ class PdfViewer {
         }
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
-        LayoutScanner.refreshProfileOptions();
+        console.log('[renderStack] All pages rendered, calling refreshProfileOptions()');
+        setTimeout(() => {
+            LayoutScanner.refreshProfileOptions();
+        }, 100); // 100ms delay to ensure DOM has fully updated
         if(DemoManager.isGeneratorActive) {
             // Populate page selector
             const pageSelector = document.getElementById('page-selector');
@@ -3907,7 +3920,7 @@ static render(res, crit, totalCount) {
             <div class="panel-name">${i.displayId || i.id}</div>
             <div class="badge-row">${badges.join(' ') || '<span class="hud-badge unknown">NO MATCH</span>'}</div>
             <div class="card-actions">
-                <button class="thumb-btn up" onclick="FeedbackService.up('${i.id}', this, ${JSON.stringify(crit)})">👍</button>
+                <button class="thumb-btn up ${FeedbackService.lockout.has(`${i.id}:up`) ? 'voted-up' : ''}" onclick="FeedbackService.up('${i.id}', this, event)">👍</button>
                 <button class="thumb-btn down" onclick="FeedbackService.down('${i.id}', this)">👎</button>
             </div>
         `;
