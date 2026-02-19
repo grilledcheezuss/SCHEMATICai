@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.28 (Generator OFF shows original PDF; page 1 COVER_TEMPLATE zones deterministic; default zoom 100%) ---
-const APP_VERSION = "v2.5.28";
+// --- SCHEMATICA ai v2.5.29 (prioritize page-1 overlays immediately; dock generator on tablet/no drag; hard-disable generator on phones; fix invalid profile dropdown) ---
+const APP_VERSION = "v2.5.29";
 const VERSION_HISTORY = {
+    "v2.5.29": "Prioritize page-1 COVER_TEMPLATE overlays immediately within renderStack loop; dock generator panel on tablet (skip DragManager on 768-1024px); hard-disable generator on small mobile via UI.isSmallMobile() guard; fix invalid profile dropdown (validate value after innerHTML swap, fall back to AUTO); generator-transition fade; version bump",
     "v2.5.28": "Generator OFF now renders original PDF for all pages with no template overlay and no auto-scan; SmartScanner page 1 always applies COVER_TEMPLATE deterministically (skips text/OCR detection); default desktop zoom changed from 110% to 100%; version bump",
     "v2.5.27": "Fix cover page redaction zones stacking (createZoneOnWrapper now appends redaction-text span before resize handle; refreshContent never overwrites innerHTML, creates span if missing for legacy boxes); fix profile dropdown to use <option>/<optgroup> markup; version bump",
     "v2.5.26": "Fix cover/template redaction zone placement (pdf-content-container height: 100%, waitForLayoutStable RAF flush before applyRuleToWrapper); compact generator panel (295px, reduced padding/spacing); Project Context default-collapsed on every load; version bump",
@@ -478,11 +479,17 @@ class DemoManager {
     static isGeneratorActive = false;
 
     static toggleGenerator() {
+        if (UI.isSmallMobile()) {
+            console.log('[DemoManager] Generator not available on small mobile devices.');
+            return;
+        }
         this.isGeneratorActive = !this.isGeneratorActive;
         const btn = document.getElementById('menu-demo');
         const indicator = document.getElementById('gen-status');
         const panel = document.getElementById('generator-panel');
         const restoreBtn = document.getElementById('generator-restore-btn');
+
+        document.body.classList.add('generator-transition');
         
         if(this.isGeneratorActive) { 
             document.body.classList.add('demo-mode'); 
@@ -490,8 +497,8 @@ class DemoManager {
             if(indicator) indicator.style.display = 'inline-block';
             if(btn) btn.style.color = 'var(--app-primary)';
             if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
-            if(PdfViewer.doc) PdfViewer.renderStack();
-            DragManager.init();
+            if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
+            if (!UI.isTablet()) DragManager.init();
         } else { 
             document.body.classList.remove('demo-mode'); 
             document.body.classList.remove('editor-active'); 
@@ -499,7 +506,7 @@ class DemoManager {
             restoreBtn.style.display = 'none';
             if(indicator) indicator.style.display = 'none';
             if(btn) btn.style.color = ''; 
-            if(PdfViewer.doc) PdfViewer.renderStack();
+            if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
         }
     }
 
@@ -1981,7 +1988,17 @@ class LayoutScanner {
                 html += '</optgroup>';
             }
             select.innerHTML = html;
-            select.value = currentVal || 'AUTO';
+            // Restore previous selection; if the option no longer exists (e.g. deleted custom
+            // profile), fall back to AUTO instead of leaving the select in an invalid empty state.
+            if (currentVal) {
+                select.value = currentVal;
+                if (select.value !== currentVal) {
+                    console.warn(`[refreshProfileOptions] Profile "${currentVal}" not found in options; resetting to AUTO`);
+                    select.value = 'AUTO';
+                }
+            } else {
+                select.value = 'AUTO';
+            }
             console.log(`[refreshProfileOptions] Populated dropdown ${index + 1} with ${select.options.length} options`);
         });
     }
@@ -3526,6 +3543,14 @@ class PdfViewer {
                     }
                 }
             }
+
+            // Page 1: apply COVER_TEMPLATE overlays immediately after canvas renders — do not
+            // wait for scanAllPages() so the overlay appears as soon as page 1 is visible.
+            if (i === 1 && DemoManager.isGeneratorActive) {
+                await PdfViewer.waitForLayoutStable(contentContainer);
+                LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES['COVER_TEMPLATE']);
+                console.log(`[renderStack] Page 1 COVER_TEMPLATE applied immediately (${wrapper.querySelectorAll('.redaction-box').length} zones)`);
+            }
         }
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
@@ -3550,10 +3575,13 @@ class PdfViewer {
             // Set initial page context
             PageContext.setActivePage(1);
             
-            setTimeout(() => {
-                console.log('🔍 Auto-scanning PDF pages...');
-                SmartScanner.scanAllPages();
-            }, 500);
+            // Start scan immediately after render completes; remove transition class when done.
+            console.log('🔍 Auto-scanning PDF pages...');
+            SmartScanner.scanAllPages().finally(() => {
+                document.body.classList.remove('generator-transition');
+            });
+        } else {
+            document.body.classList.remove('generator-transition');
         }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
@@ -3763,6 +3791,9 @@ class UI {
         }); 
     }
     
+    static isSmallMobile() { return window.innerWidth < 768; }
+    static isTablet() { return window.innerWidth >= 768 && window.innerWidth <= 1024; }
+
     static toggleDarkMode() { 
         document.body.classList.toggle('dark-mode'); 
         localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); 
