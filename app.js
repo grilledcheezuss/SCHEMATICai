@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.21 (Comprehensive Voltage Matching) ---
-const APP_VERSION = "v2.5.21";
+// --- SCHEMATICA ai v2.5.22 (Refactored Search Engine) ---
+const APP_VERSION = "v2.5.22";
 const VERSION_HISTORY = {
+    "v2.5.22": "Refactored search engine into isolated, testable modules (Phase 1: VoltageMatcher, HorsepowerMatcher, KeywordMatcher) - no logic changes, pure reorganization to prevent future regressions",
     "v2.5.21": "Comprehensive voltage equivalency matching: 240V now matches 230V/220V/120-240V; 480V matches 460V/440V/277-480V per NEC standards; fixed dual-voltage inclusion logic",
     "v2.5.20": "Fixed 480V false positives (exclude 120/240V panels from 480V searches); simplified positive feedback (removed flawed implicit corrections); profile dropdown population timing fix",
     "v2.5.19": "Fixed 480V false positives (strict voltage boundaries + dual-voltage exclusion in search); voltage extraction now removes lower voltage from canonical pairs (120/240, 277/480) to prevent dual-voltage panels matching both voltages",
@@ -2137,28 +2138,30 @@ class FeedbackService {
     static close() { document.getElementById('feedback-modal').classList.remove('active-modal'); }
 }
 
-class SearchEngine {
-    static currentResults = [];
-    static currentPage = 1;
-    static pageSize = 25;
-    static lastCriteria = null;
-    
+/**
+ * VoltageMatcher - Isolated voltage matching logic per NEC/IEC standards
+ * 
+ * @example
+ * // Test voltage matching independently
+ * const result = VoltageMatcher.matches({ volt: "480", desc: "480V motor" }, "480");
+ * // => { matches: true, confidence: 'high', weight: 500, isFuzzy: false }
+ * 
+ * @example
+ * // Test 277/480V matching for 480V search
+ * const result = VoltageMatcher.matches({ volt: "277/480" }, "480");
+ * // => { matches: true, confidence: 'high', weight: 500, isFuzzy: false }
+ */
+class VoltageMatcher {
     /**
-     * Voltage equivalency groups for search matching (v2.5.21)
-     * Each key is a search voltage, value contains patterns to match and exclude
-     * Follows NEC/IEC standards for voltage tolerances and naming conventions
-     * 
-     * fieldPatterns: Lenient patterns for structured volt field (e.g., "240", "120/240")
-     * descPatterns: Strict patterns for free-text descriptions (require voltage suffix)
-     * excludePatterns: Patterns to exclude from matches
+     * Voltage equivalency groups (v2.5.21)
+     * Copied from SearchEngine.VOLTAGE_EQUIVALENTS - do not modify logic
      */
     static VOLTAGE_EQUIVALENTS = {
-        // 120V Group - matches 120V, 115V, 110V (NOT dual-voltage like 120/240V)
         '120': {
             fieldPatterns: [
-                /^120$/i,      // Exact "120"
-                /^115$/i,      // Exact "115"
-                /^110$/i       // Exact "110"
+                /^120$/i,
+                /^115$/i,
+                /^110$/i
             ],
             descPatterns: [
                 /\b120\s*(?:V|VAC|VOLT|PH)\b/i,
@@ -2166,18 +2169,16 @@ class SearchEngine {
                 /\b110\s*(?:V|VAC|VOLT|PH)\b/i
             ],
             excludePatterns: [
-                /\b120\s*[\/\-]\s*\d+/i  // Exclude 120/240, 120/208, etc.
+                /\b120\s*[\/\-]\s*\d+/i
             ]
         },
-        
-        // 240V Group - matches 240V, 230V, 220V, AND 120/240V, 120/230V
         '240': {
             fieldPatterns: [
                 /^240$/i,
                 /^230$/i,
                 /^220$/i,
-                /^120\s*[\/\-]\s*240$/i,  // Dual-voltage: 120/240
-                /^120\s*[\/\-]\s*230$/i   // Dual-voltage: 120/230
+                /^120\s*[\/\-]\s*240$/i,
+                /^120\s*[\/\-]\s*230$/i
             ],
             descPatterns: [
                 /\b240\s*(?:V|VAC|VOLT|PH)\b/i,
@@ -2188,8 +2189,6 @@ class SearchEngine {
             ],
             excludePatterns: []
         },
-        
-        // 208V Group - matches 208V and 120/208V
         '208': {
             fieldPatterns: [
                 /^208$/i,
@@ -2201,8 +2200,6 @@ class SearchEngine {
             ],
             excludePatterns: []
         },
-        
-        // 277V Group - matches only 277V (single-phase from 480V wye)
         '277': {
             fieldPatterns: [
                 /^277$/i
@@ -2211,17 +2208,15 @@ class SearchEngine {
                 /\b277\s*(?:V|VAC|VOLT|PH)\b/i
             ],
             excludePatterns: [
-                /\b277\s*[\/\-]\s*480/i  // Exclude 277/480 (that's a 480V search)
+                /\b277\s*[\/\-]\s*480/i
             ]
         },
-        
-        // 480V Group - matches 480V, 460V, 440V, AND 277/480V
         '480': {
             fieldPatterns: [
                 /^480$/i,
-                /^460$/i,      // Motor nameplate voltage
-                /^440$/i,      // Legacy 3-phase
-                /^277\s*[\/\-]\s*480$/i   // Dual-voltage: 277/480
+                /^460$/i,
+                /^440$/i,
+                /^277\s*[\/\-]\s*480$/i
             ],
             descPatterns: [
                 /\b480\s*(?:V|VAC|VOLT|PH)\b/i,
@@ -2230,12 +2225,10 @@ class SearchEngine {
                 /\b277\s*[\/\-]\s*480(?:\s*(?:V|VAC|VOLT|PH))?\b/i
             ],
             excludePatterns: [
-                /\b120\s*[\/\-]\s*240/i,  // Exclude 120/240 (not a 480V panel)
-                /\b120\s*[\/\-]\s*230/i   // Exclude 120/230 (not a 480V panel)
+                /\b120\s*[\/\-]\s*240/i,
+                /\b120\s*[\/\-]\s*230/i
             ]
         },
-        
-        // 575V Group (Canadian standard)
         '575': {
             fieldPatterns: [
                 /^575$/i,
@@ -2248,25 +2241,111 @@ class SearchEngine {
             excludePatterns: []
         }
     };
-
+    
+    static FIELD_MATCH_WEIGHT = 500;
+    static DESC_MATCH_WEIGHT = 100;
+    
     /**
-     * Helper: Match HP value in record (strict field or fuzzy description)
-     * @param {Object} record - Database record
-     * @param {string} searchHp - HP value to search for
-     * @returns {Object} {matches: boolean, isVariant: boolean, weight: number}
-     * @private
+     * Match voltage value in record
+     * @param {Object} record - Database record with volt and desc fields
+     * @param {string} searchVoltage - Voltage to search for (e.g., "480")
+     * @returns {Object} { matches: boolean, confidence: 'high'|'medium'|'low', weight: number, isFuzzy: boolean }
      */
-    static _matchHp(record, searchHp) {
-        const HP_TOLERANCE = 0.1; // 10% tolerance for fuzzy matching
-        const HP_STRICT_WEIGHT = 5000;
-        const HP_FUZZY_WEIGHT = 2000;
+    static matches(record, searchVoltage) {
+        const voltConfig = this.VOLTAGE_EQUIVALENTS[searchVoltage];
         
+        if (!voltConfig) {
+            // Fallback for unknown voltage values - exact match only
+            if (record.volt && record.volt.includes(searchVoltage)) {
+                return { matches: true, confidence: 'high', weight: this.FIELD_MATCH_WEIGHT, isFuzzy: false };
+            }
+            return { matches: false, confidence: 'low', weight: 0, isFuzzy: false };
+        }
+        
+        let matched = false;
+        let isFieldMatch = false;
+        
+        // === STEP 1: Check volt field for equivalents ===
+        if (record.volt) {
+            for (const pattern of voltConfig.fieldPatterns) {
+                if (pattern.test(record.volt)) {
+                    matched = true;
+                    isFieldMatch = true;
+                    break;
+                }
+            }
+            
+            if (matched) {
+                for (const excludePattern of voltConfig.excludePatterns) {
+                    if (excludePattern.test(record.volt)) {
+                        return { matches: false, confidence: 'low', weight: 0, isFuzzy: false };
+                    }
+                }
+            }
+        }
+        
+        // === STEP 2: If no field match, check description ===
+        if (!matched && record.desc) {
+            for (const pattern of voltConfig.descPatterns) {
+                if (pattern.test(record.desc)) {
+                    matched = true;
+                    break;
+                }
+            }
+            
+            if (matched) {
+                for (const excludePattern of voltConfig.excludePatterns) {
+                    if (excludePattern.test(record.desc)) {
+                        return { matches: false, confidence: 'low', weight: 0, isFuzzy: false };
+                    }
+                }
+            }
+        }
+        
+        // === STEP 3: Return result ===
+        if (!matched) {
+            return { matches: false, confidence: 'low', weight: 0, isFuzzy: false };
+        }
+        
+        if (isFieldMatch) {
+            return { matches: true, confidence: 'high', weight: this.FIELD_MATCH_WEIGHT, isFuzzy: false };
+        } else {
+            return { matches: true, confidence: 'medium', weight: this.DESC_MATCH_WEIGHT, isFuzzy: true };
+        }
+    }
+}
+
+/**
+ * HorsepowerMatcher - Isolated HP matching logic with fractional support
+ * 
+ * @example
+ * // Test HP matching independently
+ * const result = HorsepowerMatcher.matches({ hp: "5" }, "5");
+ * // => { matches: true, isVariant: false, weight: 5000 }
+ * 
+ * @example
+ * // Test fuzzy description match
+ * const result = HorsepowerMatcher.matches({ desc: "7.5 HP motor" }, "7.5");
+ * // => { matches: true, isVariant: true, weight: 2000 }
+ */
+class HorsepowerMatcher {
+    static HP_TOLERANCE = 0.1;
+    static HP_STRICT_WEIGHT = 5000;
+    static HP_FUZZY_WEIGHT = 2000;
+    
+    /**
+     * Match HP value in record (strict field or fuzzy description)
+     * @param {Object} record - Database record with hp and desc fields
+     * @param {string} searchHp - HP value to search for (e.g., "5", "7.5")
+     * @returns {Object} { matches: boolean, isVariant: boolean, weight: number }
+     */
+    static matches(record, searchHp) {
         const searchHpNum = parseFloat(searchHp);
         
         // === STRICT FIELD MATCH ===
-        const strictMatch = record.hp && Math.abs(parseFloat(record.hp) - searchHpNum) < HP_TOLERANCE;
+        const strictMatch = record.hp && Math.abs(parseFloat(record.hp) - searchHpNum) < this.HP_TOLERANCE;
         if (strictMatch) {
-            return { matches: true, isVariant: false, weight: HP_STRICT_WEIGHT };
+            return { matches: true, isVariant: false, weight: this.HP_STRICT_WEIGHT };
         }
         
         // === FUZZY DESCRIPTION MATCH ===
@@ -2274,32 +2353,24 @@ class SearchEngine {
             return { matches: false, isVariant: false, weight: 0 };
         }
         
-        // Enhanced safety regex for various formats
-        // Pattern matches: word boundary + HP value + optional decimal + HP unit + word boundary
-        // Examples: "5 HP", "5HP", "5H.P", "5 H.P.", "5KW", "5.0HP"
+        // Build regex patterns (copied from SearchEngine._matchHp - do not modify)
         const HP_UNIT_PATTERN = '(?:HP|H\\.P\\.|H\\.P|KW|kW|HORSEPOWER)';
         const BOUNDARY_START = '(?:^|\\s|\\(|,)';
         const BOUNDARY_END = '(?:\\s|\\)|,|$)';
-        // Numeric boundary guards: prevent digits or decimals immediately before/after HP value
-        // This prevents "0.5" from matching in "1.5" or "10.5"
-        const NUMERIC_BOUNDARY_BEFORE = '(?<![\\.\\d])'; // Negative lookbehind: no digit or decimal before
-        const NUMERIC_BOUNDARY_AFTER = '(?![\\.\\d])'; // Negative lookahead: no digit or decimal after
+        const NUMERIC_BOUNDARY_BEFORE = '(?<![\\.\\d])';
+        const NUMERIC_BOUNDARY_AFTER = '(?![\\.\\d])';
+        
         const hpPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}(?:${searchHp}|${searchHp}\\.0)${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
         
-        // Fractional pattern for values < 1 HP (e.g., 1/2 HP, 1/4 HP)
-        // Guard against division by zero and very small values
         const fractionalPattern = (searchHpNum > 0.001 && searchHpNum < 1) 
             ? `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}1/${Math.round(1/searchHpNum)}${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}` 
             : null;
         
-        // Mixed fraction pattern for values with fractional parts (e.g., 7.5 HP should match "7 1/2 HP", "7-1/2 HP", "7½ HP")
-        const FRACTIONAL_TOLERANCE = 0.01; // Tolerance for fractional comparison
+        const FRACTIONAL_TOLERANCE = 0.01;
         let mixedFractionPattern = null;
         if (searchHpNum > 1) {
             const whole = Math.floor(searchHpNum);
             const fractional = searchHpNum - whole;
-            // Common fractions: 0.5 = 1/2, 0.25 = 1/4, 0.75 = 3/4, 0.33 = 1/3, 0.67 = 2/3
-            // Numeric boundary guard applied to whole number to prevent "7.5" matching "17.5"
             if (Math.abs(fractional - 0.5) < FRACTIONAL_TOLERANCE) {
                 mixedFractionPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}${whole}[-\\s]?(?:1/2|½)${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
             } else if (Math.abs(fractional - 0.25) < FRACTIONAL_TOLERANCE) {
@@ -2313,29 +2384,38 @@ class SearchEngine {
         const fractionalMatch = fractionalPattern && new RegExp(fractionalPattern, 'i').test(record.desc);
         const mixedMatch = mixedFractionPattern && new RegExp(mixedFractionPattern, 'i').test(record.desc);
         
-        // Table/header format: "HP: 5", "HP | 5", "HP 5", "Horsepower 5" or "Motor HP 5"
-        // Add numeric boundary guards to prevent substring matching in table format too
         const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${NUMERIC_BOUNDARY_BEFORE}${searchHp}${NUMERIC_BOUNDARY_AFTER}(?:\\s|\\)|,|$)`;
         const tableMatch = new RegExp(tablePattern, 'i').test(record.desc);
         
         if (safetyMatch || fractionalMatch || mixedMatch || tableMatch) {
-            return { matches: true, isVariant: true, weight: HP_FUZZY_WEIGHT };
+            return { matches: true, isVariant: true, weight: this.HP_FUZZY_WEIGHT };
         }
         
         return { matches: false, isVariant: false, weight: 0 };
     }
-    
+}
+
+/**
+ * KeywordMatcher - Isolated keyword matching with alias expansion
+ * 
+ * @example
+ * // Test keyword matching independently
+ * const result = KeywordMatcher.matches(
+ *   { id: "CP-1234", desc: "SURGE ARRESTOR INCLUDED" },
+ *   ["SA"],
+ *   [["SA", "SURGE ARRESTOR", "TVSS"]]
+ * );
+ * // => true
+ */
+class KeywordMatcher {
     /**
-     * Helper: Match keywords in record with alias expansion and reject logic
-     * @param {Object} record - Database record
-     * @param {Array} rawKeywords - Raw keywords from user input
-     * @param {Array} expandedKeywords - Keywords expanded with aliases
+     * Match keywords in record with alias expansion and reject logic
+     * @param {Object} record - Database record with id, desc, and reject_keywords fields
+     * @param {Array} rawKeywords - Raw keywords from user input (e.g., ["SA", "PM"])
+     * @param {Array} expandedKeywords - Keywords expanded with aliases (e.g., [["SA", "SURGE ARRESTOR"], ["PM", "PHASE MONITOR"]])
      * @returns {boolean} True if all keyword groups match
-     * @private
      */
-    static _matchKeywords(record, rawKeywords, expandedKeywords) {
-        const KEYWORD_WEIGHT = 10;
-        
+    static matches(record, rawKeywords, expandedKeywords) {
         if (!expandedKeywords || expandedKeywords.length === 0) {
             return true; // No keyword filter
         }
@@ -2352,8 +2432,6 @@ class SearchEngine {
         const allGroupsMatch = expandedKeywords.every(group => {
             return group.some(alias => {
                 const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-                
-                // CRITICAL FIX: Safe word-boundary regex to prevent partial acronym matches
                 const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
                 return regex.test(text); 
             });
@@ -2361,6 +2439,13 @@ class SearchEngine {
 
         return allGroupsMatch;
     }
+}
+
+class SearchEngine {
+    static currentResults = [];
+    static currentPage = 1;
+    static pageSize = 25;
+    static lastCriteria = null;
 
     static perform() {
         // === STOP PREVIOUS PRELOADING ===
@@ -2418,92 +2503,25 @@ class SearchEngine {
             
             // HP filter using helper
             if(crit.hp !== "Any") {
-                const hpMatch = this._matchHp(r, crit.hp);
+                const hpMatch = HorsepowerMatcher.matches(r, crit.hp);
                 if (!hpMatch.matches) return;
+                
                 w += hpMatch.weight;
-                // Strict field match overrides worker variance (green badge for exact HP field matches)
-                // Only mark as varied for fuzzy description matches
+                // Strict field match overrides worker variance
                 if (hpMatch.isVariant) {
                     hpV = true;
-                } else if (hpMatch.weight === 5000) {
-                    // Strict field match (HP_STRICT_WEIGHT = 5000) - force green badge
+                } else if (hpMatch.weight === HorsepowerMatcher.HP_STRICT_WEIGHT) {
                     hpV = false;
                 }
-                // If weight is neither strict (5000) nor fuzzy (2000), hpV retains worker's original value
             }
             
             // Volt/Phase/Enclosure filters
-            if(crit.volt !== "Any") { 
-                const voltConfig = SearchEngine.VOLTAGE_EQUIVALENTS[crit.volt];
+            if(crit.volt !== "Any") {
+                const voltMatch = VoltageMatcher.matches(r, crit.volt);
+                if (!voltMatch.matches) return;
                 
-                if (!voltConfig) {
-                    // Fallback for unknown voltage values - exact match only
-                    if(r.volt && r.volt.includes(crit.volt)) {
-                        voltV = false;
-                        w += 500;
-                    } else {
-                        return;
-                    }
-                } else {
-                    let matched = false;
-                    let isFieldMatch = false;
-                    
-                    // === STEP 1: Check volt field for equivalents ===
-                    if (r.volt) {
-                        // Check if volt field matches any equivalent pattern (use lenient field patterns)
-                        for (const pattern of voltConfig.fieldPatterns) {
-                            if (pattern.test(r.volt)) {
-                                matched = true;
-                                isFieldMatch = true;
-                                break;
-                            }
-                        }
-                        
-                        // If matched, check exclusion patterns
-                        if (matched) {
-                            for (const excludePattern of voltConfig.excludePatterns) {
-                                if (excludePattern.test(r.volt)) {
-                                    return; // Excluded - skip this record
-                                }
-                            }
-                        }
-                    }
-                    
-                    // === STEP 2: If no field match, check description ===
-                    if (!matched && r.desc) {
-                        // Check if description matches any equivalent pattern (use strict desc patterns)
-                        for (const pattern of voltConfig.descPatterns) {
-                            if (pattern.test(r.desc)) {
-                                matched = true;
-                                break;
-                            }
-                        }
-                        
-                        // If matched, check exclusion patterns
-                        if (matched) {
-                            for (const excludePattern of voltConfig.excludePatterns) {
-                                if (excludePattern.test(r.desc)) {
-                                    return; // Excluded - skip this record
-                                }
-                            }
-                        }
-                    }
-                    
-                    // === STEP 3: Apply scoring ===
-                    if (!matched) {
-                        return; // No match - exclude record
-                    }
-                    
-                    if (isFieldMatch) {
-                        // Strict field match - green badge
-                        voltV = false;
-                        w += 500;
-                    } else {
-                        // Fuzzy description match - orange badge
-                        voltV = true;
-                        w += 100;
-                    }
-                }
+                w += voltMatch.weight;
+                voltV = voltMatch.isFuzzy;
             }
             if(crit.phase!=="Any") { 
                 if(r.phase===crit.phase) {
@@ -2529,7 +2547,7 @@ class SearchEngine {
             }
             
             // Keyword filter using helper
-            if(!this._matchKeywords(r, rawKeywords, expandedKeywords)) return;
+            if(!KeywordMatcher.matches(r, rawKeywords, expandedKeywords)) return;
             if(expandedKeywords.length) w += 10;
 
             r.w=w; r.p=p; r.mfgV=mfgV; r.hpV=hpV; r.voltV=voltV; r.phaseV=phaseV; r.encV=encV; res.push(r);
