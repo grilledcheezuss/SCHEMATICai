@@ -407,7 +407,7 @@ body.demo-mode .page-toolbar { display: flex; }
 .pdf-content-container {
     position: relative !important; 
     width: 100%;
-    height: auto;
+    height: 100%;
 }
 
 .pdf-page-canvas { 
@@ -506,7 +506,7 @@ body.editor-active .redaction-resize-handle {
     position: fixed; 
     top: 90px; 
     right: 20px;
-    width: 340px;
+    width: 295px;
     max-height: calc(100vh - 110px); 
     display: flex;
     flex-direction: column;
@@ -542,7 +542,7 @@ body.editor-active .redaction-resize-handle {
 .panel-btn:hover { opacity: 1; }
 
 #redaction-editor-content {
-    padding: 15px;
+    padding: 10px;
     overflow-y: auto;
     flex: 1; 
     width: 100%; 
@@ -565,7 +565,7 @@ body.editor-active .redaction-resize-handle {
 }
 #generator-restore-btn:hover { transform: scale(1.1); }
 
-.editor-section { margin-bottom: 15px; } 
+.editor-section { margin-bottom: 10px; } 
 .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; } 
 .disabled-overlay { opacity: 0.5; pointer-events: none; } 
 .demo-label { font-size: 10px; font-weight: 800; color: var(--app-primary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; } 

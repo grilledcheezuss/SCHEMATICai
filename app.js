@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.25 (Universal Cover Template + Layout Profile Cleanup + Cover Zones) ---
-const APP_VERSION = "v2.5.25";
+// --- SCHEMATICA ai v2.5.26 (Fix cover/template redaction zone placement + compact control panel + default-collapsed Project Context) ---
+const APP_VERSION = "v2.5.26";
 const VERSION_HISTORY = {
+    "v2.5.26": "Fix cover/template redaction zone placement (pdf-content-container height: 100%, waitForLayoutStable RAF flush before applyRuleToWrapper); compact generator panel (295px, reduced padding/spacing); Project Context default-collapsed on every load; version bump",
     "v2.5.25": "Universal cover sheet template as page 1 for all PDFs; simplified layout profiles (added COVER_TEMPLATE, deprecated legacy title keys from UI); fixed profile dropdown onchange error (applyProfileToPage alias); cover template zones with bold/underline/font rules; page 1 dropdown disabled",
     "v2.5.24": "Fixed thumbs-up lockout rendering (buttons now respect FeedbackService.lockout Set during UI.render) and profile dropdown population (added defensive logging and timing fix)",
     "v2.5.23": "Fixed positive feedback lockout persistence (lockout applied immediately, CSS class guard) and profile dropdown population (called once after all pages rendered)",
@@ -1747,7 +1748,9 @@ class SmartScanner {
             
             if(manualSelect) manualSelect.value = profileKey;
         }
-        
+
+        // Flush layout before measuring container dimensions for zone placement
+        if (container) await PdfViewer.waitForLayoutStable(container);
         LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
     }
     
@@ -1904,6 +1907,7 @@ class LayoutScanner {
                     }
                     if(manualSelect) manualSelect.value = profileKey;
                 }
+                if (container) await PdfViewer.waitForLayoutStable(container);
                 LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
             } 
             RedactionManager.refreshContent(); 
@@ -3540,6 +3544,21 @@ class PdfViewer {
         }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
+
+    /** Wait two animation frames so the browser has had a chance to perform layout. */
+    static waitForLayoutStable(element, { minWidth = 1, minHeight = 1, retries = 10, delay = 50 } = {}) {
+        return new Promise((resolve) => {
+            const check = (remainingRetries) => {
+                if ((element.offsetWidth >= minWidth && element.offsetHeight >= minHeight) || remainingRetries <= 0) {
+                    // Two nested RAF calls to let layout and paint finish
+                    requestAnimationFrame(() => requestAnimationFrame(resolve));
+                } else {
+                    setTimeout(() => check(remainingRetries - 1), delay);
+                }
+            };
+            check(retries);
+        });
+    }
 }
 
 class PdfController {
@@ -3981,6 +4000,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (versionEl) {
             versionEl.textContent = APP_VERSION;
         }
+
+        // Enforce collapsed Project Context on every load (not persisted)
+        const ctxContent = document.getElementById('demo-context-content');
+        const ctxPanel = document.getElementById('demo-context-panel');
+        if (ctxContent) ctxContent.classList.add('collapsed');
+        if (ctxPanel) ctxPanel.classList.add('collapsed-state');
         
         // Load cover sheet template bytes for universal page 1 overlay
         fetch('assets/cover_sheet_template.pdf')
