@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.24 (Thumbs-Up Rendering & Profile Dropdown Fix) ---
-const APP_VERSION = "v2.5.24";
+// --- SCHEMATICA ai v2.5.25 (Cover Sheet Template, Dropdown Fix, Profile Simplification) ---
+const APP_VERSION = "v2.5.25";
 const VERSION_HISTORY = {
+    "v2.5.25": "Universal cover sheet template (Page 1 always uses cover_sheet_template.pdf); fixed dropdown handler (applyProfileToPage alias); simplified layout profiles (removed legacy title layouts, added COVER_TEMPLATE); cover zones with underline decoration; Page 1 dropdown locked to Cover Template; version bump",
     "v2.5.24": "Fixed thumbs-up lockout rendering (buttons now respect FeedbackService.lockout Set during UI.render) and profile dropdown population (added defensive logging and timing fix)",
     "v2.5.23": "Fixed positive feedback lockout persistence (lockout applied immediately, CSS class guard) and profile dropdown population (called once after all pages rendered)",
     "v2.5.22": "Refactored search engine into isolated, testable modules (Phase 1: VoltageMatcher, HorsepowerMatcher, KeywordMatcher) - no logic changes, pure reorganization to prevent future regressions",
@@ -200,6 +201,13 @@ const LAYOUT_RULES = {
         { map: "cust", x: 0.1, y: 0.4, w: 0.8, h: 0.05, fontSize: 26, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
         { map: "job", x: 0.1, y: 0.48, w: 0.8, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+    ],
+    COVER_TEMPLATE: [
+        { map: "job", x: 0.15, y: 0.502, w: 0.7, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center', decoration: 'underline' },
+        { map: "type", x: 0.15, y: 0.541, w: 0.7, h: 0.04, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center', decoration: 'underline' },
+        { map: "stage", x: 0.201, y: 0.69, w: 0.6, h: 0.04, fontSize: 22, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center', decoration: 'underline' },
+        { map: "date", x: 0.25, y: 0.75, w: 0.499, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -587,11 +595,7 @@ class PageContext {
     static getProfileDisplayName(profile) {
         const names = {
             'AUTO': 'Auto-Detect',
-            'TITLE': 'Title Sheet',
-            'TITLE_ASBUILT': 'As-Built Title',
-            'COX_COVER': 'Cox Cover',
-            'DELTA_COVER': 'Delta Cover',
-            'THIRD_PARTY_COVER': '3rd Party Cover',
+            'COVER_TEMPLATE': 'Cover Template',
             'INFO': 'Info/Notes',
             'INFO_BORDERLESS': 'Info (Borderless)',
             'SCHEMATIC_LANDSCAPE': 'Schematic (Landscape)',
@@ -608,11 +612,7 @@ class PageContext {
 class ControlPanelManager {
     // Define which fields are relevant for each profile
     static PROFILE_FIELDS = {
-        'TITLE': ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'company', 'address', 'phone', 'fax'],
-        'TITLE_ASBUILT': ['cust', 'job', 'cpid', 'date', 'company', 'address', 'phone'],
-        'COX_COVER': ['cust', 'job', 'date', 'cpid', 'company', 'address', 'phone', 'fax'],
-        'DELTA_COVER': ['cust', 'job', 'date', 'cpid'],
-        'THIRD_PARTY_COVER': ['cust', 'job', 'date', 'cpid'],
+        'COVER_TEMPLATE': ['job', 'type', 'stage', 'date', 'cpid'],
         'INFO': ['cpid', 'date'],
         'INFO_BORDERLESS': ['cpid', 'date'],
         'SCHEMATIC_LANDSCAPE': ['cpid', 'date'],
@@ -1251,13 +1251,9 @@ class PageClassifier {
         // Door drawing detection (high confidence)
         if(doorScore > 20) return 'DOOR_DRAWING';
         
-        // Page 1: Almost always a title/cover sheet
+        // Page 1: Always the cover template when template is loaded, otherwise COVER_TEMPLATE profile
         if(pageNumber === 1) {
-            if(asBuiltScore > 15) return 'TITLE_ASBUILT';
-            if(coxScore > 10) return 'COX_COVER';
-            if(deltaScore > 10) return 'DELTA_COVER';
-            if(titleScore > 25 && itemCount < 100) return 'THIRD_PARTY_COVER';
-            return 'TITLE';
+            return 'COVER_TEMPLATE';
         }
         
         // Page 2: Usually info/notes
@@ -1278,13 +1274,9 @@ class PageClassifier {
             }
         }
         
-        // Cover sheet detection (fallback for page 1 without strong signals)
+        // Cover sheet detection (fallback)
         if(titleScore > 25) {
-            if(asBuiltScore > 15) return 'TITLE_ASBUILT';
-            if(coxScore > 10) return 'COX_COVER';
-            if(deltaScore > 10) return 'DELTA_COVER';
-            if(itemCount < 100) return 'THIRD_PARTY_COVER';
-            return 'TITLE';
+            return 'COVER_TEMPLATE';
         }
         
         // Info/Notes detection
@@ -1889,7 +1881,7 @@ class LayoutScanner {
                 let profileKey = manualSelect ? manualSelect.value : null;
 
                 if (!profileKey || profileKey === "AUTO") {
-                    if (i === 1) profileKey = 'TITLE';
+                    if (i === 1) profileKey = 'COVER_TEMPLATE';
                     else if (i === 2) profileKey = 'INFO';
                     else {
                         const w = container.offsetWidth; const h = container.offsetHeight;
@@ -1916,16 +1908,14 @@ class LayoutScanner {
         const customProfiles = ProfileManager.getCustomProfiles();
         
         selects.forEach((select, index) => {
+            const pageWrapper = select.closest('.pdf-page-wrapper');
+            const pageNum = pageWrapper ? parseInt(pageWrapper.dataset.pageNumber) : null;
+            const isPage1 = pageNum === 1 && window.TEMPLATE_BYTES;
+
             const currentVal = select.value;
             let html = `
                 <option value="AUTO">✨ Auto (Detected)</option>
-                <optgroup label="🏷️ Title Sheets">
-                    <option value="TITLE">🏷️ Title Sheet (Standard)</option>
-                    <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
-                    <option value="COX_COVER">🏢 Cox Cover Sheet</option>
-                    <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
-                    <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
-                </optgroup>
+                <option value="COVER_TEMPLATE">📋 Cover Template</option>
                 <optgroup label="📝 Info Sheets">
                     <option value="INFO">📝 Info / Notes (Standard)</option>
                     <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
@@ -1949,7 +1939,12 @@ class LayoutScanner {
                 html += '</optgroup>';
             }
             select.innerHTML = html;
-            select.value = currentVal || 'AUTO';
+            if (isPage1) {
+                select.value = 'COVER_TEMPLATE';
+                select.disabled = true;
+            } else {
+                select.value = currentVal || 'AUTO';
+            }
             console.log(`[refreshProfileOptions] Populated dropdown ${index + 1} with ${select.options.length} options`);
         });
     }
@@ -1970,7 +1965,7 @@ class LayoutScanner {
             rules = ProfileManager.getCustomProfiles()[name] || [];
         } else if (profileKey === "AUTO") {
              const w = container.offsetWidth; const h = container.offsetHeight;
-             if (pageNum === 1) profileKey = 'TITLE';
+             if (pageNum === 1) profileKey = 'COVER_TEMPLATE';
              else if (pageNum === 2) profileKey = 'INFO';
              else profileKey = (w > h) ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
              const select = wrapper.querySelector('.page-profile-select');
@@ -1998,10 +1993,12 @@ class LayoutScanner {
         const height = container.offsetHeight; 
         
         ruleSet.forEach(zone => { 
-            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize, zone.text, null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
+            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize, zone.text, zone.decoration || null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
         }); 
     }
 }
+// Backward-compatibility alias: some HTML may still call applyProfileToPage
+LayoutScanner.applyProfileToPage = (pageNum, profileKey) => LayoutScanner.updatePageProfile(pageNum, profileKey);
 
 class FeedbackService {
     static currentId = null; static currentDownBtn = null; static lockout = new Set();
@@ -3395,9 +3392,14 @@ class PdfViewer {
             
             // Wrap getPage in try/catch
             try {
-                if (i === 1 && window.TEMPLATE_BYTES && DemoManager.isGeneratorActive) {
-                    page = await coverDoc.getPage(1);
-                    isTemplate = true;
+                if (i === 1 && window.TEMPLATE_BYTES) {
+                    try {
+                        page = await coverDoc.getPage(1);
+                        isTemplate = true;
+                    } catch (templateError) {
+                        console.warn('[renderStack] Failed to get template page 1, falling back to original:', templateError);
+                        page = await this.doc.getPage(i);
+                    }
                 } else {
                     page = await this.doc.getPage(i);
                 }
@@ -3424,17 +3426,12 @@ class PdfViewer {
             
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
+            const isPage1WithTemplate = i === 1 && window.TEMPLATE_BYTES;
             toolbar.innerHTML = `
                 <span style="font-weight:600;">PAGE ${i}</span>
-                <select class="page-profile-select" onchange="LayoutScanner.applyProfileToPage(${i}, this.value)">
+                <select class="page-profile-select" onchange="LayoutScanner.updatePageProfile(${i}, this.value)"${isPage1WithTemplate ? ' disabled' : ''}>
                     <option value="AUTO">✨ Auto (Detected)</option>
-                    <optgroup label="📁 Title &amp; Cover Sheets">
-                        <option value="TITLE">🏷️ Title Sheet (Standard)</option>
-                        <option value="TITLE_ASBUILT">📋 Title Sheet (As-Built)</option>
-                        <option value="COX_COVER">🏢 Cox Cover Sheet</option>
-                        <option value="DELTA_COVER">🔷 Delta Cover Sheet</option>
-                        <option value="THIRD_PARTY_COVER">📄 3rd Party Cover</option>
-                    </optgroup>
+                    <option value="COVER_TEMPLATE"${isPage1WithTemplate ? ' selected' : ''}>📋 Cover Template</option>
                     <optgroup label="📁 Info &amp; Notes">
                         <option value="INFO">📝 Info / Notes (Standard)</option>
                         <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
@@ -3979,6 +3976,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (versionEl) {
             versionEl.textContent = APP_VERSION;
         }
+        
+        // Load cover sheet template bytes
+        fetch('cover_sheet_template.pdf')
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.arrayBuffer();
+            })
+            .then(buf => {
+                window.TEMPLATE_BYTES = new Uint8Array(buf);
+                console.log(`[init] cover_sheet_template.pdf loaded: ${window.TEMPLATE_BYTES.byteLength} bytes`);
+            })
+            .catch(err => {
+                console.warn('[init] cover_sheet_template.pdf not available - cover sheet disabled:', err.message);
+            });
         
         UI.init(); 
         if(AuthService.init()) { 
