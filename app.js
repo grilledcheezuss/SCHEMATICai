@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.28 (Generator OFF shows original PDF; page 1 COVER_TEMPLATE zones deterministic; default zoom 100%) ---
-const APP_VERSION = "v2.5.28";
+// --- SCHEMATICA ai v2.5.29 (Smooth generator on/off transition; tablet-first generator support; hide generator on small mobile) ---
+const APP_VERSION = "v2.5.29";
 const VERSION_HISTORY = {
+    "v2.5.29": "Smooth generator toggle transition (body.generator-transition fade, deterministic post-render scan replaces 500ms timeout); tablet breakpoint support for generator panel; UI.isSmallMobile()/isTablet() helpers; small-mobile guard in toggleGenerator(); version bump",
     "v2.5.28": "Generator OFF now renders original PDF for all pages with no template overlay and no auto-scan; SmartScanner page 1 always applies COVER_TEMPLATE deterministically (skips text/OCR detection); default desktop zoom changed from 110% to 100%; version bump",
     "v2.5.27": "Fix cover page redaction zones stacking (createZoneOnWrapper now appends redaction-text span before resize handle; refreshContent never overwrites innerHTML, creates span if missing for legacy boxes); fix profile dropdown to use <option>/<optgroup> markup; version bump",
     "v2.5.26": "Fix cover/template redaction zone placement (pdf-content-container height: 100%, waitForLayoutStable RAF flush before applyRuleToWrapper); compact generator panel (295px, reduced padding/spacing); Project Context default-collapsed on every load; version bump",
@@ -478,11 +479,17 @@ class DemoManager {
     static isGeneratorActive = false;
 
     static toggleGenerator() {
+        if (UI.isSmallMobile()) {
+            console.log('[DemoManager] Generator not available on small mobile devices.');
+            return;
+        }
         this.isGeneratorActive = !this.isGeneratorActive;
         const btn = document.getElementById('menu-demo');
         const indicator = document.getElementById('gen-status');
         const panel = document.getElementById('generator-panel');
         const restoreBtn = document.getElementById('generator-restore-btn');
+
+        document.body.classList.add('generator-transition');
         
         if(this.isGeneratorActive) { 
             document.body.classList.add('demo-mode'); 
@@ -490,7 +497,7 @@ class DemoManager {
             if(indicator) indicator.style.display = 'inline-block';
             if(btn) btn.style.color = 'var(--app-primary)';
             if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
-            if(PdfViewer.doc) PdfViewer.renderStack();
+            if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
             DragManager.init();
         } else { 
             document.body.classList.remove('demo-mode'); 
@@ -499,7 +506,7 @@ class DemoManager {
             restoreBtn.style.display = 'none';
             if(indicator) indicator.style.display = 'none';
             if(btn) btn.style.color = ''; 
-            if(PdfViewer.doc) PdfViewer.renderStack();
+            if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
         }
     }
 
@@ -3550,10 +3557,13 @@ class PdfViewer {
             // Set initial page context
             PageContext.setActivePage(1);
             
-            setTimeout(() => {
-                console.log('🔍 Auto-scanning PDF pages...');
-                SmartScanner.scanAllPages();
-            }, 500);
+            // Start scan immediately after render; remove transition class once scan completes
+            console.log('🔍 Auto-scanning PDF pages...');
+            SmartScanner.scanAllPages().finally(() => {
+                document.body.classList.remove('generator-transition');
+            });
+        } else {
+            document.body.classList.remove('generator-transition');
         }
     }
     static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
@@ -3763,6 +3773,9 @@ class UI {
         }); 
     }
     
+    static isSmallMobile() { return window.innerWidth < 768; }
+    static isTablet() { return window.innerWidth >= 768 && window.innerWidth <= 1024; }
+
     static toggleDarkMode() { 
         document.body.classList.toggle('dark-mode'); 
         localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); 
