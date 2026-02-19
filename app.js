@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.23 (Feedback & Profile Fixes) ---
-const APP_VERSION = "v2.5.23";
+// --- SCHEMATICA ai v2.5.24 (Thumbs-Up Lockout Rendering Fix) ---
+const APP_VERSION = "v2.5.24";
 const VERSION_HISTORY = {
+    "v2.5.24": "Fixed thumbs-up lockout rendering: buttons now respect FeedbackService.lockout Set during UI.render() and show voted-up state immediately",
     "v2.5.23": "Fixed positive feedback lockout persistence (lockout applied immediately, CSS class guard) and profile dropdown population (called once after all pages rendered)",
     "v2.5.22": "Refactored search engine into isolated, testable modules (Phase 1: VoltageMatcher, HorsepowerMatcher, KeywordMatcher) - no logic changes, pure reorganization to prevent future regressions",
     "v2.5.21": "Comprehensive voltage equivalency matching: 240V now matches 230V/220V/120-240V; 480V matches 460V/440V/277-480V per NEC standards; fixed dual-voltage inclusion logic",
@@ -3907,7 +3908,7 @@ static render(res, crit, totalCount) {
             <div class="panel-name">${i.displayId || i.id}</div>
             <div class="badge-row">${badges.join(' ') || '<span class="hud-badge unknown">NO MATCH</span>'}</div>
             <div class="card-actions">
-                <button class="thumb-btn up" onclick="FeedbackService.up('${i.id}', this, ${JSON.stringify(crit)})">👍</button>
+                <button class="thumb-btn up ${FeedbackService.lockout.has(`${i.id}:up`) ? 'voted-up' : ''}" onclick="FeedbackService.up('${i.id}', this, ${JSON.stringify(crit)})">👍</button>
                 <button class="thumb-btn down" onclick="FeedbackService.down('${i.id}', this)">👎</button>
             </div>
         `;
