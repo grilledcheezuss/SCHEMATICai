@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.29 (Smooth generator on/off transition; tablet-first generator support; hide generator on small mobile) ---
-const APP_VERSION = "v2.5.29";
+// --- SCHEMATICA ai v2.5.30 (Tablet UX polish: docked collapsible generator panel, responsive viewer fill, control panel cleanup) ---
+const APP_VERSION = "v2.5.30";
 const VERSION_HISTORY = {
+    "v2.5.30": "Tablet UX polish: generator panel docked as flex sibling on tablet (position:static, collapse/expand via tablet-collapsed class); responsive viewer fill (preview-pane flex:1 expands when panels collapse); control panel cleanup (moved zone-editing into project-tab, removed Clear All, merged Add Text+Whiteout into Add Box, removed duplicate Zone Styling section); version bump",
     "v2.5.29": "Smooth generator toggle transition (body.generator-transition fade, deterministic post-render scan replaces 500ms timeout); tablet breakpoint support for generator panel; UI.isSmallMobile()/isTablet() helpers; small-mobile guard in toggleGenerator(); version bump",
     "v2.5.28": "Generator OFF now renders original PDF for all pages with no template overlay and no auto-scan; SmartScanner page 1 always applies COVER_TEMPLATE deterministically (skips text/OCR detection); default desktop zoom changed from 110% to 100%; version bump",
     "v2.5.27": "Fix cover page redaction zones stacking (createZoneOnWrapper now appends redaction-text span before resize handle; refreshContent never overwrites innerHTML, creates span if missing for legacy boxes); fix profile dropdown to use <option>/<optgroup> markup; version bump",
@@ -414,6 +415,7 @@ class DataLoader {
 
 class DragManager {
     static init() {
+        if (UI.isTablet()) return; // Panel is docked (not draggable) on tablet
         const handle = document.getElementById('gen-drag-handle');
         const panel = document.getElementById('generator-panel');
         if(!handle || !panel) return;
@@ -511,10 +513,43 @@ class DemoManager {
     }
 
     static minimizePanel() {
+        if (UI.isTablet()) { this.collapseTabletPanel(); return; }
         document.getElementById('generator-panel').classList.add('minimized');
         document.getElementById('generator-restore-btn').style.display = 'flex';
         document.body.classList.remove('editor-active');
         document.body.classList.add('gen-minimized'); 
+    }
+
+    static _updateTabletCollapseBtn(isCollapsed) {
+        const btn = document.getElementById('gen-tablet-collapse-btn');
+        if (!btn) return;
+        if (isCollapsed) {
+            btn.title = 'Expand Panel';
+            btn.setAttribute('aria-label', 'Expand control panel');
+            btn.textContent = '›';
+            btn.onclick = () => DemoManager.expandTabletPanel();
+        } else {
+            btn.title = 'Collapse Panel';
+            btn.setAttribute('aria-label', 'Collapse control panel');
+            btn.textContent = '‹';
+            btn.onclick = () => DemoManager.collapseTabletPanel();
+        }
+    }
+
+    static collapseTabletPanel() {
+        const panel = document.getElementById('generator-panel');
+        panel.classList.add('tablet-collapsed');
+        document.body.classList.add('gen-minimized');
+        document.body.classList.remove('editor-active');
+        this._updateTabletCollapseBtn(true);
+    }
+
+    static expandTabletPanel() {
+        const panel = document.getElementById('generator-panel');
+        panel.classList.remove('tablet-collapsed');
+        document.body.classList.remove('gen-minimized');
+        document.body.classList.add('editor-active');
+        this._updateTabletCollapseBtn(false);
     }
 
     static restorePanel() {
