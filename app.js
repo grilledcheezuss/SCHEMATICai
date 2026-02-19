@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.27 (Fix cover page redaction zones stacking + correct profile dropdown options markup) ---
-const APP_VERSION = "v2.5.27";
+// --- SCHEMATICA ai v2.5.28 (Generator OFF shows original PDF; page 1 COVER_TEMPLATE zones deterministic; default zoom 100%) ---
+const APP_VERSION = "v2.5.28";
 const VERSION_HISTORY = {
+    "v2.5.28": "Generator OFF now renders original PDF for all pages with no template overlay and no auto-scan; SmartScanner page 1 always applies COVER_TEMPLATE deterministically (skips text/OCR detection); default desktop zoom changed from 110% to 100%; version bump",
     "v2.5.27": "Fix cover page redaction zones stacking (createZoneOnWrapper now appends redaction-text span before resize handle; refreshContent never overwrites innerHTML, creates span if missing for legacy boxes); fix profile dropdown to use <option>/<optgroup> markup; version bump",
     "v2.5.26": "Fix cover/template redaction zone placement (pdf-content-container height: 100%, waitForLayoutStable RAF flush before applyRuleToWrapper); compact generator panel (295px, reduced padding/spacing); Project Context default-collapsed on every load; version bump",
     "v2.5.25": "Universal cover sheet template as page 1 for all PDFs; simplified layout profiles (added COVER_TEMPLATE, deprecated legacy title keys from UI); fixed profile dropdown onchange error (applyProfileToPage alias); cover template zones with bold/underline/font rules; page 1 dropdown disabled",
@@ -1374,6 +1375,12 @@ class SmartScanner {
                 
                 if(btn) btn.innerText = `🔍 ANALYZING PAGE ${i}/${PdfViewer.doc.numPages}...`;
                 
+                // Page 1 always uses COVER_TEMPLATE deterministically - skip text/OCR detection
+                if (i === 1) {
+                    await this.applyPage1CoverTemplate(wrapper);
+                    continue;
+                }
+                
                 // Validate document is still valid before getPage()
                 if(!PdfViewer.isDocumentValid()) {
                     console.warn('[scanAllPages] PDF document became invalid during scan');
@@ -1483,6 +1490,16 @@ class SmartScanner {
         }
     }
     
+    static async applyPage1CoverTemplate(wrapper) {
+        const container = wrapper.querySelector('.pdf-content-container');
+        console.log(`[SmartScanner] Page 1: applying COVER_TEMPLATE deterministically. Container: ${container?.offsetWidth}x${container?.offsetHeight}`);
+        if (container) await PdfViewer.waitForLayoutStable(container);
+        console.log(`[SmartScanner] Page 1 after layout stable. Container: ${container?.offsetWidth}x${container?.offsetHeight}`);
+        LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES['COVER_TEMPLATE']);
+        console.log(`[SmartScanner] Page 1 COVER_TEMPLATE zones applied: ${wrapper.querySelectorAll('.redaction-box').length}`);
+        this.addConfidenceIndicator(wrapper, 'high');
+    }
+
     static async extractTextBasedZones(page, textContent, wrapper) {
         const viewport = page.getViewport({ scale: 1.0 });
         const container = wrapper.querySelector('.pdf-content-container');
@@ -1802,6 +1819,13 @@ class SmartScanner {
             // Clear existing zones on this page
             const layer = wrapper.querySelector('.redaction-layer');
             if(layer) layer.innerHTML = '';
+            
+            // Page 1 always uses COVER_TEMPLATE deterministically - skip text/OCR detection
+            if (pageNum === 1) {
+                await this.applyPage1CoverTemplate(wrapper);
+                RedactionManager.refreshContent();
+                return;
+            }
             
             // Validate document is still valid before getPage()
             if(!PdfViewer.isDocumentValid()) {
@@ -3014,7 +3038,7 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
 }
 
 class PdfViewer {
-    static doc = null; static currentScale = 1.1; static url = ""; static currentBlobUrl = "";
+    static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
     static currentRenderToken = 0;
     static loadingTask = null;
@@ -3167,7 +3191,7 @@ class PdfViewer {
             this.currentScale = 0.8;
             UI.toggleSearch(true); 
         } else {
-            this.currentScale = 1.1;
+            this.currentScale = 1.0;
         }
     }
 
@@ -3381,7 +3405,7 @@ class PdfViewer {
         const renderToken = ++this.currentRenderToken;
         
         let coverDoc = this.doc;
-        if (window.TEMPLATE_BYTES instanceof ArrayBuffer) {
+        if (DemoManager.isGeneratorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
              const tTask = pdfjsLib.getDocument(window.TEMPLATE_BYTES.slice(0));
              coverDoc = await tTask.promise;
         }
@@ -3404,7 +3428,7 @@ class PdfViewer {
             
             // Wrap getPage in try/catch
             try {
-                if (i === 1 && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
+                if (i === 1 && DemoManager.isGeneratorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
                     page = await coverDoc.getPage(1);
                     isTemplate = true;
                 } else {
@@ -3529,19 +3553,6 @@ class PdfViewer {
             setTimeout(() => {
                 console.log('🔍 Auto-scanning PDF pages...');
                 SmartScanner.scanAllPages();
-            }, 500);
-        } else {
-            // Auto-scan if any redaction checkboxes are enabled
-            setTimeout(() => {
-                const anyChecked = REDACTION_CHECKBOX_IDS.some(id => {
-                    const el = document.getElementById(id);
-                    return el && el.type === 'checkbox' && el.checked;
-                });
-                
-                if (anyChecked) {
-                    console.log('🔍 Auto-scanning based on enabled toggles...');
-                    SmartScanner.scanAllPages();
-                }
             }, 500);
         }
     }
