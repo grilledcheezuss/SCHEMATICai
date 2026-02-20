@@ -231,7 +231,8 @@ html.logged-in #app-container { display: flex !important; }
 #sidebar-left.collapsed { width: 0; min-width: 0; border: none; }
 
 .collapse-btn { width: 20px; background: var(--bg-card); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; z-index: 100; font-weight: bold; color: var(--text-secondary); transition: 0.3s; flex-shrink: 0; } .collapse-btn:hover { background: var(--bg-app); color: var(--app-primary); }
-#toggle-left { border-left: none; border-radius: 0 4px 4px 0; margin-right: 0; }
+#toggle-left { border-left: none; border-radius: 0 4px 4px 0; margin-right: 0; background: var(--lsu-purple); border-color: var(--lsu-purple); color: white; } #toggle-left:hover { background: #5a2a99; color: white; }
+#toggle-right { border-right: none; border-radius: 4px 0 0 4px; margin-left: 0; background: var(--lsu-purple); border-color: var(--lsu-purple); color: white; } #toggle-right:hover { background: #5a2a99; color: white; }
 
 .sidebar-controls { padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; flex-shrink: 0; } 
 .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
@@ -720,14 +721,36 @@ body.editor-active .redaction-resize-handle {
 }
 
 @media (min-width: 768px) and (max-width: 1024px) {
+    /* 3-column flex layout: left sidebar | viewer | generator sidebar */
     #generator-panel {
+        position: static;
         width: 260px;
-        max-height: calc(100vh - 80px);
-        top: 70px;
-        right: 10px;
+        min-width: 260px;
+        max-height: none;
+        height: 100%;
+        top: auto;
+        right: auto;
+        border-radius: 0;
+        border-left: 2px solid var(--border-color);
+        border-top: none;
+        border-right: none;
+        border-bottom: none;
+        box-shadow: none;
         overflow-y: auto;
+        z-index: 20;
+        flex-shrink: 0;
+        transition: width 0.3s ease, min-width 0.3s ease;
     }
-    #generator-restore-btn { top: 70px; right: 10px; }
+    #generator-panel.gen-collapsed {
+        width: 0;
+        min-width: 0;
+        border: none;
+        overflow: hidden;
+    }
+    /* Drag handle not needed on tablet */
+    #gen-drag-handle { cursor: default !important; }
+    /* Restore btn not used on tablet */
+    #generator-restore-btn { display: none !important; }
 }
 
 /* Tab Navigation Styles */
