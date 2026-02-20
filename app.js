@@ -2483,7 +2483,9 @@ class KeywordMatcher {
         
         // === CHECK REJECT KEYWORDS ===
         if (record.reject_keywords && record.reject_keywords.length > 0) {
-            const isRejected = rawKeywords.some(kw => record.reject_keywords.some(rk => rk.toUpperCase() === kw));
+            // Normalize reject_keywords to uppercase once for efficient comparison
+            const rejectUpper = record.reject_keywords.map(rk => rk.toUpperCase());
+            const isRejected = rawKeywords.some(kw => rejectUpper.includes(kw));
             if (isRejected) return false;
         }
 
