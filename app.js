@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.33 (Generator Control Panel UX polish: collapsible Zone Styling, fix action button spacing, icon-only Add/Delete buttons with tooltips, enlarge context caret; version bump) ---
-const APP_VERSION = "v2.5.33";
+// --- SCHEMATICA ai v2.5.34 (Worker-first fix: service voltage only, HP robustness, enclosure variance, keyword tolerance; version bump) ---
+const APP_VERSION = "v2.5.34";
 const VERSION_HISTORY = {
+    "v2.5.34": "Worker-first fix for search false negatives + voltage mis-badging: context-aware voltage extraction uses primary/service voltage only (strips CPT/transformer references like 480V-120VAC); expanded HP regex handles 7.5HP no-space, HP: 7.5 prefix format, 7.5-H.P. punctuation; enclosure parser adds NEMA4X/4 X/TYPE 4X patterns, prefers FG when SS+FG both present (encV=true); KeywordMatcher normalizes hyphens/spaces for model number matching (PD6000 matches PD-6000); reject keywords normalized to uppercase; version bump",
     "v2.5.33": "Generator Control Panel UX polish: Zone Styling section collapsible and collapsed by default; Add/Delete redesigned as icon-only compact buttons with tooltips placed next to Preview (Project Data) and Auto-Scan (Page Editor); removed duplicate full-width Add/Delete buttons; bottom padding fix to prevent button clipping; context caret enlarged; version bump",
     "v2.5.32": "Generator Control Panel cleanup: remove redundant checkbox toggle section from Page Editor; Preview button moved to Project Data tab only; Project Context expanded by default on load; Auto-Scan Pages button given stable id (#auto-scan-btn) with reliable click wiring; Re-scan button id (#rescan-current-btn) wired via DOMContentLoaded; version bump",
     "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
@@ -2477,10 +2478,13 @@ class KeywordMatcher {
         }
         
         const text = (record.id + " " + (record.desc || "")).toUpperCase();
+        // Normalize version: collapse one or more hyphens/spaces between alphanumeric chars (for model number matching)
+        const normText = text.replace(/([A-Z0-9])[- ]+([A-Z0-9])/g, '$1$2');
         
         // === CHECK REJECT KEYWORDS ===
         if (record.reject_keywords && record.reject_keywords.length > 0) {
-            const isRejected = rawKeywords.some(kw => record.reject_keywords.includes(kw));
+            const rejectUpper = record.reject_keywords.map(k => k.toUpperCase());
+            const isRejected = rawKeywords.some(kw => rejectUpper.includes(kw.toUpperCase()));
             if (isRejected) return false;
         }
 
@@ -2489,7 +2493,12 @@ class KeywordMatcher {
             return group.some(alias => {
                 const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
                 const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
-                return regex.test(text); 
+                if (regex.test(text)) return true;
+                // Also try normalized match (hyphens/spaces removed) for model numbers
+                const normAlias = alias.replace(/([A-Z0-9])[- ]+([A-Z0-9])/gi, '$1$2');
+                const cleanNormAlias = normAlias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const normRegex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanNormAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
+                return normRegex.test(normText);
             });
         });
 

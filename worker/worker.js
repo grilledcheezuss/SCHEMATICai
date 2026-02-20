@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.20 (Critical Bug Fixes)
+// 🧠 SCHEMATICA ai WORKER v2.5.34 (Worker-first fix: service voltage only, HP robustness, enclosure variance, keyword tolerance)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -84,7 +84,8 @@ function normalizeCADText(text) {
     // - %%X (single letter): %%U, %%O, %%D (degree), %%P (plus/minus), %%C (diameter), etc.
     // - %%nnn (exactly 3 digits): ASCII character codes like %%175
     // Match both uppercase and lowercase variants
-    return text.replace(/%%(?:[A-Za-z]|\d{3})/g, '');
+    // Replace with space (not empty) so adjacent tokens don't merge (e.g. "%%U7.5HP" → " 7.5HP" not "7.5HP" stuck to prior text)
+    return text.replace(/%%(?:[A-Za-z]|\d{3})/g, ' ');
 }
 
 function isValidHP(hp) {
@@ -422,8 +423,11 @@ function extractSpecsStrict(t) {
 
     // Detect multiple HP values
     const foundHPs = new Set();
-    // Enhanced regex to match mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP"
-    const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
+    // Enhanced regex: handles mixed fractions, decimals, unicode fractions, and optional hyphen separator before HP unit
+    // Also handles "HP before number" table format via hpPrefixRegex below
+    const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])[-\s]?(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
+    // Additional pattern: HP/KW label before the number (e.g. "HP: 7.5", "MOTOR HP: 7.5")
+    const hpPrefixRegex = /\b(?:MOTOR\s+HP|HP|HORSEPOWER)\s*[:\-]\s*(\d+(?:\.\d+)?)\b/gi;
     let match;
     while ((match = hpRegex.exec(t)) !== null) {
         let raw = match[1]; let val = 0;
@@ -453,6 +457,13 @@ function extractSpecsStrict(t) {
             foundHPs.add((Math.round(val * 10) / 10).toString());
         }
     }
+    // "HP before number" formats: "HP: 7.5", "MOTOR HP: 7.5"
+    while ((match = hpPrefixRegex.exec(t)) !== null) {
+        const val = parseFloat(match[1]);
+        if (!isNaN(val) && val >= 0.1 && val <= 500) {
+            foundHPs.add((Math.round(val * 10) / 10).toString());
+        }
+    }
     if (foundHPs.size === 1) {
         s.hp = [...foundHPs][0];
     } else if (foundHPs.size > 1) {
@@ -462,15 +473,46 @@ function extractSpecsStrict(t) {
         s.hpV = true;
     }
 
-    // Detect multiple voltages
-    // NOTE: Unlike original code which broke on first match, we now check all patterns
-    // to detect multiple voltages (e.g., "240V/480V" should be marked as varied)
-    // HOWEVER: Canonical dual-voltage pairs (120/240, 277/480) are NOT marked as varied
+    // Detect multiple voltages — context-aware: primary/service voltage only
+    // Step 1: Remove transformer notation "NNNv-MMMvac" (hyphen = CPT primary→secondary reference)
+    // e.g., "480V-120VAC" is a control transformer ref; strip it so 480 is not mis-promoted.
+    const voltText = t.replace(/\b\d+\s*V(?:AC)?\s*-\s*\d+\s*VAC\b/gi, ' ');
+    
+    // Step 2: Context window classification for remaining voltage mentions
+    // Control/transformer context hints (specific enough to avoid broad false positives)
+    const CONTROL_CTX_RE = /\b(?:CPT|XFORMER|TRANSFORMER)\b/i;
+    
     const foundVolts = new Set();
-    for (const v of VOLT_PRIORITY) { 
-        if (v.match.test(t)) { 
+    const controlOnlyVolts = new Set(); // Voltages found ONLY near transformer/CPT keywords
+    
+    for (const v of VOLT_PRIORITY) {
+        const searchRe = new RegExp(v.match.source, 'gi');
+        let m;
+        let foundAsService = false;
+        let foundAsControl = false;
+        while ((m = searchRe.exec(voltText)) !== null) {
+            const start = Math.max(0, m.index - 40);
+            const end = Math.min(voltText.length, m.index + m[0].length + 40);
+            const ctx = voltText.substring(start, end);
+            if (CONTROL_CTX_RE.test(ctx)) {
+                foundAsControl = true;
+            } else {
+                foundAsService = true;
+            }
+        }
+        if (foundAsService || foundAsControl) {
             foundVolts.add(v.id);
-        } 
+            if (foundAsControl && !foundAsService) {
+                controlOnlyVolts.add(v.id);
+            }
+        }
+    }
+    
+    // If service voltages exist alongside control-only ones, drop the control-only ones
+    if (controlOnlyVolts.size > 0 && foundVolts.size > controlOnlyVolts.size) {
+        for (const cv of controlOnlyVolts) {
+            foundVolts.delete(cv);
+        }
     }
     
     // CRITICAL FIX: Remove lower voltage from foundVolts for canonical pairs
@@ -503,9 +545,9 @@ function extractSpecsStrict(t) {
             s.volt = pair.high;
             s.voltV = false;
         } else {
-            // Multiple voltages found - mark as varied
-            // Pick first from VOLT_PRIORITY (lines 59-67: 575→480→415→277→240→208→120)
-            s.volt = voltArray[0];
+            // Multiple true service voltages found - mark as varied
+            // Pick first from VOLT_PRIORITY order (575→480→415→277→240→208→120)
+            s.volt = VOLT_PRIORITY.find(v => voltArray.includes(v.id))?.id || voltArray[0];
             s.voltV = true;
         }
     }
@@ -525,14 +567,17 @@ function extractSpecsStrict(t) {
     // Detect enclosure types
     const foundEnclosures = new Set();
     // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
-    // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
-    // Priority: Check for fiberglass first, then stainless, to avoid misclassification
+    // Accept: "4X", "4 X", "NEMA 4X", "NEMA4X", "TYPE 4X" (and 4XFG / 4XSS explicit forms)
+    const has4X = /\bNEMA\s*4\s*X\b|\bTYPE\s*4\s*X\b|\b4\s*X\b/i;
+    const hasFG = /\b(FIBERGLASS|FIBER\s*GLASS)\b/i;
+    const hasSS = /\b(STAINLESS|SS)\b/i;
+    // Explicit compound codes
     if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(STAINLESS|SS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XSS");
+    if (hasFG.test(t) && has4X.test(t)) foundEnclosures.add("4XFG");
     if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
+    if (hasSS.test(t) && has4X.test(t)) foundEnclosures.add("4XSS");
     // Default: bare "4X" without material keywords defaults to stainless steel (4XSS)
-    if (/\b4X\b/i.test(t) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && !foundEnclosures.has("4XSS")) {
+    if (has4X.test(t) && !hasFG.test(t) && !/\b4XFG\b/i.test(t) && !foundEnclosures.has("4XSS")) {
         foundEnclosures.add("4XSS");
     }
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
@@ -540,8 +585,8 @@ function extractSpecsStrict(t) {
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
-        // Multiple enclosure types found - mark as varied
-        s.enc = [...foundEnclosures][0];
+        // Multiple enclosure materials found - mark as varied; prefer fiberglass (FG) as canonical
+        s.enc = foundEnclosures.has("4XFG") ? "4XFG" : [...foundEnclosures][0];
         s.encV = true;
     }
 
