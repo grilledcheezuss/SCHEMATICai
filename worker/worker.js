@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.34 (Worker parsing + search robustness fixes)
+// 🧠 SCHEMATICA ai WORKER v2.5.35 (Hotfix: 503 on auth backend unavailable; no false 401 on Users fetch failure)
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -218,8 +218,14 @@ async function ensureAuthAndFeedback(env) {
     
     CACHE_AUTH_PROMISE = (async () => {
         console.log("Fetching Auth & Feedback...");
+        const usersResp = await fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } });
+        if (!usersResp.ok) {
+            const err = new Error(`AuthBackendUnavailable: Users fetch returned HTTP ${usersResp.status}`);
+            err.isAuthBackendUnavailable = true;
+            throw err;
+        }
         const [usersData, fbData] = await Promise.all([
-            fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } }).then(r=>r.json()),
+            usersResp.json(),
             fetchAirtablePages(TABLE_FEEDBACK, 5, ['Panel ID', 'Corrections'], env) // Cap at 500 to keep it fast
         ]);
 
@@ -261,7 +267,12 @@ async function ensureAuthAndFeedback(env) {
         }
         CACHE_TIME = Date.now();
     })();
-    await CACHE_AUTH_PROMISE;
+    try {
+        await CACHE_AUTH_PROMISE;
+    } catch(e) {
+        CACHE_AUTH_PROMISE = null;
+        throw e;
+    }
     CACHE_AUTH_PROMISE = null;
 }
 
@@ -764,7 +775,15 @@ export default {
             }
 
             // Immediately ready to authenticate!
-            await ensureAuthAndFeedback(env);
+            try {
+                await ensureAuthAndFeedback(env);
+            } catch(e) {
+                if (e.isAuthBackendUnavailable) {
+                    console.error("Auth backend unavailable:", e.message);
+                    return new Response(JSON.stringify({ error: "AuthBackendUnavailable" }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                }
+                throw e;
+            }
 
             // Fire and forget ML training in the background
             if (!CACHE_NB_MODEL && !IS_BUILDING_ML && ctx && ctx.waitUntil) {

@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.34
+## Version: v2.5.35
 
 ## Overview
 
@@ -137,6 +137,7 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
 **Response**:
 - Success (200): JSON with control panel records
 - Error (401): Unauthorized (invalid credentials)
+- Error (503): Service Unavailable (auth backend unreachable)
 - Error (500): Server error
 
 **Response Format**:
@@ -271,10 +272,11 @@ All errors return JSON with CORS headers:
 
 **Common Error Codes**:
 - `400`: Bad Request (missing parameters, invalid URL)
-- `401`: Unauthorized (authentication failed)
+- `401`: Unauthorized (invalid credentials — prompt re-login)
 - `403`: Forbidden (host not allowed)
 - `404`: Not Found (resource not found)
 - `500`: Server Error (worker exception)
+- `503`: Service Unavailable (auth backend unreachable — retry later)
 
 ---
 
