@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.31 (Fix tablet right rail expansion: restorePanel clears display:none; thicken collapse rails; move mapped-data + auto-scan to Page Editor tab; version bump) ---
-const APP_VERSION = "v2.5.31";
+// --- SCHEMATICA ai v2.5.32 (Generator Control Panel cleanup: remove checkbox toggles, Preview button Project Data only, Project Context expanded by default, fix Auto-Scan button wiring with stable IDs; version bump) ---
+const APP_VERSION = "v2.5.32";
 const VERSION_HISTORY = {
+    "v2.5.32": "Generator Control Panel cleanup: remove redundant checkbox toggle section from Page Editor; Preview button moved to Project Data tab only; Project Context expanded by default on load; Auto-Scan Pages button given stable id (#auto-scan-btn) with reliable click wiring; Re-scan button id (#rescan-current-btn) wired via DOMContentLoaded; version bump",
     "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
     "v2.5.30": "Tablet UI: generator panel docked as collapsible right sidebar with purple rail; viewer flex:1 fills freed space; preview minimizes panel + shows redacted modal with Print/Export action sheet; Print Redacted uses previewPdfBytes + afterprint cleanup; base print uses afterprint + 90s fallback; base print button labeled as original PDF; control panel: removed duplicate zone block, Clear All, Export; consolidated Add Box; version bump",
     "v2.5.29": "Smooth generator toggle transition (body.generator-transition fade, deterministic post-render scan replaces 500ms timeout); tablet breakpoint support for generator panel; UI.isSmallMobile()/isTablet() helpers; small-mobile guard in toggleGenerator(); version bump",
@@ -75,13 +76,6 @@ async function loadTesseract() {
     
     return tesseractLoadPromise;
 }
-
-// Redaction checkbox IDs used for auto-scan detection
-const REDACTION_CHECKBOX_IDS = [
-    'toggle-cust', 'toggle-job', 'toggle-type', 'toggle-cpid', 
-    'toggle-date', 'toggle-stage', 'toggle-po', 'toggle-serial',
-    'toggle-company', 'toggle-address', 'toggle-phone', 'toggle-fax'
-];
 
 // Preloading configuration
 const PRELOAD_START_DELAY_MS = 500; // Delay before starting preload after search completes
@@ -686,19 +680,7 @@ class ControlPanelManager {
     static refreshForProfile(profile) {
         const relevantFields = this.PROFILE_FIELDS[profile] || this.PROFILE_FIELDS['AUTO'];
         
-        // Show/hide checkbox rows based on profile
-        const allFields = ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'po', 'serial', 'company', 'address', 'phone', 'fax'];
-        
-        allFields.forEach(field => {
-            const checkbox = document.getElementById(`toggle-${field}`);
-            const row = checkbox?.closest('.toggle-row');
-            
-            if (row) {
-                row.style.display = relevantFields.includes(field) ? '' : 'none';
-            }
-        });
-        
-        // Also update input field visibility
+        // Update input field visibility
         this.updateInputFields(relevantFields);
     }
     
@@ -1171,22 +1153,6 @@ class RedactionManager {
     static refreshContent() { 
         const ctx = DemoManager.getContext(); 
         
-        // Get toggle states
-        const toggles = {
-            cust: document.getElementById('toggle-cust')?.checked ?? true,
-            job: document.getElementById('toggle-job')?.checked ?? true,
-            type: document.getElementById('toggle-type')?.checked ?? true,
-            cpid: document.getElementById('toggle-cpid')?.checked ?? true,
-            date: document.getElementById('toggle-date')?.checked ?? true,
-            stage: document.getElementById('toggle-stage')?.checked ?? true,
-            po: document.getElementById('toggle-po')?.checked ?? true,
-            serial: document.getElementById('toggle-serial')?.checked ?? true,
-            company: document.getElementById('toggle-company')?.checked ?? true,
-            address: document.getElementById('toggle-address')?.checked ?? true,
-            phone: document.getElementById('toggle-phone')?.checked ?? true,
-            fax: document.getElementById('toggle-fax')?.checked ?? true
-        };
-        
         let displayDate = ctx.date;
         if (displayDate && displayDate.includes('-')) {
              const parts = displayDate.split('-'); 
@@ -1198,52 +1164,36 @@ class RedactionManager {
         this.zones.forEach(box => { 
             const map = box.dataset.map; 
             let text = ""; 
-            let shouldShow = true;
             
             if(box.dataset.customText) {
                 text = box.dataset.customText;
             } else if(map === 'cust') {
                 text = ctx.cust;
-                shouldShow = toggles.cust;
             } else if(map === 'job') {
                 text = ctx.job;
-                shouldShow = toggles.job;
             } else if(map === 'type') {
                 text = ctx.type;
-                shouldShow = toggles.type;
             } else if(map === 'cpid') {
                 text = ctx.cpid;
-                shouldShow = toggles.cpid;
             } else if(map === 'date') {
                 text = displayDate;
-                shouldShow = toggles.date;
             } else if(map === 'stage') {
                 text = ctx.stage;
-                shouldShow = toggles.stage;
             } else if(map === 'po') {
                 text = ctx.po;
-                shouldShow = toggles.po;
             } else if(map === 'serial') {
                 text = ctx.serial;
-                shouldShow = toggles.serial;
             } else if(map === 'company') {
                 text = ctx.company;
-                shouldShow = toggles.company;
             } else if(map === 'address') {
                 text = ctx.address;
-                shouldShow = toggles.address;
             } else if(map === 'phone') {
                 text = ctx.phone;
-                shouldShow = toggles.phone;
             } else if(map === 'fax') {
                 text = ctx.fax;
-                shouldShow = toggles.fax;
             } else if(map === 'logo') {
                 text = "";
             }
-            
-            // Hide or show the box based on toggle state
-            box.style.display = shouldShow ? '' : 'none';
             
             const span = box.querySelector('.redaction-text') || box.querySelector('span'); 
             if(span) span.innerText = text; 
@@ -1399,7 +1349,7 @@ class SmartScanner {
         // Capture current fetchId to detect if PDF changes during scan
         const scanFetchId = PdfViewer.currentFetchId;
         
-        const btn = document.querySelector('button[onclick="SmartScanner.scanAllPages()"]');
+        const btn = document.getElementById('auto-scan-btn');
         const origText = btn ? btn.innerText : "";
         if(btn) { btn.innerText = "🔍 INITIALIZING..."; btn.disabled = true; }
         
@@ -4166,11 +4116,15 @@ document.addEventListener('DOMContentLoaded', () => {
             versionEl.textContent = APP_VERSION;
         }
 
-        // Enforce collapsed Project Context on every load (not persisted)
-        const ctxContent = document.getElementById('demo-context-content');
-        const ctxPanel = document.getElementById('demo-context-panel');
-        if (ctxContent) ctxContent.classList.add('collapsed');
-        if (ctxPanel) ctxPanel.classList.add('collapsed-state');
+        // Wire Auto-Scan and Re-scan buttons with stable IDs
+        const autoScanBtn = document.getElementById('auto-scan-btn');
+        if (autoScanBtn) {
+            autoScanBtn.addEventListener('click', () => SmartScanner.scanAllPages());
+        }
+        const rescanBtn = document.getElementById('rescan-current-btn');
+        if (rescanBtn) {
+            rescanBtn.addEventListener('click', () => SmartScanner.rescanPage(PageContext.getActivePage()));
+        }
         
         // Load cover sheet template bytes for universal page 1 overlay
         fetch('assets/cover_sheet_template.pdf')
