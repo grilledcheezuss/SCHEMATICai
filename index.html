@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.31)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.32)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -86,7 +86,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.31</span>
+        <span class="app-title-version" id="app-version">v2.5.32</span>
     </div>
 
     <div class="header-controls">
@@ -194,7 +194,7 @@
             
             <!-- Tab Content: Project Data -->
             <div class="tab-content active" id="project-tab">
-             <div id="demo-context-panel">
+            <div id="demo-context-panel">
                 <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:8px; margin-bottom:10px; border-radius:4px; cursor:pointer;" onclick="DemoManager.toggleContext()">
                     <span style="font-size:11px; font-weight:600; color:var(--glass-text);">🔐 PROJECT CONTEXT &amp; SENSITIVE DATA</span>
                     <span id="context-toggle-icon" style="font-size:12px; color:var(--glass-text);">&#9662;</span>
@@ -229,6 +229,9 @@
                     </div>
                 </div>
             </div>
+            <div style="padding:0 8px; margin-top:10px;">
+                <button class="search-btn" style="background:#8b5cf6 !important; width:100%;" onclick="PdfExporter.preview()">👁️ Preview Redacted PDF</button>
+            </div>
             </div>
             
             <!-- Tab Content: Page Editor -->
@@ -248,28 +251,9 @@
                     </div>
                 </div>
                 
-                <!-- Redaction Toggles -->
-                <div style="margin-bottom:15px; padding:0 8px;">
-                    <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">✅ Redaction Toggles (Check to Include)</div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px; font-size:9px;">
-                        <label class="toggle-row" data-field="cust" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cust" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Customer</label>
-                        <label class="toggle-row" data-field="job" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-job" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Job</label>
-                        <label class="toggle-row" data-field="type" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-type" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> System</label>
-                        <label class="toggle-row" data-field="cpid" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-cpid" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Panel ID</label>
-                        <label class="toggle-row" data-field="date" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-date" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Date</label>
-                        <label class="toggle-row" data-field="stage" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-stage" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Stage</label>
-                        <label class="toggle-row" data-field="po" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-po" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> PO</label>
-                        <label class="toggle-row" data-field="serial" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-serial" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Serial</label>
-                        <label class="toggle-row" data-field="company" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-company" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Company</label>
-                        <label class="toggle-row" data-field="address" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-address" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Address</label>
-                        <label class="toggle-row" data-field="phone" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-phone" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Phone</label>
-                        <label class="toggle-row" data-field="fax" style="display:flex; align-items:center; cursor:pointer;"><input type="checkbox" id="toggle-fax" checked onchange="RedactionManager.refreshContent()" style="margin-right:4px;"> Fax</label>
-                    </div>
-                </div>
-                
                 <!-- Page Actions -->
                 <div style="padding:0 8px; margin-bottom:15px;">
-                    <button class="search-btn" style="width:100%; background:var(--app-accent) !important; font-size:10px; padding:8px;" onclick="SmartScanner.rescanPage(PageContext.currentPage)">
+                    <button id="rescan-current-btn" class="search-btn" style="width:100%; background:var(--app-accent) !important; font-size:10px; padding:8px;">
                         🔄 Re-scan Current Page
                     </button>
                 </div>
@@ -350,14 +334,13 @@
                 </div>
 
                 <div style="padding:0 8px; margin-top:10px;">
-                    <button class="search-btn" style="background:var(--app-accent) !important; width:100%;" onclick="SmartScanner.scanAllPages()">🔍 Auto-Scan Pages</button>
+                    <button id="auto-scan-btn" class="search-btn" style="background:var(--app-accent) !important; width:100%;">🔍 Auto-Scan Pages</button>
                 </div>
             </div>
 
             <div style="margin-top:auto; display:flex; flex-direction:column; gap:5px;">
                 <button class="search-btn" style="background:var(--app-primary) !important;" onclick="RedactionManager.addZoneToCurrentView('custom')">➕ Add Box</button>
                 <button class="search-btn" style="background:#dc2626 !important;" onclick="RedactionManager.deleteSelected()">❌ Delete Box</button>
-                <button class="search-btn" style="background:#8b5cf6 !important;" onclick="PdfExporter.preview()">👁️ Preview Redacted PDF</button>
             </div>
         </div>
     </div>
