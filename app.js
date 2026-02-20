@@ -1,8 +1,8 @@
-// --- SCHEMATICA ai v2.5.33 (Generator Control Panel UX polish: collapsible Zone Styling, fix action button spacing, icon-only Add/Delete buttons with tooltips, enlarge context caret; version bump) ---
-const APP_VERSION = "v2.5.33";
+// --- SCHEMATICA ai v2.5.34 (Worker parsing + search robustness fixes: service-first voltage, HP table format, NEMA4X enclosure, KeywordMatcher model-number flex, reject_keyword uppercase normalization; version bump) ---
+const APP_VERSION = "v2.5.34";
 const VERSION_HISTORY = {
+    "v2.5.34": "Worker parsing + search robustness: context-aware service-first voltage extraction (control transformer 480V-120VAC excluded from service volt); HP table-format parsing (HP: 7.5, MOTOR HP: 7.5); enclosure parsing covers NEMA4X/TYPE 4X/4 X; FG preferred canonical when both SS+FG present; HorsepowerMatcher decimal HP regex fix; KeywordMatcher model-number hyphen/space flex (PD6000↔PD-6000); reject_keywords normalized to uppercase; pure helpers in worker/lib/extract.js with node test runner",
     "v2.5.33": "Generator Control Panel UX polish: Zone Styling section collapsible and collapsed by default; Add/Delete redesigned as icon-only compact buttons with tooltips placed next to Preview (Project Data) and Auto-Scan (Page Editor); removed duplicate full-width Add/Delete buttons; bottom padding fix to prevent button clipping; context caret enlarged; version bump",
-    "v2.5.32": "Generator Control Panel cleanup: remove redundant checkbox toggle section from Page Editor; Preview button moved to Project Data tab only; Project Context expanded by default on load; Auto-Scan Pages button given stable id (#auto-scan-btn) with reliable click wiring; Re-scan button id (#rescan-current-btn) wired via DOMContentLoaded; version bump",
     "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
     "v2.5.30": "Tablet UI: generator panel docked as collapsible right sidebar with purple rail; viewer flex:1 fills freed space; preview minimizes panel + shows redacted modal with Print/Export action sheet; Print Redacted uses previewPdfBytes + afterprint cleanup; base print uses afterprint + 90s fallback; base print button labeled as original PDF; control panel: removed duplicate zone block, Clear All, Export; consolidated Add Box; version bump",
     "v2.5.29": "Smooth generator toggle transition (body.generator-transition fade, deterministic post-render scan replaces 500ms timeout); tablet breakpoint support for generator panel; UI.isSmallMobile()/isTablet() helpers; small-mobile guard in toggleGenerator(); version bump",
@@ -2416,7 +2416,10 @@ class HorsepowerMatcher {
         const NUMERIC_BOUNDARY_BEFORE = '(?<![\\.\\d])';
         const NUMERIC_BOUNDARY_AFTER = '(?![\\.\\d])';
         
-        const hpPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}(?:${searchHp}|${searchHp}\\.0)${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
+        const escapedHp = searchHp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // For integer HP values, also match the decimal form (e.g. "5" matches "5.0 HP")
+        const hpAlt = Number.isInteger(searchHpNum) ? `${escapedHp}|${escapedHp}\\.0` : escapedHp;
+        const hpPattern = `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}(?:${hpAlt})${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}`;
         
         const fractionalPattern = (searchHpNum > 0.001 && searchHpNum < 1) 
             ? `${BOUNDARY_START}${NUMERIC_BOUNDARY_BEFORE}1/${Math.round(1/searchHpNum)}${NUMERIC_BOUNDARY_AFTER}\\s*${HP_UNIT_PATTERN}${BOUNDARY_END}` 
@@ -2440,7 +2443,7 @@ class HorsepowerMatcher {
         const fractionalMatch = fractionalPattern && new RegExp(fractionalPattern, 'i').test(record.desc);
         const mixedMatch = mixedFractionPattern && new RegExp(mixedFractionPattern, 'i').test(record.desc);
         
-        const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${NUMERIC_BOUNDARY_BEFORE}${searchHp}${NUMERIC_BOUNDARY_AFTER}(?:\\s|\\)|,|$)`;
+        const tablePattern = `(?:HP|HORSEPOWER|MOTOR\\s+HP)\\s*[:\\s|]+\\s*${NUMERIC_BOUNDARY_BEFORE}${escapedHp}${NUMERIC_BOUNDARY_AFTER}(?:\\s|\\)|,|$)`;
         const tableMatch = new RegExp(tablePattern, 'i').test(record.desc);
         
         if (safetyMatch || fractionalMatch || mixedMatch || tableMatch) {
@@ -2480,15 +2483,22 @@ class KeywordMatcher {
         
         // === CHECK REJECT KEYWORDS ===
         if (record.reject_keywords && record.reject_keywords.length > 0) {
-            const isRejected = rawKeywords.some(kw => record.reject_keywords.includes(kw));
+            // Normalize reject_keywords to uppercase once for efficient comparison
+            const rejectUpper = record.reject_keywords.map(rk => rk.toUpperCase());
+            const isRejected = rawKeywords.some(kw => rejectUpper.includes(kw));
             if (isRejected) return false;
         }
 
         // === CHECK ALL KEYWORD GROUPS MATCH ===
         const allGroupsMatch = expandedKeywords.every(group => {
             return group.some(alias => {
-                const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
-                const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
+                const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Also allow optional hyphen/space at letter-digit boundaries for model numbers
+                // e.g. "PD6000" matches "PD-6000" and "PD 6000"
+                const flexAlias = cleanAlias
+                    .replace(/([A-Za-z])([\d])/g, '$1[-\\s]?$2')
+                    .replace(/([\d])([A-Za-z])/g, '$1[-\\s]?$2');
+                const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + flexAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
                 return regex.test(text); 
             });
         });
