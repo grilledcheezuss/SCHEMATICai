@@ -1,5 +1,6 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.20 (Critical Bug Fixes)
+// 🧠 SCHEMATICA ai WORKER v2.5.34 (Worker parsing + search robustness fixes)
+// Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -391,6 +392,92 @@ function validatePageSize(pageSizeParam) {
     return Math.min(Math.max(pageSize, 1), 100); // Clamp between 1 and 100
 }
 
+// Parse HP values from normalized text (number-before-unit and table formats).
+// Logic mirrored in worker/lib/extract.js for unit testing.
+function _parseHP(t) {
+    const foundHPs = new Set();
+    const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
+    let match;
+    while ((match = hpRegex.exec(t)) !== null) {
+        let raw = match[1]; let val = 0;
+        if (match[2] && match[2].toUpperCase().includes('KW')) val = parseFloat(raw) * 1.341;
+        else if (/(\d+)[-\s](\d+)\/(\d+)/.test(raw)) {
+            const mx = raw.match(/(\d+)[-\s](\d+)\/(\d+)/);
+            val = parseFloat(mx[1]) + parseFloat(mx[2]) / parseFloat(mx[3]);
+        } else if (/(\d+)([¼½¾])/.test(raw)) {
+            const mx = raw.match(/(\d+)([¼½¾])/);
+            val = parseFloat(mx[1]) + { '¼': 0.25, '½': 0.5, '¾': 0.75 }[mx[2]];
+        } else if (raw.includes('-')) {
+            const nums = raw.split('-').filter(Boolean).map(p => parseFloat(p)).filter(x => !isNaN(x));
+            if (nums.length) val = Math.max(...nums);
+        } else if (raw.includes('/')) {
+            const [num, den] = raw.split('/');
+            val = parseFloat(num) / parseFloat(den);
+        } else {
+            val = parseFloat(raw);
+        }
+        if (!isNaN(val) && val >= 0.1 && val <= 500) foundHPs.add((Math.round(val * 10) / 10).toString());
+    }
+    // Table/header format: "HP: 7.5", "MOTOR HP: 7.5"
+    const tableHpRegex = /\b(?:MOTOR\s+)?(?:HP|HORSEPOWER)\s*[:\s|]+\s*(\d+(?:\.\d+)?)\b/gi;
+    while ((match = tableHpRegex.exec(t)) !== null) {
+        const val = parseFloat(match[1]);
+        if (!isNaN(val) && val >= 0.1 && val <= 500) foundHPs.add((Math.round(val * 10) / 10).toString());
+    }
+    return foundHPs;
+}
+
+// Context-aware voltage extraction: separates service from control/transformer voltages.
+// Inline transformer notation (e.g. "480V-120VAC") is classified as control-only.
+// Logic mirrored in worker/lib/extract.js for unit testing.
+function _parseVoltageContextAware(t) {
+    const controlRanges = [];
+    const xfmrInlineRegex = /\b\d{2,4}(?:VAC|V)\s*[-]\s*\d{2,4}VAC\b/gi;
+    let m;
+    while ((m = xfmrInlineRegex.exec(t)) !== null) {
+        controlRanges.push([m.index, m.index + m[0].length]);
+    }
+    const XFMR_KEYWORDS = /\b(?:TRANSFORMER|XFORMER|XFMR|CPT|SECONDARY|PRIMARY)\b/i;
+    const serviceVolts = new Set();
+    const controlVolts = new Set();
+    for (const v of VOLT_PRIORITY) {
+        const r = new RegExp(v.match.source, 'gi');
+        while ((m = r.exec(t)) !== null) {
+            const pos = m.index;
+            const end = pos + m[0].length;
+            if (controlRanges.some(([s, e]) => pos >= s && pos < e)) {
+                controlVolts.add(v.id);
+                continue;
+            }
+            const ctx = t.slice(Math.max(0, pos - 40), Math.min(t.length, end + 40));
+            if (XFMR_KEYWORDS.test(ctx)) {
+                controlVolts.add(v.id);
+            } else {
+                serviceVolts.add(v.id);
+            }
+        }
+    }
+    return { serviceVolts, controlVolts };
+}
+
+// Parse enclosure type: detects NEMA 4X, NEMA4X, TYPE 4X, 4XSS, 4XFG, POLY.
+// Logic mirrored in worker/lib/extract.js for unit testing.
+function _parseEnclosure(t) {
+    const foundEnclosures = new Set();
+    if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
+    if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
+    const has4X = /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t);
+    const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS)\b/i.test(t);
+    const hasSS = /\bSTAINLESS\b/i.test(t);
+    if (has4X) {
+        if (hasFG) foundEnclosures.add("4XFG");
+        if (hasSS) foundEnclosures.add("4XSS");
+        if (!hasFG && !hasSS && !foundEnclosures.has("4XFG") && !foundEnclosures.has("4XSS")) foundEnclosures.add("4XSS");
+    }
+    if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
+    return foundEnclosures;
+}
+
 function extractSpecsStrict(t) {
     // Return object: parameter values with variance flags (suffix 'V' indicates varied/ambiguous)
     const s = { 
@@ -402,7 +489,7 @@ function extractSpecsStrict(t) {
     // Normalize CAD control codes before parsing
     t = normalizeCADText(t);
     
-    // Detect multiple manufacturers
+    // --- Manufacturer ---
     const foundMfgs = new Set();
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
@@ -416,132 +503,73 @@ function extractSpecsStrict(t) {
     if (foundMfgs.size === 1) {
         s.mfg = [...foundMfgs][0];
     } else if (foundMfgs.size > 1) {
-        s.mfg = [...foundMfgs][0]; // Pick first, but mark as varied
+        s.mfg = [...foundMfgs][0];
         s.mfgV = true;
     }
 
-    // Detect multiple HP values
-    const foundHPs = new Set();
-    // Enhanced regex to match mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP"
-    const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
-    let match;
-    while ((match = hpRegex.exec(t)) !== null) {
-        let raw = match[1]; let val = 0;
-        if (match[2] && match[2].toUpperCase().includes('KW')) val = parseFloat(raw) * 1.341;
-        else if (/(\d+)[-\s](\d+)\/(\d+)/.test(raw)) {
-            const mixedMatch = raw.match(/(\d+)[-\s](\d+)\/(\d+)/);
-            const whole = parseFloat(mixedMatch[1]);
-            const num = parseFloat(mixedMatch[2]);
-            const den = parseFloat(mixedMatch[3]);
-            val = whole + (num / den);
-        } else if (/(\d+)([¼½¾])/.test(raw)) {
-            const unicodeMatch = raw.match(/(\d+)([¼½¾])/);
-            const whole = parseFloat(unicodeMatch[1]);
-            const fractionMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
-            val = whole + fractionMap[unicodeMatch[2]];
-        } else if (raw.includes('-')) {
-            const parts = raw.split('-').filter(Boolean);
-            const nums = parts.map(p => parseFloat(p)).filter(x => !isNaN(x));
-            if (nums.length) val = Math.max(...nums);
-        } else if (raw.includes('/')) {
-            const [num, den] = raw.split('/');
-            val = parseFloat(num) / parseFloat(den);
-        } else {
-            val = parseFloat(raw);
-        }
-        if (!isNaN(val) && val >= 0.1 && val <= 500) {
-            foundHPs.add((Math.round(val * 10) / 10).toString());
-        }
-    }
+    // --- HP (number-before-unit + table format) ---
+    const foundHPs = _parseHP(t);
     if (foundHPs.size === 1) {
         s.hp = [...foundHPs][0];
     } else if (foundHPs.size > 1) {
-        // Multiple HP values found - mark as varied
-        // Pick largest to match typical use case (max motor HP in multi-motor panels)
         s.hp = [...foundHPs].sort((a, b) => parseFloat(b) - parseFloat(a))[0];
         s.hpV = true;
     }
 
-    // Detect multiple voltages
-    // NOTE: Unlike original code which broke on first match, we now check all patterns
-    // to detect multiple voltages (e.g., "240V/480V" should be marked as varied)
-    // HOWEVER: Canonical dual-voltage pairs (120/240, 277/480) are NOT marked as varied
-    const foundVolts = new Set();
-    for (const v of VOLT_PRIORITY) { 
-        if (v.match.test(t)) { 
-            foundVolts.add(v.id);
-        } 
-    }
-    
-    // CRITICAL FIX: Remove lower voltage from foundVolts for canonical pairs
-    // This prevents dual-voltage panels (e.g., "120/240V") from being extracted with both
-    // voltages in their metadata, which would cause incorrect matches during search
-    if (foundVolts.size === 2) {
-        const voltArray = [...foundVolts];
-        const canonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(pair => 
-            voltArray.includes(pair.low) && voltArray.includes(pair.high)
-        );
-        if (canonicalPair) {
-            foundVolts.delete(canonicalPair.low); // Remove lower voltage
-        }
-    }
-    
-    if (foundVolts.size === 1) {
-        s.volt = [...foundVolts][0];
-    } else if (foundVolts.size > 1) {
-        // Check if this is a canonical dual-voltage pair (split-phase configuration)
-        const voltArray = [...foundVolts];
-        const isCanonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.some(pair => {
-            return (voltArray.includes(pair.low) && voltArray.includes(pair.high) && voltArray.length === 2);
-        });
-        
-        if (isCanonicalPair) {
-            // Canonical split-phase pair - use higher voltage, don't mark as varied
-            const pair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(p => 
-                voltArray.includes(p.low) && voltArray.includes(p.high)
+    // --- Voltage (service-first, context-aware) ---
+    // Excludes inline transformer notation (e.g. "480V-120VAC") from service candidates.
+    const { serviceVolts, controlVolts } = _parseVoltageContextAware(t);
+    const targetVolts = serviceVolts.size > 0 ? serviceVolts : controlVolts;
+
+    if (targetVolts.size > 0) {
+        // Apply canonical dual-voltage pair handling (120+240 → keep 240; 277+480 → keep 480)
+        if (targetVolts.size === 2) {
+            const voltArray = [...targetVolts];
+            const canonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(pair =>
+                voltArray.includes(pair.low) && voltArray.includes(pair.high)
             );
-            s.volt = pair.high;
-            s.voltV = false;
+            if (canonicalPair) targetVolts.delete(canonicalPair.low);
+        }
+
+        if (targetVolts.size === 1) {
+            s.volt = [...targetVolts][0];
         } else {
-            // Multiple voltages found - mark as varied
-            // Pick first from VOLT_PRIORITY (lines 59-67: 575→480→415→277→240→208→120)
-            s.volt = voltArray[0];
-            s.voltV = true;
+            const voltArray = [...targetVolts];
+            const isCanonicalPair = CANONICAL_DUAL_VOLTAGE_PAIRS.some(pair =>
+                voltArray.includes(pair.low) && voltArray.includes(pair.high) && voltArray.length === 2
+            );
+            if (isCanonicalPair) {
+                const pair = CANONICAL_DUAL_VOLTAGE_PAIRS.find(p =>
+                    voltArray.includes(p.low) && voltArray.includes(p.high)
+                );
+                s.volt = pair.high;
+                s.voltV = false;
+            } else {
+                // Multiple distinct service voltages → varied; pick highest priority
+                s.volt = VOLT_PRIORITY.find(v => voltArray.includes(v.id))?.id || voltArray[0];
+                s.voltV = true;
+            }
         }
     }
-    
-    // Detect multiple phases
+
+    // --- Phase ---
     const foundPhases = new Set();
     if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*3)\b/i.test(t)) foundPhases.add("3");
     if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*1)\b/i.test(t)) foundPhases.add("1");
     if (foundPhases.size === 1) {
         s.phase = [...foundPhases][0];
     } else if (foundPhases.size > 1) {
-        // Multiple phases found - mark as varied
-        s.phase = "3"; // Default to 3-phase if both present
+        s.phase = "3";
         s.phaseV = true;
     }
 
-    // Detect enclosure types
-    const foundEnclosures = new Set();
-    // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
-    // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
-    // Priority: Check for fiberglass first, then stainless, to avoid misclassification
-    if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(STAINLESS|SS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XSS");
-    if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
-    // Default: bare "4X" without material keywords defaults to stainless steel (4XSS)
-    if (/\b4X\b/i.test(t) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && !foundEnclosures.has("4XSS")) {
-        foundEnclosures.add("4XSS");
-    }
-    if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
-    
+    // --- Enclosure (NEMA 4X, NEMA4X, TYPE 4X, 4XSS, 4XFG, POLY) ---
+    const foundEnclosures = _parseEnclosure(t);
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
-        // Multiple enclosure types found - mark as varied
-        s.enc = [...foundEnclosures][0];
+        // Prefer FG (fiberglass) when both SS and FG present (deterministic canonical)
+        s.enc = foundEnclosures.has("4XFG") ? "4XFG" : [...foundEnclosures][0];
         s.encV = true;
     }
 
