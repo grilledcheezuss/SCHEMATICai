@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.29 (Smooth generator on/off transition; tablet-first generator support; hide generator on small mobile) ---
-const APP_VERSION = "v2.5.29";
+// --- SCHEMATICA ai v2.5.30 (Tablet UI polish: docked generator sidebar + purple collapse rail; redacted preview Print/Export action sheet; base print afterprint stability; version bump) ---
+const APP_VERSION = "v2.5.30";
 const VERSION_HISTORY = {
+    "v2.5.30": "Tablet UI: generator panel docked as collapsible right sidebar with purple rail; viewer flex:1 fills freed space; preview minimizes panel + shows redacted modal with Print/Export action sheet; Print Redacted uses previewPdfBytes + afterprint cleanup; base print uses afterprint + 90s fallback; base print button labeled as original PDF; control panel: removed duplicate zone block, Clear All, Export; consolidated Add Box; version bump",
     "v2.5.29": "Smooth generator toggle transition (body.generator-transition fade, deterministic post-render scan replaces 500ms timeout); tablet breakpoint support for generator panel; UI.isSmallMobile()/isTablet() helpers; small-mobile guard in toggleGenerator(); version bump",
     "v2.5.28": "Generator OFF now renders original PDF for all pages with no template overlay and no auto-scan; SmartScanner page 1 always applies COVER_TEMPLATE deterministically (skips text/OCR detection); default desktop zoom changed from 110% to 100%; version bump",
     "v2.5.27": "Fix cover page redaction zones stacking (createZoneOnWrapper now appends redaction-text span before resize handle; refreshContent never overwrites innerHTML, creates span if missing for legacy boxes); fix profile dropdown to use <option>/<optgroup> markup; version bump",
@@ -493,17 +494,28 @@ class DemoManager {
         
         if(this.isGeneratorActive) { 
             document.body.classList.add('demo-mode'); 
+            if (UI.isTablet()) {
+                const rail = document.getElementById('toggle-right');
+                if (rail) rail.style.display = 'flex';
+            }
             this.restorePanel(); 
             if(indicator) indicator.style.display = 'inline-block';
             if(btn) btn.style.color = 'var(--app-primary)';
             if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
-            DragManager.init();
+            if (!UI.isTablet()) DragManager.init();
         } else { 
             document.body.classList.remove('demo-mode'); 
             document.body.classList.remove('editor-active'); 
-            panel.style.display = 'none';
-            restoreBtn.style.display = 'none';
+            if (UI.isTablet()) {
+                panel.classList.remove('gen-collapsed');
+                panel.style.display = 'none';
+                const rail = document.getElementById('toggle-right');
+                if (rail) rail.style.display = 'none';
+            } else {
+                panel.style.display = 'none';
+                restoreBtn.style.display = 'none';
+            }
             if(indicator) indicator.style.display = 'none';
             if(btn) btn.style.color = ''; 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
@@ -511,19 +523,43 @@ class DemoManager {
     }
 
     static minimizePanel() {
-        document.getElementById('generator-panel').classList.add('minimized');
-        document.getElementById('generator-restore-btn').style.display = 'flex';
+        const panel = document.getElementById('generator-panel');
+        if (UI.isTablet()) {
+            // On tablet: collapse the docked sidebar
+            panel.classList.add('gen-collapsed');
+            const rail = document.getElementById('toggle-right');
+            if (rail) rail.innerText = '⚙';
+        } else {
+            panel.classList.add('minimized');
+            document.getElementById('generator-restore-btn').style.display = 'flex';
+        }
         document.body.classList.remove('editor-active');
         document.body.classList.add('gen-minimized'); 
     }
 
     static restorePanel() {
         const panel = document.getElementById('generator-panel');
-        panel.style.display = 'flex';
-        panel.classList.remove('minimized');
-        document.getElementById('generator-restore-btn').style.display = 'none';
+        if (UI.isTablet()) {
+            panel.classList.remove('gen-collapsed');
+            const rail = document.getElementById('toggle-right');
+            if (rail) rail.innerText = '›';
+        } else {
+            panel.style.display = 'flex';
+            panel.classList.remove('minimized');
+            document.getElementById('generator-restore-btn').style.display = 'none';
+        }
         document.body.classList.add('editor-active');
         document.body.classList.remove('gen-minimized'); 
+    }
+
+    static toggleGeneratorSidebar() {
+        const panel = document.getElementById('generator-panel');
+        if (!panel) return;
+        if (panel.classList.contains('gen-collapsed')) {
+            this.restorePanel();
+        } else {
+            this.minimizePanel();
+        }
     }
 
     static toggleContext() {
@@ -2709,6 +2745,94 @@ class SearchEngine {
 class PdfExporter {
     static previewPdfBytes = null;
     
+    static async preview() {
+        if (!PdfViewer.doc) return alert("No PDF loaded!");
+        
+        // Minimize generator panel while previewing
+        DemoManager.minimizePanel();
+        
+        const modal = document.getElementById('pdf-preview-modal');
+        const container = document.getElementById('pdf-preview-container');
+        const btn = document.querySelector('button[onclick="PdfExporter.preview()"]');
+        const origText = btn ? btn.innerText : '';
+        if (btn) { btn.innerText = "⏳ GENERATING..."; btn.disabled = true; }
+        
+        try {
+            const pdfBytes = await this.generateRedactedPdf();
+            this.previewPdfBytes = pdfBytes;
+            
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blobUrl = URL.createObjectURL(blob);
+            
+            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:70vh; border:none;"></iframe>`;
+            modal.style.display = 'block';
+        } catch (e) {
+            console.error(e);
+            alert("Preview Failed: " + e.message);
+        } finally {
+            if (btn) { btn.innerText = origText; btn.disabled = false; }
+        }
+    }
+    
+    static closePreview() {
+        const modal = document.getElementById('pdf-preview-modal');
+        if (modal) modal.style.display = 'none';
+        const container = document.getElementById('pdf-preview-container');
+        if (container) container.innerHTML = '';
+        // Restore generator panel
+        DemoManager.restorePanel();
+    }
+    
+    static openPrintExportMenu() {
+        const menu = document.getElementById('print-export-menu');
+        if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
+    
+    static closePrintExportMenu() {
+        const menu = document.getElementById('print-export-menu');
+        if (menu) menu.style.display = 'none';
+    }
+    
+    static async printRedacted() {
+        this.closePrintExportMenu();
+        if (!this.previewPdfBytes) return alert("No redacted preview available.");
+        
+        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
+        const blobUrl = URL.createObjectURL(blob);
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+        
+        let fallbackId = null;
+        const cleanup = () => {
+            if (fallbackId) { clearTimeout(fallbackId); fallbackId = null; }
+            if (iframe.parentNode === document.body) document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+        };
+        
+        iframe.onload = () => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+                iframe.contentWindow.print();
+                fallbackId = setTimeout(cleanup, PdfViewer.PRINT_CLEANUP_TIMEOUT_MS);
+            } catch(e) { console.error('Print redacted error:', e); cleanup(); }
+        };
+        
+        fallbackId = setTimeout(cleanup, PdfViewer.PRINT_MAX_TIMEOUT_MS);
+    }
+    
+    static downloadRedacted() {
+        this.closePrintExportMenu();
+        if (!this.previewPdfBytes) return alert("No redacted preview available.");
+        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `redacted_${new Date().getTime()}.pdf`;
+        link.click();
+    }
+    
     static async confirmExport() {
         if (!this.previewPdfBytes) {
             alert("No preview available. Please generate preview first.");
@@ -3050,8 +3174,8 @@ class PdfViewer {
     static currentRenderToken = 0;
     static loadingTask = null;
     static isPrinting = false;
-    static PRINT_CLEANUP_TIMEOUT_MS = 5000; // 5 seconds to allow for print dialog interaction
-    static PRINT_MAX_TIMEOUT_MS = 10000; // 10 second maximum timeout
+    static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
+    static PRINT_MAX_TIMEOUT_MS = 120000; // 2 minute hard maximum
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -3381,10 +3505,15 @@ class PdfViewer {
         iframe.onload = () => {
             try {
                 iframe.contentWindow.focus();
+                
+                // Prefer afterprint event for clean cleanup (does not close browser print UI prematurely)
+                iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+                
                 iframe.contentWindow.print();
                 
-                // Keep iframe alive through print dialog, then cleanup
-                setTimeout(cleanup, this.PRINT_CLEANUP_TIMEOUT_MS);
+                // Fallback: cleanup after long timeout in case afterprint never fires
+                if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
+                fallbackTimeoutId = setTimeout(cleanup, this.PRINT_CLEANUP_TIMEOUT_MS);
             } catch (e) {
                 console.error('Print error:', e);
                 cleanup();
@@ -3769,7 +3898,15 @@ class UI {
             const btn = document.querySelector('.menu-btn'); 
             if (menu && menu.classList.contains('visible') && !menu.contains(e.target) && !btn.contains(e.target)) { 
                 menu.classList.remove('visible'); 
-            } 
+            }
+            // Close Print/Export action sheet if clicking outside
+            const printMenu = document.getElementById('print-export-menu');
+            if (printMenu && printMenu.style.display === 'block' && !printMenu.contains(e.target)) {
+                const printBtn = printMenu.previousElementSibling;
+                if (!printBtn || !printBtn.contains(e.target)) {
+                    printMenu.style.display = 'none';
+                }
+            }
         }); 
     }
     
