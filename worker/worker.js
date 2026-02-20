@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.20 (Critical Bug Fixes)
+// 🧠 SCHEMATICA ai WORKER v2.5.34 (Fix search false negatives and mismatched badges)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -422,7 +422,12 @@ function extractSpecsStrict(t) {
 
     // Detect multiple HP values
     const foundHPs = new Set();
-    // Enhanced regex to match mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP"
+    function addHP(val) {
+        if (!isNaN(val) && val >= 0.1 && val <= 500) {
+            foundHPs.add((Math.round(val * 10) / 10).toString());
+        }
+    }
+    // Primary pattern: number before HP keyword (e.g., "7.5 HP", "7.5HP", "7 1/2 HP")
     const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
     let match;
     while ((match = hpRegex.exec(t)) !== null) {
@@ -449,9 +454,12 @@ function extractSpecsStrict(t) {
         } else {
             val = parseFloat(raw);
         }
-        if (!isNaN(val) && val >= 0.1 && val <= 500) {
-            foundHPs.add((Math.round(val * 10) / 10).toString());
-        }
+        addHP(val);
+    }
+    // Secondary pattern: HP keyword before value (e.g., "HP: 7.5", "MOTOR HP: 7.5", table formats)
+    const hpLabelRegex = /\b(?:MOTOR\s+)?HP\s*[:\-=]\s*(\d+(?:\.\d+)?)\b/gi;
+    while ((match = hpLabelRegex.exec(t)) !== null) {
+        addHP(parseFloat(match[1]));
     }
     if (foundHPs.size === 1) {
         s.hp = [...foundHPs][0];
@@ -466,9 +474,14 @@ function extractSpecsStrict(t) {
     // NOTE: Unlike original code which broke on first match, we now check all patterns
     // to detect multiple voltages (e.g., "240V/480V" should be marked as varied)
     // HOWEVER: Canonical dual-voltage pairs (120/240, 277/480) are NOT marked as varied
+    //
+    // De-prioritize control/transformer voltages: mask step-down transformer patterns
+    // like "480V-120VAC" (primary-secondary notation) before voltage detection to prevent
+    // transformer secondary/primary from overriding the panel's actual line voltage.
+    const maskedForVolt = t.replace(/\b\d+V\s*-\s*\d+VAC\b/gi, 'XFMR_SPEC');
     const foundVolts = new Set();
     for (const v of VOLT_PRIORITY) { 
-        if (v.match.test(t)) { 
+        if (v.match.test(maskedForVolt)) { 
             foundVolts.add(v.id);
         } 
     }
@@ -526,13 +539,15 @@ function extractSpecsStrict(t) {
     const foundEnclosures = new Set();
     // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
     // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
+    // Also match NEMA4X (no space), NEMA 4X, TYPE 4X, 4 X variants
     // Priority: Check for fiberglass first, then stainless, to avoid misclassification
-    if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(STAINLESS|SS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XSS");
-    if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
+    const has4X = /(?:\b(?:NEMA|TYPE)\s*4\s*X\b|\b4\s*X\b)/i.test(t);
+    if (/\bNEMA\s*4XFG\b|\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
+    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && has4X) foundEnclosures.add("4XFG");
+    if (/\b(STAINLESS|SS)\b/i.test(t) && has4X) foundEnclosures.add("4XSS");
+    if (/\bNEMA\s*4XSS\b|\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
     // Default: bare "4X" without material keywords defaults to stainless steel (4XSS)
-    if (/\b4X\b/i.test(t) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && !foundEnclosures.has("4XSS")) {
+    if (has4X && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && !foundEnclosures.has("4XSS")) {
         foundEnclosures.add("4XSS");
     }
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");

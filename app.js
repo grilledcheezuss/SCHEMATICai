@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.33 (Generator Control Panel UX polish: collapsible Zone Styling, fix action button spacing, icon-only Add/Delete buttons with tooltips, enlarge context caret; version bump) ---
-const APP_VERSION = "v2.5.33";
+// --- SCHEMATICA ai v2.5.34 (Fix search false negatives and mismatched badges: HP 7.5 extraction, transformer voltage de-prioritization, NEMA4X enclosure variant, keyword model-number normalization) ---
+const APP_VERSION = "v2.5.34";
 const VERSION_HISTORY = {
+    "v2.5.34": "Fix search false negatives and mismatched badges: expand HP regex to cover 'HP: 7.5' / 'MOTOR HP: 7.5' table formats; mask step-down transformer voltage patterns (e.g. 480V-120VAC) so panel primary voltage is not overridden; extend enclosure parsing to NEMA4X (no-space) and 4 X variants; KeywordMatcher reject_keywords now case-insensitive and model numbers matched with optional hyphen/space normalization; version bump",
     "v2.5.33": "Generator Control Panel UX polish: Zone Styling section collapsible and collapsed by default; Add/Delete redesigned as icon-only compact buttons with tooltips placed next to Preview (Project Data) and Auto-Scan (Page Editor); removed duplicate full-width Add/Delete buttons; bottom padding fix to prevent button clipping; context caret enlarged; version bump",
     "v2.5.32": "Generator Control Panel cleanup: remove redundant checkbox toggle section from Page Editor; Preview button moved to Project Data tab only; Project Context expanded by default on load; Auto-Scan Pages button given stable id (#auto-scan-btn) with reliable click wiring; Re-scan button id (#rescan-current-btn) wired via DOMContentLoaded; version bump",
     "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
@@ -2480,16 +2481,28 @@ class KeywordMatcher {
         
         // === CHECK REJECT KEYWORDS ===
         if (record.reject_keywords && record.reject_keywords.length > 0) {
-            const isRejected = rawKeywords.some(kw => record.reject_keywords.includes(kw));
+            const rejectedSet = new Set(record.reject_keywords.map(r => String(r).toUpperCase()));
+            const isRejected = rawKeywords.some(kw => rejectedSet.has(kw));
             if (isRejected) return false;
         }
+
+        // Normalized text for model-number fallback matching (strip hyphens/spaces)
+        const textNorm = text.replace(/[-\s]+/g, '');
 
         // === CHECK ALL KEYWORD GROUPS MATCH ===
         const allGroupsMatch = expandedKeywords.every(group => {
             return group.some(alias => {
                 const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
                 const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + cleanAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
-                return regex.test(text); 
+                if (regex.test(text)) return true;
+                // Fallback: normalize hyphens/spaces for model-number variant matching
+                // (e.g., "PD6000" matches "PD-6000" or "PD 6000" in text)
+                const aliasNorm = alias.replace(/[-\s]+/g, '');
+                // Only apply when the alias actually contained hyphens/spaces and is not trivially short
+                if (aliasNorm.length > 2 && aliasNorm !== alias) {
+                    return textNorm.includes(aliasNorm);
+                }
+                return false;
             });
         });
 

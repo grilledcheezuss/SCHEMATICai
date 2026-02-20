@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.16
+## Version: v2.5.34
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.34**: Fix search false negatives and mismatched badges: expand HP regex to cover 'HP: 7.5' / 'MOTOR HP: 7.5' table formats; mask step-down transformer voltage patterns (e.g. 480V-120VAC) so panel primary voltage is not overridden; extend enclosure parsing to NEMA4X (no-space) and 4 X variants; version bump
 - **v2.5.16**: Professional-Grade Update: restored positive feedback lockout; voltage/phase/enc badge strictness fix (green for exact field matches, orange for fuzzy); page toolbar cleanup; OCR min-size guard for tiny boxes; smarter page classification with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control)
 - **v2.5.15**: Sorting: perfect matches (no varied flags) prioritized above varied results when weights equal; Feedback: removed thumbs-down lockout to allow multiple per-parameter corrections per panel per search
 - **v2.5.14**: Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions
