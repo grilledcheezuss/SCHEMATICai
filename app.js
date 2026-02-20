@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.34 (Worker parsing + search robustness fixes: service-first voltage, HP table format, NEMA4X enclosure, KeywordMatcher model-number flex, reject_keyword uppercase normalization; version bump) ---
-const APP_VERSION = "v2.5.34";
+// --- SCHEMATICA ai v2.5.35 (Hotfix: auth regression on version bump cache purge; 503 for backend unavailable; INVALID CREDENTIALS for 401; credential guard before preload) ---
+const APP_VERSION = "v2.5.35";
 const VERSION_HISTORY = {
+    "v2.5.35": "Hotfix: guard preload against missing credentials (show auth modal instead of 401); differentiate 401 (INVALID CREDENTIALS + re-login) vs 503 (SERVICE UNAVAILABLE + retry); worker returns 503 when auth backend (Airtable Users) is unreachable instead of leaving CACHE_USERS empty and falsely returning 401",
     "v2.5.34": "Worker parsing + search robustness: context-aware service-first voltage extraction (control transformer 480V-120VAC excluded from service volt); HP table-format parsing (HP: 7.5, MOTOR HP: 7.5); enclosure parsing covers NEMA4X/TYPE 4X/4 X; FG preferred canonical when both SS+FG present; HorsepowerMatcher decimal HP regex fix; KeywordMatcher model-number hyphen/space flex (PD6000↔PD-6000); reject_keywords normalized to uppercase; pure helpers in worker/lib/extract.js with node test runner",
     "v2.5.33": "Generator Control Panel UX polish: Zone Styling section collapsible and collapsed by default; Add/Delete redesigned as icon-only compact buttons with tooltips placed next to Preview (Project Data) and Auto-Scan (Page Editor); removed duplicate full-width Add/Delete buttons; bottom padding fix to prevent button clipping; context caret enlarged; version bump",
     "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
@@ -299,6 +300,15 @@ class NetworkService {
 
 class DataLoader {
     static async preload() {
+        // Guard: credentials must exist before attempting any worker call
+        const cox_user = localStorage.getItem('cox_user');
+        const cox_pass = localStorage.getItem('cox_pass');
+        if (!cox_user || !cox_pass) {
+            console.warn("Preload skipped: credentials missing. Showing auth modal.");
+            document.getElementById('auth-overlay').classList.add('active-modal');
+            return;
+        }
+
         const lastVer = localStorage.getItem('cox_version');
         if (lastVer !== APP_VERSION) {
             console.warn(`⚡ ${APP_VERSION} Update: Purging Cache...`);
@@ -365,9 +375,25 @@ class DataLoader {
                     throw e; 
                 }
 
-                if(r.status===401) { console.error("Sync Failed 401"); btn.classList.add('error'); btn.innerText="AUTH ERROR"; break; }
+                if(r.status===401) {
+                    console.error("Sync Failed 401 - Invalid credentials");
+                    btn.classList.add('error');
+                    btn.innerText = "INVALID CREDENTIALS";
+                    btn.disabled = false;
+                    btn.onclick = () => { AuthService.logout(); };
+                    break;
+                }
+
+                if(r.status===503) {
+                    console.error("Sync Failed 503 - Auth backend unavailable");
+                    btn.classList.add('error');
+                    btn.innerText = "SERVICE UNAVAILABLE";
+                    btn.disabled = false;
+                    btn.onclick = () => { location.reload(); };
+                    break;
+                }
                 
-                if(r.status!==200) { 
+                if(r.status!==200) {
                     console.warn(`🔥 Server returned ${r.status}. Pausing to let network breathe...`);
                     retryCount++;
                     if (retryCount <= 5) { 
