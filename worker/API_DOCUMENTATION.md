@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.16
+## Version: v2.5.34
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.34**: Worker search false negatives fix: HP table-format parsing (HP: 7.5 / HP - 7.5), NEMA4X enclosure detection (NEMA 4X / NEMA4X / TYPE 4X), `searchText` field in MAIN response for model-number matching (PD6000 matches PD-6000), `reject_keywords` normalized to uppercase for consistent client matching
 - **v2.5.16**: Professional-Grade Update: restored positive feedback lockout; voltage/phase/enc badge strictness fix (green for exact field matches, orange for fuzzy); page toolbar cleanup; OCR min-size guard for tiny boxes; smarter page classification with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control)
 - **v2.5.15**: Sorting: perfect matches (no varied flags) prioritized above varied results when weights equal; Feedback: removed thumbs-down lockout to allow multiple per-parameter corrections per panel per search
 - **v2.5.14**: Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions
@@ -146,6 +147,7 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
       "id": "1234",
       "displayId": "CP-1234",
       "desc": "CONTROL PANEL DESCRIPTION",
+      "searchText": "CONTROL PANEL DESCRIPTION 1234 CONTROLPANEL...",
       "pdfUrl": "https://...",
       "pdfStatus": "present",
       "mfg": "GORMAN RUPP",

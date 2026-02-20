@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.20 (Critical Bug Fixes)
+// 🧠 SCHEMATICA ai WORKER v2.5.34 (Refine worker search parsing: HP table-format, NEMA4X enclosure, searchText field, reject_keyword normalization)
 // ==========================================
 
 // Security: Keys are now read from Worker environment secrets
@@ -391,6 +391,18 @@ function validatePageSize(pageSizeParam) {
     return Math.min(Math.max(pageSize, 1), 100); // Clamp between 1 and 100
 }
 
+// Generate a normalized search text that aids model-number matching (e.g., PD6000 matches PD-6000).
+// Appends a collapsed variant with internal hyphens removed from alphanumeric tokens.
+function normalizeTextForSearch(text) {
+    if (!text || typeof text !== 'string') return '';
+    const upper = text.toUpperCase();
+    // Collapse internal hyphens inside alphanumeric tokens (e.g., PD-6000 -> PD6000, A-B-C -> ABC).
+    // Lookahead prevents consuming the trailing char so consecutive hyphens are all removed.
+    const collapsed = upper.replace(/([A-Z0-9])-(?=[A-Z0-9])/g, '$1');
+    // Only append the collapsed form if it differs from the original
+    return upper === collapsed ? upper : upper + ' ' + collapsed;
+}
+
 function extractSpecsStrict(t) {
     // Return object: parameter values with variance flags (suffix 'V' indicates varied/ambiguous)
     const s = { 
@@ -422,12 +434,10 @@ function extractSpecsStrict(t) {
 
     // Detect multiple HP values
     const foundHPs = new Set();
-    // Enhanced regex to match mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP"
-    const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
-    let match;
-    while ((match = hpRegex.exec(t)) !== null) {
-        let raw = match[1]; let val = 0;
-        if (match[2] && match[2].toUpperCase().includes('KW')) val = parseFloat(raw) * 1.341;
+    // Helper to parse a raw HP string and add to foundHPs
+    function parseAndAddHP(raw, isKW) {
+        let val = 0;
+        if (isKW) val = parseFloat(raw) * 1.341;
         else if (/(\d+)[-\s](\d+)\/(\d+)/.test(raw)) {
             const mixedMatch = raw.match(/(\d+)[-\s](\d+)\/(\d+)/);
             const whole = parseFloat(mixedMatch[1]);
@@ -439,10 +449,6 @@ function extractSpecsStrict(t) {
             const whole = parseFloat(unicodeMatch[1]);
             const fractionMap = { '¼': 0.25, '½': 0.5, '¾': 0.75 };
             val = whole + fractionMap[unicodeMatch[2]];
-        } else if (raw.includes('-')) {
-            const parts = raw.split('-').filter(Boolean);
-            const nums = parts.map(p => parseFloat(p)).filter(x => !isNaN(x));
-            if (nums.length) val = Math.max(...nums);
         } else if (raw.includes('/')) {
             const [num, den] = raw.split('/');
             val = parseFloat(num) / parseFloat(den);
@@ -452,6 +458,17 @@ function extractSpecsStrict(t) {
         if (!isNaN(val) && val >= 0.1 && val <= 500) {
             foundHPs.add((Math.round(val * 10) / 10).toString());
         }
+    }
+    // Enhanced regex to match mixed fractions: "7 1/2 HP", "7-1/2 HP", "7½ HP", "7.5HP" (no space)
+    const hpRegex = /\b(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\s*(HP|H\.P\.|H\.P|KW|kW|HORSEPOWER)\b/gi;
+    // Table/spec-label format: "HP: 7.5", "HP - 7.5", "HORSEPOWER: 7.5"
+    const hpTableRegex = /\b(HP|H\.P\.|H\.P|HORSEPOWER)\s*[:\-]\s*(\d+(?:\.\d+)?(?:[-\s]\d+\/\d+)?|\d+\/\d+|\d+[¼½¾])\b/gi;
+    let match;
+    while ((match = hpRegex.exec(t)) !== null) {
+        parseAndAddHP(match[1], match[2] && match[2].toUpperCase().includes('KW'));
+    }
+    while ((match = hpTableRegex.exec(t)) !== null) {
+        parseAndAddHP(match[2], false);
     }
     if (foundHPs.size === 1) {
         s.hp = [...foundHPs][0];
@@ -524,15 +541,18 @@ function extractSpecsStrict(t) {
 
     // Detect enclosure types
     const foundEnclosures = new Set();
+    // Detect 4X in all common forms: standalone "4X", "NEMA 4X", "NEMA4X", "TYPE 4X", "4X SS", "4XSS", "4XFG"
+    // Use a broad pattern that captures NEMA/TYPE prefixes (which prevent \b from matching)
+    const has4X = /(?:\b|NEMA\s*(?:TYPE\s*)?|TYPE\s*)4X/i.test(t);
     // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
     // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
     // Priority: Check for fiberglass first, then stainless, to avoid misclassification
     if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b(STAINLESS|SS)\b/i.test(t) && /\b4X\b/i.test(t)) foundEnclosures.add("4XSS");
+    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(t) && has4X) foundEnclosures.add("4XFG");
+    if (/\b(STAINLESS|SS)\b/i.test(t) && has4X) foundEnclosures.add("4XSS");
     if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
-    // Default: bare "4X" without material keywords defaults to stainless steel (4XSS)
-    if (/\b4X\b/i.test(t) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && !foundEnclosures.has("4XSS")) {
+    // Default: bare "4X" (any form) without material keywords defaults to stainless steel (4XSS)
+    if (has4X && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(t) && !foundEnclosures.has("4XSS")) {
         foundEnclosures.add("4XSS");
     }
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
@@ -822,10 +842,17 @@ export default {
                     const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
                     const pdfStatus = pdfUrl ? "present" : "missing";
 
+                    // Build a normalized search text to aid model-number matching (e.g., PD6000 vs PD-6000)
+                    const searchText = normalizeTextForSearch(fullDesc + " " + cleanId);
+                    // Normalize reject_keywords to uppercase for consistent client-side matching
+                    const rawRejectKws = overrides ? (overrides.reject_keywords || []) : [];
+                    const rejectKeywords = rawRejectKws.map(kw => String(kw).toUpperCase());
+
                     return {
                         id: cleanId,
                         displayId: "CP-" + cleanId,
                         desc: fullDesc,
+                        searchText,
                         pdfUrl,
                         pdfStatus,
                         mfg: finalMfg,
@@ -834,7 +861,7 @@ export default {
                         phase: finalPhase,
                         enc: finalEnc,
                         category: finalCategory,
-                        reject_keywords: overrides ? (overrides.reject_keywords || []) : [],
+                        reject_keywords: rejectKeywords,
                         mfgV: explicit.mfgV || false,
                         hpV: explicit.hpV || false,
                         voltV: explicit.voltV || false,

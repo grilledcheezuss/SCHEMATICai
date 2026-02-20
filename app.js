@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.33 (Generator Control Panel UX polish: collapsible Zone Styling, fix action button spacing, icon-only Add/Delete buttons with tooltips, enlarge context caret; version bump) ---
-const APP_VERSION = "v2.5.33";
+// --- SCHEMATICA ai v2.5.34 (Refine worker search parsing: HP table-format, NEMA4X enclosure, searchText field, reject_keyword normalization) ---
+const APP_VERSION = "v2.5.34";
 const VERSION_HISTORY = {
+    "v2.5.34": "Worker search false negatives fix: HP table-format parsing (HP: 7.5), NEMA4X enclosure detection, searchText field for model-number matching (PD6000 matches PD-6000), reject_keywords normalized to uppercase; client KeywordMatcher uses searchText",
     "v2.5.33": "Generator Control Panel UX polish: Zone Styling section collapsible and collapsed by default; Add/Delete redesigned as icon-only compact buttons with tooltips placed next to Preview (Project Data) and Auto-Scan (Page Editor); removed duplicate full-width Add/Delete buttons; bottom padding fix to prevent button clipping; context caret enlarged; version bump",
     "v2.5.32": "Generator Control Panel cleanup: remove redundant checkbox toggle section from Page Editor; Preview button moved to Project Data tab only; Project Context expanded by default on load; Auto-Scan Pages button given stable id (#auto-scan-btn) with reliable click wiring; Re-scan button id (#rescan-current-btn) wired via DOMContentLoaded; version bump",
     "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
@@ -2476,11 +2477,17 @@ class KeywordMatcher {
             return true; // No keyword filter
         }
         
-        const text = (record.id + " " + (record.desc || "")).toUpperCase();
+        // Use worker-provided searchText (includes collapsed model-number variants) when available,
+        // otherwise fall back to id + desc. This allows "PD6000" to match "PD-6000" etc.
+        const baseText = (record.id + " " + (record.desc || "")).toUpperCase();
+        const text = record.searchText ? record.searchText.toUpperCase() : baseText;
         
         // === CHECK REJECT KEYWORDS ===
         if (record.reject_keywords && record.reject_keywords.length > 0) {
-            const isRejected = rawKeywords.some(kw => record.reject_keywords.includes(kw));
+            // Compare case-insensitively to handle records cached before worker normalization was applied
+            const isRejected = rawKeywords.some(kw =>
+                record.reject_keywords.some(rk => String(rk).toUpperCase() === kw.toUpperCase())
+            );
             if (isRejected) return false;
         }
 
