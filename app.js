@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.32 (Generator Control Panel cleanup: remove checkbox toggles, Preview button Project Data only, Project Context expanded by default, fix Auto-Scan button wiring with stable IDs; version bump) ---
-const APP_VERSION = "v2.5.32";
+// --- SCHEMATICA ai v2.5.33 (Generator Control Panel UX polish: collapsible Zone Styling, fix action button spacing, icon-only Add/Delete buttons with tooltips, enlarge context caret; version bump) ---
+const APP_VERSION = "v2.5.33";
 const VERSION_HISTORY = {
+    "v2.5.33": "Generator Control Panel UX polish: Zone Styling section collapsible and collapsed by default; Add/Delete redesigned as icon-only compact buttons with tooltips placed next to Preview (Project Data) and Auto-Scan (Page Editor); removed duplicate full-width Add/Delete buttons; bottom padding fix to prevent button clipping; context caret enlarged; version bump",
     "v2.5.32": "Generator Control Panel cleanup: remove redundant checkbox toggle section from Page Editor; Preview button moved to Project Data tab only; Project Context expanded by default on load; Auto-Scan Pages button given stable id (#auto-scan-btn) with reliable click wiring; Re-scan button id (#rescan-current-btn) wired via DOMContentLoaded; version bump",
     "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
     "v2.5.30": "Tablet UI: generator panel docked as collapsible right sidebar with purple rail; viewer flex:1 fills freed space; preview minimizes panel + shows redacted modal with Print/Export action sheet; Print Redacted uses previewPdfBytes + afterprint cleanup; base print uses afterprint + 90s fallback; base print button labeled as original PDF; control panel: removed duplicate zone block, Clear All, Export; consolidated Add Box; version bump",
@@ -569,6 +570,15 @@ class DemoManager {
             content.classList.add('collapsed');
             panel.classList.add('collapsed-state');
         }
+    }
+
+    static toggleZoneStyling() {
+        const content = document.getElementById('zone-styling-content');
+        const icon = document.getElementById('zone-styling-toggle-icon');
+        if (!content) return;
+        const isHidden = content.style.display === 'none' || content.style.display === '';
+        content.style.display = isHidden ? 'block' : 'none';
+        if (icon) icon.style.transform = isHidden ? 'rotate(90deg)' : '';
     }
 
     static getContext() {
