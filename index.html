@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.30)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.31)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -86,7 +86,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.30</span>
+        <span class="app-title-version" id="app-version">v2.5.31</span>
     </div>
 
     <div class="header-controls">
@@ -322,36 +322,39 @@
                         <input type="range" id="redact-size" min="8" max="32" value="14" style="width:100%;" oninput="RedactionManager.updateActiveStyle()">
                     </div>
                 </div>
-            </div>
 
-            <div id="editor-controls" class="disabled-overlay">
-                <div class="editor-section">
-                    <span class="editor-label">Mapped Data</span>
-                    <select id="zone-map-select" class="cox-input" onchange="RedactionManager.mapSelectedZone()">
-                        <option value="cust">Customer Name</option>
-                        <option value="job">Job Name</option>
-                        <option value="type">System Type</option>
-                        <option value="cpid">Panel ID (CP-####)</option>
-                        <option value="date">Date</option>
-                        <option value="stage">Design Stage</option>
-                        <option value="po">PO Number</option>
-                        <option value="serial">Serial Number</option>
-                        <option value="company">Company Name</option>
-                        <option value="address">Company Address</option>
-                        <option value="phone">Phone Number</option>
-                        <option value="fax">Fax Number</option>
-                        <option value="custom">Custom Text...</option>
-                        <option value="logo">Branding/Logo (Block)</option>
-                    </select>
-                    
-                    <div id="custom-text-wrapper" style="display:none; margin-top:5px;">
-                        <input type="text" id="custom-zone-text" class="demo-input" placeholder="Type text here..." oninput="RedactionManager.updateCustomText(this.value)">
+                <div id="editor-controls" class="disabled-overlay">
+                    <div class="editor-section">
+                        <span class="editor-label">Mapped Data</span>
+                        <select id="zone-map-select" class="cox-input" onchange="RedactionManager.mapSelectedZone()">
+                            <option value="cust">Customer Name</option>
+                            <option value="job">Job Name</option>
+                            <option value="type">System Type</option>
+                            <option value="cpid">Panel ID (CP-####)</option>
+                            <option value="date">Date</option>
+                            <option value="stage">Design Stage</option>
+                            <option value="po">PO Number</option>
+                            <option value="serial">Serial Number</option>
+                            <option value="company">Company Name</option>
+                            <option value="address">Company Address</option>
+                            <option value="phone">Phone Number</option>
+                            <option value="fax">Fax Number</option>
+                            <option value="custom">Custom Text...</option>
+                            <option value="logo">Branding/Logo (Block)</option>
+                        </select>
+                        
+                        <div id="custom-text-wrapper" style="display:none; margin-top:5px;">
+                            <input type="text" id="custom-zone-text" class="demo-input" placeholder="Type text here..." oninput="RedactionManager.updateCustomText(this.value)">
+                        </div>
                     </div>
                 </div>
+
+                <div style="padding:0 8px; margin-top:10px;">
+                    <button class="search-btn" style="background:var(--app-accent) !important; width:100%;" onclick="SmartScanner.scanAllPages()">🔍 Auto-Scan Pages</button>
+                </div>
             </div>
-            
+
             <div style="margin-top:auto; display:flex; flex-direction:column; gap:5px;">
-                <button class="search-btn" style="background:var(--app-accent) !important;" onclick="SmartScanner.scanAllPages()">🔍 Auto-Scan Pages</button>
                 <button class="search-btn" style="background:var(--app-primary) !important;" onclick="RedactionManager.addZoneToCurrentView('custom')">➕ Add Box</button>
                 <button class="search-btn" style="background:#dc2626 !important;" onclick="RedactionManager.deleteSelected()">❌ Delete Box</button>
                 <button class="search-btn" style="background:#8b5cf6 !important;" onclick="PdfExporter.preview()">👁️ Preview Redacted PDF</button>

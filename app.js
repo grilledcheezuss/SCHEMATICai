@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.30 (Tablet UI polish: docked generator sidebar + purple collapse rail; redacted preview Print/Export action sheet; base print afterprint stability; version bump) ---
-const APP_VERSION = "v2.5.30";
+// --- SCHEMATICA ai v2.5.31 (Fix tablet right rail expansion: restorePanel clears display:none; thicken collapse rails; move mapped-data + auto-scan to Page Editor tab; version bump) ---
+const APP_VERSION = "v2.5.31";
 const VERSION_HISTORY = {
+    "v2.5.31": "Fix tablet right rail expansion (restorePanel now clears inline display:none so generator panel becomes visible on expand); thicken collapse rails (collapse-btn width 20px→23px); move Mapped Data dropdown and Auto-Scan Pages button from outside tabs into Page Editor tab; version bump",
     "v2.5.30": "Tablet UI: generator panel docked as collapsible right sidebar with purple rail; viewer flex:1 fills freed space; preview minimizes panel + shows redacted modal with Print/Export action sheet; Print Redacted uses previewPdfBytes + afterprint cleanup; base print uses afterprint + 90s fallback; base print button labeled as original PDF; control panel: removed duplicate zone block, Clear All, Export; consolidated Add Box; version bump",
     "v2.5.29": "Smooth generator toggle transition (body.generator-transition fade, deterministic post-render scan replaces 500ms timeout); tablet breakpoint support for generator panel; UI.isSmallMobile()/isTablet() helpers; small-mobile guard in toggleGenerator(); version bump",
     "v2.5.28": "Generator OFF now renders original PDF for all pages with no template overlay and no auto-scan; SmartScanner page 1 always applies COVER_TEMPLATE deterministically (skips text/OCR detection); default desktop zoom changed from 110% to 100%; version bump",
@@ -540,6 +541,7 @@ class DemoManager {
     static restorePanel() {
         const panel = document.getElementById('generator-panel');
         if (UI.isTablet()) {
+            panel.style.display = '';
             panel.classList.remove('gen-collapsed');
             const rail = document.getElementById('toggle-right');
             if (rail) rail.innerText = '›';
