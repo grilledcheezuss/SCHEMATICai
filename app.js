@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.37 (Title page layout overhaul + multiline zones + desktop docked panel) ---
-const APP_VERSION = "v2.5.37";
+// --- SCHEMATICA ai v2.5.38 (Title page layout parity fix + dynamic overlay scaling + right-panel UI polish) ---
+const APP_VERSION = "v2.5.38";
 const VERSION_HISTORY = {
+    "v2.5.38": "Cover/title page layout parity fix: COVER_TEMPLATE zones redesigned to match Cox reference (cust bold/Times centered below logo; job_block now Job+SystemType multiline underline; separate stage and date zones; cpid bottom-right); job_block mapping changed from job+stage to job+type; overlay boxes now store data-rel-x/y/w/h for zoom-stable scaling; RedactionManager.rescaleZones() reapplies absolute positions from rel coords after drag/resize; right panel tabs given white background in light mode with visible border and no white-corner artifacts; version bump",
     "v2.5.37": "Title page text layout overhaul: COVER_TEMPLATE zones redesigned for Cox title page parity (cust/job_block/type/date/cpid); unified job+stage into multiline job_block zone; custom text editor upgraded from input to textarea supporting newlines (white-space: pre-line on-screen, per-line PDF drawText); desktop control panel now docked/collapsible right sidebar matching tablet layout (isTablet expanded to all >=768px widths); version bump",
     "v2.5.36": "Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS when both detected); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each weight+variedCount tier instead of global partition)",
     "v2.5.35": "Hotfix: guard preload against missing credentials (show auth modal instead of 401); differentiate 401 (INVALID CREDENTIALS + re-login) vs 503 (SERVICE UNAVAILABLE + retry); worker returns 503 when auth backend (Airtable Users) is unreachable instead of leaving CACHE_USERS empty and falsely returning 401",
@@ -207,11 +208,11 @@ const LAYOUT_RULES = {
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     COVER_TEMPLATE: [
-        { map: "cust", x: 0.15, y: 0.20, w: 0.7, h: 0.05, fontSize: 26, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "job_block", x: 0.15, y: 0.28, w: 0.7, h: 0.09, fontSize: 22, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "type", x: 0.15, y: 0.40, w: 0.7, h: 0.04, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "date", x: 0.25, y: 0.80, w: 0.499, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+        { map: "cust",      x: 0.1,   y: 0.22,  w: 0.8,   h: 0.055, fontSize: 28, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job_block", x: 0.1,   y: 0.32,  w: 0.8,   h: 0.11,  fontSize: 22, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "stage",     x: 0.15,  y: 0.495, w: 0.7,   h: 0.04,  fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "date",      x: 0.15,  y: 0.545, w: 0.7,   h: 0.04,  fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid",      x: 0.835, y: 0.948, w: 0.15,  h: 0.03,  fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -1051,6 +1052,13 @@ class RedactionManager {
         box.dataset.map = mapKey || 'custom';
         if(text) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration; 
         
+        // Store relative coordinates for zoom-stable rescaling (only when container has valid dimensions)
+        const cw = container.offsetWidth; const ch = container.offsetHeight;
+        if (cw > 0 && ch > 0) {
+            box.dataset.relX = x / cw; box.dataset.relY = y / ch;
+            box.dataset.relW = w / cw; box.dataset.relH = h / ch;
+        }
+        
         box.dataset.transparent = transparent.toString(); 
         
         let styleFont = fontFamily;
@@ -1116,7 +1124,39 @@ class RedactionManager {
 
     static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = box.offsetLeft; this.startTop = box.offsetTop; box.style.cursor = 'grabbing'; }
     static handleDrag(e) { if(!this.isDragging || !this.activeBox) return; e.preventDefault(); const deltaX = e.clientX - this.startX; const deltaY = e.clientY - this.startY; this.activeBox.style.left = (this.startLeft + deltaX) + 'px'; this.activeBox.style.top = (this.startTop + deltaY) + 'px'; }
-    static endDrag() { if(this.activeBox) this.activeBox.style.cursor = 'grab'; this.isDragging = false; }
+    static endDrag() { 
+        if(this.activeBox) { 
+            this.activeBox.style.cursor = 'grab'; 
+            // Update relative coordinates after drag so rescaleZones stays accurate
+            const layer = this.activeBox.closest('.redaction-layer');
+            const container = layer ? layer.closest('.pdf-content-container') : null;
+            if (container) {
+                const cw = container.offsetWidth || 1; const ch = container.offsetHeight || 1;
+                this.activeBox.dataset.relX = this.activeBox.offsetLeft / cw;
+                this.activeBox.dataset.relY = this.activeBox.offsetTop / ch;
+                this.activeBox.dataset.relW = this.activeBox.offsetWidth / cw;
+                this.activeBox.dataset.relH = this.activeBox.offsetHeight / ch;
+            }
+        } 
+        this.isDragging = false; 
+    }
+
+    /** Reapply absolute pixel positions for all zones in a wrapper from their stored relative coords.
+     *  Call after layout changes (e.g. window resize) to keep overlay boxes aligned with PDF content. */
+    static rescaleZones(wrapper) {
+        const container = wrapper ? wrapper.querySelector('.pdf-content-container') : null;
+        if (!container) return;
+        const cw = container.offsetWidth; const ch = container.offsetHeight;
+        if (!cw || !ch) return;
+        container.querySelectorAll('.redaction-box').forEach(box => {
+            const rx = parseFloat(box.dataset.relX); const ry = parseFloat(box.dataset.relY);
+            const rw = parseFloat(box.dataset.relW); const rh = parseFloat(box.dataset.relH);
+            if (!isNaN(rx) && !isNaN(ry) && !isNaN(rw) && !isNaN(rh)) {
+                box.style.left = (rx * cw) + 'px'; box.style.top  = (ry * ch) + 'px';
+                box.style.width = (rw * cw) + 'px'; box.style.height = (rh * ch) + 'px';
+            }
+        });
+    }
     
     static selectZone(box) { 
         if(this.activeBox) this.activeBox.classList.remove('selected'); 
@@ -1209,7 +1249,8 @@ class RedactionManager {
             } else if(map === 'job') {
                 text = ctx.job;
             } else if(map === 'job_block') {
-                const lines = [ctx.job, ctx.stage].filter(Boolean);
+                // job_block = Job Name + System Type (two-line multiline block; ctx.type is System Type)
+                const lines = [ctx.job, ctx.type].filter(Boolean);
                 text = lines.join('\n');
             } else if(map === 'type') {
                 text = ctx.type;
