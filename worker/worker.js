@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.35 (Hotfix: 503 on auth backend unavailable; no false 401 on Users fetch failure)
+// 🧠 SCHEMATICA ai WORKER v2.5.36 (Enclosure spec-table wins; tier-aware no-PDF sorting)
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -472,6 +472,7 @@ function _parseVoltageContextAware(t) {
 }
 
 // Parse enclosure type: detects NEMA 4X, NEMA4X, TYPE 4X, 4XSS, 4XFG, POLY.
+// When both SS and FG detected, spec-table context keywords determine the winner.
 // Logic mirrored in worker/lib/extract.js for unit testing.
 function _parseEnclosure(t) {
     const foundEnclosures = new Set();
@@ -486,6 +487,31 @@ function _parseEnclosure(t) {
         if (!hasFG && !hasSS && !foundEnclosures.has("4XFG") && !foundEnclosures.has("4XSS")) foundEnclosures.add("4XSS");
     }
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
+
+    // Spec-table precedence: when both SS and FG are detected, check which
+    // material appears near high-confidence spec-table context keywords.
+    if (foundEnclosures.has("4XFG") && foundEnclosures.has("4XSS")) {
+        const SPEC_TABLE_KW = /\b(?:ENCLOSURE\s+MATERIAL|ENCLOSURE\s+NEMA\s+RATING|NAMEPLATE(?:\s+SCHEDULE)?|PANEL\s+TYPE)\b/i;
+        const SPEC_TABLE_WINDOW = 150;
+        let ssInSpecTable = false;
+        let fgInSpecTable = false;
+        const skRegex = new RegExp(SPEC_TABLE_KW, 'gi');
+        let m;
+        while ((m = skRegex.exec(t)) !== null) {
+            // Look FORWARD only from the spec-table keyword: the value follows the label
+            const start = m.index + m[0].length;
+            const end = Math.min(t.length, start + SPEC_TABLE_WINDOW);
+            const ctx = t.slice(start, end);
+            if (/\bSTAINLESS\b/i.test(ctx)) ssInSpecTable = true;
+            if (/\b(?:FIBERGLASS|FIBER\s*GLASS)\b/i.test(ctx)) fgInSpecTable = true;
+        }
+        if (ssInSpecTable && !fgInSpecTable) {
+            foundEnclosures.delete("4XFG");
+        } else if (fgInSpecTable && !ssInSpecTable) {
+            foundEnclosures.delete("4XSS");
+        }
+    }
+
     return foundEnclosures;
 }
 
@@ -579,8 +605,9 @@ function extractSpecsStrict(t) {
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
-        // Prefer FG (fiberglass) when both SS and FG present (deterministic canonical)
-        s.enc = foundEnclosures.has("4XFG") ? "4XFG" : [...foundEnclosures][0];
+        // Spec-table precedence already applied in _parseEnclosure.
+        // If still multiple (both materials in spec table, or neither), prefer SS as canonical.
+        s.enc = foundEnclosures.has("4XSS") ? "4XSS" : [...foundEnclosures][0];
         s.encV = true;
     }
 
