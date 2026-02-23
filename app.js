@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.36 (Enclosure spec-table wins + tier-aware no-PDF sorting) ---
-const APP_VERSION = "v2.5.36";
+// --- SCHEMATICA ai v2.5.37 (Title page layout overhaul + multiline zones + desktop docked panel) ---
+const APP_VERSION = "v2.5.37";
 const VERSION_HISTORY = {
+    "v2.5.37": "Title page text layout overhaul: COVER_TEMPLATE zones redesigned for Cox title page parity (cust/job_block/type/date/cpid); unified job+stage into multiline job_block zone; custom text editor upgraded from input to textarea supporting newlines (white-space: pre-line on-screen, per-line PDF drawText); desktop control panel now docked/collapsible right sidebar matching tablet layout (isTablet expanded to all >=768px widths); version bump",
     "v2.5.36": "Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS when both detected); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each weight+variedCount tier instead of global partition)",
     "v2.5.35": "Hotfix: guard preload against missing credentials (show auth modal instead of 401); differentiate 401 (INVALID CREDENTIALS + re-login) vs 503 (SERVICE UNAVAILABLE + retry); worker returns 503 when auth backend (Airtable Users) is unreachable instead of leaving CACHE_USERS empty and falsely returning 401",
     "v2.5.34": "Worker parsing + search robustness: context-aware service-first voltage extraction (control transformer 480V-120VAC excluded from service volt); HP table-format parsing (HP: 7.5, MOTOR HP: 7.5); enclosure parsing covers NEMA4X/TYPE 4X/4 X; FG preferred canonical when both SS+FG present; HorsepowerMatcher decimal HP regex fix; KeywordMatcher model-number hyphen/space flex (PD6000↔PD-6000); reject_keywords normalized to uppercase; pure helpers in worker/lib/extract.js with node test runner",
@@ -206,11 +207,10 @@ const LAYOUT_RULES = {
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     COVER_TEMPLATE: [
-        { map: "cust", x: 0.15, y: 0.38, w: 0.7, h: 0.04, fontSize: 24, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "job", x: 0.15, y: 0.44, w: 0.7, h: 0.04, fontSize: 22, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "type", x: 0.15, y: 0.485, w: 0.7, h: 0.04, fontSize: 18, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "stage", x: 0.201, y: 0.69, w: 0.6, h: 0.04, fontSize: 22, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "date", x: 0.25, y: 0.75, w: 0.499, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cust", x: 0.15, y: 0.20, w: 0.7, h: 0.05, fontSize: 26, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job_block", x: 0.15, y: 0.28, w: 0.7, h: 0.09, fontSize: 22, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.15, y: 0.40, w: 0.7, h: 0.04, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "date", x: 0.25, y: 0.80, w: 0.499, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     GENERAL: [
@@ -697,7 +697,7 @@ class PageContext {
 class ControlPanelManager {
     // Define which fields are relevant for each profile
     static PROFILE_FIELDS = {
-        'COVER_TEMPLATE': ['cust', 'job', 'type', 'cpid', 'date', 'stage'],
+        'COVER_TEMPLATE': ['cust', 'job', 'job_block', 'type', 'cpid', 'date', 'stage'],
         'TITLE': ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'company', 'address', 'phone', 'fax'],
         'TITLE_ASBUILT': ['cust', 'job', 'cpid', 'date', 'company', 'address', 'phone'],
         'COX_COVER': ['cust', 'job', 'date', 'cpid', 'company', 'address', 'phone', 'fax'],
@@ -1208,6 +1208,9 @@ class RedactionManager {
                 text = ctx.cust;
             } else if(map === 'job') {
                 text = ctx.job;
+            } else if(map === 'job_block') {
+                const lines = [ctx.job, ctx.stage].filter(Boolean);
+                text = lines.join('\n');
             } else if(map === 'type') {
                 text = ctx.type;
             } else if(map === 'cpid') {
@@ -2937,56 +2940,43 @@ class PdfExporter {
                         
                         let fontToUse = fontTimes;
                         if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
-                        const textWidth = fontToUse.widthOfTextAtSize(text, fontSize);
-                        
-                        let textX = drawX;
-                        if (box.style.textAlign === 'center') textX = drawX + (drawW/2) - (textWidth/2);
-                        else if (box.style.textAlign === 'right') textX = drawX + drawW - textWidth;
 
-                        const textY = drawY + (drawH/2) - (fontSize/4);
-                        
                         const rotation = parseFloat(box.dataset.rotation) || 0;
                         if (rotation !== 0) {
-                            // Apply rotation transform
+                            // Rotated text: single-line only (existing behavior)
+                            const textWidth = fontToUse.widthOfTextAtSize(text, fontSize);
                             const centerX = drawX + drawW/2;
                             const centerY = drawY + drawH/2;
-                            
-                            page.drawText(text, { 
-                                x: centerX, 
-                                y: centerY, 
-                                size: fontSize, 
-                                font: fontToUse, 
-                                color: PDFLib.rgb(0,0,0),
-                                rotate: PDFLib.degrees(rotation)
-                            });
-                            
-                            // FIX: Apply underline for rotated text with proper transform
+                            page.drawText(text, { x: centerX, y: centerY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0), rotate: PDFLib.degrees(rotation) });
                             if (box.dataset.decoration === 'underline') {
                                 const halfWidth = textWidth / 2;
                                 const underlineOffset = fontSize / 8;
                                 const radians = (rotation * Math.PI) / 180;
-                                const cos = Math.cos(radians);
-                                const sin = Math.sin(radians);
-                                
-                                // Calculate underline endpoints with rotation
+                                const cos = Math.cos(radians); const sin = Math.sin(radians);
                                 const startX = centerX - halfWidth * cos - underlineOffset * sin;
                                 const startY = centerY - halfWidth * sin + underlineOffset * cos;
                                 const endX = centerX + halfWidth * cos - underlineOffset * sin;
                                 const endY = centerY + halfWidth * sin + underlineOffset * cos;
-                                
-                                page.drawLine({
-                                    start: { x: startX, y: startY },
-                                    end: { x: endX, y: endY },
-                                    thickness: 1,
-                                    color: PDFLib.rgb(0,0,0)
-                                });
+                                page.drawLine({ start: { x: startX, y: startY }, end: { x: endX, y: endY }, thickness: 1, color: PDFLib.rgb(0,0,0) });
                             }
                         } else {
-                            page.drawText(text, { x: textX, y: textY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
-                            
-                            if (box.dataset.decoration === 'underline') {
-                                page.drawLine({ start: { x: textX, y: textY - 2 }, end: { x: textX + textWidth, y: textY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
-                            }
+                            // Non-rotated: support multiline by splitting on \n
+                            const lines = text.split('\n');
+                            const lineHeight = fontSize * 1.4;
+                            const totalTextHeight = lineHeight * lines.length;
+                            const baseY = drawY + drawH/2 + totalTextHeight/2 - fontSize;
+                            lines.forEach((line, i) => {
+                                const lineText = line || '';
+                                const lineWidth = lineText ? fontToUse.widthOfTextAtSize(lineText, fontSize) : 0;
+                                let lineX = drawX;
+                                if (box.style.textAlign === 'center') lineX = drawX + (drawW/2) - (lineWidth/2);
+                                else if (box.style.textAlign === 'right') lineX = drawX + drawW - lineWidth;
+                                const lineY = baseY - i * lineHeight;
+                                if (lineText) page.drawText(lineText, { x: lineX, y: lineY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
+                                if (box.dataset.decoration === 'underline' && lineText) {
+                                    page.drawLine({ start: { x: lineX, y: lineY - 2 }, end: { x: lineX + lineWidth, y: lineY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
+                                }
+                            });
                         }
                     }
                 });
@@ -3914,7 +3904,7 @@ class UI {
     }
     
     static isSmallMobile() { return window.innerWidth < 768; }
-    static isTablet() { return window.innerWidth >= 768 && window.innerWidth <= 1024; }
+    static isTablet() { return window.innerWidth >= 768; } // includes desktop — docked sidebar on all non-mobile widths
 
     static toggleDarkMode() { 
         document.body.classList.toggle('dark-mode'); 

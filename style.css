@@ -463,7 +463,9 @@ body.demo-mode .redaction-layer {
     box-sizing: border-box !important;
     min-width: 20px;
     min-height: 20px;
-} 
+}
+
+.redaction-text { white-space: pre-line; }
 
 .redaction-box[data-transparent="false"] { 
     background: white; 
@@ -721,8 +723,8 @@ body.editor-active .redaction-resize-handle {
     #menu-demo { display: flex; }
 }
 
-@media (min-width: 768px) and (max-width: 1024px) {
-    /* 3-column flex layout: left sidebar | viewer | generator sidebar */
+@media (min-width: 768px) {
+    /* 3-column flex layout: left sidebar | viewer | generator sidebar (tablet + desktop) */
     #generator-panel {
         position: static;
         width: 260px;
