@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.35 (Hotfix: auth regression on version bump cache purge; 503 for backend unavailable; INVALID CREDENTIALS for 401; credential guard before preload) ---
-const APP_VERSION = "v2.5.35";
+// --- SCHEMATICA ai v2.5.36 (Enclosure spec-table wins + tier-aware no-PDF sorting) ---
+const APP_VERSION = "v2.5.36";
 const VERSION_HISTORY = {
+    "v2.5.36": "Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS when both detected); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each weight+variedCount tier instead of global partition)",
     "v2.5.35": "Hotfix: guard preload against missing credentials (show auth modal instead of 401); differentiate 401 (INVALID CREDENTIALS + re-login) vs 503 (SERVICE UNAVAILABLE + retry); worker returns 503 when auth backend (Airtable Users) is unreachable instead of leaving CACHE_USERS empty and falsely returning 401",
     "v2.5.34": "Worker parsing + search robustness: context-aware service-first voltage extraction (control transformer 480V-120VAC excluded from service volt); HP table-format parsing (HP: 7.5, MOTOR HP: 7.5); enclosure parsing covers NEMA4X/TYPE 4X/4 X; FG preferred canonical when both SS+FG present; HorsepowerMatcher decimal HP regex fix; KeywordMatcher model-number hyphen/space flex (PD6000↔PD-6000); reject_keywords normalized to uppercase; pure helpers in worker/lib/extract.js with node test runner",
     "v2.5.33": "Generator Control Panel UX polish: Zone Styling section collapsible and collapsed by default; Add/Delete redesigned as icon-only compact buttons with tooltips placed next to Preview (Project Data) and Auto-Scan (Page Editor); removed duplicate full-width Add/Delete buttons; bottom padding fix to prevent button clipping; context caret enlarged; version bump",
@@ -2646,6 +2647,8 @@ class SearchEngine {
         });
         
         // === SORT AND PARTITION RESULTS ===
+        // isMissingPdf helper used as a sort sub-key (within each tier, PDF-present records first)
+        const isMissingPdf = r => !r.pdfUrl || r.pdfStatus === PDF_STATUS.MISSING || String(r.pdfUrl || '').trim() === '';
         res.sort((a,b) => { 
             if(a.w !== b.w) return b.w - a.w;
             
@@ -2666,13 +2669,15 @@ class SearchEngine {
             
             if(aVariedCount !== bVariedCount) return aVariedCount - bVariedCount; // Fewer varied flags = better
             
+            // Within the same tier, PDF-present records sort before missing-PDF records
+            const aMissing = isMissingPdf(a) ? 1 : 0;
+            const bMissing = isMissingPdf(b) ? 1 : 0;
+            if(aMissing !== bMissing) return aMissing - bMissing;
+            
             return b.id.localeCompare(a.id, undefined, {numeric:true, sensitivity:'base'}); 
         });
         
-        // Partition: with PDF first, then no-PDF, preserving intra-group order
-        const withPdf = res.filter(r => r.pdfUrl);
-        const noPdf = res.filter(r => !r.pdfUrl);
-        this.currentResults = [...withPdf, ...noPdf];
+        this.currentResults = res;
         this.currentPage = 1;
         this.lastCriteria = crit;
         this.renderCurrentPage();

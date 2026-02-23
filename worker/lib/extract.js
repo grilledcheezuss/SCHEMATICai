@@ -164,6 +164,9 @@ function parseVoltageContextAware(t) {
 /**
  * Parse enclosure type from text.
  * Detects: NEMA 4X, NEMA4X, TYPE 4X, 4X, 4 X, 4XSS, 4XFG and material hints.
+ * When both fiberglass and stainless are present, spec-table context wins:
+ *   Keywords like ENCLOSURE MATERIAL, NAMEPLATE, PANEL TYPE near a material
+ *   keyword are treated as high-confidence spec-table evidence.
  * Returns a Set of enclosure type strings.
  */
 function parseEnclosure(t) {
@@ -192,6 +195,33 @@ function parseEnclosure(t) {
 
     // Polycarbonate (can appear without 4X rating)
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
+
+    // Spec-table precedence: when both SS and FG are detected, check which
+    // material appears near high-confidence spec-table context keywords.
+    // The spec-table context wins over general-text material mentions.
+    if (foundEnclosures.has("4XFG") && foundEnclosures.has("4XSS")) {
+        const SPEC_TABLE_KW = /\b(?:ENCLOSURE\s+MATERIAL|ENCLOSURE\s+NEMA\s+RATING|NAMEPLATE(?:\s+SCHEDULE)?|PANEL\s+TYPE)\b/i;
+        const SPEC_TABLE_WINDOW = 150;
+        let ssInSpecTable = false;
+        let fgInSpecTable = false;
+        const skRegex = new RegExp(SPEC_TABLE_KW, 'gi');
+        let m;
+        while ((m = skRegex.exec(t)) !== null) {
+            // Look FORWARD only from the spec-table keyword: the value follows the label
+            const start = m.index + m[0].length;
+            const end = Math.min(t.length, start + SPEC_TABLE_WINDOW);
+            const ctx = t.slice(start, end);
+            if (/\bSTAINLESS\b/i.test(ctx)) ssInSpecTable = true;
+            if (/\b(?:FIBERGLASS|FIBER\s*GLASS)\b/i.test(ctx)) fgInSpecTable = true;
+        }
+        // Spec-table context wins: remove the material NOT supported by spec table
+        if (ssInSpecTable && !fgInSpecTable) {
+            foundEnclosures.delete("4XFG");
+        } else if (fgInSpecTable && !ssInSpecTable) {
+            foundEnclosures.delete("4XSS");
+        }
+        // If both or neither appear near spec-table keywords, leave both (encV = true)
+    }
 
     return foundEnclosures;
 }
@@ -291,8 +321,9 @@ function extractSpecsStrict(t) {
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
-        // Prefer FG (fiberglass) when both SS and FG present (deterministic canonical)
-        s.enc = foundEnclosures.has("4XFG") ? "4XFG" : [...foundEnclosures][0];
+        // Spec-table precedence already applied in parseEnclosure.
+        // If still multiple (both materials in spec table, or neither), prefer SS as canonical.
+        s.enc = foundEnclosures.has("4XSS") ? "4XSS" : [...foundEnclosures][0];
         s.encV = true;
     }
 

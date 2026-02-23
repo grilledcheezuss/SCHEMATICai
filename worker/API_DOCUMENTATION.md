@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.35
+## Version: v2.5.36
 
 ## Overview
 
@@ -10,7 +10,9 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
-- **v2.5.34**: Worker parsing + search robustness: context-aware service-first voltage extraction (control transformer notation excluded from service voltage); HP table-format parsing; NEMA4X/TYPE 4X enclosure coverage; pure helpers in worker/lib/extract.js with node test runner (worker/tests/run.js)
+- **v2.5.36**: Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each scoring tier)
+- **v2.5.35**: Hotfix: guard preload against missing credentials; differentiate 401 vs 503; worker returns 503 when auth backend unreachable
+- **v2.5.34**: Worker parsing + search robustness: context-aware service-first voltage extraction (control transformer notation excluded from service voltage); HP table-format parsing; NEMA4X/TYPE 4X enclosure coverage; pure helpers in worker/lib/extract.js with node test runner
 - **v2.5.16**: Professional-Grade Update: restored positive feedback lockout; voltage/phase/enc badge strictness fix (green for exact field matches, orange for fuzzy); page toolbar cleanup; OCR min-size guard for tiny boxes; smarter page classification with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control)
 - **v2.5.15**: Sorting: perfect matches (no varied flags) prioritized above varied results when weights equal; Feedback: removed thumbs-down lockout to allow multiple per-parameter corrections per panel per search
 - **v2.5.14**: Fixed 4XSS enclosure parsing to exclude fiberglass panels (now correctly mapped to 4XFG); added Date field to feedback submissions

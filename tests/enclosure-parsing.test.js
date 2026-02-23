@@ -1,4 +1,7 @@
-// Test enclosure parsing functionality (v2.5.14)
+// Test enclosure parsing functionality (v2.5.36)
+
+// Use the actual parseEnclosure from extract.js
+const { parseEnclosure } = require('../worker/lib/extract.js');
 
 // Simple test framework
 function assertEquals(actual, expected, message) {
@@ -12,37 +15,22 @@ function assertEquals(actual, expected, message) {
     return true;
 }
 
-// Simplified extractSpecsStrict function (enclosure portion only for testing)
+// Wrapper: uses parseEnclosure (same logic as worker) and returns { enc, encV }
 function extractEnclosure(text) {
     const result = { enc: null, encV: false };
     if (!text || typeof text !== 'string') return result;
-    
-    const foundEnclosures = new Set();
-    // Match common NEMA enclosure ratings: 4X (stainless steel), 4XFG (fiberglass), POLY (polycarbonate)
-    // 4X variants: 4X, 4XSS (stainless steel explicit), 4XFG (fiberglass)
-    // Priority: Check for fiberglass first, then stainless, to avoid misclassification
-    if (/\b4XFG\b/i.test(text)) foundEnclosures.add("4XFG");
-    if (/\b(FIBERGLASS|FIBER\s*GLASS)\b/i.test(text) && /\b4X\b/i.test(text)) foundEnclosures.add("4XFG");
-    if (/\b(STAINLESS|SS)\b/i.test(text) && /\b4X\b/i.test(text)) foundEnclosures.add("4XSS");
-    if (/\b4XSS\b/i.test(text)) foundEnclosures.add("4XSS");
-    // Default: bare "4X" without material keywords defaults to stainless steel (4XSS)
-    if (/\b4X\b/i.test(text) && !/\b(FIBERGLASS|FIBER\s*GLASS|4XFG)\b/i.test(text) && !foundEnclosures.has("4XSS")) {
-        foundEnclosures.add("4XSS");
-    }
-    if (/\bPOLY(?:CARBONATE)?\b/i.test(text)) foundEnclosures.add("POLY");
-    
+    const foundEnclosures = parseEnclosure(text);
     if (foundEnclosures.size === 1) {
         result.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
-        // Multiple enclosure types found - mark as varied
-        result.enc = [...foundEnclosures][0];
+        // Spec-table precedence already applied; prefer SS as tie-break canonical
+        result.enc = foundEnclosures.has("4XSS") ? "4XSS" : [...foundEnclosures][0];
         result.encV = true;
     }
-    
     return result;
 }
 
-console.log('🧪 Enclosure Parsing Tests - v2.5.14\n');
+console.log('🧪 Enclosure Parsing Tests - v2.5.36\n');
 console.log('Testing enclosure extraction...\n');
 
 let passed = 0;
@@ -107,8 +95,8 @@ const tests = [
     },
     {
         input: "4X STAINLESS AND 4XFG MIXED ENCLOSURES",
-        expected: { enc: "4XFG", encV: true },
-        name: "Multiple enclosure types (marked varied)"
+        expected: { enc: "4XSS", encV: true },
+        name: "Multiple enclosure types without spec-table context (canonical is SS)"
     },
     {
         input: "PUMP MOTOR 5 HP 480V 3PH",
@@ -124,6 +112,31 @@ const tests = [
         input: "FIBER GLASS ENCLOSURE 4X RATED",
         expected: { enc: "4XFG", encV: false },
         name: "Fiber glass (two words) with 4X"
+    },
+    // --- v2.5.36 spec-table precedence tests (CP-6915-like) ---
+    {
+        // CP-6915 scenario: FG mention is template/noise; spec table (NAMEPLATE) says SS.
+        input: "NEMA 4X FIBERGLASS ENCLOSURE (TEMPLATE) ... NAMEPLATE SCHEDULE: NEMA 4X STAINLESS STEEL ENCLOSURE 480V 3PH FLA 28A",
+        expected: { enc: "4XSS", encV: false },
+        name: "CP-6915: spec table (NAMEPLATE) says stainless — SS wins over template FG"
+    },
+    {
+        // Spec table says FG (ENCLOSURE MATERIAL near fiberglass); SS mention elsewhere is noise.
+        input: "STAINLESS STEEL SUPPORT STRUCTURE ... ENCLOSURE MATERIAL: FIBERGLASS NEMA 4X RATING",
+        expected: { enc: "4XFG", encV: false },
+        name: "Spec table (ENCLOSURE MATERIAL) says fiberglass — FG wins over noise SS"
+    },
+    {
+        // Both materials near a spec-table keyword — remains varied.
+        input: "PANEL TYPE: NEMA 4X STAINLESS OR FIBERGLASS PER SCHEDULE",
+        expected: { enc: "4XSS", encV: true },
+        name: "Spec table mentions both materials — remains varied (SS canonical)"
+    },
+    {
+        // FG appears before NAMEPLATE; SS appears after NAMEPLATE (forward window finds SS).
+        input: "NEMA 4X FIBERGLASS OPTION AVAILABLE. NAMEPLATE: 480V STAINLESS STEEL 4X ENCLOSURE",
+        expected: { enc: "4XSS", encV: false },
+        name: "NAMEPLATE spec-table context forward-window finds SS — resolves to 4XSS"
     }
 ];
 
