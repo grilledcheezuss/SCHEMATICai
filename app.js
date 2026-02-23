@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.38 (Cover template parity, job_block mapping fix, zoom-scaling, tab UI polish) ---
-const APP_VERSION = "v2.5.38";
+// --- SCHEMATICA ai v2.5.39 (Fix cover template placement, zoom-safe font scaling, rapid zoom rogue-page bug, right-rail color; align versions) ---
+const APP_VERSION = "v2.5.39";
 const VERSION_HISTORY = {
+    "v2.5.39": "Fix cover template placement (cust below logo, job_block/stage/date evenly spaced, no logo overlap); zoom-safe font scaling via data-relFont (rescaleZones recomputes fontSize from relFont*ch); debounce zoom() to eliminate rogue/duplicate page on rapid zoom; toggle-left/toggle-right rails white bg with border in light mode, contrast in dark mode; align version strings across app.js and index.html; version bump",
     "v2.5.38": "Cover template parity: COVER_TEMPLATE overlay zones updated for Cox title page (logo/footer already in template artwork; overlays fill cust/job_block/stage/date/cpid only); all cover overlays use Times New Roman serif; job_block now maps job+type with word-wrap (not job+stage); stage rendered as its own zone; zoom-scaling via data-rel geometry (rescaleZones after render); right panel tab UI polish (white background, visible borders); version bump",
     "v2.5.37": "Title page text layout overhaul: COVER_TEMPLATE zones redesigned for Cox title page parity (cust/job_block/type/date/cpid); unified job+stage into multiline job_block zone; custom text editor upgraded from input to textarea supporting newlines (white-space: pre-line on-screen, per-line PDF drawText); desktop control panel now docked/collapsible right sidebar matching tablet layout (isTablet expanded to all >=768px widths); version bump",
     "v2.5.36": "Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS when both detected); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each weight+variedCount tier instead of global partition)",
@@ -210,10 +211,10 @@ const LAYOUT_RULES = {
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     COVER_TEMPLATE: [
-        { map: "cust", x: 0.15, y: 0.26, w: 0.7, h: 0.05, fontSize: 22, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "job_block", x: 0.15, y: 0.34, w: 0.7, h: 0.10, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "stage", x: 0.15, y: 0.56, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "date", x: 0.25, y: 0.62, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "cust", x: 0.15, y: 0.32, w: 0.7, h: 0.06, fontSize: 22, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job_block", x: 0.15, y: 0.42, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "stage", x: 0.15, y: 0.62, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "date", x: 0.25, y: 0.69, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
         { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'right' }
     ],
     GENERAL: [
@@ -1058,6 +1059,7 @@ class RedactionManager {
         box.dataset.relY = (y / ch).toFixed(6);
         box.dataset.relW = (w / cw).toFixed(6);
         box.dataset.relH = (h / ch).toFixed(6);
+        box.dataset.relFont = (fontSize / ch).toFixed(6);
         box.dataset.map = mapKey || 'custom';
         if(text) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration; 
         
@@ -1182,7 +1184,10 @@ class RedactionManager {
         
         if(!this.activeBox) return; 
         this.activeBox.style.fontFamily = document.getElementById('redact-font').value; 
-        this.activeBox.style.fontSize = fs + 'px'; 
+        this.activeBox.style.fontSize = fs + 'px';
+        const container = this.activeBox.closest('.pdf-content-container');
+        const ch = container ? (container.offsetHeight || 1) : 1;
+        this.activeBox.dataset.relFont = (parseFloat(fs) / ch).toFixed(6);
     }
     
     static updateActiveAlignment(align) {
@@ -1303,6 +1308,10 @@ class RedactionManager {
                 box.style.top = (ry * ch) + 'px';
                 box.style.width = (rw * cw) + 'px';
                 box.style.height = (rh * ch) + 'px';
+            }
+            const rf = parseFloat(box.dataset.relFont);
+            if (!isNaN(rf)) {
+                box.style.fontSize = (rf * ch) + 'px';
             }
         });
     }
@@ -3751,7 +3760,7 @@ class PdfViewer {
             document.body.classList.remove('generator-transition');
         }
     }
-    static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; this.renderStack(); }
+    static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; clearTimeout(this._zoomTimer); this._zoomTimer = setTimeout(() => this.renderStack(), 100); }
 
     /** Wait two animation frames so the browser has had a chance to perform layout. */
     static waitForLayoutStable(element, { minWidth = 1, minHeight = 1, retries = 10, delay = 50 } = {}) {
