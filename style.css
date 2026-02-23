@@ -763,7 +763,7 @@ body.editor-active .redaction-resize-handle {
     display: flex;
     border-bottom: 2px solid var(--app-primary);
     margin-bottom: 0;
-    background: #ffffff;
+    background: var(--bg-controls);
     border-radius: 0;
     overflow: hidden;
 }
@@ -771,7 +771,7 @@ body.editor-active .redaction-resize-handle {
 .tab-btn {
     flex: 1;
     padding: 10px;
-    background: #ffffff;
+    background: var(--bg-controls);
     border: none;
     border-right: 1px solid var(--border-color);
     color: var(--text-secondary);
@@ -855,6 +855,11 @@ body.dark-mode .del-zone-btn {
 }
 #zone-styling-toggle-icon {
     transition: transform 0.3s;
+    min-width: 28px;
+    text-align: center;
+}
+#zone-styling-panel.expanded-state #zone-styling-toggle-icon {
+    transform: rotate(90deg);
 }
 
 /* Enlarged Project Context caret */

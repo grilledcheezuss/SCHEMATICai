@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.39 (Fix cover template placement, zoom-safe font scaling, rapid zoom rogue-page bug, right-rail color; align versions) ---
-const APP_VERSION = "v2.5.39";
+// --- SCHEMATICA ai v2.5.40 (Cover template typography/placement parity + fix zoom font scaling + unify right panel styling) ---
+const APP_VERSION = "v2.5.40";
 const VERSION_HISTORY = {
+    "v2.5.40": "Cover template parity: cust moved below logo (y=0.40), job_block shifted down (y=0.50), both job+type lines underlined; label 'Customer Name'→'Company Name'; getContext defaults COMPANY NAME/JOB NAME; zoom-safe rescaleZones infers relFont from computed style when missing, waitForLayoutStable before rescaleZones in renderStack; right panel tab strip uses CSS vars; Zone Styling section styled to match Project Context card (dashed border, glass header); version bump",
     "v2.5.39": "Fix cover template placement (cust below logo, job_block/stage/date evenly spaced, no logo overlap); zoom-safe font scaling via data-relFont (rescaleZones recomputes fontSize from relFont*ch); debounce zoom() to eliminate rogue/duplicate page on rapid zoom; toggle-left/toggle-right rails white bg with border in light mode, contrast in dark mode; align version strings across app.js and index.html; version bump",
     "v2.5.38": "Cover template parity: COVER_TEMPLATE overlay zones updated for Cox title page (logo/footer already in template artwork; overlays fill cust/job_block/stage/date/cpid only); all cover overlays use Times New Roman serif; job_block now maps job+type with word-wrap (not job+stage); stage rendered as its own zone; zoom-scaling via data-rel geometry (rescaleZones after render); right panel tab UI polish (white background, visible borders); version bump",
     "v2.5.37": "Title page text layout overhaul: COVER_TEMPLATE zones redesigned for Cox title page parity (cust/job_block/type/date/cpid); unified job+stage into multiline job_block zone; custom text editor upgraded from input to textarea supporting newlines (white-space: pre-line on-screen, per-line PDF drawText); desktop control panel now docked/collapsible right sidebar matching tablet layout (isTablet expanded to all >=768px widths); version bump",
@@ -211,10 +212,10 @@ const LAYOUT_RULES = {
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     COVER_TEMPLATE: [
-        { map: "cust", x: 0.15, y: 0.32, w: 0.7, h: 0.06, fontSize: 22, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "job_block", x: 0.15, y: 0.42, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "stage", x: 0.15, y: 0.62, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "date", x: 0.25, y: 0.69, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "cust", x: 0.15, y: 0.40, w: 0.7, h: 0.06, fontSize: 22, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
         { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'right' }
     ],
     GENERAL: [
@@ -614,8 +615,8 @@ class DemoManager {
 
     static getContext() {
         return { 
-            cust: document.getElementById('demo-cust-name').value || "CUSTOMER NAME", 
-            job: document.getElementById('demo-job-name').value || "JOB TITLE", 
+            cust: document.getElementById('demo-cust-name').value || "COMPANY NAME", 
+            job: document.getElementById('demo-job-name').value || "JOB NAME", 
             type: document.getElementById('demo-system-type').value || "SYSTEM TYPE", 
             cpid: document.getElementById('demo-panel-id').value || "CP-####", 
             date: document.getElementById('demo-date').value || "YYYY-MM-DD", 
@@ -1309,7 +1310,15 @@ class RedactionManager {
                 box.style.width = (rw * cw) + 'px';
                 box.style.height = (rh * ch) + 'px';
             }
-            const rf = parseFloat(box.dataset.relFont);
+            const rf_raw = parseFloat(box.dataset.relFont);
+            let rf = isNaN(rf_raw) ? NaN : rf_raw;
+            if (isNaN(rf)) {
+                const computedFs = parseFloat(getComputedStyle(box).fontSize);
+                if (!isNaN(computedFs) && ch > 1) {
+                    rf = computedFs / ch;
+                    box.dataset.relFont = rf.toFixed(6);
+                }
+            }
             if (!isNaN(rf)) {
                 box.style.fontSize = (rf * ch) + 'px';
             }
@@ -3726,6 +3735,7 @@ class PdfViewer {
                 }
             }
             // Re-scale any existing overlay zones to match new page dimensions
+            await PdfViewer.waitForLayoutStable(contentContainer);
             RedactionManager.rescaleZones(wrapper);
         }
         // Populate ALL profile dropdowns ONCE after all pages are rendered
