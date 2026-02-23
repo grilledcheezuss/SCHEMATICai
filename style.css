@@ -852,8 +852,8 @@ body.dark-mode .del-zone-btn {
     min-width: 28px;
     text-align: center;
 }
-#zone-styling-panel.expanded-state #zone-styling-toggle-icon {
-    transform: rotate(90deg);
+#zone-styling-panel.collapsed-state #zone-styling-toggle-icon {
+    transform: rotate(-90deg);
 }
 
 /* Enlarged Project Context caret */
