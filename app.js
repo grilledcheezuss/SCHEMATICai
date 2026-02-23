@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.37 (Title page layout overhaul + multiline zones + desktop docked panel) ---
-const APP_VERSION = "v2.5.37";
+// --- SCHEMATICA ai v2.5.38 (Cover template parity, job_block mapping fix, zoom-scaling, tab UI polish) ---
+const APP_VERSION = "v2.5.38";
 const VERSION_HISTORY = {
+    "v2.5.38": "Cover template parity: COVER_TEMPLATE overlay zones updated for Cox title page (logo/footer already in template artwork; overlays fill cust/job_block/stage/date/cpid only); all cover overlays use Times New Roman serif; job_block now maps job+type with word-wrap (not job+stage); stage rendered as its own zone; zoom-scaling via data-rel geometry (rescaleZones after render); right panel tab UI polish (white background, visible borders); version bump",
     "v2.5.37": "Title page text layout overhaul: COVER_TEMPLATE zones redesigned for Cox title page parity (cust/job_block/type/date/cpid); unified job+stage into multiline job_block zone; custom text editor upgraded from input to textarea supporting newlines (white-space: pre-line on-screen, per-line PDF drawText); desktop control panel now docked/collapsible right sidebar matching tablet layout (isTablet expanded to all >=768px widths); version bump",
     "v2.5.36": "Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS when both detected); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each weight+variedCount tier instead of global partition)",
     "v2.5.35": "Hotfix: guard preload against missing credentials (show auth modal instead of 401); differentiate 401 (INVALID CREDENTIALS + re-login) vs 503 (SERVICE UNAVAILABLE + retry); worker returns 503 when auth backend (Airtable Users) is unreachable instead of leaving CACHE_USERS empty and falsely returning 401",
@@ -125,6 +126,8 @@ const DOM_CACHE = {
 
 window.TEMPLATE_BYTES = null;
 
+const JOB_BLOCK_MAX_CHARS_PER_LINE = 30;
+
 const LAYOUT_RULES = {
     TITLE: [
         { map: "cust", x: 0.15, y: 0.42, w: 0.7, h: 0.04, fontSize: 24, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
@@ -207,11 +210,11 @@ const LAYOUT_RULES = {
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     COVER_TEMPLATE: [
-        { map: "cust", x: 0.15, y: 0.20, w: 0.7, h: 0.05, fontSize: 26, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "job_block", x: 0.15, y: 0.28, w: 0.7, h: 0.09, fontSize: 22, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "type", x: 0.15, y: 0.40, w: 0.7, h: 0.04, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "date", x: 0.25, y: 0.80, w: 0.499, h: 0.04, fontSize: 20, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+        { map: "cust", x: 0.15, y: 0.26, w: 0.7, h: 0.05, fontSize: 22, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "job_block", x: 0.15, y: 0.34, w: 0.7, h: 0.10, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "stage", x: 0.15, y: 0.56, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "date", x: 0.25, y: 0.62, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -1048,6 +1051,13 @@ class RedactionManager {
         
         const box = document.createElement('div'); box.className = 'redaction-box';
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
+        // Store relative geometry for zoom-scaling
+        const cw = container.offsetWidth || 1;
+        const ch = container.offsetHeight || 1;
+        box.dataset.relX = (x / cw).toFixed(6);
+        box.dataset.relY = (y / ch).toFixed(6);
+        box.dataset.relW = (w / cw).toFixed(6);
+        box.dataset.relH = (h / ch).toFixed(6);
         box.dataset.map = mapKey || 'custom';
         if(text) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration; 
         
@@ -1116,7 +1126,23 @@ class RedactionManager {
 
     static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = box.offsetLeft; this.startTop = box.offsetTop; box.style.cursor = 'grabbing'; }
     static handleDrag(e) { if(!this.isDragging || !this.activeBox) return; e.preventDefault(); const deltaX = e.clientX - this.startX; const deltaY = e.clientY - this.startY; this.activeBox.style.left = (this.startLeft + deltaX) + 'px'; this.activeBox.style.top = (this.startTop + deltaY) + 'px'; }
-    static endDrag() { if(this.activeBox) this.activeBox.style.cursor = 'grab'; this.isDragging = false; }
+    static endDrag() {
+        if(this.activeBox) {
+            this.activeBox.style.cursor = 'grab';
+            // Update relative geometry after drag
+            const layer = this.activeBox.closest('.redaction-layer');
+            const container = layer ? layer.parentElement : null;
+            if (container) {
+                const cw = container.offsetWidth || 1;
+                const ch = container.offsetHeight || 1;
+                this.activeBox.dataset.relX = (this.activeBox.offsetLeft / cw).toFixed(6);
+                this.activeBox.dataset.relY = (this.activeBox.offsetTop / ch).toFixed(6);
+                this.activeBox.dataset.relW = (this.activeBox.offsetWidth / cw).toFixed(6);
+                this.activeBox.dataset.relH = (this.activeBox.offsetHeight / ch).toFixed(6);
+            }
+        }
+        this.isDragging = false;
+    }
     
     static selectZone(box) { 
         if(this.activeBox) this.activeBox.classList.remove('selected'); 
@@ -1209,7 +1235,21 @@ class RedactionManager {
             } else if(map === 'job') {
                 text = ctx.job;
             } else if(map === 'job_block') {
-                const lines = [ctx.job, ctx.stage].filter(Boolean);
+                const jobLines = [];
+                if (ctx.job) {
+                    const words = ctx.job.split(' ');
+                    let line = '';
+                    for (const word of words) {
+                        if (line.length > 0 && (line + ' ' + word).length > JOB_BLOCK_MAX_CHARS_PER_LINE) {
+                            jobLines.push(line);
+                            line = word;
+                        } else {
+                            line = line.length > 0 ? line + ' ' + word : word;
+                        }
+                    }
+                    if (line) jobLines.push(line);
+                }
+                const lines = [...jobLines, ctx.type].filter(Boolean);
                 text = lines.join('\n');
             } else if(map === 'type') {
                 text = ctx.type;
@@ -1246,6 +1286,26 @@ class RedactionManager {
         }); 
     }
     static clearAll() { document.querySelectorAll('.redaction-layer').forEach(l => l.innerHTML = ''); this.zones = []; this.deselect(); }
+
+    static rescaleZones(wrapper) {
+        const container = wrapper.querySelector('.pdf-content-container');
+        if (!container) return;
+        const cw = container.offsetWidth || 1;
+        const ch = container.offsetHeight || 1;
+        const boxes = container.querySelectorAll('.redaction-box');
+        boxes.forEach(box => {
+            const rx = parseFloat(box.dataset.relX);
+            const ry = parseFloat(box.dataset.relY);
+            const rw = parseFloat(box.dataset.relW);
+            const rh = parseFloat(box.dataset.relH);
+            if (!isNaN(rx) && !isNaN(ry) && !isNaN(rw) && !isNaN(rh)) {
+                box.style.left = (rx * cw) + 'px';
+                box.style.top = (ry * ch) + 'px';
+                box.style.width = (rw * cw) + 'px';
+                box.style.height = (rh * ch) + 'px';
+            }
+        });
+    }
 }
 
 class PageClassifier {
@@ -2067,7 +2127,8 @@ class LayoutScanner {
         
         ruleSet.forEach(zone => { 
             RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize, zone.text, zone.decoration || null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
-        }); 
+        });
+        RedactionManager.rescaleZones(wrapper);
     }
 }
 
@@ -3655,6 +3716,8 @@ class PdfViewer {
                     }
                 }
             }
+            // Re-scale any existing overlay zones to match new page dimensions
+            RedactionManager.rescaleZones(wrapper);
         }
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
