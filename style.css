@@ -761,20 +761,27 @@ body.editor-active .redaction-resize-handle {
     display: flex;
     border-bottom: 2px solid var(--app-primary);
     margin-bottom: 0;
-    background: var(--bg-card);
+    background: #ffffff;
+    border-radius: 0;
+    overflow: hidden;
 }
 
 .tab-btn {
     flex: 1;
     padding: 10px;
-    background: transparent;
+    background: #ffffff;
     border: none;
+    border-right: 1px solid var(--border-color);
     color: var(--text-secondary);
     cursor: pointer;
     font-weight: 500;
     font-size: 11px;
     transition: all 0.2s;
     border-bottom: 3px solid transparent;
+}
+
+.tab-btn:last-child {
+    border-right: none;
 }
 
 .tab-btn:hover {
