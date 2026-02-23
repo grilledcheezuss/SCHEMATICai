@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.40 (Cover template typography/placement parity + fix zoom font scaling + unify right panel styling) ---
-const APP_VERSION = "v2.5.40";
+// --- SCHEMATICA ai v2.5.41 (Control Panel UI cleanup: remove drag-handle header, unify right panel with left sidebar, Zone Styling card parity) ---
+const APP_VERSION = "v2.5.41";
 const VERSION_HISTORY = {
+    "v2.5.41": "Control Panel UI cleanup: removed obsolete drag-handle header (purple bar, minimize/close buttons); generator panel header now matches left sidebar (bg-sidebar, border-color); tab strip integrated as sidebar UI; Zone Styling card outer styling verified identical to Project Context card; DragManager.init() never called on docked widths (>=768px); version bump",
     "v2.5.40": "Cover template parity: cust moved below logo (y=0.40), job_block shifted down (y=0.50), both job+type lines underlined; label 'Customer Name'→'Company Name'; getContext defaults COMPANY NAME/JOB NAME; zoom-safe rescaleZones infers relFont from computed style when missing, waitForLayoutStable before rescaleZones in renderStack; right panel tab strip uses CSS vars; Zone Styling section styled to match Project Context card (dashed border, glass header); version bump",
     "v2.5.39": "Fix cover template placement (cust below logo, job_block/stage/date evenly spaced, no logo overlap); zoom-safe font scaling via data-relFont (rescaleZones recomputes fontSize from relFont*ch); debounce zoom() to eliminate rogue/duplicate page on rapid zoom; toggle-left/toggle-right rails white bg with border in light mode, contrast in dark mode; align version strings across app.js and index.html; version bump",
     "v2.5.38": "Cover template parity: COVER_TEMPLATE overlay zones updated for Cox title page (logo/footer already in template artwork; overlays fill cust/job_block/stage/date/cpid only); all cover overlays use Times New Roman serif; job_block now maps job+type with word-wrap (not job+stage); stage rendered as its own zone; zoom-scaling via data-rel geometry (rescaleZones after render); right panel tab UI polish (white background, visible borders); version bump",
@@ -531,7 +532,6 @@ class DemoManager {
             if(btn) btn.style.color = 'var(--app-primary)';
             if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
-            if (!UI.isTablet()) DragManager.init();
         } else { 
             document.body.classList.remove('demo-mode'); 
             document.body.classList.remove('editor-active'); 
