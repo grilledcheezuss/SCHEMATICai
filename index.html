@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.40)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.41)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -86,7 +86,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.40</span>
+        <span class="app-title-version" id="app-version">v2.5.41</span>
     </div>
 
     <div class="header-controls">
@@ -170,14 +170,8 @@
     <div id="toggle-right" class="collapse-btn" onclick="DemoManager.toggleGeneratorSidebar()" style="display:none;">›</div>
 
     <div id="generator-panel" style="display:none;">
-        <div id="gen-drag-handle" class="editor-header" style="cursor: move;">
-            <div style="display:flex; flex-direction:column; gap:4px; flex:1;">
-                <span class="editor-title">Control Panel</span>
-            </div>
-            <div class="panel-controls">
-                <button class="panel-btn" onclick="DemoManager.minimizePanel()" title="Minimize to View">─</button>
-                <button class="panel-btn" onclick="DemoManager.toggleGenerator()" title="Close Generator">✖</button>
-            </div>
+        <div id="gen-drag-handle" class="panel-sidebar-header">
+            <span class="editor-title">Control Panel</span>
         </div>
         
         <!-- Tab Navigation -->

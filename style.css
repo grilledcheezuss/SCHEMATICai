@@ -531,21 +531,17 @@ body.editor-active .redaction-resize-handle {
     transform: translateY(20px);
 }
 
-#generator-panel .editor-header {
-    background: var(--lsu-purple);
-    color: white;
-    padding: 12px 15px;
-    border-radius: 8px 8px 0 0;
-    margin: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    display: flex; justify-content: space-between; align-items: center;
+#generator-panel .panel-sidebar-header {
+    background: var(--bg-controls);
+    color: var(--text-primary);
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
 }
 
-#generator-panel .editor-title { color: white !important; }
-
-.panel-controls { display: flex; gap: 8px; }
-.panel-btn { background: none; border: none; color: white; font-size: 14px; opacity: 0.8; padding: 0 5px; }
-.panel-btn:hover { opacity: 1; }
+#generator-panel .editor-title { color: var(--text-primary) !important; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 
 #redaction-editor-content {
     padding: 10px;
@@ -752,8 +748,6 @@ body.editor-active .redaction-resize-handle {
         border: none;
         overflow: hidden;
     }
-    /* Drag handle not needed on tablet */
-    #gen-drag-handle { cursor: default !important; }
     /* Restore btn not used on tablet */
     #generator-restore-btn { display: none !important; }
 }
