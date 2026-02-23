@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.39)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.40)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -86,7 +86,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.39</span>
+        <span class="app-title-version" id="app-version">v2.5.40</span>
     </div>
 
     <div class="header-controls">
@@ -201,7 +201,7 @@
                 </div>
 
                 <div id="demo-context-content">
-                    <div class="input-wrapper" data-field="cust"><span class="demo-label">Customer Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Customer..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="cust"><span class="demo-label">Company Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Company..." oninput="RedactionManager.refreshContent()"></div>
                     <div class="input-wrapper" data-field="job"><span class="demo-label">Job Name</span><input type="text" id="demo-job-name" class="demo-input" placeholder="Enter Job Name..." oninput="RedactionManager.refreshContent()"></div>
                     <div class="input-wrapper" data-field="type"><span class="demo-label">System Type</span><input type="text" id="demo-system-type" class="demo-input" placeholder="e.g. Duplex Pump..." oninput="RedactionManager.refreshContent()"></div>
                     <div class="input-wrapper" data-field="cpid"><span class="demo-label">Panel ID</span><input type="text" id="demo-panel-id" class="demo-input" placeholder="CP-####" oninput="RedactionManager.refreshContent()"></div>
@@ -276,10 +276,10 @@
                 </div>
                 
                 <!-- Zone Styling (collapsible, collapsed by default) -->
-                <div class="editor-section" style="border-top:1px solid var(--border-color); padding-top:10px; padding-bottom:10px; margin-bottom:10px;">
-                    <div class="zone-styling-header" onclick="DemoManager.toggleZoneStyling()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom:0;">
-                        <div style="font-size:11px; font-weight:600; color:var(--text-primary);">🎨 Zone Styling</div>
-                        <span id="zone-styling-toggle-icon" style="font-size:16px; color:var(--text-secondary); transition:transform 0.3s; line-height:1;">&#9658;</span>
+                <div id="zone-styling-panel" style="padding:10px; margin-bottom:15px; background:var(--demo-bg); border:2px dashed var(--demo-border); border-radius:8px;">
+                    <div class="zone-styling-header" onclick="DemoManager.toggleZoneStyling()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:var(--glass-bg); border:1px solid var(--glass-border); padding:8px; margin-bottom:0; border-radius:4px;">
+                        <span style="font-size:11px; font-weight:600; color:var(--glass-text);">🎨 ZONE STYLING</span>
+                        <span id="zone-styling-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px; transition:transform 0.3s;">&#9658;</span>
                     </div>
                     <div id="zone-styling-content" style="display:none; margin-top:8px;">
                     
@@ -318,7 +318,7 @@
                     <div class="editor-section">
                         <span class="editor-label">Mapped Data</span>
                         <select id="zone-map-select" class="cox-input" onchange="RedactionManager.mapSelectedZone()">
-                            <option value="cust">Customer Name</option>
+                            <option value="cust">Company Name</option>
                             <option value="job">Job Name</option>
                             <option value="job_block">Job + System Type Block (multiline)</option>
                             <option value="type">System Type</option>
