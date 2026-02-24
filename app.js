@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.41 (Control Panel UI cleanup: remove drag-handle header, unify right panel with left sidebar, Zone Styling card parity) ---
-const APP_VERSION = "v2.5.41";
+// --- SCHEMATICA ai v2.5.42 (Toggle caret parity, default zone styling mono+opaque, fix opaque toggle, adjust cover cust font size, fix zoom font scaling) ---
+const APP_VERSION = "v2.5.42";
 const VERSION_HISTORY = {
+    "v2.5.42": "Toggle caret parity (zone-styling caret matches Project Context glyph+CSS); default zone styling mono+opaque for non-cust zones; fix opaque toggle (rescaleZones after transparent toggle); cover cust fontSize 22→24; zoom font scaling: RAF double-tick in rescaleZones + second rescaleZones RAF pass after renderStack; version bump",
     "v2.5.41": "Control Panel UI cleanup: removed obsolete drag-handle header (purple bar, minimize/close buttons); generator panel header now matches left sidebar (bg-sidebar, border-color); tab strip integrated as sidebar UI; Zone Styling card outer styling verified identical to Project Context card; DragManager.init() never called on docked widths (>=768px); version bump",
     "v2.5.40": "Cover template parity: cust moved below logo (y=0.40), job_block shifted down (y=0.50), both job+type lines underlined; label 'Customer Name'→'Company Name'; getContext defaults COMPANY NAME/JOB NAME; zoom-safe rescaleZones infers relFont from computed style when missing, waitForLayoutStable before rescaleZones in renderStack; right panel tab strip uses CSS vars; Zone Styling section styled to match Project Context card (dashed border, glass header); version bump",
     "v2.5.39": "Fix cover template placement (cust below logo, job_block/stage/date evenly spaced, no logo overlap); zoom-safe font scaling via data-relFont (rescaleZones recomputes fontSize from relFont*ch); debounce zoom() to eliminate rogue/duplicate page on rapid zoom; toggle-left/toggle-right rails white bg with border in light mode, contrast in dark mode; align version strings across app.js and index.html; version bump",
@@ -213,7 +214,7 @@ const LAYOUT_RULES = {
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     COVER_TEMPLATE: [
-        { map: "cust", x: 0.15, y: 0.40, w: 0.7, h: 0.06, fontSize: 22, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
+        { map: "cust", x: 0.15, y: 0.40, w: 0.7, h: 0.06, fontSize: 24, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
         { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
         { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
         { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
@@ -605,12 +606,15 @@ class DemoManager {
     }
 
     static toggleZoneStyling() {
+        const panel = document.getElementById('zone-styling-panel');
         const content = document.getElementById('zone-styling-content');
-        const icon = document.getElementById('zone-styling-toggle-icon');
         if (!content) return;
         const isHidden = content.style.display === 'none' || content.style.display === '';
         content.style.display = isHidden ? 'block' : 'none';
-        if (icon) icon.style.transform = isHidden ? 'rotate(90deg)' : '';
+        if (panel) {
+            if (isHidden) panel.classList.remove('collapsed-state');
+            else panel.classList.add('collapsed-state');
+        }
     }
 
     static getContext() {
@@ -1112,7 +1116,7 @@ class RedactionManager {
         const fontSize = document.getElementById('redact-size').value;
         const currentFontFamily = document.getElementById('redact-font').value; 
         const isWhiteout = type === 'blocker';
-        const transparent = !isWhiteout;
+        const transparent = false; // All new zones default to opaque (whiteout) per default styling rules
 
         this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize, isWhiteout ? '' : 'New Text', null, null, 'bold', transparent, 0, currentFontFamily, 'center');
         this.refreshContent();
@@ -1217,7 +1221,13 @@ class RedactionManager {
         this.activeBox.querySelector('span').innerText = text;
     }
 
-    static toggleBoxBackground() { if(!this.activeBox) return; const isOpaque = document.getElementById('zone-bg-toggle').checked; this.activeBox.dataset.transparent = isOpaque ? "false" : "true"; }
+    static toggleBoxBackground() {
+        if(!this.activeBox) return;
+        const isOpaque = document.getElementById('zone-bg-toggle').checked;
+        this.activeBox.dataset.transparent = isOpaque ? "false" : "true";
+        const wrapper = this.activeBox.closest('.pdf-page-wrapper');
+        if (wrapper) RedactionManager.rescaleZones(wrapper);
+    }
     
     static refreshContent() { 
         const ctx = DemoManager.getContext(); 
@@ -1322,6 +1332,18 @@ class RedactionManager {
             if (!isNaN(rf)) {
                 box.style.fontSize = (rf * ch) + 'px';
             }
+        });
+        // RAF double-tick: re-apply font sizes after layout settles to guard against
+        // animation / paint timing that may alter container dimensions after first pass
+        requestAnimationFrame(() => {
+            const cw2 = container.offsetWidth || 1;
+            const ch2 = container.offsetHeight || 1;
+            boxes.forEach(box => {
+                const rf2 = parseFloat(box.dataset.relFont);
+                if (!isNaN(rf2)) {
+                    box.style.fontSize = (rf2 * ch2) + 'px';
+                }
+            });
         });
     }
 }
@@ -3737,6 +3759,8 @@ class PdfViewer {
             // Re-scale any existing overlay zones to match new page dimensions
             await PdfViewer.waitForLayoutStable(contentContainer);
             RedactionManager.rescaleZones(wrapper);
+            // Second pass after fade-in animation may alter layout
+            requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
         }
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
