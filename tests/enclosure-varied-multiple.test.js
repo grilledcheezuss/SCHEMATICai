@@ -5,7 +5,7 @@
 
 // === Helpers (mirroring SearchEngine logic from app.js) ===
 
-const ENC_FG_RE = /\b(?:FIBERGLASS|FIBREGLASS|FRP|FG)\b/i;
+const ENC_FG_RE = /\b(?:FIBERGLASS|FIBREGLASS|FRP)\b/i;
 const ENC_SS_RE = /\b(?:4XSS|4X\s+SS|STAINLESS|S\/S|SS)\b/i;
 const ENC_POLY_RE = /\bPOLY(?:CARBONATE)?\b/i;
 
@@ -22,8 +22,19 @@ function reclassifyEnclosure(rec) {
         const isEncSS = rec.enc === '4XSS';
         // Reclassify when enc field contradicts description or desc has both signals
         if ((isEncFG && hasSSSignal) || (isEncSS && hasFGSignal) || (hasFGSignal && hasSSSignal)) {
-            rec.enc = 'Varied / Multiple';
-            rec.encV = true;
+            // Apply explicit compound token preference before falling back to Varied / Multiple
+            const hasExplicit4XSS = /\b4XSS\b/i.test(desc);
+            const hasExplicit4XFG = /\b4XFG\b/i.test(desc);
+            if (hasExplicit4XSS && !hasExplicit4XFG) {
+                rec.enc = '4XSS';
+                rec.encV = false;
+            } else if (hasExplicit4XFG && !hasExplicit4XSS) {
+                rec.enc = '4XFG';
+                rec.encV = false;
+            } else {
+                rec.enc = 'Varied / Multiple';
+                rec.encV = true;
+            }
         } else if (!rec.enc) {
             if (hasFGSignal) rec.enc = '4XFG';
             else if (hasSSSignal) rec.enc = '4XSS';
@@ -194,11 +205,11 @@ console.log('\n🧪 A: Enclosure Reclassification — Varied / Multiple\n');
 }
 
 {
-    // FRP token triggers FG signal
+    // FRP token + explicit 4XSS compound code → explicit 4XSS wins (v2.5.47 preference order)
     const rec = { enc: '4XSS', encV: false, desc: 'FRP PANEL 4XSS ENCLOSURE' };
     reclassifyEnclosure(rec);
-    assertEquals({ enc: rec.enc, encV: rec.encV }, { enc: 'Varied / Multiple', encV: true },
-        'FRP + 4XSS → Varied / Multiple');
+    assertEquals({ enc: rec.enc, encV: rec.encV }, { enc: '4XSS', encV: false },
+        'FRP + explicit 4XSS → 4XSS (explicit compound token wins)');
 }
 
 {

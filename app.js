@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.46 (Vendor PDF.js locally; guard pdfjsLib init; resilient CDN-free load) ---
-const APP_VERSION = "v2.5.46";
+// --- SCHEMATICA ai v2.5.47 (Refine enclosure parsing: explicit token preference + FRP signal; remove bare FG from client regex; vendor pdf-lib/fontkit locally; PDFLib guard) ---
+const APP_VERSION = "v2.5.47";
 const VERSION_HISTORY = {
+    "v2.5.47": "Enclosure parsing refinement: worker and client now prefer explicit compound tokens (4XSS/4XFG) as tiebreaker when spec-table context does not resolve mixed signals; FRP added as strong FG signal in worker hasFG check; client ENC_FG_RE no longer matches bare FG to prevent false Varied/Multiple; PDFLib guard added to generateRedactedPdf; pdf-lib and fontkit vendored locally under assets/vendor/; index.html updated to load local pdf-lib/fontkit with CDN-missing guards; version bump",
     "v2.5.46": "Vendor PDF.js v3.11.174 locally under assets/vendor/pdfjs/ (pdf.min.js + pdf.worker.min.js); replace CDN script tag with local path; guard pdfjsLib.GlobalWorkerOptions.workerSrc with window.pdfjsLib check so app does not crash when CDN is blocked/timed-out; set window.__pdfjsMissing flag and log clear error on missing library; version bump",
     "v2.5.45": "Worker-side enclosure parsing now outputs enc='Varied / Multiple' (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with (?<!208/) lookbehind guards to prevent 208/220V and 208/230V false positives; version bump",
     "v2.5.44": "Add enclosure 'Varied / Multiple' classification: client-side safety net reclassifies records with both FG+SS signals; enclosure filter includes Varied/Multiple matches with lower weight (100 vs 500); sorting tie-breaker: HP-varied ranks above ENC-varied when both have exactly one varied flag; version bump",
@@ -2691,7 +2692,8 @@ class SearchEngine {
         
         // === FILTER AND SCORE RESULTS ===
         // Client-side enclosure signal regexes for "Varied / Multiple" classification (v2.5.44)
-        const ENC_FG_RE = /\b(?:FIBERGLASS|FIBREGLASS|FRP|FG)\b/i;
+        // FRP and FIBERGLASS/FIBREGLASS are strong FG signals; bare FG excluded (too many false matches)
+        const ENC_FG_RE = /\b(?:FIBERGLASS|FIBREGLASS|FRP)\b/i;
         const ENC_SS_RE = /\b(?:4XSS|4X\s+SS|STAINLESS|S\/S|SS)\b/i;
         const ENC_POLY_RE = /\bPOLY(?:CARBONATE)?\b/i;
 
@@ -2715,9 +2717,22 @@ class SearchEngine {
                 const isEncSS = r.enc === '4XSS';
                 // Reclassify when enc field contradicts description or desc has both signals
                 if ((isEncFG && hasSSSignal) || (isEncSS && hasFGSignal) || (hasFGSignal && hasSSSignal)) {
-                    r.enc = 'Varied / Multiple';
-                    r.encV = true;
-                    encV = true;
+                    // Apply explicit compound token preference before Varied / Multiple (v2.5.47)
+                    const hasExplicit4XSS = /\b4XSS\b/i.test(desc);
+                    const hasExplicit4XFG = /\b4XFG\b/i.test(desc);
+                    if (hasExplicit4XSS && !hasExplicit4XFG) {
+                        r.enc = '4XSS';
+                        r.encV = false;
+                        encV = false;
+                    } else if (hasExplicit4XFG && !hasExplicit4XSS) {
+                        r.enc = '4XFG';
+                        r.encV = false;
+                        encV = false;
+                    } else {
+                        r.enc = 'Varied / Multiple';
+                        r.encV = true;
+                        encV = true;
+                    }
                 } else if (!r.enc) {
                     if (hasFGSignal) r.enc = '4XFG';
                     else if (hasSSSignal) r.enc = '4XSS';
@@ -3047,6 +3062,9 @@ class PdfExporter {
     }
     
     static async generateRedactedPdf() {
+        if (!window.PDFLib) {
+            throw new Error('PDF generation library (pdf-lib) is not available. Please check your network connection or contact support.');
+        }
         const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
         const mainPdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
         const compositeDoc = await PDFLib.PDFDocument.create();
