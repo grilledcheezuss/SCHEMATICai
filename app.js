@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.43 (Enforce default zone font/opaque policy: Times only for cover page company name; fix zoom font scaling reliably) ---
-const APP_VERSION = "v2.5.43";
+// --- SCHEMATICA ai v2.5.44 (Enclosure "Varied / Multiple" classification; strict filtering & scoring so ambiguous enclosures appear behind HP-varied results) ---
+const APP_VERSION = "v2.5.44";
 const VERSION_HISTORY = {
+    "v2.5.44": "Add enclosure 'Varied / Multiple' classification: client-side safety net reclassifies records with both FG+SS signals; enclosure filter includes Varied/Multiple matches with lower weight (100 vs 500); sorting tie-breaker: HP-varied ranks above ENC-varied when both have exactly one varied flag; version bump",
     "v2.5.43": "Default zone font/opaque policy: Times New Roman only for page 1 cust zone (cover page Company Name); all other zones default Courier+opaque; SmartScanner detected zones default transparent=false; zoom font scaling fix: applyRuleToWrapper scales LAYOUT_RULES fontSize by currentScale so boxes scale proportionally at 60%/40% zoom; rescaleZones added after applyDetectedZones; debug log in rescaleZones for editor mode; version bump",
     "v2.5.42": "Toggle caret parity (zone-styling caret matches Project Context glyph+CSS); default zone styling mono+opaque for non-cust zones; fix opaque toggle (rescaleZones after transparent toggle); cover cust fontSize 22→24; zoom font scaling: RAF double-tick in rescaleZones + second rescaleZones RAF pass after renderStack; version bump",
     "v2.5.41": "Control Panel UI cleanup: removed obsolete drag-handle header (purple bar, minimize/close buttons); generator panel header now matches left sidebar (bg-sidebar, border-color); tab strip integrated as sidebar UI; Zone Styling card outer styling verified identical to Project Context card; DragManager.init() never called on docked widths (>=768px); version bump",
@@ -2687,6 +2688,11 @@ class SearchEngine {
         };
         
         // === FILTER AND SCORE RESULTS ===
+        // Client-side enclosure signal regexes for "Varied / Multiple" classification (v2.5.44)
+        const ENC_FG_RE = /\b(?:FIBERGLASS|FIBREGLASS|FRP|FG)\b/i;
+        const ENC_SS_RE = /\b(?:4XSS|4X\s+SS|STAINLESS|S\/S|SS)\b/i;
+        const ENC_POLY_RE = /\bPOLY(?:CARBONATE)?\b/i;
+
         let res = [];
         window.LOCAL_DB.forEach(r => {
             let w = 0, p = true;
@@ -2696,6 +2702,25 @@ class SearchEngine {
             let voltV = r.voltV || false;
             let phaseV = r.phaseV || false;
             let encV = r.encV || false;
+
+            // A: Client-side enclosure reclassification — "Varied / Multiple" when both FG+SS present (v2.5.44)
+            // NOTE: intentionally mutates r.enc/r.encV (consistent with existing w/mfgV/hpV mutations below)
+            if (r.enc === '4XSS' || r.enc === '4XFG' || !r.enc) {
+                const desc = r.desc || '';
+                const hasFGSignal = ENC_FG_RE.test(desc);
+                const hasSSSignal = ENC_SS_RE.test(desc);
+                const isEncFG = r.enc === '4XFG';
+                const isEncSS = r.enc === '4XSS';
+                // Reclassify when enc field contradicts description or desc has both signals
+                if ((isEncFG && hasSSSignal) || (isEncSS && hasFGSignal) || (hasFGSignal && hasSSSignal)) {
+                    r.enc = 'Varied / Multiple';
+                    r.encV = true;
+                    encV = true;
+                } else if (!r.enc) {
+                    if (hasFGSignal) r.enc = '4XFG';
+                    else if (hasSSSignal) r.enc = '4XSS';
+                }
+            }
             
             // Category filter
             if (cat === 'Standard' && r.category === 'low_voltage') return;
@@ -2753,6 +2778,19 @@ class SearchEngine {
                     // Strict field match - override worker variance flag
                     encV = false;
                     w += 500;
+                } else if (r.enc === 'Varied / Multiple') {
+                    // B: Varied/Multiple enclosure — include if desc contains the searched signal (v2.5.44)
+                    const desc = r.desc || '';
+                    const isMatch =
+                        (crit.enc === '4XSS' && ENC_SS_RE.test(desc)) ||
+                        (crit.enc === '4XFG' && ENC_FG_RE.test(desc)) ||
+                        (crit.enc === 'POLY' && ENC_POLY_RE.test(desc));
+                    if (isMatch) {
+                        encV = true;
+                        w += 100; // Lower weight than strict match (500) — sorts behind strict results
+                    } else {
+                        return;
+                    }
                 } else {
                     return;
                 }
@@ -2787,6 +2825,21 @@ class SearchEngine {
                 (crit.enc !== 'Any' && b.encV ? 1 : 0);
             
             if(aVariedCount !== bVariedCount) return aVariedCount - bVariedCount; // Fewer varied flags = better
+            
+            // D: Tie-breaker when both have exactly one varied flag — prefer HP-varied over ENC-varied (v2.5.44)
+            if (aVariedCount === 1 && bVariedCount === 1) {
+                const variedPriority = r => {
+                    if (crit.hp !== 'Any' && r.hpV) return 4;    // best (HP-varied ranks highest)
+                    if (crit.volt !== 'Any' && r.voltV) return 3;
+                    if (crit.phase !== 'Any' && r.phaseV) return 3;
+                    if (crit.enc !== 'Any' && r.encV) return 2;
+                    if (crit.mfg !== 'Any' && r.mfgV) return 1;  // worst
+                    return 0;
+                };
+                const aPri = variedPriority(a);
+                const bPri = variedPriority(b);
+                if (aPri !== bPri) return bPri - aPri; // Higher priority = earlier in results
+            }
             
             // Within the same tier, PDF-present records sort before missing-PDF records
             const aMissing = isMissingPdf(a) ? 1 : 0;
