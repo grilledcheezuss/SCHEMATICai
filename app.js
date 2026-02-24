@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.48 (Redaction box defaults: CSS font fix Courier; zoom 110% default; SS spec-table lock always resolves 4XSS; version bump) ---
-const APP_VERSION = "v2.5.48";
+// --- SCHEMATICA ai v2.5.49 (Cover overlay text immediate render; correct COVER_TEMPLATE fonts: Courier for non-cust zones; cover font guardrail; version bump) ---
+const APP_VERSION = "v2.5.49";
 const VERSION_HISTORY = {
+    "v2.5.49": "Cover overlay text immediate render: applyPage1CoverTemplate now calls refreshContentForWrapper via requestAnimationFrame so text appears instantly instead of waiting for global scan end; corrected COVER_TEMPLATE font defaults: job_block/stage/date/cpid use Courier New monospace (Times New Roman reserved for cust only); guardrail in createZoneOnWrapper overrides Times to Courier on page 1 non-cust zones; version bump",
     "v2.5.48": "Redaction box defaults: CSS .redaction-box font-family changed from Times New Roman to Courier New so CSS does not override JS defaults; PdfViewer._setScaleForDevice desktop/tablet default zoom 1.0→1.1 (110%); Enclosure SS spec-table lock: when ENCLOSURE MATERIAL spec-table keyword indicates Stainless, always resolves to 4XSS (encV=false) even when FG signals also present; same logic mirrored in worker/lib/extract.js; new spec-table lock tests added; version bump",
     "v2.5.47": "Enclosure parsing refinement: worker and client now prefer explicit compound tokens (4XSS/4XFG) as tiebreaker when spec-table context does not resolve mixed signals; FRP added as strong FG signal in worker hasFG check; client ENC_FG_RE no longer matches bare FG to prevent false Varied/Multiple; PDFLib guard added to generateRedactedPdf; pdf-lib and fontkit vendored locally under assets/vendor/; index.html updated to load local pdf-lib/fontkit with CDN-missing guards; version bump",
     "v2.5.46": "Vendor PDF.js v3.11.174 locally under assets/vendor/pdfjs/ (pdf.min.js + pdf.worker.min.js); replace CDN script tag with local path; guard pdfjsLib.GlobalWorkerOptions.workerSrc with window.pdfjsLib check so app does not crash when CDN is blocked/timed-out; set window.__pdfjsMissing flag and log clear error on missing library; version bump",
@@ -221,10 +222,10 @@ const LAYOUT_RULES = {
     ],
     COVER_TEMPLATE: [
         { map: "cust", x: 0.15, y: 0.40, w: 0.7, h: 0.06, fontSize: 24, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'right' }
+        { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -1082,6 +1083,11 @@ class RedactionManager {
              const isCoverCust = (mapKey === 'cust' && pageNum === 1);
              styleFont = isCoverCust ? "'Times New Roman', serif" : "'Courier New', monospace";
         }
+        // Guardrail: on page 1 cover, only cust zone may use Times New Roman
+        const _pageNum = parseInt(wrapper.dataset.pageNumber, 10);
+        if (_pageNum === 1 && mapKey !== 'cust' && styleFont && styleFont.toLowerCase().includes('times')) {
+            styleFont = "'Courier New', monospace";
+        }
         
         box.style.fontFamily = styleFont;
         box.style.fontSize = fontSize + 'px'; 
@@ -1237,7 +1243,7 @@ class RedactionManager {
         if (wrapper) RedactionManager.rescaleZones(wrapper);
     }
     
-    static refreshContent() { 
+    static refreshContent(wrapper) { 
         const ctx = DemoManager.getContext(); 
         
         let displayDate = ctx.date;
@@ -1248,7 +1254,8 @@ class RedactionManager {
              }
         }
 
-        this.zones.forEach(box => { 
+        const boxes = wrapper ? wrapper.querySelectorAll('.redaction-box') : this.zones;
+        boxes.forEach(box => { 
             const map = box.dataset.map; 
             let text = ""; 
             
@@ -1309,6 +1316,7 @@ class RedactionManager {
             }
         }); 
     }
+    static refreshContentForWrapper(wrapper) { this.refreshContent(wrapper); }
     static clearAll() { document.querySelectorAll('.redaction-layer').forEach(l => l.innerHTML = ''); this.zones = []; this.deselect(); }
 
     static rescaleZones(wrapper) {
@@ -1649,6 +1657,8 @@ class SmartScanner {
         console.log(`[SmartScanner] Page 1 after layout stable. Container: ${container?.offsetWidth}x${container?.offsetHeight}`);
         LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES['COVER_TEMPLATE']);
         console.log(`[SmartScanner] Page 1 COVER_TEMPLATE zones applied: ${wrapper.querySelectorAll('.redaction-box').length}`);
+        // Populate text immediately so cover zones show text without waiting for global scan end
+        requestAnimationFrame(() => RedactionManager.refreshContentForWrapper(wrapper));
         this.addConfidenceIndicator(wrapper, 'high');
     }
 
