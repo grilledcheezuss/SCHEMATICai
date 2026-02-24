@@ -172,16 +172,18 @@ function parseVoltageContextAware(t) {
 function parseEnclosure(t) {
     const foundEnclosures = new Set();
 
-    // Explicit compound codes take priority
-    if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
+    // Explicit compound codes take priority; track presence for tie-breaking
+    const hasExplicit4XFG = /\b4XFG\b/i.test(t);
+    const hasExplicit4XSS = /\b4XSS\b/i.test(t);
+    if (hasExplicit4XFG) foundEnclosures.add("4XFG");
+    if (hasExplicit4XSS) foundEnclosures.add("4XSS");
 
     // Detect generic 4X rating (covers NEMA 4X, NEMA4X, TYPE 4X, 4 X, plain 4X)
     // Does NOT match 4XSS/4XFG (they contain more chars after X, already handled above)
     const has4X = /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t);
 
-    // Material keywords (used when bare 4X is present)
-    const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS)\b/i.test(t);
+    // Material keywords (used when bare 4X is present); FRP is a strong FG signal
+    const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(t);
     const hasSS = /\bSTAINLESS\b/i.test(t);
 
     if (has4X) {
@@ -212,15 +214,22 @@ function parseEnclosure(t) {
             const end = Math.min(t.length, start + SPEC_TABLE_WINDOW);
             const ctx = t.slice(start, end);
             if (/\bSTAINLESS\b/i.test(ctx)) ssInSpecTable = true;
-            if (/\b(?:FIBERGLASS|FIBER\s*GLASS)\b/i.test(ctx)) fgInSpecTable = true;
+            if (/\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(ctx)) fgInSpecTable = true;
         }
         // Spec-table context wins: remove the material NOT supported by spec table
         if (ssInSpecTable && !fgInSpecTable) {
             foundEnclosures.delete("4XFG");
         } else if (fgInSpecTable && !ssInSpecTable) {
             foundEnclosures.delete("4XSS");
+        } else {
+            // Spec-table did not resolve: prefer explicit compound token when unambiguous
+            if (hasExplicit4XSS && !hasExplicit4XFG) {
+                foundEnclosures.delete("4XFG");
+            } else if (hasExplicit4XFG && !hasExplicit4XSS) {
+                foundEnclosures.delete("4XSS");
+            }
+            // Both explicit tokens or neither → leave both (encV = true)
         }
-        // If both or neither appear near spec-table keywords, leave both (encV = true)
     }
 
     return foundEnclosures;

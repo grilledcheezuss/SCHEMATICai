@@ -1,4 +1,4 @@
-// Test enclosure parsing functionality (v2.5.45)
+// Test enclosure parsing functionality (v2.5.47)
 
 // Use the actual parseEnclosure from extract.js
 const { parseEnclosure } = require('../worker/lib/extract.js');
@@ -30,7 +30,7 @@ function extractEnclosure(text) {
     return result;
 }
 
-console.log('🧪 Enclosure Parsing Tests - v2.5.45\n');
+console.log('🧪 Enclosure Parsing Tests - v2.5.47\n');
 console.log('Testing enclosure extraction...\n');
 
 let passed = 0;
@@ -95,8 +95,8 @@ const tests = [
     },
     {
         input: "4X STAINLESS AND 4XFG MIXED ENCLOSURES",
-        expected: { enc: "Varied / Multiple", encV: true },
-        name: "Multiple enclosure types without spec-table context (Varied / Multiple)"
+        expected: { enc: "4XFG", encV: false },
+        name: "Explicit 4XFG with derived 4XSS (STAINLESS) — explicit 4XFG token wins"
     },
     {
         input: "PUMP MOTOR 5 HP 480V 3PH",
@@ -137,6 +137,31 @@ const tests = [
         input: "NEMA 4X FIBERGLASS OPTION AVAILABLE. NAMEPLATE: 480V STAINLESS STEEL 4X ENCLOSURE",
         expected: { enc: "4XSS", encV: false },
         name: "NAMEPLATE spec-table context forward-window finds SS — resolves to 4XSS"
+    },
+    // --- v2.5.47 explicit token preference tests ---
+    {
+        // FRP (strong FG signal) + explicit 4XSS code, no explicit 4XFG → prefer explicit 4XSS
+        input: "NEMA 4X FRP PANEL WITH 4XSS ENCLOSURE RATING",
+        expected: { enc: "4XSS", encV: false },
+        name: "v2.5.47: FRP material + explicit 4XSS token (no 4XFG) → 4XSS wins"
+    },
+    {
+        // Explicit 4XSS only (no 4XFG, FIBERGLASS material noise elsewhere) → prefer 4XSS
+        input: "4XSS RATED NEMA 4X ENCLOSURE FIBERGLASS CABLE TRAY",
+        expected: { enc: "4XSS", encV: false },
+        name: "v2.5.47: Explicit 4XSS + incidental FIBERGLASS noise → 4XSS (explicit token wins)"
+    },
+    {
+        // Explicit 4XFG only (no 4XSS, STAINLESS material elsewhere) → prefer 4XFG
+        input: "4XFG NEMA 4X ENCLOSURE STAINLESS STEEL SUPPORT STRUCTURE",
+        expected: { enc: "4XFG", encV: false },
+        name: "v2.5.47: Explicit 4XFG + incidental STAINLESS noise → 4XFG (explicit token wins)"
+    },
+    {
+        // Both explicit compound tokens → truly mixed, Varied / Multiple
+        input: "PANEL A: 4XSS ENCLOSURE. PANEL B: 4XFG ENCLOSURE.",
+        expected: { enc: "Varied / Multiple", encV: true },
+        name: "v2.5.47: Both explicit 4XSS and 4XFG tokens → Varied / Multiple"
     }
 ];
 

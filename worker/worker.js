@@ -476,10 +476,14 @@ function _parseVoltageContextAware(t) {
 // Logic mirrored in worker/lib/extract.js for unit testing.
 function _parseEnclosure(t) {
     const foundEnclosures = new Set();
-    if (/\b4XFG\b/i.test(t)) foundEnclosures.add("4XFG");
-    if (/\b4XSS\b/i.test(t)) foundEnclosures.add("4XSS");
+    // Explicit compound codes take priority; track presence for tie-breaking
+    const hasExplicit4XFG = /\b4XFG\b/i.test(t);
+    const hasExplicit4XSS = /\b4XSS\b/i.test(t);
+    if (hasExplicit4XFG) foundEnclosures.add("4XFG");
+    if (hasExplicit4XSS) foundEnclosures.add("4XSS");
     const has4X = /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t);
-    const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS)\b/i.test(t);
+    // FRP is a strong FG signal alongside FIBERGLASS/FIBER GLASS
+    const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(t);
     const hasSS = /\bSTAINLESS\b/i.test(t);
     if (has4X) {
         if (hasFG) foundEnclosures.add("4XFG");
@@ -503,12 +507,20 @@ function _parseEnclosure(t) {
             const end = Math.min(t.length, start + SPEC_TABLE_WINDOW);
             const ctx = t.slice(start, end);
             if (/\bSTAINLESS\b/i.test(ctx)) ssInSpecTable = true;
-            if (/\b(?:FIBERGLASS|FIBER\s*GLASS)\b/i.test(ctx)) fgInSpecTable = true;
+            if (/\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(ctx)) fgInSpecTable = true;
         }
         if (ssInSpecTable && !fgInSpecTable) {
             foundEnclosures.delete("4XFG");
         } else if (fgInSpecTable && !ssInSpecTable) {
             foundEnclosures.delete("4XSS");
+        } else {
+            // Spec-table did not resolve: prefer explicit compound token when unambiguous
+            if (hasExplicit4XSS && !hasExplicit4XFG) {
+                foundEnclosures.delete("4XFG");
+            } else if (hasExplicit4XFG && !hasExplicit4XSS) {
+                foundEnclosures.delete("4XSS");
+            }
+            // Both explicit tokens or neither → Varied / Multiple (leave both)
         }
     }
 
