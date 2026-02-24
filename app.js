@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.45 (Worker: Varied/Multiple enclosure output; 208V voltage boundary guards) ---
-const APP_VERSION = "v2.5.45";
+// --- SCHEMATICA ai v2.5.46 (Vendor PDF.js locally; guard pdfjsLib init; resilient CDN-free load) ---
+const APP_VERSION = "v2.5.46";
 const VERSION_HISTORY = {
+    "v2.5.46": "Vendor PDF.js v3.11.174 locally under assets/vendor/pdfjs/ (pdf.min.js + pdf.worker.min.js); replace CDN script tag with local path; guard pdfjsLib.GlobalWorkerOptions.workerSrc with window.pdfjsLib check so app does not crash when CDN is blocked/timed-out; set window.__pdfjsMissing flag and log clear error on missing library; version bump",
     "v2.5.45": "Worker-side enclosure parsing now outputs enc='Varied / Multiple' (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with (?<!208/) lookbehind guards to prevent 208/220V and 208/230V false positives; version bump",
     "v2.5.44": "Add enclosure 'Varied / Multiple' classification: client-side safety net reclassifies records with both FG+SS signals; enclosure filter includes Varied/Multiple matches with lower weight (100 vs 500); sorting tie-breaker: HP-varied ranks above ENC-varied when both have exactly one varied flag; version bump",
     "v2.5.43": "Default zone font/opaque policy: Times New Roman only for page 1 cust zone (cover page Company Name); all other zones default Courier+opaque; SmartScanner detected zones default transparent=false; zoom font scaling fix: applyRuleToWrapper scales LAYOUT_RULES fontSize by currentScale so boxes scale proportionally at 60%/40% zoom; rescaleZones added after applyDetectedZones; debug log in rescaleZones for editor mode; version bump",

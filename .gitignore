@@ -12,6 +12,8 @@ yarn-error.log*
 # The server will install these automatically
 node_modules/
 jspm_packages/
+package.json
+package-lock.json
 
 # --- Build Artifacts: Generated automatically ---
 .next/
