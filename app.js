@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.47 (Refine enclosure parsing: explicit token preference + FRP signal; remove bare FG from client regex; vendor pdf-lib/fontkit locally; PDFLib guard) ---
-const APP_VERSION = "v2.5.47";
+// --- SCHEMATICA ai v2.5.48 (Redaction box defaults: CSS font fix Courier; zoom 110% default; SS spec-table lock always resolves 4XSS; version bump) ---
+const APP_VERSION = "v2.5.48";
 const VERSION_HISTORY = {
+    "v2.5.48": "Redaction box defaults: CSS .redaction-box font-family changed from Times New Roman to Courier New so CSS does not override JS defaults; PdfViewer._setScaleForDevice desktop/tablet default zoom 1.0→1.1 (110%); Enclosure SS spec-table lock: when ENCLOSURE MATERIAL spec-table keyword indicates Stainless, always resolves to 4XSS (encV=false) even when FG signals also present; same logic mirrored in worker/lib/extract.js; new spec-table lock tests added; version bump",
     "v2.5.47": "Enclosure parsing refinement: worker and client now prefer explicit compound tokens (4XSS/4XFG) as tiebreaker when spec-table context does not resolve mixed signals; FRP added as strong FG signal in worker hasFG check; client ENC_FG_RE no longer matches bare FG to prevent false Varied/Multiple; PDFLib guard added to generateRedactedPdf; pdf-lib and fontkit vendored locally under assets/vendor/; index.html updated to load local pdf-lib/fontkit with CDN-missing guards; version bump",
     "v2.5.46": "Vendor PDF.js v3.11.174 locally under assets/vendor/pdfjs/ (pdf.min.js + pdf.worker.min.js); replace CDN script tag with local path; guard pdfjsLib.GlobalWorkerOptions.workerSrc with window.pdfjsLib check so app does not crash when CDN is blocked/timed-out; set window.__pdfjsMissing flag and log clear error on missing library; version bump",
     "v2.5.45": "Worker-side enclosure parsing now outputs enc='Varied / Multiple' (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with (?<!208/) lookbehind guards to prevent 208/220V and 208/230V false positives; version bump",
@@ -3504,7 +3505,7 @@ class PdfViewer {
             this.currentScale = 0.8;
             UI.toggleSearch(true); 
         } else {
-            this.currentScale = 1.0;
+            this.currentScale = 1.1;
         }
     }
 

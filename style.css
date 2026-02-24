@@ -452,7 +452,7 @@ body.demo-mode .redaction-layer {
     background: transparent; 
     color: var(--cad-text); 
     font-size: 14px; 
-    font-family: 'Times New Roman', serif; 
+    font-family: 'Courier New', monospace; 
     font-weight: bold; 
     display: flex !important; /* NOT hidden */
     align-items: center; 

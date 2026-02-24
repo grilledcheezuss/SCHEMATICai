@@ -509,9 +509,10 @@ function _parseEnclosure(t) {
             if (/\bSTAINLESS\b/i.test(ctx)) ssInSpecTable = true;
             if (/\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(ctx)) fgInSpecTable = true;
         }
-        if (ssInSpecTable && !fgInSpecTable) {
+        if (ssInSpecTable) {
+            // SS spec-table lock: stainless always wins, even if FG also appears in spec-table
             foundEnclosures.delete("4XFG");
-        } else if (fgInSpecTable && !ssInSpecTable) {
+        } else if (fgInSpecTable) {
             foundEnclosures.delete("4XSS");
         } else {
             // Spec-table did not resolve: prefer explicit compound token when unambiguous

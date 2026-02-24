@@ -113,6 +113,19 @@ console.log('\n=== parseEnclosure ===');
     assert(r.has('4XFG'), 'conflict: has 4XFG');
     assert(r.size === 2, 'conflict: size=2');
 }
+{
+    // SS spec-table lock: ENCLOSURE MATERIAL → STAINLESS should always win, even with FG signal
+    const r = parseEnclosure('NEMA 4X FIBERGLASS ENCLOSURE MATERIAL: STAINLESS STEEL');
+    assert(r.has('4XSS'), 'SS spec-table lock: ENCLOSURE MATERIAL → STAINLESS wins over FG signal');
+    assert(!r.has('4XFG'), 'SS spec-table lock: 4XFG removed when spec-table says STAINLESS');
+    assert(r.size === 1, 'SS spec-table lock: only 4XSS remains');
+}
+{
+    // SS spec-table lock: stainless in spec-table wins even when both SS and FG appear in spec-table window
+    const r = parseEnclosure('ENCLOSURE MATERIAL: STAINLESS STEEL / FIBERGLASS NEMA 4X');
+    assert(r.has('4XSS'), 'SS spec-table lock: SS wins when both materials in spec-table window');
+    assert(!r.has('4XFG'), 'SS spec-table lock: FG removed when spec-table includes stainless');
+}
 
 // ─── extractSpecsStrict: CP-8078 ────────────────────────────────────────────
 console.log('\n=== extractSpecsStrict: CP-8078 fixture ===');
