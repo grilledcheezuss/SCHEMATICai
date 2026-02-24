@@ -27,7 +27,7 @@ const VOLT_PRIORITY = [
     { id: '480', match: /\b(?:480|460|440)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:480|460|440)\b/i },
     { id: '415', match: /\b(?:415|380)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:415|380)\b/i },
     { id: '277', match: /\b(?:277)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:277)\b/i },
-    { id: '240', match: /\b(?:240|230|220)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:240|230|220)\b/i },
+    { id: '240', match: /\b(?:240|(?<!208\/)230|(?<!208\/)220)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*(?!208\b)[\d\.\/]*\b(?:240|230|220)\b/i },
     { id: '208', match: /\b(?:208)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:208)\b/i },
     { id: '120', match: /\b(?:120|115|110)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:120|115|110)\b/i }
 ];
@@ -322,8 +322,8 @@ function extractSpecsStrict(t) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
         // Spec-table precedence already applied in parseEnclosure.
-        // If still multiple (both materials in spec table, or neither), prefer SS as canonical.
-        s.enc = foundEnclosures.has("4XSS") ? "4XSS" : [...foundEnclosures][0];
+        // If multiple enclosures still remain, output "Varied / Multiple" (no SS canonical tie-break).
+        s.enc = "Varied / Multiple";
         s.encV = true;
     }
 

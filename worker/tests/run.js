@@ -2,7 +2,7 @@
 // Lightweight Node test runner for worker/lib/extract.js
 // Run with: node worker/tests/run.js
 
-const { extractSpecsStrict, normalizeCADText, parseHP, parseEnclosure } = require('../lib/extract.js');
+const { extractSpecsStrict, normalizeCADText, parseHP, parseEnclosure, parseVoltageContextAware } = require('../lib/extract.js');
 const {
     CP8078_TEXT,
     PANEL_480V_TEXT,
@@ -122,7 +122,7 @@ console.log('\n=== extractSpecsStrict: CP-8078 fixture ===');
     assertEqual(s.volt, '240', 'CP-8078: volt === "240" (service-only, not 480)');
     assertEqual(s.voltV, false, 'CP-8078: voltV === false (single service voltage)');
     assert(s.encV === true, 'CP-8078: encV === true (SS + FG conflict)');
-    assertEqual(s.enc, '4XFG', 'CP-8078: enc === "4XFG" (FG preferred when explicit)');
+    assertEqual(s.enc, 'Varied / Multiple', 'CP-8078: enc === "Varied / Multiple" (both SS+FG present, no spec-table winner)');
 }
 
 // ─── extractSpecsStrict: 480V panel ─────────────────────────────────────────
@@ -167,6 +167,46 @@ console.log('\n=== extractSpecsStrict: NEMA4X no-space enclosure ===');
     const s = extractSpecsStrict(PANEL_NEMA4X_NOSPACE_TEXT);
     assertEqual(s.enc, '4XSS', 'NEMA4X no-space → 4XSS');
     assertEqual(s.encV, false, 'NEMA4X no-space → encV false');
+}
+
+// ─── Voltage: 208V boundary regression tests ────────────────────────────────
+console.log('\n=== parseVoltageContextAware: 208V boundary guards ===');
+{
+    // Pure 208V panel — must NOT trigger a 240 classification
+    const { serviceVolts } = parseVoltageContextAware('208V 3PH 60HZ PUMP PANEL');
+    assert(!serviceVolts.has('240'), '208V only: 240 NOT in serviceVolts');
+    assert(serviceVolts.has('208'), '208V only: 208 in serviceVolts');
+}
+{
+    // 120/208V wye system — only 208 detected (120 has no V-suffix in slash notation)
+    const { serviceVolts } = parseVoltageContextAware('120/208V 3PH PUMP CONTROLLER');
+    assert(!serviceVolts.has('240'), '120/208V: 240 NOT in serviceVolts');
+    assert(serviceVolts.has('208'), '120/208V: 208 in serviceVolts');
+}
+{
+    // 208/220V (international range) — 220 must NOT trigger 240 classification via lookbehind guard
+    // Note: 208 itself cannot be detected from slash notation without a V-suffix or VOLTAGE keyword
+    const { serviceVolts } = parseVoltageContextAware('208/220V 3PH PUMP PANEL');
+    assert(!serviceVolts.has('240'), '208/220V: 240 NOT in serviceVolts (208/ lookbehind blocks 220)');
+    assert(!serviceVolts.has('208'), '208/220V slash notation: 208 not detected (no V-suffix in slash position)');
+}
+{
+    // 208V + explicit 120/240V — 240 IS present (expected, not a false positive)
+    const { serviceVolts } = parseVoltageContextAware('208V SERVICE WITH 120/240V BACKUP');
+    assert(serviceVolts.has('208'), '208V + 120/240V: 208 in serviceVolts');
+    assert(serviceVolts.has('240'), '208V + 120/240V: 240 in serviceVolts (explicitly present)');
+}
+{
+    // extractSpecsStrict: pure 208V panel must give volt=208, voltV=false
+    const s = extractSpecsStrict('208V 3PH 60HZ PUMP CONTROL PANEL');
+    assertEqual(s.volt, '208', 'pure 208V panel: volt === "208"');
+    assertEqual(s.voltV, false, 'pure 208V panel: voltV === false');
+}
+{
+    // extractSpecsStrict: 208/220V slash notation — 240 NOT a false positive (volt=null, not 240)
+    const s = extractSpecsStrict('208/220V 3PH PUMP PANEL NEMA 4X FIBERGLASS');
+    assert(s.volt !== '240', '208/220V panel: volt is NOT "240" (no false positive)');
+    assertEqual(s.voltV, false, '208/220V panel: voltV === false');
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

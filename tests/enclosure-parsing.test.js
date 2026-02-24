@@ -1,4 +1,4 @@
-// Test enclosure parsing functionality (v2.5.36)
+// Test enclosure parsing functionality (v2.5.45)
 
 // Use the actual parseEnclosure from extract.js
 const { parseEnclosure } = require('../worker/lib/extract.js');
@@ -23,14 +23,14 @@ function extractEnclosure(text) {
     if (foundEnclosures.size === 1) {
         result.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
-        // Spec-table precedence already applied; prefer SS as tie-break canonical
-        result.enc = foundEnclosures.has("4XSS") ? "4XSS" : [...foundEnclosures][0];
+        // Multiple enclosures remaining after spec-table precedence → Varied / Multiple
+        result.enc = "Varied / Multiple";
         result.encV = true;
     }
     return result;
 }
 
-console.log('🧪 Enclosure Parsing Tests - v2.5.36\n');
+console.log('🧪 Enclosure Parsing Tests - v2.5.45\n');
 console.log('Testing enclosure extraction...\n');
 
 let passed = 0;
@@ -95,8 +95,8 @@ const tests = [
     },
     {
         input: "4X STAINLESS AND 4XFG MIXED ENCLOSURES",
-        expected: { enc: "4XSS", encV: true },
-        name: "Multiple enclosure types without spec-table context (canonical is SS)"
+        expected: { enc: "Varied / Multiple", encV: true },
+        name: "Multiple enclosure types without spec-table context (Varied / Multiple)"
     },
     {
         input: "PUMP MOTOR 5 HP 480V 3PH",
@@ -105,8 +105,8 @@ const tests = [
     },
     {
         input: "4XSS ENCLOSURE WITH POLY BACKUP",
-        expected: { enc: "4XSS", encV: true },
-        name: "Mixed 4XSS and POLY (marked varied)"
+        expected: { enc: "Varied / Multiple", encV: true },
+        name: "Mixed 4XSS and POLY (marked Varied / Multiple)"
     },
     {
         input: "FIBER GLASS ENCLOSURE 4X RATED",
@@ -127,10 +127,10 @@ const tests = [
         name: "Spec table (ENCLOSURE MATERIAL) says fiberglass — FG wins over noise SS"
     },
     {
-        // Both materials near a spec-table keyword — remains varied.
+        // Both materials near a spec-table keyword — remains Varied / Multiple.
         input: "PANEL TYPE: NEMA 4X STAINLESS OR FIBERGLASS PER SCHEDULE",
-        expected: { enc: "4XSS", encV: true },
-        name: "Spec table mentions both materials — remains varied (SS canonical)"
+        expected: { enc: "Varied / Multiple", encV: true },
+        name: "Spec table mentions both materials — remains Varied / Multiple"
     },
     {
         // FG appears before NAMEPLATE; SS appears after NAMEPLATE (forward window finds SS).

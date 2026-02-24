@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.36
+## Version: v2.5.45
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.45**: Worker-side enclosure parsing now outputs `enc="Varied / Multiple"` (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with `(?<!208/)` lookbehind guards to prevent 208/220V and 208/230V false positives
 - **v2.5.36**: Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each scoring tier)
 - **v2.5.35**: Hotfix: guard preload against missing credentials; differentiate 401 vs 503; worker returns 503 when auth backend unreachable
 - **v2.5.34**: Worker parsing + search robustness: context-aware service-first voltage extraction (control transformer notation excluded from service voltage); HP table-format parsing; NEMA4X/TYPE 4X enclosure coverage; pure helpers in worker/lib/extract.js with node test runner

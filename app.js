@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.44 (Enclosure "Varied / Multiple" classification; strict filtering & scoring so ambiguous enclosures appear behind HP-varied results) ---
-const APP_VERSION = "v2.5.44";
+// --- SCHEMATICA ai v2.5.45 (Worker: Varied/Multiple enclosure output; 208V voltage boundary guards) ---
+const APP_VERSION = "v2.5.45";
 const VERSION_HISTORY = {
+    "v2.5.45": "Worker-side enclosure parsing now outputs enc='Varied / Multiple' (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with (?<!208/) lookbehind guards to prevent 208/220V and 208/230V false positives; version bump",
     "v2.5.44": "Add enclosure 'Varied / Multiple' classification: client-side safety net reclassifies records with both FG+SS signals; enclosure filter includes Varied/Multiple matches with lower weight (100 vs 500); sorting tie-breaker: HP-varied ranks above ENC-varied when both have exactly one varied flag; version bump",
     "v2.5.43": "Default zone font/opaque policy: Times New Roman only for page 1 cust zone (cover page Company Name); all other zones default Courier+opaque; SmartScanner detected zones default transparent=false; zoom font scaling fix: applyRuleToWrapper scales LAYOUT_RULES fontSize by currentScale so boxes scale proportionally at 60%/40% zoom; rescaleZones added after applyDetectedZones; debug log in rescaleZones for editor mode; version bump",
     "v2.5.42": "Toggle caret parity (zone-styling caret matches Project Context glyph+CSS); default zone styling mono+opaque for non-cust zones; fix opaque toggle (rescaleZones after transparent toggle); cover cust fontSize 22→24; zoom font scaling: RAF double-tick in rescaleZones + second rescaleZones RAF pass after renderStack; version bump",
