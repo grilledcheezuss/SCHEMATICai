@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.49)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.50)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -105,7 +105,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.49</span>
+        <span class="app-title-version" id="app-version">v2.5.50</span>
     </div>
 
     <div class="header-controls">
@@ -160,53 +160,8 @@
         <div id="results-scroll-area">
             <div id="results-area"></div>
         </div>
-        
-        <div id="pagination-footer">
-            <button id="page-prev" class="page-btn" onclick="SearchEngine.prevPage()">‹ Prev</button>
-            <span id="page-info" class="page-info"></span>
-            <button id="page-next" class="page-btn" onclick="SearchEngine.nextPage()">Next ›</button>
-        </div>
-    </div>
-    
-    <div id="toggle-left" class="collapse-btn" onclick="UI.toggleLeftSidebar()">‹</div>
 
-    <div id="preview-pane">
-        <div id="pdf-toolbar">
-            <button class="pdf-tool-btn" onclick="PdfViewer.print()" title="Print original (unredacted) PDF — For redacted print/export, use Submittal Generator preview">🖨️</button>
-            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)" title="Zoom Out">-</button>
-            <span id="pdf-zoom-level">110%</span>
-            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)" title="Zoom In">+</button>
-        </div>
-        <div id="custom-pdf-viewer" style="display:none;"><div id="pdf-main-view"></div></div>
-        <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
-        <div id="pdf-fallback" class="pdf-fallback">
-            <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
-            <a id="pdf-fallback-link" target="_blank">Open File</a>
-        </div>
-        <div id="pdf-placeholder-text">📄 Select a schematic</div>
-    </div>
-
-    <div id="toggle-right" class="collapse-btn" onclick="DemoManager.toggleGeneratorSidebar()" style="display:none;">›</div>
-
-    <div id="generator-panel" style="display:none;">
-        <div id="gen-drag-handle" class="panel-sidebar-header">
-            <span class="editor-title">Control Panel</span>
-        </div>
-        
-        <!-- Tab Navigation -->
-        <div class="tab-navigation">
-            <button class="tab-btn active" data-tab="project" onclick="ControlPanel.switchTab('project')">
-                📄 Project Data
-            </button>
-            <button class="tab-btn" data-tab="editor" onclick="ControlPanel.switchTab('editor')">
-                🎨 Page Editor
-            </button>
-        </div>
-        
-        <div id="redaction-editor-content">
-            
-            <!-- Tab Content: Project Data -->
-            <div class="tab-content active" id="project-tab">
+        <div id="left-generator-context" style="display:none;">
             <div id="demo-context-panel">
                 <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:8px; margin-bottom:10px; border-radius:4px; cursor:pointer;" onclick="DemoManager.toggleContext()">
                     <span style="font-size:11px; font-weight:600; color:var(--glass-text);">🔐 PROJECT CONTEXT &amp; SENSITIVE DATA</span>
@@ -242,15 +197,41 @@
                     </div>
                 </div>
             </div>
-            <div style="padding:0 8px; margin-top:10px; margin-bottom:8px; display:flex; gap:6px; align-items:center;">
-                <button class="thumb-btn add-zone-btn" onclick="RedactionManager.addZoneToCurrentView('custom')" title="Add new redaction box">+</button>
-                <button class="thumb-btn del-zone-btn" onclick="RedactionManager.deleteSelected()" title="Remove existing redaction box">&#215;</button>
-                <button class="search-btn" style="background:#8b5cf6 !important; flex:1;" onclick="PdfExporter.preview()">&#128065;&#65039; Preview Redacted PDF</button>
-            </div>
-            </div>
-            
-            <!-- Tab Content: Page Editor -->
-            <div class="tab-content" id="editor-tab" style="display: none;">
+        </div>
+        
+        <div id="pagination-footer">
+            <button id="page-prev" class="page-btn" onclick="SearchEngine.prevPage()">‹ Prev</button>
+            <span id="page-info" class="page-info"></span>
+            <button id="page-next" class="page-btn" onclick="SearchEngine.nextPage()">Next ›</button>
+        </div>
+    </div>
+    
+    <div id="toggle-left" class="collapse-btn" onclick="UI.toggleLeftSidebar()">‹</div>
+
+    <div id="preview-pane">
+        <div id="pdf-toolbar">
+            <button class="pdf-tool-btn" onclick="PdfViewer.print()" title="Print original (unredacted) PDF — For redacted print/export, use Submittal Generator preview">🖨️</button>
+            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)" title="Zoom Out">-</button>
+            <span id="pdf-zoom-level">110%</span>
+            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)" title="Zoom In">+</button>
+        </div>
+        <div id="custom-pdf-viewer" style="display:none;"><div id="pdf-main-view"></div></div>
+        <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
+        <div id="pdf-fallback" class="pdf-fallback">
+            <div style="margin-bottom:10px;">⚠️ PDF Link Not Found</div>
+            <a id="pdf-fallback-link" target="_blank">Open File</a>
+        </div>
+        <div id="pdf-placeholder-text">📄 Select a schematic</div>
+    </div>
+
+    <div id="toggle-right" class="collapse-btn" onclick="DemoManager.toggleGeneratorSidebar()" style="display:none;">›</div>
+
+    <div id="generator-panel" style="display:none;">
+        <div id="gen-drag-handle" class="panel-sidebar-header">
+            <span class="editor-title">CONTROL PANEL</span>
+        </div>
+        
+        <div id="redaction-editor-content">
                 <!-- Page Selection -->
                 <div style="padding:8px; border-bottom:1px solid var(--border-color); margin-bottom:10px;">
                     <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">📄 Page Selection</div>
@@ -357,9 +338,9 @@
                 <div style="padding:0 8px; margin-top:10px; margin-bottom:8px; display:flex; gap:6px; align-items:center;">
                     <button class="thumb-btn add-zone-btn" onclick="RedactionManager.addZoneToCurrentView('custom')" title="Add new redaction box">+</button>
                     <button class="thumb-btn del-zone-btn" onclick="RedactionManager.deleteSelected()" title="Remove existing redaction box">&#215;</button>
+                    <button class="search-btn" style="background:#8b5cf6 !important; flex:1;" onclick="PdfExporter.preview()">&#128065;&#65039; Preview Redacted PDF</button>
                     <button id="auto-scan-btn" class="search-btn" style="background:var(--app-accent) !important; flex:1;">🔍 Auto-Scan Pages</button>
                 </div>
-            </div>
         </div>
     </div>
 

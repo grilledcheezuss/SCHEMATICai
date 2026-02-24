@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.49 (Cover overlay text immediate render; correct COVER_TEMPLATE fonts: Courier for non-cust zones; cover font guardrail; version bump) ---
-const APP_VERSION = "v2.5.49";
+// --- SCHEMATICA ai v2.5.50 (UI restructure: move Project Context to left sidebar; simplify right panel to single CONTROL PANEL; default collapsed on generator activation; version bump) ---
+const APP_VERSION = "v2.5.50";
 const VERSION_HISTORY = {
+    "v2.5.50": "UI restructure for Submittal Generator: Project Context & Sensitive Data block moved from right panel Project Data tab to left sidebar (visible only when generator active); right panel tab strip removed; single CONTROL PANEL header with zone editor controls only; generator panel defaults to collapsed/disabled on activation so first view is clean redacted title page; left sidebar CSS accommodates new context section; version bump",
     "v2.5.49": "Cover overlay text immediate render: applyPage1CoverTemplate now calls refreshContentForWrapper via requestAnimationFrame so text appears instantly instead of waiting for global scan end; corrected COVER_TEMPLATE font defaults: job_block/stage/date/cpid use Courier New monospace (Times New Roman reserved for cust only); guardrail in createZoneOnWrapper overrides Times to Courier on page 1 non-cust zones; version bump",
     "v2.5.48": "Redaction box defaults: CSS .redaction-box font-family changed from Times New Roman to Courier New so CSS does not override JS defaults; PdfViewer._setScaleForDevice desktop/tablet default zoom 1.0→1.1 (110%); Enclosure SS spec-table lock: when ENCLOSURE MATERIAL spec-table keyword indicates Stainless, always resolves to 4XSS (encV=false) even when FG signals also present; same logic mirrored in worker/lib/extract.js; new spec-table lock tests added; version bump",
     "v2.5.47": "Enclosure parsing refinement: worker and client now prefer explicit compound tokens (4XSS/4XFG) as tiebreaker when spec-table context does not resolve mixed signals; FRP added as strong FG signal in worker hasFG check; client ENC_FG_RE no longer matches bare FG to prevent false Varied/Multiple; PDFLib guard added to generateRedactedPdf; pdf-lib and fontkit vendored locally under assets/vendor/; index.html updated to load local pdf-lib/fontkit with CDN-missing guards; version bump",
@@ -535,7 +536,11 @@ class DemoManager {
                 const rail = document.getElementById('toggle-right');
                 if (rail) rail.style.display = 'flex';
             }
-            this.restorePanel(); 
+            // Show left-sidebar context block
+            const leftCtx = document.getElementById('left-generator-context');
+            if (leftCtx) leftCtx.style.display = 'block';
+            // Default right control panel to collapsed so first view is clean redacted title page
+            this.minimizePanel();
             if(indicator) indicator.style.display = 'inline-block';
             if(btn) btn.style.color = 'var(--app-primary)';
             if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
@@ -543,6 +548,9 @@ class DemoManager {
         } else { 
             document.body.classList.remove('demo-mode'); 
             document.body.classList.remove('editor-active'); 
+            // Hide left-sidebar context block
+            const leftCtx = document.getElementById('left-generator-context');
+            if (leftCtx) leftCtx.style.display = 'none';
             if (UI.isTablet()) {
                 panel.classList.remove('gen-collapsed');
                 panel.style.display = 'none';
@@ -4327,29 +4335,7 @@ static render(res, crit, totalCount) {
 window.UI = UI;
 
 class ControlPanel {
-    static switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.dataset.tab === tabName) {
-                btn.classList.add('active');
-            }
-        });
-        
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.style.display = 'none';
-            content.classList.remove('active');
-        });
-        
-        const activeTab = document.getElementById(`${tabName}-tab`);
-        if (activeTab) {
-            activeTab.style.display = 'block';
-            activeTab.classList.add('active');
-        }
-        
-        console.log(`Switched to ${tabName} tab`);
-    }
+    // Tab navigation removed in v2.5.50; right panel is now a single CONTROL PANEL
 }
 
 window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set(); window.FOUND_ENCS = new Set();
