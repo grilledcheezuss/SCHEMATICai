@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.51 (Left sidebar Project Context polish: fix input clipping, sticky header, condense vertical spacing; version bump) ---
-const APP_VERSION = "v2.5.51";
+// --- SCHEMATICA ai v2.6.0 (UI polish: scrollbar width +15%, COX logo TM mark, settings dropdown z-layer fix; mobile sync progress smoothing) ---
+const APP_VERSION = "v2.6.0";
 const VERSION_HISTORY = {
+    "v2.6.0": "UI polish: scrollbar width increased 8px→9px (~15%); TM superscript added to COX wordmark in header; settings dropdown z-layer raised (header z-index 100→3000) to prevent clipping by generator panel rail; mobile sync progress smoothed by yielding to RAF every 10 shards and throttling progress callback to requestAnimationFrame; version bump",
     "v2.5.51": "Left sidebar Project Context polish: #left-generator-context restructured as overflow:hidden flex column so only #demo-context-content scrolls and .context-header stays sticky/visible; .demo-input height/line-height/box-sizing fixed to eliminate vertical clipping; .input-wrapper min-width:0 prevents flex overflow in date/phone rows; reduced padding and gaps in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context, #demo-context-panel, #demo-context-content; version bump",
     "v2.5.49": "Cover overlay text immediate render: applyPage1CoverTemplate now calls refreshContentForWrapper via requestAnimationFrame so text appears instantly instead of waiting for global scan end; corrected COVER_TEMPLATE font defaults: job_block/stage/date/cpid use Courier New monospace (Times New Roman reserved for cust only); guardrail in createZoneOnWrapper overrides Times to Courier on page 1 non-cust zones; version bump",
     "v2.5.48": "Redaction box defaults: CSS .redaction-box font-family changed from Times New Roman to Courier New so CSS does not override JS defaults; PdfViewer._setScaleForDevice desktop/tablet default zoom 1.0→1.1 (110%); Enclosure SS spec-table lock: when ENCLOSURE MATERIAL spec-table keyword indicates Stainless, always resolves to 4XSS (encV=false) even when FG signals also present; same logic mirrored in worker/lib/extract.js; new spec-table lock tests added; version bump",
@@ -273,8 +274,9 @@ class CacheService {
         if(!this.activeKey) return null; 
         const keys = await DB.getChunkKeys(); 
         if(!keys || keys.length === 0) return null; 
+        let lastPct = -1;
         for(let i = 0; i < keys.length; i++) { 
-            if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); 
+            if(i % 10 === 0) await new Promise(r => requestAnimationFrame(r)); 
             const chunk = await DB.getChunk(keys[i]); 
             if(chunk) { 
                 try { 
@@ -290,7 +292,14 @@ class CacheService {
                     } 
                 } catch(e) {} 
             } 
-            if(progressCallback) progressCallback(Math.round(((i + 1) / keys.length) * 100)); 
+            if(progressCallback) {
+                const pct = Math.round(((i + 1) / keys.length) * 100);
+                if(pct !== lastPct) {
+                    lastPct = pct;
+                    await new Promise(r => requestAnimationFrame(r));
+                    progressCallback(pct);
+                }
+            }
         } 
         return true; 
     }
