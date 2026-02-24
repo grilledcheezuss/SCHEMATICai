@@ -119,7 +119,7 @@ body {
     font-size: 13px; font-weight: 400; 
 }
 
-::-webkit-scrollbar { width: 8px; height: 8px; } 
+::-webkit-scrollbar { width: 9px; height: 9px; } 
 ::-webkit-scrollbar-track { background: transparent; } 
 ::-webkit-scrollbar-thumb { 
     background: var(--lsu-purple); 
@@ -162,11 +162,12 @@ header {
     height: var(--header-base-height); min-height: var(--header-base-height); 
     display: flex; align-items: center; justify-content: space-between; 
     box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
-    z-index: 100; flex-shrink: 0; position: relative; 
+    z-index: 3000; flex-shrink: 0; position: relative; 
 }
 
 .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; justify-content: center; } 
 .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; } 
+.logo-tm { font-size: 0.45em; font-weight: 700; color: rgba(255,255,255,0.85); vertical-align: super; letter-spacing: 0; margin-left: 1px; }
 .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.75rem; color: #b39ddb; font-weight: 700; letter-spacing: 4.5px; text-transform: uppercase; margin-top: 4px; margin-left: 2px; }
 
 .app-title-group { 
