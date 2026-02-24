@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.42 (Toggle caret parity, default zone styling mono+opaque, fix opaque toggle, adjust cover cust font size, fix zoom font scaling) ---
-const APP_VERSION = "v2.5.42";
+// --- SCHEMATICA ai v2.5.43 (Enforce default zone font/opaque policy: Times only for cover page company name; fix zoom font scaling reliably) ---
+const APP_VERSION = "v2.5.43";
 const VERSION_HISTORY = {
+    "v2.5.43": "Default zone font/opaque policy: Times New Roman only for page 1 cust zone (cover page Company Name); all other zones default Courier+opaque; SmartScanner detected zones default transparent=false; zoom font scaling fix: applyRuleToWrapper scales LAYOUT_RULES fontSize by currentScale so boxes scale proportionally at 60%/40% zoom; rescaleZones added after applyDetectedZones; debug log in rescaleZones for editor mode; version bump",
     "v2.5.42": "Toggle caret parity (zone-styling caret matches Project Context glyph+CSS); default zone styling mono+opaque for non-cust zones; fix opaque toggle (rescaleZones after transparent toggle); cover cust fontSize 22→24; zoom font scaling: RAF double-tick in rescaleZones + second rescaleZones RAF pass after renderStack; version bump",
     "v2.5.41": "Control Panel UI cleanup: removed obsolete drag-handle header (purple bar, minimize/close buttons); generator panel header now matches left sidebar (bg-sidebar, border-color); tab strip integrated as sidebar UI; Zone Styling card outer styling verified identical to Project Context card; DragManager.init() never called on docked widths (>=768px); version bump",
     "v2.5.40": "Cover template parity: cust moved below logo (y=0.40), job_block shifted down (y=0.50), both job+type lines underlined; label 'Customer Name'→'Company Name'; getContext defaults COMPANY NAME/JOB NAME; zoom-safe rescaleZones infers relFont from computed style when missing, waitForLayoutStable before rescaleZones in renderStack; right panel tab strip uses CSS vars; Zone Styling section styled to match Project Context card (dashed border, glass header); version bump",
@@ -1072,7 +1073,9 @@ class RedactionManager {
         
         let styleFont = fontFamily;
         if (!styleFont) {
-             styleFont = (mapKey === 'cust') ? "'Times New Roman', serif" : "'Courier New', monospace";
+             const pageNum = parseInt(wrapper.dataset.pageNumber, 10);
+             const isCoverCust = (mapKey === 'cust' && pageNum === 1);
+             styleFont = isCoverCust ? "'Times New Roman', serif" : "'Courier New', monospace";
         }
         
         box.style.fontFamily = styleFont;
@@ -1309,6 +1312,14 @@ class RedactionManager {
         const cw = container.offsetWidth || 1;
         const ch = container.offsetHeight || 1;
         const boxes = container.querySelectorAll('.redaction-box');
+        // Debug log for editor mode (one active box)
+        if (document.body.classList.contains('editor-active') && boxes.length > 0) {
+            const b = this.activeBox || boxes[0];
+            const scale = (typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1;
+            const rf = b.dataset.relFont;
+            const computedFs = rf ? (parseFloat(rf) * ch).toFixed(1) : getComputedStyle(b).fontSize;
+            console.log(`[rescaleZones] scale=${scale} ch=${ch} relFont=${rf} fontSize=${computedFs}px`);
+        }
         boxes.forEach(box => {
             const rx = parseFloat(box.dataset.relX);
             const ry = parseFloat(box.dataset.relY);
@@ -1596,6 +1607,7 @@ class SmartScanner {
                 // Apply detected zones or fallback to layout rules
                 if(detectedZones && detectedZones.length > 0) {
                     this.applyDetectedZones(wrapper, detectedZones);
+                    RedactionManager.rescaleZones(wrapper);
                 } else {
                     // Fallback to existing LAYOUT_RULES
                     scanConfidence = 'low';
@@ -1686,7 +1698,7 @@ class SmartScanner {
                         h: valueItem.height * this.HEIGHT_PADDING_FACTOR,
                         map: mapKey,
                         fontSize: Math.round(valueItem.fontSize),
-                        transparent: true,
+                        transparent: false,
                         fontFamily: "'Courier New', monospace",
                         textAlign: 'left'
                     });
@@ -1841,7 +1853,7 @@ class SmartScanner {
                             h: valueItem.height * this.HEIGHT_PADDING_FACTOR,
                             map: mapKey,
                             fontSize: Math.round(valueItem.fontSize),
-                            transparent: true,
+                            transparent: false,
                             fontFamily: "'Courier New', monospace",
                             textAlign: 'left'
                         });
@@ -2029,6 +2041,7 @@ class SmartScanner {
             
             if(detectedZones && detectedZones.length > 0) {
                 this.applyDetectedZones(wrapper, detectedZones);
+                RedactionManager.rescaleZones(wrapper);
             } else {
                 await this.fallbackToLayoutRules(wrapper, pageNum, page, textContent);
             }
@@ -2164,9 +2177,11 @@ class LayoutScanner {
 
         const width = container.offsetWidth; 
         const height = container.offsetHeight; 
+        // Scale LAYOUT_RULES font sizes (defined at scale=1.0) proportionally to current zoom
+        const scale = (typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1;
         
         ruleSet.forEach(zone => { 
-            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize, zone.text, zone.decoration || null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
+            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize * scale, zone.text, zone.decoration || null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
         });
         RedactionManager.rescaleZones(wrapper);
     }
