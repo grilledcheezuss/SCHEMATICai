@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.6.3)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.6.4)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -105,7 +105,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.6.3</span>
+        <span class="app-title-version" id="app-version">v2.6.4</span>
     </div>
 
     <div class="header-controls">
@@ -163,8 +163,9 @@
 
         <div id="left-generator-context" style="display:none;">
             <div id="demo-context-panel">
-                <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:6px; margin-bottom:4px; border-radius:4px; cursor:pointer;" onclick="DemoManager.toggleContext()">
-                    <span style="font-size:11px; font-weight:600; color:var(--glass-text);">🔐 PROJECT CONTEXT &amp; SENSITIVE DATA</span>
+                <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:6px; margin-bottom:4px; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="DemoManager.toggleContext()">
+                    <span style="font-size:11px; font-weight:600; color:var(--glass-text); flex:1;">Custom PDF Info</span>
+                    <button onclick="event.stopPropagation(); PdfExporter.preview();" title="Preview Redacted PDF" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:var(--glass-text); border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; line-height:1.4; backdrop-filter:blur(4px); cursor:pointer; flex-shrink:0;">👁 Preview</button>
                     <span id="context-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
                 </div>
 
@@ -349,7 +350,7 @@
         <div style="position:relative; max-width:1200px; margin:20px auto; background:var(--bg-card); border-radius:8px; padding:20px; box-sizing:border-box; width:100%;">
             <div style="display:flex; justify-content:center; align-items:center; margin-bottom:15px; background:var(--app-primary); border-radius:6px; padding:10px 14px; position:relative;">
                 <h2 style="color:#fff; margin:0; font-size:1rem; text-align:center;">Redacted PDF Preview</h2>
-                <button onclick="PdfExporter.closePreview()" aria-label="Close preview" title="Close preview" style="position:absolute; right:10px; background:rgba(255,255,255,0.25); border:2px solid #fff; color:#fff; border-radius:50%; width:36px; height:36px; font-size:18px; font-weight:700; line-height:1; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center;">✖</button>
+                <button onclick="PdfExporter.closePreview()" aria-label="Close preview" title="Close preview" class="preview-close-btn">✖</button>
             </div>
             <div id="pdf-preview-container" style="border:1px solid var(--border-color); background:#fff; min-height:400px; overflow:auto; width:100%; display:flex; justify-content:center;"></div>
             <div style="display:flex; gap:10px; margin-top:15px; justify-content:flex-end; align-items:center; position:relative;">

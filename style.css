@@ -217,7 +217,7 @@ header {
 .menu-item.danger:hover { background: var(--match-red-bg); color: var(--match-red-text); }
 body.dark-mode .menu-item.danger { color: var(--match-red-text); }
 
-#app-container { display: none; flex-direction: row; width: 100%; height: calc(100dvh - var(--header-base-height)); overflow: hidden; position: relative; } 
+#app-container { display: none; flex-direction: row; width: 100%; flex: 1; height: auto; min-height: 0; overflow: hidden; position: relative; } 
 html.logged-in #app-container { display: flex !important; }
 
 #sidebar-left { 
@@ -273,11 +273,11 @@ input[type=range] { accent-color: var(--lsu-purple); }
     padding: 4px 1px;
     background: var(--bg-sidebar);
     border-top: 1px solid var(--border-color);
-    flex-shrink: 0;
-    overflow: hidden;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    max-height: 40vh;
 }
 
 #pagination-footer {
@@ -916,4 +916,30 @@ body.dark-mode .del-zone-btn {
         height: 100% !important;
         min-height: 60vh;
     }
+}
+
+/* Preview modal close button: match frosted white icon style */
+#pdf-preview-modal .preview-close-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 700;
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: absolute;
+    right: 8px;
+    padding: 0;
+    line-height: 1;
+}
+#pdf-preview-modal .preview-close-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    border-color: rgba(255, 255, 255, 0.5);
 }
