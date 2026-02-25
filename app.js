@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.17 (pre-search idle placeholder: inject .results-idle-placeholder into #results-area on init and clear on search; add padding:0 to #results-scroll-area.pre-search to eliminate empty gray strip; version bump) ---
-const APP_VERSION = "v2.6.17";
+// --- SCHEMATICA ai v2.6.18 (fix left sidebar Custom PDF Info docking/collapse layout: add margin-top:auto to #left-generator-context for proper bottom-anchoring in sidebar flex column; version bump) ---
+const APP_VERSION = "v2.6.18";
 const VERSION_HISTORY = {
+    "v2.6.18": "Fix left sidebar Custom PDF Info docking/collapse layout: add margin-top:auto to #left-generator-context so it anchors to the bottom of the sidebar flex column instead of floating mid-page in demo mode; version bump",
     "v2.6.17": "pre-search idle placeholder: inject .results-idle-placeholder 'Enter filters and press Search to view results.' into #results-area when !hasSearched; set padding:0 on #results-scroll-area.pre-search to eliminate unintentional gray strip beneath search controls; version bump",
     "v2.6.16": "force-hide #pagination-footer pre-search: add UI.applyPreSearchState() called from DOMContentLoaded and UI.render() when !hasSearched; add DemoManager.syncContextInvariant() to re-sync collapse-state classes on #demo-context-panel and #left-generator-context after every rerender (perform, renderCurrentPage, toggleGenerator); version bump",
     "v2.6.15": "fix generator auto-restore regression: stop calling toggleGenerator() on load from localStorage so generator defaults OFF; make DemoManager.reapplyGeneratorState() symmetric (removes body.demo-mode when generator inactive) to eliminate class drift; replace iframe redacted preview with pdf.js canvas render for deterministic centering on tablet; version bump",

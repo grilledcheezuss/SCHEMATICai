@@ -284,6 +284,7 @@ input[type=range] { accent-color: var(--lsu-purple); }
     min-height: 0;
     display: none;
     flex-direction: column;
+    margin-top: auto;
 }
 
 body.demo-mode #left-generator-context {
