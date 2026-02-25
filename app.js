@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.5 (generator-only Custom PDF Info visibility; fix sidebar flex sizing: results-scroll-area flex:1, left-generator-context flex:0 0 auto + max-height + overflow; iOS Safari viewport: body min-height 100dvh fallback; tablet-only sidebar width reduction 768-1023px; verify collapse toggle; verify preview iframe injection; version bump) ---
-const APP_VERSION = "v2.6.5";
+// --- SCHEMATICA ai v2.6.6 (fix iOS/tablet layout: remove body height:100vh use min-height:100dvh+auto+@supports fallback; add min-height:0 to sidebar/preview-pane/pdf-main-view/generator-panel; Custom PDF Info: header moved to bottom of panel so collapse is downward, collapsed-state truly collapses to header-only removing padding/border/bg; preview container align-items:stretch+padding:0+margin:0 for centering fix; preview blob URL tracked+revoked on close/new preview; mobile PDF load retry on transient failure with 1.5s backoff; improve load diagnostics; version bump) ---
+const APP_VERSION = "v2.6.6";
 const VERSION_HISTORY = {
+    "v2.6.6": "iOS/tablet layout: body removes height:100vh, uses min-height:100dvh height:auto with @supports not(min-height:100dvh) fallback; add min-height:0 to #sidebar-left, #preview-pane, #pdf-main-view, #generator-panel(tablet); Custom PDF Info sticky header UX: header markup moved to bottom of panel so collapse collapses downward into it; #demo-context-panel.collapsed-state truly collapses (flex:0 0 auto, no padding/border/bg); #pdf-preview-container centering fix (align-items:stretch, padding:0, margin:0, iframe display:block); preview blob URL tracked in PdfExporter._previewBlobUrl and revoked on close/new preview; mobile PDF loadById: single auto-retry on transient failure (not 401/404) with 1.5s backoff via _isMobileRetrying flag; improved load error diagnostics; version bump",
     "v2.6.5": "generator-only Custom PDF Info visibility confirmed; fix #left-generator-context flex:0 0 auto + max-height:40vh + overflow-y:auto so results-scroll-area flex:1 is primary scroll region and Custom PDF Info anchors below; iOS Safari viewport: body uses min-height:100dvh (with 100vh fallback) to eliminate bottom gap/top cutoff; tablet-only media query (768-1023px) reduces --sidebar-width and generator panel width; collapse toggle CSS verified; preview iframe injection verified in PdfExporter.preview(); version bump",
     "v2.6.4": "fix left sidebar Custom PDF Info scrolling/cutoff: #left-generator-context flex:1 1 auto + overflow-y:auto + min-height:0, removed max-height:40vh; rename section header to 'Custom PDF Info' + add inline preview button; fix tablet layout shift: #app-container uses flex:1 + height:auto + min-height:0 instead of calc(100dvh - var(--header-base-height)); preview modal close button styled as frosted white icon matching .menu-btn; version bump",
     "v2.6.2": "Preview modal header: removed REDACTED pill, centered title, X-only close button wired to PdfExporter.closePreview(); tablet preview PDF alignment fix: #pdf-preview-container and embedded element set to 100% width/height; control-panel button label clipping fixed via line-height/padding adjustment on .search-btn; logo-tm font-size enlarged for legibility on tablet/desktop; left sidebar horizontal padding further reduced (~5%) in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context; version bump",
@@ -2972,6 +2973,7 @@ class SearchEngine {
 
 class PdfExporter {
     static previewPdfBytes = null;
+    static _previewBlobUrl = null;
     
     static async preview() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
@@ -2989,10 +2991,17 @@ class PdfExporter {
             const pdfBytes = await this.generateRedactedPdf();
             this.previewPdfBytes = pdfBytes;
             
+            // Revoke previous blob URL to prevent memory leaks
+            if (this._previewBlobUrl) {
+                URL.revokeObjectURL(this._previewBlobUrl);
+                this._previewBlobUrl = null;
+            }
+            
             const blob = new Blob([pdfBytes], { type: "application/pdf" });
             const blobUrl = URL.createObjectURL(blob);
+            this._previewBlobUrl = blobUrl;
             
-            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:70vh; border:none;"></iframe>`;
+            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:100%; min-height:60vh; border:none; display:block;"></iframe>`;
             modal.style.display = 'block';
         } catch (e) {
             console.error(e);
@@ -3007,6 +3016,11 @@ class PdfExporter {
         if (modal) modal.style.display = 'none';
         const container = document.getElementById('pdf-preview-container');
         if (container) container.innerHTML = '';
+        // Revoke preview blob URL to free memory
+        if (this._previewBlobUrl) {
+            URL.revokeObjectURL(this._previewBlobUrl);
+            this._previewBlobUrl = null;
+        }
         // Restore generator panel
         DemoManager.restorePanel();
     }
@@ -3392,6 +3406,7 @@ class PdfViewer {
     static currentRenderToken = 0;
     static loadingTask = null;
     static isPrinting = false;
+    static _isMobileRetrying = false;
     static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
     static PRINT_MAX_TIMEOUT_MS = 120000; // 2 minute hard maximum
 
@@ -3525,7 +3540,24 @@ class PdfViewer {
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
-                console.error("PDF Load Error:", e);
+                console.error(`[loadById] PDF load error for panel ${panelId}:`, e);
+                // Mobile: auto-retry once on transient failure (not 401/404)
+                const isMobile = window.innerWidth < 768;
+                const isCredentialError = e.message?.includes('401') || e.message?.includes('credentials') || e.message?.includes('Unauthorized');
+                const is404 = e.message?.includes('404') || e.message?.includes('Not Found');
+                if (isMobile && !isCredentialError && !is404 && !this._isMobileRetrying) {
+                    this._isMobileRetrying = true;
+                    console.log(`[loadById] Mobile transient failure — retrying panel ${panelId} in 1.5s...`);
+                    setPdfUiState(PDF_UI_STATE.LOADING, '⚠️ Retrying...');
+                    await new Promise(r => setTimeout(r, 1500));
+                    try {
+                        await this.loadById(panelId, fallbackUrl);
+                    } finally {
+                        this._isMobileRetrying = false;
+                    }
+                    return;
+                }
+                this._isMobileRetrying = false;
                 setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
             }
         }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.6.5)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.6.6)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -105,7 +105,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.6.5</span>
+        <span class="app-title-version" id="app-version">v2.6.6</span>
     </div>
 
     <div class="header-controls">
@@ -163,11 +163,6 @@
 
         <div id="left-generator-context" style="display:none;">
             <div id="demo-context-panel">
-                <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:6px; margin-bottom:4px; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="DemoManager.toggleContext()">
-                    <span style="font-size:11px; font-weight:600; color:var(--glass-text); flex:1;">Custom PDF Info</span>
-                    <button onclick="event.stopPropagation(); PdfExporter.preview();" title="Preview Redacted PDF" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:var(--glass-text); border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; line-height:1.4; backdrop-filter:blur(4px); cursor:pointer; flex-shrink:0;">👁 Preview</button>
-                    <span id="context-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
-                </div>
 
                 <div id="demo-context-content">
                     <div class="input-wrapper" data-field="cust"><span class="demo-label">Company Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Company..." oninput="RedactionManager.refreshContent()"></div>
@@ -196,6 +191,12 @@
                         <div class="input-wrapper" data-field="phone" style="flex:1;"><span class="demo-label">Phone</span><input type="text" id="demo-phone" class="demo-input" placeholder="(123) 456-7890" oninput="RedactionManager.refreshContent()"></div>
                         <div class="input-wrapper" data-field="fax" style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(123) 456-7891" oninput="RedactionManager.refreshContent()"></div>
                     </div>
+                </div>
+
+                <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:6px; margin-top:4px; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="DemoManager.toggleContext()">
+                    <span style="font-size:11px; font-weight:600; color:var(--glass-text); flex:1;">Custom PDF Info</span>
+                    <button onclick="event.stopPropagation(); PdfExporter.preview();" title="Preview Redacted PDF" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:var(--glass-text); border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; line-height:1.4; backdrop-filter:blur(4px); cursor:pointer; flex-shrink:0;">👁 Preview</button>
+                    <span id="context-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
                 </div>
             </div>
         </div>
