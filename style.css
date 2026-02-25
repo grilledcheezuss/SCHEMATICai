@@ -606,7 +606,7 @@ body.editor-active .redaction-resize-handle {
     gap: 0;
     transition: gap 0.3s;
     overflow: hidden;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-height: 0;
     max-height: 100%;
 }
