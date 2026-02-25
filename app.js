@@ -1,7 +1,8 @@
-// --- SCHEMATICA ai v2.5.54 (Fix Custom PDF Info input clipping: date/stage and phone/fax rows no longer overflow sidebar; version bump) ---
-const APP_VERSION = "v2.5.54";
+// --- SCHEMATICA ai v2.5.56 (Responsive sidebar: collapse both sidebars by default on <=1024px so viewer gets full width; fix display:contents on mobile; version bump) ---
+const APP_VERSION = "v2.5.56";
 const VERSION_HISTORY = {
-    "v2.5.53": "Fix Custom PDF Info input clipping: date/stage and phone/fax rows no longer overflow sidebar; demo-input min-width:0 for flex shrink; date input text-align:left; left-generator-context and demo-context-panel overflow guard; version bump",
+    "v2.5.56": "Responsive sidebar: collapse left sidebar and generator panel by default on <=1024px (tablets/phones) so PDF viewer gets full width; fix display:contents on mobile left sidebar (replaced with proper width:0 collapse); generator restore button shown on tablet; version bump",
+    "v2.5.55": "Fix Custom PDF Info input clipping: date/stage and phone/fax rows no longer overflow sidebar; version bump",
     "v2.5.53": "PDF preview header centering fix (absolute-positioned title for true center); tablet sidebar width reduced ~8%; tablet default zoom 80% (matching mobile); version bump",
     "v2.5.52": "Fix bottom button clipping with stacked layout; redesign PDF preview modal as full-screen overlay with slim purple header bar; version bump",
     "v2.5.51": "UI restructure: move Project Context to left sidebar; simplify right panel to single CONTROL PANEL; default collapsed on generator activation; version bump",
