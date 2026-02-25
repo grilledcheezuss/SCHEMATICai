@@ -115,8 +115,11 @@ body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
     margin: 0; padding: 0; 
     background-color: var(--bg-app); color: var(--text-primary); 
-    height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; overflow: hidden; 
+    min-height: 100dvh; height: auto; display: flex; flex-direction: column; overflow: hidden; 
     font-size: 13px; font-weight: 400; 
+}
+@supports not (min-height: 100dvh) {
+    body { min-height: 100vh; }
 }
 
 ::-webkit-scrollbar { width: 9px; height: 9px; } 
@@ -227,7 +230,7 @@ html.logged-in #app-container { display: flex !important; }
     border-right: 2px solid var(--border-color); 
     display: flex; flex-direction: column; z-index: 20; 
     transition: all 0.3s ease; 
-    overflow: hidden; flex-shrink: 0; height: 100%; 
+    overflow: hidden; flex-shrink: 0; height: 100%; min-height: 0; 
 } 
 #sidebar-left.collapsed { width: 0; min-width: 0; border: none; }
 
@@ -353,10 +356,10 @@ body.dark-mode .thumb-btn:hover { background: #3f3f46; }
 #pdf-toolbar { display: none; height: 45px; background: #2a2a2a; border-bottom: 1px solid #444; align-items: center; justify-content: center; gap: 20px; flex-shrink: 0; width: 100%; }
 #pdf-zoom-level { color: #f3f4f6; font-weight: 700; min-width: 40px; text-align: center; }
 
-#preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; z-index: 1; }
+#preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; min-height: 0; z-index: 1; }
 #custom-pdf-viewer { flex: 1; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; opacity: 0; transition: opacity 0.3s ease-in; }
 #custom-pdf-viewer[style*="display: flex"] { opacity: 1; }
-#pdf-main-view { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; -webkit-overflow-scrolling: touch; transition: opacity 0.2s ease; }
+#pdf-main-view { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; min-height: 0; -webkit-overflow-scrolling: touch; transition: opacity 0.2s ease; }
 body.generator-transition #pdf-main-view { opacity: 0.6; }
 
 .pdf-page-wrapper { 
@@ -609,10 +612,9 @@ body.editor-active .redaction-resize-handle {
     font-weight: 800; 
     color: var(--app-primary); 
     text-transform: uppercase;
-    margin-bottom: 4px;
+    margin-top: 4px;
+    margin-bottom: 0;
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
 }
 
 #demo-context-content {
@@ -639,6 +641,15 @@ body.editor-active .redaction-resize-handle {
 
 #demo-context-panel.collapsed-state #context-toggle-icon {
     transform: rotate(-90deg);
+}
+
+/* When collapsed: panel shrinks to header-only with no extra padding/border/background */
+#demo-context-panel.collapsed-state {
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    background: transparent;
+    gap: 0;
 }
 
 .active-page-indicator {
@@ -752,6 +763,7 @@ body.editor-active .redaction-resize-handle {
         min-width: 260px;
         max-height: none;
         height: 100%;
+        min-height: 0;
         top: auto;
         right: auto;
         border-radius: 0;
@@ -906,30 +918,21 @@ body.dark-mode .del-zone-btn {
     box-sizing: border-box;
     display: flex;
     justify-content: center;
+    align-items: stretch;
+    padding: 0;
+    margin: 0;
 }
 #pdf-preview-container iframe,
 #pdf-preview-container embed,
 #pdf-preview-container object {
+    display: block;
+    margin: 0 auto;
     width: 100% !important;
     height: 100% !important;
     min-height: 60vh;
 }
 
-/* Tablet/desktop: ensure PDF preview container fills allocated space */
-@media (min-width: 768px) {
-    #pdf-preview-container {
-        width: 100%;
-        min-height: 60vh;
-        box-sizing: border-box;
-    }
-    #pdf-preview-container iframe,
-    #pdf-preview-container embed,
-    #pdf-preview-container object {
-        width: 100% !important;
-        height: 100% !important;
-        min-height: 60vh;
-    }
-}
+/* Tablet/desktop: preview container already handled by base rules above */
 
 /* Preview modal close button: match frosted white icon style */
 #pdf-preview-modal .preview-close-btn {
