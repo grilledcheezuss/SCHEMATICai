@@ -279,8 +279,7 @@ input[type=range] { accent-color: var(--lsu-purple); }
     background: var(--bg-sidebar);
     border-top: 1px solid var(--border-color);
     flex: 0 0 auto;
-    max-height: 45%;
-    overflow: clip;
+    margin-top: auto;
     min-height: 0;
     display: none;
     flex-direction: column;
