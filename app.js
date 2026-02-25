@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.2 (UX/UI refinements: preview modal X-only close + remove REDACTED pill + center header title; fix tablet preview PDF alignment; fix control-panel button label clipping; enlarge TM superscript; tighten left sidebar horizontal padding) ---
-const APP_VERSION = "v2.6.2";
+// --- SCHEMATICA ai v2.6.3 (pre-client demo polish: manual-only scan progress indicator; iPad Safari header/viewport fix; preview modal X contrast + mobile base rules; Project Context hidden on small mobile; logo-tm size increase; version bump) ---
+const APP_VERSION = "v2.6.3";
 const VERSION_HISTORY = {
+    "v2.6.3": "scanAllPages({ source }) param: button text updates only for manual scans; iPad Safari: header height:auto + padding-top safe-area-inset-top, #app-container uses 100dvh; preview modal: X button enlarged/contrasted, #pdf-preview-container base rules added for mobile fill; #left-generator-context hidden on small mobile (max-width:767px); logo-tm font-size increased; version bump",
     "v2.6.2": "Preview modal header: removed REDACTED pill, centered title, X-only close button wired to PdfExporter.closePreview(); tablet preview PDF alignment fix: #pdf-preview-container and embedded element set to 100% width/height; control-panel button label clipping fixed via line-height/padding adjustment on .search-btn; logo-tm font-size enlarged for legibility on tablet/desktop; left sidebar horizontal padding further reduced (~5%) in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context; version bump",
     "v2.6.1": "Sidebar context scroll fix: removed conflicting max-height:500px from #demo-context-content, now uses flex:1 for proper scroll within 40vh parent; TM placement corrected to follow RESEARCH wordmark (not COX); default PDF scale set to 90% for both mobile and tablet; left sidebar horizontal padding reduced (~1-2px) in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context; icons removed from Preview Redacted PDF and Auto-Scan Pages buttons; preview modal redesigned with purple header, single close action (removed Back to Editor), preview container centered with full-width layout; version bump",
     "v2.6.0": "UI polish: scrollbar width increased 8px→9px (~15%); TM superscript added to COX wordmark in header; settings dropdown z-layer raised (header z-index 100→3000) to prevent clipping by generator panel rail; mobile sync progress smoothed by yielding to RAF every 10 shards and throttling progress callback to requestAnimationFrame; version bump",
@@ -1513,7 +1514,8 @@ class SmartScanner {
     static MIN_OCR_BOX_WIDTH = 20; // Minimum width in pixels to avoid "too small to scale" errors
     static MIN_OCR_BOX_HEIGHT = 10; // Minimum height in pixels to avoid "too small to scale" errors
     
-    static async scanAllPages() {
+    static async scanAllPages({ source = 'manual' } = {}) {
+        const isManual = source === 'manual';
         console.log('🔍 Auto-scanning PDF pages...');
         RedactionManager.clearAll(); 
         if(!PdfViewer.isDocumentValid()) {
@@ -1534,7 +1536,8 @@ class SmartScanner {
         
         const btn = document.getElementById('auto-scan-btn');
         const origText = btn ? btn.innerText : "";
-        if(btn) { btn.innerText = "🔍 INITIALIZING..."; btn.disabled = true; }
+        if(isManual && btn) { btn.innerText = "🔍 Scanning…"; btn.disabled = true; }
+        else if(btn) { btn.disabled = true; }
         
         let textPages = 0;
         let ocrPages = 0;
@@ -1551,7 +1554,7 @@ class SmartScanner {
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
                 if(!wrapper) continue;
                 
-                if(btn) btn.innerText = `🔍 ANALYZING PAGE ${i}/${PdfViewer.doc.numPages}...`;
+                if(isManual && btn) btn.innerText = `🔍 Scanning ${i}/${PdfViewer.doc.numPages}`;
                 
                 // Page 1 always uses COVER_TEMPLATE deterministically - skip text/OCR detection
                 if (i === 1) {
@@ -1614,7 +1617,7 @@ class SmartScanner {
                 
                 // Check if text extraction yielded useful results
                 if(textContent.items.length > 10) {
-                    if(btn) btn.innerText = `🔍 TEXT SCAN PAGE ${i}/${PdfViewer.doc.numPages}...`;
+                    if(isManual && btn) btn.innerText = `🔍 Scanning ${i}/${PdfViewer.doc.numPages}`;
                     detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
                     if(detectedZones && detectedZones.length > 0) {
                         scanConfidence = 'high';
@@ -1622,7 +1625,7 @@ class SmartScanner {
                     }
                 } else {
                     // Fallback to OCR for scanned/image PDFs
-                    if(btn) btn.innerText = `🔍 OCR PAGE ${i}/${PdfViewer.doc.numPages}...`;
+                    if(isManual && btn) btn.innerText = `🔍 Scanning ${i}/${PdfViewer.doc.numPages}`;
                     detectedZones = await this.ocrBasedZones(page, wrapper);
                     if(detectedZones && detectedZones.length > 0) {
                         scanConfidence = 'medium';
@@ -1655,15 +1658,17 @@ class SmartScanner {
             console.log(`✅ Scan complete. Created zones on ${textPages + ocrPages} pages`);
             console.log(`📊 Total zones in manager: ${RedactionManager.zones.length}`);
             
-            // Show summary
-            if(btn) {
-                const summary = `✅ Scanned ${numPages} pages (${textPages} text, ${ocrPages} OCR)`;
-                btn.innerText = summary;
+            // Show summary only for manual scans
+            if(isManual && btn) {
+                btn.innerText = `✅ Scanned ${numPages} pages`;
                 setTimeout(() => { btn.innerText = origText; }, 3000);
+            } else if(btn) {
+                btn.innerText = origText;
             }
         } catch(e) { 
             console.error('[scanAllPages] Scan error:', e); 
-            if(btn) btn.innerText = "❌ SCAN FAILED";
+            if(isManual && btn) btn.innerText = "❌ SCAN FAILED";
+            else if(btn) btn.innerText = origText;
         } finally {
             if(btn) btn.disabled = false;
         }
@@ -3905,7 +3910,7 @@ class PdfViewer {
             
             // Start scan immediately after render; remove transition class once scan completes
             console.log('🔍 Auto-scanning PDF pages...');
-            SmartScanner.scanAllPages().finally(() => {
+            SmartScanner.scanAllPages({ source: 'auto' }).finally(() => {
                 document.body.classList.remove('generator-transition');
             });
         } else {
@@ -4362,7 +4367,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Wire Auto-Scan and Re-scan buttons with stable IDs
         const autoScanBtn = document.getElementById('auto-scan-btn');
         if (autoScanBtn) {
-            autoScanBtn.addEventListener('click', () => SmartScanner.scanAllPages());
+            autoScanBtn.addEventListener('click', () => SmartScanner.scanAllPages({ source: 'manual' }));
         }
         const rescanBtn = document.getElementById('rescan-current-btn');
         if (rescanBtn) {
