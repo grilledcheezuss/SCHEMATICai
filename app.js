@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.13 (fix Custom PDF Info persistence/placement on tablet+desktop: persist isGeneratorActive to localStorage, restore on startup, re-apply after search; fix pre-search layout so #left-generator-context stays anchored at bottom; fix redacted preview iframe fill/centering; version bump) ---
-const APP_VERSION = "v2.6.13";
+// --- SCHEMATICA ai v2.6.14 (harden Project Context visibility: reapplyGeneratorState on every renderCurrentPage including pagination; harden worker CORS: full Access-Control headers on PDF proxy success responses; version bump) ---
+const APP_VERSION = "v2.6.14";
 const VERSION_HISTORY = {
+    "v2.6.14": "harden Project Context (left-generator-context) visibility: call DemoManager.reapplyGeneratorState() from SearchEngine.renderCurrentPage() so body.demo-mode is guaranteed on every render including pagination; harden worker CORS: include all three Access-Control headers on PDF proxy success responses; align worker version to app version v2.6.14; version bump",
     "v2.6.13": "fix Custom PDF Info (Project Context) persistence and placement on tablet/desktop: persist DemoManager.isGeneratorActive to localStorage and restore on startup; re-apply body.demo-mode after SearchEngine.perform() to guarantee visibility; fix pre-search sidebar layout so #results-scroll-area keeps flex:1 in DOM and #left-generator-context stays anchored at bottom instead of floating/elevated; fix redacted preview modal PDF fill/centering: remove display:flex+justify-content:center from #pdf-preview-container inline style; remove conflicting min-height:60vh from injected iframe; add .preview-pdf-frame CSS class for deterministic sizing; version bump",
     "v2.6.11": "regression fixes: results area hidden (display:none) pre-search instead of idle placeholder; Project Context collapse is flush at bottom (context-header position:static; wrapper collapsed-state removes border-top/padding; toggleContext also toggles left-generator-context class); redacted preview modal header refactored to flex row (left: Print/Export+menu, center: title, right: close X); close button no longer absolutely positioned; version bump",
     "v2.6.10": "context header sticky fix: .context-header changed from position:sticky bottom:0 to top:0 so Project Context header stays anchored at top of card (not bottom); version bump",
@@ -2975,6 +2976,10 @@ class SearchEngine {
         if (nextBtn) {
             nextBtn.disabled = this.currentPage >= totalPages;
         }
+
+        // Guard: ensure body.demo-mode is present whenever generator is active
+        // (covers pagination re-renders where perform() reapply is not called)
+        DemoManager.reapplyGeneratorState();
     }
 
     static prevPage() {

@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.45 (Varied/Multiple enclosure; 208V voltage boundary guards)
+// 🧠 SCHEMATICA ai WORKER v2.6.14 (Varied/Multiple enclosure; 208V voltage boundary guards; hardened CORS on all response paths)
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -667,6 +667,8 @@ export default {
                     const pdfResponse = await fetchPdfWithGuards(pdfUrl);
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
+                    newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                    newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, X-Cox-User, X-Cox-Pass');
                     newHeaders.set('Content-Type', 'application/pdf');
                     console.log('[PDF] Successfully fetched PDF');
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
@@ -805,6 +807,8 @@ export default {
                     const pdfResponse = await fetchPdfWithGuards(pdfUrl);
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
+                    newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                    newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, X-Cox-User, X-Cox-Pass');
                     newHeaders.set('Content-Type', 'application/pdf');
                     console.log('[PDF_BY_ID] Successfully fetched PDF for panel:', panelId);
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
