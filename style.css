@@ -262,6 +262,7 @@ input[type=range] { accent-color: var(--lsu-purple); }
 .search-btn:hover { filter: brightness(1.2); }
 .search-btn:disabled { background-color: #9ca3af !important; opacity: 0.7; filter: none; cursor: default !important; } 
 .search-btn.error { background-color: #991b1b !important; border-color: #7f1d1d !important; }
+#pdf-preview-header .search-btn { flex: none; }
 #context-preview-btn { background: var(--app-primary); color: white; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 4px; border: none; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; margin-left: auto; margin-right: 4px; transition: filter 0.2s; }
 #context-preview-btn:hover { filter: brightness(1.2); }
 
@@ -730,6 +731,7 @@ input[type="date"].demo-input { text-align: left; }
     }
     .logo-main { font-size: 1.5rem; } 
     .logo-sub { font-size: 0.6rem; letter-spacing: 2px; }
+    .date-stage-row { flex-wrap: wrap; }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
