@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.6.21)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.50)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -101,11 +101,11 @@
 </div>
 
 <header>
-    <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH<sup class="logo-tm">™</sup></span></a>
+    <a href="#" class="logo-group"><span class="logo-main">COX</span><span class="logo-sub">RESEARCH</span></a>
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.6.21</span>
+        <span class="app-title-version" id="app-version">v2.5.50</span>
     </div>
 
     <div class="header-controls">
@@ -157,18 +157,16 @@
             </div>
         </div>
         <div id="refine-btn-area"><button class="refine-btn" onclick="UI.toggleSearch(true)">🔍 REFINE SEARCH</button></div>
-        <div id="results-scroll-area" class="pre-search">
+        <div id="results-scroll-area">
             <div id="results-area"></div>
         </div>
 
-        <div id="pagination-footer">
-            <button id="page-prev" class="page-btn" onclick="SearchEngine.prevPage()">‹ Prev</button>
-            <span id="page-info" class="page-info"></span>
-            <button id="page-next" class="page-btn" onclick="SearchEngine.nextPage()">Next ›</button>
-        </div>
-
-        <div id="left-generator-context">
+        <div id="left-generator-context" style="display:none;">
             <div id="demo-context-panel">
+                <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:8px; margin-bottom:10px; border-radius:4px; cursor:pointer;" onclick="DemoManager.toggleContext()">
+                    <span style="font-size:11px; font-weight:600; color:var(--glass-text);">🔐 PROJECT CONTEXT &amp; SENSITIVE DATA</span>
+                    <span id="context-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
+                </div>
 
                 <div id="demo-context-content">
                     <div class="input-wrapper" data-field="cust"><span class="demo-label">Company Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Company..." oninput="RedactionManager.refreshContent()"></div>
@@ -198,13 +196,13 @@
                         <div class="input-wrapper" data-field="fax" style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(123) 456-7891" oninput="RedactionManager.refreshContent()"></div>
                     </div>
                 </div>
-
-                <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:6px; margin-top:4px; border-radius:4px; cursor:pointer; display:flex; align-items:center; gap:4px;" onclick="DemoManager.toggleContext()">
-                    <span style="font-size:11px; font-weight:600; color:var(--glass-text); flex:1;">Custom PDF Info</span>
-                    <button onclick="event.stopPropagation(); PdfExporter.preview();" title="Preview Redacted PDF" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:var(--glass-text); border-radius:4px; font-size:10px; font-weight:700; padding:2px 6px; line-height:1.4; backdrop-filter:blur(4px); cursor:pointer; flex-shrink:0;">👁 Preview</button>
-                    <span id="context-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
-                </div>
             </div>
+        </div>
+        
+        <div id="pagination-footer">
+            <button id="page-prev" class="page-btn" onclick="SearchEngine.prevPage()">‹ Prev</button>
+            <span id="page-info" class="page-info"></span>
+            <button id="page-next" class="page-btn" onclick="SearchEngine.nextPage()">Next ›</button>
         </div>
     </div>
     
@@ -340,29 +338,35 @@
                 <div style="padding:0 8px; margin-top:10px; margin-bottom:8px; display:flex; gap:6px; align-items:center;">
                     <button class="thumb-btn add-zone-btn" onclick="RedactionManager.addZoneToCurrentView('custom')" title="Add new redaction box">+</button>
                     <button class="thumb-btn del-zone-btn" onclick="RedactionManager.deleteSelected()" title="Remove existing redaction box">&#215;</button>
-                    <button class="search-btn" style="background:#8b5cf6 !important; flex:1;" onclick="PdfExporter.preview()">Preview Redacted PDF</button>
-                    <button id="auto-scan-btn" class="search-btn" style="background:var(--app-accent) !important; flex:1;">Auto-Scan Pages</button>
+                    <button class="search-btn" style="background:#8b5cf6 !important; flex:1;" onclick="PdfExporter.preview()">&#128065;&#65039; Preview Redacted PDF</button>
+                    <button id="auto-scan-btn" class="search-btn" style="background:var(--app-accent) !important; flex:1;">🔍 Auto-Scan Pages</button>
                 </div>
         </div>
     </div>
 
     <!-- PDF Preview Modal -->
     <div id="pdf-preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; overflow:auto;">
-        <div style="position:relative; max-width:1200px; margin:20px auto; background:var(--bg-card); border-radius:8px; padding:20px; box-sizing:border-box; width:calc(100% - 16px);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background:var(--app-primary); border-radius:6px; padding:6px 10px; gap:8px;">
-                <div style="position:relative; flex-shrink:0;">
-                    <button class="search-btn" style="background:rgba(255,255,255,0.15) !important; border:1px solid rgba(255,255,255,0.3) !important; color:#fff; font-size:10px;" onclick="PdfExporter.openPrintExportMenu()">🖨️ Print / Export ▾</button>
-                    <div id="print-export-menu" style="display:none; position:absolute; top:calc(100% + 8px); left:0; background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.3); min-width:220px; z-index:100; overflow:hidden;">
+        <div style="position:relative; max-width:1200px; margin:20px auto; background:var(--bg-card); border-radius:8px; padding:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <h2 style="color:var(--app-primary); margin:0;">Redacted PDF Preview</h2>
+                    <span style="background:#dc2626; color:white; font-size:10px; font-weight:800; padding:3px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">🔒 REDACTED</span>
+                </div>
+                <button class="search-btn" style="background:#dc2626 !important; padding:8px 16px;" onclick="PdfExporter.closePreview()">✖ Close</button>
+            </div>
+            <div id="pdf-preview-container" style="border:1px solid var(--border-color); background:#fff; min-height:400px; overflow:auto;"></div>
+            <div style="display:flex; gap:10px; margin-top:15px; justify-content:flex-end; align-items:center; position:relative;">
+                <button class="search-btn" style="background:#475569 !important;" onclick="PdfExporter.closePreview()">← Back to Editor</button>
+                <div style="position:relative;">
+                    <button class="search-btn" style="background:var(--app-primary) !important;" onclick="PdfExporter.openPrintExportMenu()">🖨️ Print / Export ▾</button>
+                    <div id="print-export-menu" style="display:none; position:absolute; bottom:calc(100% + 8px); right:0; background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.3); min-width:220px; z-index:100; overflow:hidden;">
                         <button class="menu-item" onclick="PdfExporter.printRedacted()"><span class="menu-icon">🖨️</span> Print Redacted PDF</button>
                         <button class="menu-item" onclick="PdfExporter.downloadRedacted()"><span class="menu-icon">💾</span> Download Redacted PDF</button>
                         <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon">📧</span> Email (coming soon)</button>
                         <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon">💬</span> Text (coming soon)</button>
                     </div>
                 </div>
-                <h2 style="color:#fff; margin:0; font-size:1rem; text-align:center; flex:1;">Redacted PDF Preview</h2>
-                <button type="button" onclick="PdfExporter.closePreview()" aria-label="Close preview" title="Close preview" class="preview-close-btn">&times;</button>
             </div>
-            <div id="pdf-preview-container" style="background:#fff; min-height:400px; overflow:hidden; width:100%;"></div>
         </div>
     </div>
 

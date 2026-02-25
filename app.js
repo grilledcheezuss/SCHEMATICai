@@ -1,23 +1,7 @@
-// --- SCHEMATICA ai v2.6.21 (CSS fix: #demo-context-panel flex:0 0 auto so Custom PDF Info is content-sized and bottom-docked; version bump) ---
-const APP_VERSION = "v2.6.21";
+// --- SCHEMATICA ai v2.5.50 (UI restructure: move Project Context to left sidebar; simplify right panel to single CONTROL PANEL; default collapsed on generator activation; version bump) ---
+const APP_VERSION = "v2.5.50";
 const VERSION_HISTORY = {
-    "v2.6.21": "CSS fix: #demo-context-panel flex:0 0 auto so Custom PDF Info is content-sized and bottom-docked; version bump",
-    "v2.6.20": "layout fix: bottom-dock #left-generator-context via margin-top:auto; remove max-height:45% and overflow:clip from wrapper; scrolling confined to #demo-context-content; version bump",
-    "v2.6.19": "pagination fix: move #pagination-footer before #left-generator-context in DOM so it is never clipped by overflow:hidden on sidebar; show pagination only when totalPages>1; add paginationFooter show/hide to renderCurrentPage(); #pagination-footer flex:0 0 auto; remove margin-top:auto from #left-generator-context; #left-generator-context overflow:clip; version bump",
-    "v2.6.16": "force-hide #pagination-footer pre-search: add UI.applyPreSearchState() called from DOMContentLoaded and UI.render() when !hasSearched; add DemoManager.syncContextInvariant() to re-sync collapse-state classes on #demo-context-panel and #left-generator-context after every rerender (perform, renderCurrentPage, toggleGenerator); version bump",
-    "v2.6.15": "fix generator auto-restore regression: stop calling toggleGenerator() on load from localStorage so generator defaults OFF; make DemoManager.reapplyGeneratorState() symmetric (removes body.demo-mode when generator inactive) to eliminate class drift; replace iframe redacted preview with pdf.js canvas render for deterministic centering on tablet; version bump",
-    "v2.6.14": "harden Project Context (left-generator-context) visibility: call DemoManager.reapplyGeneratorState() from SearchEngine.renderCurrentPage() so body.demo-mode is guaranteed on every render including pagination; harden worker CORS: include all three Access-Control headers on PDF proxy success responses; align worker version to app version v2.6.14; version bump",
-    "v2.6.13": "fix Custom PDF Info (Project Context) persistence and placement on tablet/desktop: persist DemoManager.isGeneratorActive to localStorage and restore on startup; re-apply body.demo-mode after SearchEngine.perform() to guarantee visibility; fix pre-search sidebar layout so #results-scroll-area keeps flex:1 in DOM and #left-generator-context stays anchored at bottom instead of floating/elevated; fix redacted preview modal PDF fill/centering: remove display:flex+justify-content:center from #pdf-preview-container inline style; remove conflicting min-height:60vh from injected iframe; add .preview-pdf-frame CSS class for deterministic sizing; version bump",
-    "v2.6.11": "regression fixes: results area hidden (display:none) pre-search instead of idle placeholder; Project Context collapse is flush at bottom (context-header position:static; wrapper collapsed-state removes border-top/padding; toggleContext also toggles left-generator-context class); redacted preview modal header refactored to flex row (left: Print/Export+menu, center: title, right: close X); close button no longer absolutely positioned; version bump",
-    "v2.6.10": "context header sticky fix: .context-header changed from position:sticky bottom:0 to top:0 so Project Context header stays anchored at top of card (not bottom); version bump",
-    "v2.6.9": "professional UI fixes: sidebar pre-search shows compact idle placeholder with results-idle CSS class (flex:0 0 auto, overflow:hidden); #demo-context-panel changed from flex:1 1 auto to flex:0 0 auto so Project Context hugs content up to 40vh cap; #demo-context-content gets max-height + flex:0 1 auto as scroll container; #pdf-preview-container changed to display:block + height:70vh (60vh mobile) + border:none to eliminate left-shift and heavy border; mobile modal card adds box-sizing:border-box; version bump",
-    "v2.6.7": "hotfix: restore desktop sidebar layout regression from v2.6.6: #left-generator-context overflow:hidden eliminates gap below search; #demo-context-panel flex:1 1 auto+min-height:0 fills constrained space without dead space; #demo-context-content flex:1 1 auto as sole scroll container; .context-header position:sticky bottom:0 z-index:2 keeps header visible at bottom; #demo-context-content.collapsed uses display:none for true collapse; #demo-context-panel.collapsed-state keeps border/background (not invisible); preview modal close button adds type=button and uses &times; entity for proper CSS styling; version bump",
-    "v2.6.5": "generator-only Custom PDF Info visibility confirmed; fix #left-generator-context flex:0 0 auto + max-height:40vh + overflow-y:auto so results-scroll-area flex:1 is primary scroll region and Custom PDF Info anchors below; iOS Safari viewport: body uses min-height:100dvh (with 100vh fallback) to eliminate bottom gap/top cutoff; tablet-only media query (768-1023px) reduces --sidebar-width and generator panel width; collapse toggle CSS verified; preview iframe injection verified in PdfExporter.preview(); version bump",
-    "v2.6.4": "fix left sidebar Custom PDF Info scrolling/cutoff: #left-generator-context flex:1 1 auto + overflow-y:auto + min-height:0, removed max-height:40vh; rename section header to 'Custom PDF Info' + add inline preview button; fix tablet layout shift: #app-container uses flex:1 + height:auto + min-height:0 instead of calc(100dvh - var(--header-base-height)); preview modal close button styled as frosted white icon matching .menu-btn; version bump",
-    "v2.6.2": "Preview modal header: removed REDACTED pill, centered title, X-only close button wired to PdfExporter.closePreview(); tablet preview PDF alignment fix: #pdf-preview-container and embedded element set to 100% width/height; control-panel button label clipping fixed via line-height/padding adjustment on .search-btn; logo-tm font-size enlarged for legibility on tablet/desktop; left sidebar horizontal padding further reduced (~5%) in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context; version bump",
-    "v2.6.1": "Sidebar context scroll fix: removed conflicting max-height:500px from #demo-context-content, now uses flex:1 for proper scroll within 40vh parent; TM placement corrected to follow RESEARCH wordmark (not COX); default PDF scale set to 90% for both mobile and tablet; left sidebar horizontal padding reduced (~1-2px) in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context; icons removed from Preview Redacted PDF and Auto-Scan Pages buttons; preview modal redesigned with purple header, single close action (removed Back to Editor), preview container centered with full-width layout; version bump",
-    "v2.6.0": "UI polish: scrollbar width increased 8px→9px (~15%); TM superscript added to COX wordmark in header; settings dropdown z-layer raised (header z-index 100→3000) to prevent clipping by generator panel rail; mobile sync progress smoothed by yielding to RAF every 10 shards and throttling progress callback to requestAnimationFrame; version bump",
-    "v2.5.51": "Left sidebar Project Context polish: #left-generator-context restructured as overflow:hidden flex column so only #demo-context-content scrolls and .context-header stays sticky/visible; .demo-input height/line-height/box-sizing fixed to eliminate vertical clipping; .input-wrapper min-width:0 prevents flex overflow in date/phone rows; reduced padding and gaps in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context, #demo-context-panel, #demo-context-content; version bump",
+    "v2.5.50": "UI restructure for Submittal Generator: Project Context & Sensitive Data block moved from right panel Project Data tab to left sidebar (visible only when generator active); right panel tab strip removed; single CONTROL PANEL header with zone editor controls only; generator panel defaults to collapsed/disabled on activation so first view is clean redacted title page; left sidebar CSS accommodates new context section; version bump",
     "v2.5.49": "Cover overlay text immediate render: applyPage1CoverTemplate now calls refreshContentForWrapper via requestAnimationFrame so text appears instantly instead of waiting for global scan end; corrected COVER_TEMPLATE font defaults: job_block/stage/date/cpid use Courier New monospace (Times New Roman reserved for cust only); guardrail in createZoneOnWrapper overrides Times to Courier on page 1 non-cust zones; version bump",
     "v2.5.48": "Redaction box defaults: CSS .redaction-box font-family changed from Times New Roman to Courier New so CSS does not override JS defaults; PdfViewer._setScaleForDevice desktop/tablet default zoom 1.0→1.1 (110%); Enclosure SS spec-table lock: when ENCLOSURE MATERIAL spec-table keyword indicates Stainless, always resolves to 4XSS (encV=false) even when FG signals also present; same logic mirrored in worker/lib/extract.js; new spec-table lock tests added; version bump",
     "v2.5.47": "Enclosure parsing refinement: worker and client now prefer explicit compound tokens (4XSS/4XFG) as tiebreaker when spec-table context does not resolve mixed signals; FRP added as strong FG signal in worker hasFG check; client ENC_FG_RE no longer matches bare FG to prevent false Varied/Multiple; PDFLib guard added to generateRedactedPdf; pdf-lib and fontkit vendored locally under assets/vendor/; index.html updated to load local pdf-lib/fontkit with CDN-missing guards; version bump",
@@ -289,9 +273,8 @@ class CacheService {
         if(!this.activeKey) return null; 
         const keys = await DB.getChunkKeys(); 
         if(!keys || keys.length === 0) return null; 
-        let lastPct = -1;
         for(let i = 0; i < keys.length; i++) { 
-            if(i % 10 === 0) await new Promise(r => requestAnimationFrame(r)); 
+            if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); 
             const chunk = await DB.getChunk(keys[i]); 
             if(chunk) { 
                 try { 
@@ -307,14 +290,7 @@ class CacheService {
                     } 
                 } catch(e) {} 
             } 
-            if(progressCallback) {
-                const pct = Math.round(((i + 1) / keys.length) * 100);
-                if(pct !== lastPct) {
-                    lastPct = pct;
-                    await new Promise(r => requestAnimationFrame(r));
-                    progressCallback(pct);
-                }
-            }
+            if(progressCallback) progressCallback(Math.round(((i + 1) / keys.length) * 100)); 
         } 
         return true; 
     }
@@ -384,14 +360,14 @@ class DataLoader {
         }
     }
     
-    static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); DB.deleteDatabase().finally(() => location.reload()); }
+    static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }
     
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0; let buffer = []; let shardCount = 0;
-        let fetchedCount = 0; let retryCount = 0; let syncCompleted = false;
+        let fetchedCount = 0; let retryCount = 0;
         try {
             do {
-                loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) { console.warn('⚠️ Sync cap reached; not marking DB complete.'); break; }
+                loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
                 console.group(`📥 Sync Batch ${loop}`); 
                 
                 if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
@@ -446,7 +422,7 @@ class DataLoader {
                 
                 retryCount = 0; 
                 const d = await r.json(); 
-                if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); syncCompleted = true; break; }
+                if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
                 fetchedCount += d.records.length;
                 
                 d.records.forEach(rec => {
@@ -467,13 +443,7 @@ class DataLoader {
                 
             } while(offset);
             
-            if (!syncCompleted && !offset) syncCompleted = true;
-            if (syncCompleted) {
-                console.log('✅ Preload declaring complete (full sync finished).');
-                localStorage.setItem('cox_db_complete', 'true');
-            } else {
-                console.warn('⚠️ Sync ended without full completion; cox_db_complete NOT set.');
-            }
+            localStorage.setItem('cox_db_complete', 'true'); 
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
         } catch(e) { console.error("Sync Critical Error", e); } 
     }
@@ -553,7 +523,6 @@ class DemoManager {
             return;
         }
         this.isGeneratorActive = !this.isGeneratorActive;
-        localStorage.setItem('cox_generator_active', String(this.isGeneratorActive));
         const btn = document.getElementById('menu-demo');
         const indicator = document.getElementById('gen-status');
         const panel = document.getElementById('generator-panel');
@@ -567,6 +536,9 @@ class DemoManager {
                 const rail = document.getElementById('toggle-right');
                 if (rail) rail.style.display = 'flex';
             }
+            // Show left-sidebar context block
+            const leftCtx = document.getElementById('left-generator-context');
+            if (leftCtx) leftCtx.style.display = 'block';
             // Default right control panel to collapsed so first view is clean redacted title page
             this.minimizePanel();
             if(indicator) indicator.style.display = 'inline-block';
@@ -576,6 +548,9 @@ class DemoManager {
         } else { 
             document.body.classList.remove('demo-mode'); 
             document.body.classList.remove('editor-active'); 
+            // Hide left-sidebar context block
+            const leftCtx = document.getElementById('left-generator-context');
+            if (leftCtx) leftCtx.style.display = 'none';
             if (UI.isTablet()) {
                 panel.classList.remove('gen-collapsed');
                 panel.style.display = 'none';
@@ -589,7 +564,6 @@ class DemoManager {
             if(btn) btn.style.color = ''; 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
         }
-        DemoManager.syncContextInvariant();
     }
 
     static minimizePanel() {
@@ -633,54 +607,16 @@ class DemoManager {
         }
     }
 
-    static restoreGeneratorState() {
-        // NOTE: Auto-restore intentionally disabled (v2.6.15 regression fix).
-        // Generator must remain OFF by default on every page load regardless of
-        // stale localStorage values. User must explicitly enable via UI toggle.
-        // (Previously: called toggleGenerator() here if cox_generator_active===true,
-        //  which caused generator/demo-mode to re-enable unintentionally on reload.)
-    }
-
-    static reapplyGeneratorState() {
-        // Symmetric: add or remove body.demo-mode based on actual generator state
-        // to prevent class drift from pagination/search re-renders
-        if (this.isGeneratorActive) {
-            document.body.classList.add('demo-mode');
-        } else {
-            document.body.classList.remove('demo-mode');
-        }
-    }
-
-    static syncContextInvariant() {
-        // Re-sync collapse-state classes between content, panel, and wrapper so
-        // rerenders (search, pagination, generator toggle) cannot leave them mismatched.
-        const content = document.getElementById('demo-context-content');
-        const panel   = document.getElementById('demo-context-panel');
-        const wrapper = document.getElementById('left-generator-context');
-        if (!content || !panel || !wrapper) return;
-        const isCollapsed = content.classList.contains('collapsed');
-        if (isCollapsed) {
-            panel.classList.add('collapsed-state');
-            wrapper.classList.add('collapsed-state');
-        } else {
-            panel.classList.remove('collapsed-state');
-            wrapper.classList.remove('collapsed-state');
-        }
-    }
-
     static toggleContext() {
         const panel = document.getElementById('demo-context-panel');
         const content = document.getElementById('demo-context-content');
-        const wrapper = document.getElementById('left-generator-context');
         
         if (content.classList.contains('collapsed')) {
             content.classList.remove('collapsed');
             panel.classList.remove('collapsed-state');
-            if (wrapper) wrapper.classList.remove('collapsed-state');
         } else {
             content.classList.add('collapsed');
             panel.classList.add('collapsed-state');
-            if (wrapper) wrapper.classList.add('collapsed-state');
         }
     }
 
@@ -1566,8 +1502,7 @@ class SmartScanner {
     static MIN_OCR_BOX_WIDTH = 20; // Minimum width in pixels to avoid "too small to scale" errors
     static MIN_OCR_BOX_HEIGHT = 10; // Minimum height in pixels to avoid "too small to scale" errors
     
-    static async scanAllPages({ source = 'manual' } = {}) {
-        const isManual = source === 'manual';
+    static async scanAllPages() {
         console.log('🔍 Auto-scanning PDF pages...');
         RedactionManager.clearAll(); 
         if(!PdfViewer.isDocumentValid()) {
@@ -1588,8 +1523,7 @@ class SmartScanner {
         
         const btn = document.getElementById('auto-scan-btn');
         const origText = btn ? btn.innerText : "";
-        if(isManual && btn) { btn.innerText = "🔍 Scanning…"; btn.disabled = true; }
-        else if(btn) { btn.disabled = true; }
+        if(btn) { btn.innerText = "🔍 INITIALIZING..."; btn.disabled = true; }
         
         let textPages = 0;
         let ocrPages = 0;
@@ -1606,7 +1540,7 @@ class SmartScanner {
                 const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
                 if(!wrapper) continue;
                 
-                if(isManual && btn) btn.innerText = `🔍 Scanning ${i}/${PdfViewer.doc.numPages}`;
+                if(btn) btn.innerText = `🔍 ANALYZING PAGE ${i}/${PdfViewer.doc.numPages}...`;
                 
                 // Page 1 always uses COVER_TEMPLATE deterministically - skip text/OCR detection
                 if (i === 1) {
@@ -1669,7 +1603,7 @@ class SmartScanner {
                 
                 // Check if text extraction yielded useful results
                 if(textContent.items.length > 10) {
-                    if(isManual && btn) btn.innerText = `🔍 Scanning ${i}/${PdfViewer.doc.numPages}`;
+                    if(btn) btn.innerText = `🔍 TEXT SCAN PAGE ${i}/${PdfViewer.doc.numPages}...`;
                     detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
                     if(detectedZones && detectedZones.length > 0) {
                         scanConfidence = 'high';
@@ -1677,7 +1611,7 @@ class SmartScanner {
                     }
                 } else {
                     // Fallback to OCR for scanned/image PDFs
-                    if(isManual && btn) btn.innerText = `🔍 Scanning ${i}/${PdfViewer.doc.numPages}`;
+                    if(btn) btn.innerText = `🔍 OCR PAGE ${i}/${PdfViewer.doc.numPages}...`;
                     detectedZones = await this.ocrBasedZones(page, wrapper);
                     if(detectedZones && detectedZones.length > 0) {
                         scanConfidence = 'medium';
@@ -1710,17 +1644,15 @@ class SmartScanner {
             console.log(`✅ Scan complete. Created zones on ${textPages + ocrPages} pages`);
             console.log(`📊 Total zones in manager: ${RedactionManager.zones.length}`);
             
-            // Show summary only for manual scans
-            if(isManual && btn) {
-                btn.innerText = `✅ Scanned ${numPages} pages`;
+            // Show summary
+            if(btn) {
+                const summary = `✅ Scanned ${numPages} pages (${textPages} text, ${ocrPages} OCR)`;
+                btn.innerText = summary;
                 setTimeout(() => { btn.innerText = origText; }, 3000);
-            } else if(btn) {
-                btn.innerText = origText;
             }
         } catch(e) { 
             console.error('[scanAllPages] Scan error:', e); 
-            if(isManual && btn) btn.innerText = "❌ SCAN FAILED";
-            else if(btn) btn.innerText = origText;
+            if(btn) btn.innerText = "❌ SCAN FAILED";
         } finally {
             if(btn) btn.disabled = false;
         }
@@ -2749,7 +2681,6 @@ class SearchEngine {
     static currentPage = 1;
     static pageSize = 25;
     static lastCriteria = null;
-    static hasSearched = false;
 
     static perform() {
         // === STOP PREVIOUS PRELOADING ===
@@ -2957,14 +2888,15 @@ class SearchEngine {
         this.currentResults = res;
         this.currentPage = 1;
         this.lastCriteria = crit;
-        this.hasSearched = true;
         this.renderCurrentPage();
         
+        // === UPDATE UI ===
+        const paginationFooter = DOM_CACHE.get('pagination-footer');
+        if (paginationFooter) {
+            paginationFooter.style.display = res.length > 0 ? 'flex' : 'none';
+        }
+        
         UI.toggleSearch(false);
-
-        // Re-apply generator body class to ensure it survives search re-render
-        DemoManager.reapplyGeneratorState();
-        DemoManager.syncContextInvariant();
 
         // === PRELOAD PDFs ===
         if (res.length > 0) {
@@ -2987,11 +2919,6 @@ class SearchEngine {
         const pageInfo = DOM_CACHE.get('page-info');
         const prevBtn = DOM_CACHE.get('page-prev');
         const nextBtn = DOM_CACHE.get('page-next');
-        const paginationFooter = DOM_CACHE.get('pagination-footer');
-        
-        if (paginationFooter) {
-            paginationFooter.style.display = totalPages > 1 ? 'flex' : 'none';
-        }
         
         if (pageInfo) {
             pageInfo.textContent = `Page ${this.currentPage} of ${totalPages}`;
@@ -3004,11 +2931,6 @@ class SearchEngine {
         if (nextBtn) {
             nextBtn.disabled = this.currentPage >= totalPages;
         }
-
-        // Guard: ensure body.demo-mode is present whenever generator is active
-        // (covers pagination re-renders where perform() reapply is not called)
-        DemoManager.reapplyGeneratorState();
-        DemoManager.syncContextInvariant();
     }
 
     static prevPage() {
@@ -3033,7 +2955,6 @@ class SearchEngine {
 
 class PdfExporter {
     static previewPdfBytes = null;
-    static _previewBlobUrl = null;
     
     static async preview() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
@@ -3051,47 +2972,10 @@ class PdfExporter {
             const pdfBytes = await this.generateRedactedPdf();
             this.previewPdfBytes = pdfBytes;
             
-            // Revoke previous blob URL to prevent memory leaks
-            if (this._previewBlobUrl) {
-                URL.revokeObjectURL(this._previewBlobUrl);
-                this._previewBlobUrl = null;
-            }
+            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blobUrl = URL.createObjectURL(blob);
             
-            // Use pdf.js canvas rendering instead of an iframe to guarantee
-            // centered alignment on tablet/iPad renderers (v2.6.15 fix).
-            container.innerHTML = '';
-            if (window.pdfjsLib) {
-                try {
-                    const typedArray = new Uint8Array(pdfBytes);
-                    const loadingTask = pdfjsLib.getDocument({ data: typedArray });
-                    const pdfDoc = await loadingTask.promise;
-                    const page = await pdfDoc.getPage(1);
-                    const containerWidth = container.clientWidth || 600;
-                    const unscaled = page.getViewport({ scale: 1 });
-                    const scale = containerWidth / unscaled.width;
-                    const viewport = page.getViewport({ scale });
-                    const canvas = document.createElement('canvas');
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    canvas.style.display = 'block';
-                    canvas.style.margin = '0 auto';
-                    canvas.style.maxWidth = '100%';
-                    container.appendChild(canvas);
-                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                } catch (canvasErr) {
-                    console.warn('[PdfExporter.preview] pdf.js canvas render failed, falling back to iframe:', canvasErr);
-                    const blob = new Blob([pdfBytes], { type: "application/pdf" });
-                    const blobUrl = URL.createObjectURL(blob);
-                    this._previewBlobUrl = blobUrl;
-                    container.innerHTML = `<iframe src="${blobUrl}" class="preview-pdf-frame"></iframe>`;
-                }
-            } else {
-                // pdf.js unavailable: fall back to iframe
-                const blob = new Blob([pdfBytes], { type: "application/pdf" });
-                const blobUrl = URL.createObjectURL(blob);
-                this._previewBlobUrl = blobUrl;
-                container.innerHTML = `<iframe src="${blobUrl}" class="preview-pdf-frame"></iframe>`;
-            }
+            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:70vh; border:none;"></iframe>`;
             modal.style.display = 'block';
         } catch (e) {
             console.error(e);
@@ -3106,11 +2990,6 @@ class PdfExporter {
         if (modal) modal.style.display = 'none';
         const container = document.getElementById('pdf-preview-container');
         if (container) container.innerHTML = '';
-        // Revoke preview blob URL to free memory
-        if (this._previewBlobUrl) {
-            URL.revokeObjectURL(this._previewBlobUrl);
-            this._previewBlobUrl = null;
-        }
         // Restore generator panel
         DemoManager.restorePanel();
     }
@@ -3496,7 +3375,6 @@ class PdfViewer {
     static currentRenderToken = 0;
     static loadingTask = null;
     static isPrinting = false;
-    static _isMobileRetrying = false;
     static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
     static PRINT_MAX_TIMEOUT_MS = 120000; // 2 minute hard maximum
 
@@ -3630,24 +3508,7 @@ class PdfViewer {
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
-                console.error(`[loadById] PDF load error for panel ${panelId}:`, e);
-                // Mobile: auto-retry once on transient failure (not 401/404)
-                const isMobile = window.innerWidth < 768;
-                const isCredentialError = e.message?.includes('401') || e.message?.includes('credentials') || e.message?.includes('Unauthorized');
-                const is404 = e.message?.includes('404') || e.message?.includes('Not Found');
-                if (isMobile && !isCredentialError && !is404 && !this._isMobileRetrying) {
-                    this._isMobileRetrying = true;
-                    console.log(`[loadById] Mobile transient failure — retrying panel ${panelId} in 1.5s...`);
-                    setPdfUiState(PDF_UI_STATE.LOADING, '⚠️ Retrying...');
-                    await new Promise(r => setTimeout(r, 1500));
-                    try {
-                        await this.loadById(panelId, fallbackUrl);
-                    } finally {
-                        this._isMobileRetrying = false;
-                    }
-                    return;
-                }
-                this._isMobileRetrying = false;
+                console.error("PDF Load Error:", e);
                 setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
             }
         }
@@ -3659,10 +3520,10 @@ class PdfViewer {
      */
     static _setScaleForDevice() {
         if (window.innerWidth < 768) {
-            this.currentScale = 0.9;
+            this.currentScale = 0.8;
             UI.toggleSearch(true); 
         } else {
-            this.currentScale = 0.9;
+            this.currentScale = 1.1;
         }
     }
 
@@ -4033,7 +3894,7 @@ class PdfViewer {
             
             // Start scan immediately after render; remove transition class once scan completes
             console.log('🔍 Auto-scanning PDF pages...');
-            SmartScanner.scanAllPages({ source: 'auto' }).finally(() => {
+            SmartScanner.scanAllPages().finally(() => {
                 document.body.classList.remove('generator-transition');
             });
         } else {
@@ -4258,14 +4119,6 @@ class UI {
     static isSmallMobile() { return window.innerWidth < 768; }
     static isTablet() { return window.innerWidth >= 768; } // includes desktop — docked sidebar on all non-mobile widths
 
-    static applyPreSearchState() {
-        // Deterministically hide pagination footer and clear page-info before any search.
-        const paginationFooter = DOM_CACHE.get('pagination-footer');
-        if (paginationFooter) paginationFooter.style.display = 'none';
-        const pageInfo = DOM_CACHE.get('page-info');
-        if (pageInfo) pageInfo.textContent = '';
-    }
-
     static toggleDarkMode() { 
         document.body.classList.toggle('dark-mode'); 
         localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); 
@@ -4444,15 +4297,6 @@ static _generateBadges(record, criteria) {
 static render(res, crit, totalCount) {
     const a = DOM_CACHE.get('results-area');
     if (!a) return;
-    const scrollArea = DOM_CACHE.get('results-scroll-area');
-
-    if (!SearchEngine.hasSearched) {
-        a.innerHTML = '<div class="results-idle-placeholder">Enter filters and press Search to view results.</div>';
-        if (scrollArea) scrollArea.classList.add('pre-search');
-        UI.applyPreSearchState();
-        return;
-    }
-    if (scrollArea) scrollArea.classList.remove('pre-search');
     
     a.innerHTML = `Found ${totalCount || res.length} records`; 
     
@@ -4507,7 +4351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Wire Auto-Scan and Re-scan buttons with stable IDs
         const autoScanBtn = document.getElementById('auto-scan-btn');
         if (autoScanBtn) {
-            autoScanBtn.addEventListener('click', () => SmartScanner.scanAllPages({ source: 'manual' }));
+            autoScanBtn.addEventListener('click', () => SmartScanner.scanAllPages());
         }
         const rescanBtn = document.getElementById('rescan-current-btn');
         if (rescanBtn) {
@@ -4527,10 +4371,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(err => console.warn('⚠️ Cover sheet template not loaded (app continues without it):', err));
         
-        UI.init();
-        UI.applyPreSearchState();
-        // Restore generator active state from localStorage (persisted across sessions)
-        DemoManager.restoreGeneratorState();
+        UI.init(); 
         if(AuthService.init()) { 
             DataLoader.preload(); 
         }
