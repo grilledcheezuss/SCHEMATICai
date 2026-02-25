@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.0 (UI polish: scrollbar width +15%, COX logo TM mark, settings dropdown z-layer fix; mobile sync progress smoothing) ---
-const APP_VERSION = "v2.6.0";
+// --- SCHEMATICA ai v2.6.1 (UI polish: sidebar context scrolling fix, TM after RESEARCH, default PDF scale 90%, sidebar padding reduction, preview/scan button icons removed, preview modal purple theme redesign) ---
+const APP_VERSION = "v2.6.1";
 const VERSION_HISTORY = {
+    "v2.6.1": "Sidebar context scroll fix: removed conflicting max-height:500px from #demo-context-content, now uses flex:1 for proper scroll within 40vh parent; TM placement corrected to follow RESEARCH wordmark (not COX); default PDF scale set to 90% for both mobile and tablet; left sidebar horizontal padding reduced (~1-2px) in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context; icons removed from Preview Redacted PDF and Auto-Scan Pages buttons; preview modal redesigned with purple header, single close action (removed Back to Editor), preview container centered with full-width layout; version bump",
     "v2.6.0": "UI polish: scrollbar width increased 8px→9px (~15%); TM superscript added to COX wordmark in header; settings dropdown z-layer raised (header z-index 100→3000) to prevent clipping by generator panel rail; mobile sync progress smoothed by yielding to RAF every 10 shards and throttling progress callback to requestAnimationFrame; version bump",
     "v2.5.51": "Left sidebar Project Context polish: #left-generator-context restructured as overflow:hidden flex column so only #demo-context-content scrolls and .context-header stays sticky/visible; .demo-input height/line-height/box-sizing fixed to eliminate vertical clipping; .input-wrapper min-width:0 prevents flex overflow in date/phone rows; reduced padding and gaps in .sidebar-controls, #results-scroll-area, .record-card, #left-generator-context, #demo-context-panel, #demo-context-content; version bump",
     "v2.5.49": "Cover overlay text immediate render: applyPage1CoverTemplate now calls refreshContentForWrapper via requestAnimationFrame so text appears instantly instead of waiting for global scan end; corrected COVER_TEMPLATE font defaults: job_block/stage/date/cpid use Courier New monospace (Times New Roman reserved for cust only); guardrail in createZoneOnWrapper overrides Times to Courier on page 1 non-cust zones; version bump",
@@ -3529,10 +3530,10 @@ class PdfViewer {
      */
     static _setScaleForDevice() {
         if (window.innerWidth < 768) {
-            this.currentScale = 0.8;
+            this.currentScale = 0.9;
             UI.toggleSearch(true); 
         } else {
-            this.currentScale = 1.1;
+            this.currentScale = 0.9;
         }
     }
 
