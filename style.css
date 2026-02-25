@@ -270,7 +270,7 @@ input[type=range] { accent-color: var(--lsu-purple); }
 .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; } 
 
 #results-scroll-area { flex: 1; overflow-y: auto; padding: 4px 1px; background: var(--bg-sidebar); min-height: 0; display: flex; flex-direction: column; } 
-#results-scroll-area.results-idle { flex: 0 0 auto; justify-content: flex-start; overflow-y: hidden; }
+#results-scroll-area.pre-search { display: none; }
 .results-idle-placeholder { display: flex; align-items: center; justify-content: center; padding: 18px 8px; margin: 8px 4px; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: 6px; color: var(--text-muted, #888); font-size: 11px; text-align: center; opacity: 0.75; user-select: none; }
 #results-area { display: flex; flex-direction: column; gap: 4px; padding-bottom: 10px; transition: opacity 0.2s ease; }
 
@@ -618,9 +618,7 @@ body.editor-active .redaction-resize-handle {
     margin-top: 4px;
     margin-bottom: 0;
     flex-shrink: 0;
-    position: sticky;
-    top: 0;
-    z-index: 2;
+    position: static;
 }
 
 #demo-context-content {
@@ -653,6 +651,13 @@ body.editor-active .redaction-resize-handle {
     flex: 0 0 auto;
     padding: 2px 6px;
     gap: 0;
+}
+
+/* Wrapper shrinks to hug only the collapsed panel */
+#left-generator-context.collapsed-state {
+    max-height: none;
+    border-top: none;
+    padding: 0 1px;
 }
 
 .active-page-indicator {
@@ -955,19 +960,18 @@ body.dark-mode .del-zone-btn {
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    width: 44px;
-    height: 44px;
+    width: 36px;
+    height: 36px;
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     backdrop-filter: blur(4px);
     cursor: pointer;
     transition: all 0.2s;
-    position: absolute;
-    right: 8px;
+    flex-shrink: 0;
     padding: 0;
     line-height: 1;
 }

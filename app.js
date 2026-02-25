@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.10 (context header sticky top fix: .context-header position:sticky top:0 so header stays at top of card not bottom; version bump) ---
-const APP_VERSION = "v2.6.10";
+// --- SCHEMATICA ai v2.6.11 (results area hidden pre-search; Project Context collapse flush fix; redacted preview modal Print/Export moved to header; close button contained in header; version bump) ---
+const APP_VERSION = "v2.6.11";
 const VERSION_HISTORY = {
+    "v2.6.11": "regression fixes: results area hidden (display:none) pre-search instead of idle placeholder; Project Context collapse is flush at bottom (context-header position:static; wrapper collapsed-state removes border-top/padding; toggleContext also toggles left-generator-context class); redacted preview modal header refactored to flex row (left: Print/Export+menu, center: title, right: close X); close button no longer absolutely positioned; version bump",
     "v2.6.10": "context header sticky fix: .context-header changed from position:sticky bottom:0 to top:0 so Project Context header stays anchored at top of card (not bottom); version bump",
     "v2.6.9": "professional UI fixes: sidebar pre-search shows compact idle placeholder with results-idle CSS class (flex:0 0 auto, overflow:hidden); #demo-context-panel changed from flex:1 1 auto to flex:0 0 auto so Project Context hugs content up to 40vh cap; #demo-context-content gets max-height + flex:0 1 auto as scroll container; #pdf-preview-container changed to display:block + height:70vh (60vh mobile) + border:none to eliminate left-shift and heavy border; mobile modal card adds box-sizing:border-box; version bump",
     "v2.6.7": "hotfix: restore desktop sidebar layout regression from v2.6.6: #left-generator-context overflow:hidden eliminates gap below search; #demo-context-panel flex:1 1 auto+min-height:0 fills constrained space without dead space; #demo-context-content flex:1 1 auto as sole scroll container; .context-header position:sticky bottom:0 z-index:2 keeps header visible at bottom; #demo-context-content.collapsed uses display:none for true collapse; #demo-context-panel.collapsed-state keeps border/background (not invisible); preview modal close button adds type=button and uses &times; entity for proper CSS styling; version bump",
@@ -626,13 +627,16 @@ class DemoManager {
     static toggleContext() {
         const panel = document.getElementById('demo-context-panel');
         const content = document.getElementById('demo-context-content');
+        const wrapper = document.getElementById('left-generator-context');
         
         if (content.classList.contains('collapsed')) {
             content.classList.remove('collapsed');
             panel.classList.remove('collapsed-state');
+            if (wrapper) wrapper.classList.remove('collapsed-state');
         } else {
             content.classList.add('collapsed');
             panel.classList.add('collapsed-state');
+            if (wrapper) wrapper.classList.add('collapsed-state');
         }
     }
 
@@ -4353,11 +4357,11 @@ static render(res, crit, totalCount) {
     const scrollArea = DOM_CACHE.get('results-scroll-area');
 
     if (!SearchEngine.hasSearched) {
-        a.innerHTML = '<div class="results-idle-placeholder">🔍 Run a search to view results</div>';
-        if (scrollArea) scrollArea.classList.add('results-idle');
+        a.innerHTML = '';
+        if (scrollArea) scrollArea.classList.add('pre-search');
         return;
     }
-    if (scrollArea) scrollArea.classList.remove('results-idle');
+    if (scrollArea) scrollArea.classList.remove('pre-search');
     
     a.innerHTML = `Found ${totalCount || res.length} records`; 
     
