@@ -619,7 +619,7 @@ body.editor-active .redaction-resize-handle {
     margin-bottom: 0;
     flex-shrink: 0;
     position: sticky;
-    bottom: 0;
+    top: 0;
     z-index: 2;
 }
 
