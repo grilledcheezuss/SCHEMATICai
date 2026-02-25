@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.6.15
+## Version: v2.6.17
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.6.17**: Align worker version to app version v2.6.17; UI fix: pre-search sidebar now shows idle placeholder ("Enter filters and press Search to view results.") instead of blank gray strip; padding:0 added to #results-scroll-area.pre-search
 - **v2.6.15**: Align worker version to app version v2.6.15; UI fixes: disable generator auto-restore on load, symmetric reapplyGeneratorState(), pdf.js canvas preview
 - **v2.6.14**: Align worker version to app version v2.6.14; hardened CORS on PDF proxy success responses to include all three Access-Control headers (Allow-Origin, Allow-Methods, Allow-Headers) instead of only Allow-Origin
 - **v2.5.45**: Worker-side enclosure parsing now outputs `enc="Varied / Multiple"` (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with `(?<!208/)` lookbehind guards to prevent 208/220V and 208/230V false positives
