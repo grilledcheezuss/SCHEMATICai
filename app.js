@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.15 (fix generator auto-restore regression: disable restoreGeneratorState() on load so generator stays OFF unless explicitly enabled; make reapplyGeneratorState() symmetric to prevent body.demo-mode drift; replace iframe PDF preview with pdf.js canvas for tablet centering; version bump) ---
-const APP_VERSION = "v2.6.15";
+// --- SCHEMATICA ai v2.6.16 (force-hide pagination footer pre-search via UI.applyPreSearchState(); add DemoManager.syncContextInvariant() to keep collapse state consistent across rerenders; call both from init, perform, renderCurrentPage, and toggleGenerator; version bump) ---
+const APP_VERSION = "v2.6.16";
 const VERSION_HISTORY = {
+    "v2.6.16": "force-hide #pagination-footer pre-search: add UI.applyPreSearchState() called from DOMContentLoaded and UI.render() when !hasSearched; add DemoManager.syncContextInvariant() to re-sync collapse-state classes on #demo-context-panel and #left-generator-context after every rerender (perform, renderCurrentPage, toggleGenerator); version bump",
     "v2.6.15": "fix generator auto-restore regression: stop calling toggleGenerator() on load from localStorage so generator defaults OFF; make DemoManager.reapplyGeneratorState() symmetric (removes body.demo-mode when generator inactive) to eliminate class drift; replace iframe redacted preview with pdf.js canvas render for deterministic centering on tablet; version bump",
     "v2.6.14": "harden Project Context (left-generator-context) visibility: call DemoManager.reapplyGeneratorState() from SearchEngine.renderCurrentPage() so body.demo-mode is guaranteed on every render including pagination; harden worker CORS: include all three Access-Control headers on PDF proxy success responses; align worker version to app version v2.6.14; version bump",
     "v2.6.13": "fix Custom PDF Info (Project Context) persistence and placement on tablet/desktop: persist DemoManager.isGeneratorActive to localStorage and restore on startup; re-apply body.demo-mode after SearchEngine.perform() to guarantee visibility; fix pre-search sidebar layout so #results-scroll-area keeps flex:1 in DOM and #left-generator-context stays anchored at bottom instead of floating/elevated; fix redacted preview modal PDF fill/centering: remove display:flex+justify-content:center from #pdf-preview-container inline style; remove conflicting min-height:60vh from injected iframe; add .preview-pdf-frame CSS class for deterministic sizing; version bump",
@@ -585,6 +586,7 @@ class DemoManager {
             if(btn) btn.style.color = ''; 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
         }
+        DemoManager.syncContextInvariant();
     }
 
     static minimizePanel() {
@@ -643,6 +645,23 @@ class DemoManager {
             document.body.classList.add('demo-mode');
         } else {
             document.body.classList.remove('demo-mode');
+        }
+    }
+
+    static syncContextInvariant() {
+        // Re-sync collapse-state classes between content, panel, and wrapper so
+        // rerenders (search, pagination, generator toggle) cannot leave them mismatched.
+        const content = document.getElementById('demo-context-content');
+        const panel   = document.getElementById('demo-context-panel');
+        const wrapper = document.getElementById('left-generator-context');
+        if (!content || !panel || !wrapper) return;
+        const isCollapsed = content.classList.contains('collapsed');
+        if (isCollapsed) {
+            panel.classList.add('collapsed-state');
+            wrapper.classList.add('collapsed-state');
+        } else {
+            panel.classList.remove('collapsed-state');
+            wrapper.classList.remove('collapsed-state');
         }
     }
 
@@ -2948,6 +2967,7 @@ class SearchEngine {
 
         // Re-apply generator body class to ensure it survives search re-render
         DemoManager.reapplyGeneratorState();
+        DemoManager.syncContextInvariant();
 
         // === PRELOAD PDFs ===
         if (res.length > 0) {
@@ -2986,6 +3006,7 @@ class SearchEngine {
         // Guard: ensure body.demo-mode is present whenever generator is active
         // (covers pagination re-renders where perform() reapply is not called)
         DemoManager.reapplyGeneratorState();
+        DemoManager.syncContextInvariant();
     }
 
     static prevPage() {
@@ -4235,6 +4256,14 @@ class UI {
     static isSmallMobile() { return window.innerWidth < 768; }
     static isTablet() { return window.innerWidth >= 768; } // includes desktop — docked sidebar on all non-mobile widths
 
+    static applyPreSearchState() {
+        // Deterministically hide pagination footer and clear page-info before any search.
+        const paginationFooter = DOM_CACHE.get('pagination-footer');
+        if (paginationFooter) paginationFooter.style.display = 'none';
+        const pageInfo = DOM_CACHE.get('page-info');
+        if (pageInfo) pageInfo.textContent = '';
+    }
+
     static toggleDarkMode() { 
         document.body.classList.toggle('dark-mode'); 
         localStorage.setItem('cox_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); 
@@ -4418,6 +4447,7 @@ static render(res, crit, totalCount) {
     if (!SearchEngine.hasSearched) {
         a.innerHTML = '';
         if (scrollArea) scrollArea.classList.add('pre-search');
+        UI.applyPreSearchState();
         return;
     }
     if (scrollArea) scrollArea.classList.remove('pre-search');
@@ -4496,6 +4526,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.warn('⚠️ Cover sheet template not loaded (app continues without it):', err));
         
         UI.init();
+        UI.applyPreSearchState();
         // Restore generator active state from localStorage (persisted across sessions)
         DemoManager.restoreGeneratorState();
         if(AuthService.init()) { 
