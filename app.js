@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.16 (force-hide pagination footer pre-search via UI.applyPreSearchState(); add DemoManager.syncContextInvariant() to keep collapse state consistent across rerenders; call both from init, perform, renderCurrentPage, and toggleGenerator; version bump) ---
-const APP_VERSION = "v2.6.16";
+// --- SCHEMATICA ai v2.6.17 (pre-search idle placeholder: inject .results-idle-placeholder into #results-area on init and clear on search; add padding:0 to #results-scroll-area.pre-search to eliminate empty gray strip; version bump) ---
+const APP_VERSION = "v2.6.17";
 const VERSION_HISTORY = {
+    "v2.6.17": "pre-search idle placeholder: inject .results-idle-placeholder 'Enter filters and press Search to view results.' into #results-area when !hasSearched; set padding:0 on #results-scroll-area.pre-search to eliminate unintentional gray strip beneath search controls; version bump",
     "v2.6.16": "force-hide #pagination-footer pre-search: add UI.applyPreSearchState() called from DOMContentLoaded and UI.render() when !hasSearched; add DemoManager.syncContextInvariant() to re-sync collapse-state classes on #demo-context-panel and #left-generator-context after every rerender (perform, renderCurrentPage, toggleGenerator); version bump",
     "v2.6.15": "fix generator auto-restore regression: stop calling toggleGenerator() on load from localStorage so generator defaults OFF; make DemoManager.reapplyGeneratorState() symmetric (removes body.demo-mode when generator inactive) to eliminate class drift; replace iframe redacted preview with pdf.js canvas render for deterministic centering on tablet; version bump",
     "v2.6.14": "harden Project Context (left-generator-context) visibility: call DemoManager.reapplyGeneratorState() from SearchEngine.renderCurrentPage() so body.demo-mode is guaranteed on every render including pagination; harden worker CORS: include all three Access-Control headers on PDF proxy success responses; align worker version to app version v2.6.14; version bump",
@@ -4445,7 +4446,7 @@ static render(res, crit, totalCount) {
     const scrollArea = DOM_CACHE.get('results-scroll-area');
 
     if (!SearchEngine.hasSearched) {
-        a.innerHTML = '';
+        a.innerHTML = '<div class="results-idle-placeholder">Enter filters and press Search to view results.</div>';
         if (scrollArea) scrollArea.classList.add('pre-search');
         UI.applyPreSearchState();
         return;
