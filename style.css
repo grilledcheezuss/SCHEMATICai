@@ -258,10 +258,12 @@ body.dark-mode #toggle-right { background: #2a2a2a; border-color: #444; color: #
 
 input[type=range] { accent-color: var(--lsu-purple); }
 
-.search-btn { flex: 1; height: 34px; background-color: var(--app-primary) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; transition: 0.2s; font-size: 12px; letter-spacing: 0.5px; } 
+.search-btn { flex: 1; min-width: 0; height: 34px; background-color: var(--app-primary) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; transition: 0.2s; font-size: 11px; letter-spacing: 0.5px; white-space: nowrap; } 
 .search-btn:hover { filter: brightness(1.2); }
 .search-btn:disabled { background-color: #9ca3af !important; opacity: 0.7; filter: none; cursor: default !important; } 
 .search-btn.error { background-color: #991b1b !important; border-color: #7f1d1d !important; }
+#context-preview-btn { background: var(--app-primary); color: white; font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 4px; border: none; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; margin-left: auto; margin-right: 4px; transition: filter 0.2s; }
+#context-preview-btn:hover { filter: brightness(1.2); }
 
 .reset-btn { height: 34px; width: 34px; background: var(--bg-app); border: 1px solid var(--border-color); border-radius: 4px; } 
 
