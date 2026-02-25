@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.11 (results area hidden pre-search; Project Context collapse flush fix; redacted preview modal Print/Export moved to header; close button contained in header; version bump) ---
-const APP_VERSION = "v2.6.11";
+// --- SCHEMATICA ai v2.6.12 (fix generator toggle showing Project Context via CSS body.demo-mode instead of inline style; fix mobile sync completeness - cox_db_complete only set on full sync; resetSync clears IndexedDB; version bump) ---
+const APP_VERSION = "v2.6.12";
 const VERSION_HISTORY = {
+    "v2.6.12": "fix generator toggle: #left-generator-context visibility controlled by CSS body.demo-mode class instead of inline style.display; fix sync completeness: cox_db_complete set only when fetchPartition loop exits normally (not on cap/error breaks); resetSync() clears IndexedDB shards before reload; defensive logging for sync completion; version bump",
     "v2.6.11": "regression fixes: results area hidden (display:none) pre-search instead of idle placeholder; Project Context collapse is flush at bottom (context-header position:static; wrapper collapsed-state removes border-top/padding; toggleContext also toggles left-generator-context class); redacted preview modal header refactored to flex row (left: Print/Export+menu, center: title, right: close X); close button no longer absolutely positioned; version bump",
     "v2.6.10": "context header sticky fix: .context-header changed from position:sticky bottom:0 to top:0 so Project Context header stays anchored at top of card (not bottom); version bump",
     "v2.6.9": "professional UI fixes: sidebar pre-search shows compact idle placeholder with results-idle CSS class (flex:0 0 auto, overflow:hidden); #demo-context-panel changed from flex:1 1 auto to flex:0 0 auto so Project Context hugs content up to 40vh cap; #demo-context-content gets max-height + flex:0 1 auto as scroll container; #pdf-preview-container changed to display:block + height:70vh (60vh mobile) + border:none to eliminate left-shift and heavy border; mobile modal card adds box-sizing:border-box; version bump",
@@ -377,14 +378,14 @@ class DataLoader {
         }
     }
     
-    static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }
+    static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); DB.deleteDatabase().finally(() => location.reload()); }
     
     static async fetchPartition(dir, btn) {
         let offset = null, loop = 0; let buffer = []; let shardCount = 0;
-        let fetchedCount = 0; let retryCount = 0;
+        let fetchedCount = 0; let retryCount = 0; let syncCompleted = false;
         try {
             do {
-                loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
+                loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) { console.warn('⚠️ Sync cap reached; not marking DB complete.'); break; }
                 console.group(`📥 Sync Batch ${loop}`); 
                 
                 if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
@@ -439,7 +440,7 @@ class DataLoader {
                 
                 retryCount = 0; 
                 const d = await r.json(); 
-                if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
+                if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); syncCompleted = true; break; }
                 fetchedCount += d.records.length;
                 
                 d.records.forEach(rec => {
@@ -460,7 +461,13 @@ class DataLoader {
                 
             } while(offset);
             
-            localStorage.setItem('cox_db_complete', 'true'); 
+            if (!syncCompleted && !offset) syncCompleted = true;
+            if (syncCompleted) {
+                console.log('✅ Preload declaring complete (full sync finished).');
+                localStorage.setItem('cox_db_complete', 'true');
+            } else {
+                console.warn('⚠️ Sync ended without full completion; cox_db_complete NOT set.');
+            }
             if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
         } catch(e) { console.error("Sync Critical Error", e); } 
     }
@@ -553,9 +560,6 @@ class DemoManager {
                 const rail = document.getElementById('toggle-right');
                 if (rail) rail.style.display = 'flex';
             }
-            // Show left-sidebar context block
-            const leftCtx = document.getElementById('left-generator-context');
-            if (leftCtx) leftCtx.style.display = 'block';
             // Default right control panel to collapsed so first view is clean redacted title page
             this.minimizePanel();
             if(indicator) indicator.style.display = 'inline-block';
@@ -565,9 +569,6 @@ class DemoManager {
         } else { 
             document.body.classList.remove('demo-mode'); 
             document.body.classList.remove('editor-active'); 
-            // Hide left-sidebar context block
-            const leftCtx = document.getElementById('left-generator-context');
-            if (leftCtx) leftCtx.style.display = 'none';
             if (UI.isTablet()) {
                 panel.classList.remove('gen-collapsed');
                 panel.style.display = 'none';

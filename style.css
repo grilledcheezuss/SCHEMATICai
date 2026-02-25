@@ -282,8 +282,12 @@ input[type=range] { accent-color: var(--lsu-purple); }
     max-height: 40vh;
     overflow: hidden;
     min-height: 0;
-    display: flex;
+    display: none;
     flex-direction: column;
+}
+
+body.demo-mode #left-generator-context {
+    display: flex;
 }
 
 #pagination-footer {
