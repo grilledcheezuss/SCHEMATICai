@@ -105,7 +105,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.6.7</span>
+        <span class="app-title-version" id="app-version">v2.6.8</span>
     </div>
 
     <div class="header-controls">
@@ -348,12 +348,12 @@
 
     <!-- PDF Preview Modal -->
     <div id="pdf-preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; overflow:auto;">
-        <div style="position:relative; max-width:1200px; margin:20px auto; background:var(--bg-card); border-radius:8px; padding:20px; box-sizing:border-box; width:100%;">
+        <div style="position:relative; max-width:1200px; margin:20px auto; background:var(--bg-card); border-radius:8px; padding:20px; box-sizing:border-box; width:calc(100% - 16px);">
             <div style="display:flex; justify-content:center; align-items:center; margin-bottom:15px; background:var(--app-primary); border-radius:6px; padding:10px 14px; position:relative;">
                 <h2 style="color:#fff; margin:0; font-size:1rem; text-align:center;">Redacted PDF Preview</h2>
                 <button type="button" onclick="PdfExporter.closePreview()" aria-label="Close preview" title="Close preview" class="preview-close-btn">&times;</button>
             </div>
-            <div id="pdf-preview-container" style="border:1px solid var(--border-color); background:#fff; min-height:400px; overflow:auto; width:100%; display:flex; justify-content:center;"></div>
+            <div id="pdf-preview-container" style="background:#fff; min-height:400px; overflow:hidden; width:100%; display:flex; justify-content:center;"></div>
             <div style="display:flex; gap:10px; margin-top:15px; justify-content:flex-end; align-items:center; position:relative;">
                 <div style="position:relative;">
                     <button class="search-btn" style="background:var(--app-primary) !important;" onclick="PdfExporter.openPrintExportMenu()">🖨️ Print / Export ▾</button>

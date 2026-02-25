@@ -748,6 +748,13 @@ body.editor-active .redaction-resize-handle {
     }
     .logo-main { font-size: 1.5rem; } 
     .logo-sub { font-size: 0.6rem; letter-spacing: 2px; }
+
+    /* PDF preview modal: reduce card margin/padding on mobile to prevent horizontal overflow */
+    #pdf-preview-modal > div {
+        margin: 8px auto !important;
+        padding: 12px !important;
+        width: calc(100% - 16px) !important;
+    }
 }
 
 @media (min-width: 768px) {
@@ -919,7 +926,9 @@ body.dark-mode .del-zone-btn {
     justify-content: center;
     align-items: stretch;
     padding: 0;
-    margin: 0;
+    margin: 0 auto;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
 }
 #pdf-preview-container iframe,
 #pdf-preview-container embed,
