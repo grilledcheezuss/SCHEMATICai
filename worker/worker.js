@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.6.14 (Varied/Multiple enclosure; 208V voltage boundary guards; hardened CORS on all response paths)
+// 🧠 SCHEMATICA ai WORKER v2.6.15 (Varied/Multiple enclosure; 208V voltage boundary guards; hardened CORS on all response paths)
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
