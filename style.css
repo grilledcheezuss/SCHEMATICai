@@ -278,7 +278,7 @@ input[type=range] { accent-color: var(--lsu-purple); }
     border-top: 1px solid var(--border-color);
     flex: 0 0 auto;
     max-height: 40vh;
-    overflow-y: auto;
+    overflow: hidden;
     min-height: 0;
     display: flex;
     flex-direction: column;
@@ -601,7 +601,7 @@ body.editor-active .redaction-resize-handle {
     gap: 0;
     transition: gap 0.3s;
     overflow: hidden;
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
 }
 
@@ -615,6 +615,9 @@ body.editor-active .redaction-resize-handle {
     margin-top: 4px;
     margin-bottom: 0;
     flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
 }
 
 #demo-context-content {
@@ -625,13 +628,11 @@ body.editor-active .redaction-resize-handle {
     transition: opacity 0.3s ease-out;
     opacity: 1;
     min-height: 0;
-    flex: 1;
+    flex: 1 1 auto;
 }
 
 #demo-context-content.collapsed {
-    flex: 0;
-    opacity: 0;
-    margin: 0;
+    display: none;
     overflow: hidden;
 }
 
@@ -643,12 +644,10 @@ body.editor-active .redaction-resize-handle {
     transform: rotate(-90deg);
 }
 
-/* When collapsed: panel shrinks to header-only with no extra padding/border/background */
+/* When collapsed: panel shrinks to header-only with reduced padding but keeps border/background */
 #demo-context-panel.collapsed-state {
     flex: 0 0 auto;
-    padding: 0;
-    border: none;
-    background: transparent;
+    padding: 2px 6px;
     gap: 0;
 }
 
