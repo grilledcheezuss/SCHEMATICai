@@ -158,16 +158,16 @@ body {
 
 header { 
     background: var(--lsu-purple); 
-    padding: 0 25px; padding-top: max(5px, env(safe-area-inset-top)); 
-    height: var(--header-base-height); min-height: var(--header-base-height); 
+    padding: 0 25px; padding-top: env(safe-area-inset-top, 0px); 
+    height: auto; min-height: var(--header-base-height); 
     display: flex; align-items: center; justify-content: space-between; 
     box-shadow: 0 4px 20px rgba(0,0,0,0.15); 
-    z-index: 3000; flex-shrink: 0; position: relative; 
+    z-index: 3000; flex-shrink: 0; position: sticky; top: 0;
 }
 
 .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; justify-content: center; } 
 .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.2rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; } 
-.logo-tm { font-size: 0.6em; font-weight: 700; color: rgba(255,255,255,0.85); vertical-align: super; letter-spacing: 0; margin-left: 1px; }
+.logo-tm { font-size: 0.75em; font-weight: 700; color: rgba(255,255,255,0.9); vertical-align: super; letter-spacing: 0; margin-left: 1px; }
 .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.75rem; color: #b39ddb; font-weight: 700; letter-spacing: 4.5px; text-transform: uppercase; margin-top: 4px; margin-left: 2px; }
 
 .app-title-group { 
@@ -217,7 +217,7 @@ header {
 .menu-item.danger:hover { background: var(--match-red-bg); color: var(--match-red-text); }
 body.dark-mode .menu-item.danger { color: var(--match-red-text); }
 
-#app-container { display: none; flex-direction: row; width: 100%; height: calc(100vh - var(--header-base-height)); overflow: hidden; position: relative; } 
+#app-container { display: none; flex-direction: row; width: 100%; height: calc(100dvh - var(--header-base-height)); overflow: hidden; position: relative; } 
 html.logged-in #app-container { display: flex !important; }
 
 #sidebar-left { 
@@ -716,6 +716,7 @@ body.editor-active .redaction-resize-handle {
     #toggle-left { display: none; }
     #menu-demo { display: none !important; }
     #generator-panel { display: none !important; }
+    #left-generator-context { display: none !important; }
     
     .app-title-group {
         position: static;
@@ -883,6 +884,22 @@ body.dark-mode .del-zone-btn {
     transition: transform 0.3s;
     min-width: 28px;
     text-align: center;
+}
+
+/* Base: ensure PDF preview container fills and centers on all screen sizes */
+#pdf-preview-container {
+    width: 100%;
+    min-height: 60vh;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+}
+#pdf-preview-container iframe,
+#pdf-preview-container embed,
+#pdf-preview-container object {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 60vh;
 }
 
 /* Tablet/desktop: ensure PDF preview container fills allocated space */
