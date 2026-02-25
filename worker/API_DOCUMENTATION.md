@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.6.21
+## Version: v2.5.45
 
 ## Overview
 
@@ -10,13 +10,6 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
-- **v2.6.21**: Align worker version to app version v2.6.21; CSS fix: #demo-context-panel flex:0 0 auto so Custom PDF Info is content-sized and bottom-docked
-- **v2.6.20**: Align worker version to app version v2.6.20; layout fix: bottom-dock #left-generator-context via margin-top:auto; remove max-height:45% and overflow:clip from wrapper; scrolling confined to #demo-context-content
-- **v2.6.19**: Align worker version to app version v2.6.19; pagination fix: move #pagination-footer before #left-generator-context in DOM so it is never clipped by overflow:hidden on sidebar; show pagination only when totalPages>1; add paginationFooter show/hide to renderCurrentPage(); #pagination-footer flex:0 0 auto; remove margin-top:auto from #left-generator-context; #left-generator-context overflow:clip
-- **v2.6.18**: Align worker version to app version v2.6.18; CSS layout fix: bottom-dock #left-generator-context via margin-top:auto + max-height:45%; #demo-context-panel flex:1 1 auto; #demo-context-content flex:1 1 auto (drops vh max-height); #results-scroll-area flex:1 1 auto
-- **v2.6.17**: Align worker version to app version v2.6.17; UI fix: pre-search sidebar now shows idle placeholder ("Enter filters and press Search to view results.") instead of blank gray strip; padding:0 added to #results-scroll-area.pre-search
-- **v2.6.15**: Align worker version to app version v2.6.15; UI fixes: disable generator auto-restore on load, symmetric reapplyGeneratorState(), pdf.js canvas preview
-- **v2.6.14**: Align worker version to app version v2.6.14; hardened CORS on PDF proxy success responses to include all three Access-Control headers (Allow-Origin, Allow-Methods, Allow-Headers) instead of only Allow-Origin
 - **v2.5.45**: Worker-side enclosure parsing now outputs `enc="Varied / Multiple"` (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with `(?<!208/)` lookbehind guards to prevent 208/220V and 208/230V false positives
 - **v2.5.36**: Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each scoring tier)
 - **v2.5.35**: Hotfix: guard preload against missing credentials; differentiate 401 vs 503; worker returns 503 when auth backend unreachable
