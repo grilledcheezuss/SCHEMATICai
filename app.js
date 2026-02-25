@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.51 (UI restructure: move Project Context to left sidebar; simplify right panel to single CONTROL PANEL; default collapsed on generator activation; version bump) ---
-const APP_VERSION = "v2.5.51";
+// --- SCHEMATICA ai v2.5.52 (Fix bottom button clipping with stacked layout; redesign PDF preview modal as full-screen overlay with slim purple header bar; version bump) ---
+const APP_VERSION = "v2.5.52";
 const VERSION_HISTORY = {
+    "v2.5.51": "UI restructure: move Project Context to left sidebar; simplify right panel to single CONTROL PANEL; default collapsed on generator activation; version bump",
     "v2.5.50": "UI restructure for Submittal Generator: Project Context & Sensitive Data block moved from right panel Project Data tab to left sidebar (visible only when generator active); right panel tab strip removed; single CONTROL PANEL header with zone editor controls only; generator panel defaults to collapsed/disabled on activation so first view is clean redacted title page; left sidebar CSS accommodates new context section; version bump",
     "v2.5.49": "Cover overlay text immediate render: applyPage1CoverTemplate now calls refreshContentForWrapper via requestAnimationFrame so text appears instantly instead of waiting for global scan end; corrected COVER_TEMPLATE font defaults: job_block/stage/date/cpid use Courier New monospace (Times New Roman reserved for cust only); guardrail in createZoneOnWrapper overrides Times to Courier on page 1 non-cust zones; version bump",
     "v2.5.48": "Redaction box defaults: CSS .redaction-box font-family changed from Times New Roman to Courier New so CSS does not override JS defaults; PdfViewer._setScaleForDevice desktop/tablet default zoom 1.0→1.1 (110%); Enclosure SS spec-table lock: when ENCLOSURE MATERIAL spec-table keyword indicates Stainless, always resolves to 4XSS (encV=false) even when FG signals also present; same logic mirrored in worker/lib/extract.js; new spec-table lock tests added; version bump",
@@ -2975,8 +2976,8 @@ class PdfExporter {
             const blob = new Blob([pdfBytes], { type: "application/pdf" });
             const blobUrl = URL.createObjectURL(blob);
             
-            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:70vh; border:none;"></iframe>`;
-            modal.style.display = 'block';
+            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:100%; border:none;"></iframe>`;
+            modal.style.display = 'flex';
         } catch (e) {
             console.error(e);
             alert("Preview Failed: " + e.message);
