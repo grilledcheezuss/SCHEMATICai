@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.14 (harden Project Context visibility: reapplyGeneratorState on every renderCurrentPage including pagination; harden worker CORS: full Access-Control headers on PDF proxy success responses; version bump) ---
-const APP_VERSION = "v2.6.14";
+// --- SCHEMATICA ai v2.6.15 (fix generator auto-restore regression: disable restoreGeneratorState() on load so generator stays OFF unless explicitly enabled; make reapplyGeneratorState() symmetric to prevent body.demo-mode drift; replace iframe PDF preview with pdf.js canvas for tablet centering; version bump) ---
+const APP_VERSION = "v2.6.15";
 const VERSION_HISTORY = {
+    "v2.6.15": "fix generator auto-restore regression: stop calling toggleGenerator() on load from localStorage so generator defaults OFF; make DemoManager.reapplyGeneratorState() symmetric (removes body.demo-mode when generator inactive) to eliminate class drift; replace iframe redacted preview with pdf.js canvas render for deterministic centering on tablet; version bump",
     "v2.6.14": "harden Project Context (left-generator-context) visibility: call DemoManager.reapplyGeneratorState() from SearchEngine.renderCurrentPage() so body.demo-mode is guaranteed on every render including pagination; harden worker CORS: include all three Access-Control headers on PDF proxy success responses; align worker version to app version v2.6.14; version bump",
     "v2.6.13": "fix Custom PDF Info (Project Context) persistence and placement on tablet/desktop: persist DemoManager.isGeneratorActive to localStorage and restore on startup; re-apply body.demo-mode after SearchEngine.perform() to guarantee visibility; fix pre-search sidebar layout so #results-scroll-area keeps flex:1 in DOM and #left-generator-context stays anchored at bottom instead of floating/elevated; fix redacted preview modal PDF fill/centering: remove display:flex+justify-content:center from #pdf-preview-container inline style; remove conflicting min-height:60vh from injected iframe; add .preview-pdf-frame CSS class for deterministic sizing; version bump",
     "v2.6.11": "regression fixes: results area hidden (display:none) pre-search instead of idle placeholder; Project Context collapse is flush at bottom (context-header position:static; wrapper collapsed-state removes border-top/padding; toggleContext also toggles left-generator-context class); redacted preview modal header refactored to flex row (left: Print/Export+menu, center: title, right: close X); close button no longer absolutely positioned; version bump",
@@ -628,15 +629,20 @@ class DemoManager {
     }
 
     static restoreGeneratorState() {
-        if (UI.isSmallMobile()) return;
-        if (localStorage.getItem('cox_generator_active') === 'true' && !this.isGeneratorActive) {
-            this.toggleGenerator();
-        }
+        // NOTE: Auto-restore intentionally disabled (v2.6.15 regression fix).
+        // Generator must remain OFF by default on every page load regardless of
+        // stale localStorage values. User must explicitly enable via UI toggle.
+        // (Previously: called toggleGenerator() here if cox_generator_active===true,
+        //  which caused generator/demo-mode to re-enable unintentionally on reload.)
     }
 
     static reapplyGeneratorState() {
+        // Symmetric: add or remove body.demo-mode based on actual generator state
+        // to prevent class drift from pagination/search re-renders
         if (this.isGeneratorActive) {
             document.body.classList.add('demo-mode');
+        } else {
+            document.body.classList.remove('demo-mode');
         }
     }
 
@@ -3028,11 +3034,41 @@ class PdfExporter {
                 this._previewBlobUrl = null;
             }
             
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const blobUrl = URL.createObjectURL(blob);
-            this._previewBlobUrl = blobUrl;
-            
-            container.innerHTML = `<iframe src="${blobUrl}" class="preview-pdf-frame"></iframe>`;
+            // Use pdf.js canvas rendering instead of an iframe to guarantee
+            // centered alignment on tablet/iPad renderers (v2.6.15 fix).
+            container.innerHTML = '';
+            if (window.pdfjsLib) {
+                try {
+                    const typedArray = new Uint8Array(pdfBytes);
+                    const loadingTask = pdfjsLib.getDocument({ data: typedArray });
+                    const pdfDoc = await loadingTask.promise;
+                    const page = await pdfDoc.getPage(1);
+                    const containerWidth = container.clientWidth || 600;
+                    const unscaled = page.getViewport({ scale: 1 });
+                    const scale = containerWidth / unscaled.width;
+                    const viewport = page.getViewport({ scale });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    canvas.style.display = 'block';
+                    canvas.style.margin = '0 auto';
+                    canvas.style.maxWidth = '100%';
+                    container.appendChild(canvas);
+                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                } catch (canvasErr) {
+                    console.warn('[PdfExporter.preview] pdf.js canvas render failed, falling back to iframe:', canvasErr);
+                    const blob = new Blob([pdfBytes], { type: "application/pdf" });
+                    const blobUrl = URL.createObjectURL(blob);
+                    this._previewBlobUrl = blobUrl;
+                    container.innerHTML = `<iframe src="${blobUrl}" class="preview-pdf-frame"></iframe>`;
+                }
+            } else {
+                // pdf.js unavailable: fall back to iframe
+                const blob = new Blob([pdfBytes], { type: "application/pdf" });
+                const blobUrl = URL.createObjectURL(blob);
+                this._previewBlobUrl = blobUrl;
+                container.innerHTML = `<iframe src="${blobUrl}" class="preview-pdf-frame"></iframe>`;
+            }
             modal.style.display = 'block';
         } catch (e) {
             console.error(e);
