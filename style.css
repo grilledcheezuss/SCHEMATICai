@@ -280,11 +280,10 @@ input[type=range] { accent-color: var(--lsu-purple); }
     border-top: 1px solid var(--border-color);
     flex: 0 0 auto;
     max-height: 45%;
-    overflow: hidden;
+    overflow: clip;
     min-height: 0;
     display: none;
     flex-direction: column;
-    margin-top: auto;
 }
 
 body.demo-mode #left-generator-context {
@@ -298,7 +297,7 @@ body.demo-mode #left-generator-context {
     display: none; 
     justify-content: space-between;
     align-items: center;
-    flex-shrink: 0;
+    flex: 0 0 auto;
 }
 .page-btn {
     background: var(--bg-input);
