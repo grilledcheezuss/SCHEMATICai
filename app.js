@@ -1,7 +1,7 @@
-// --- SCHEMATICA ai v2.6.12 (fix generator toggle showing Project Context via CSS body.demo-mode instead of inline style; fix mobile sync completeness - cox_db_complete only set on full sync; resetSync clears IndexedDB; version bump) ---
-const APP_VERSION = "v2.6.12";
+// --- SCHEMATICA ai v2.6.13 (fix Custom PDF Info persistence/placement on tablet+desktop: persist isGeneratorActive to localStorage, restore on startup, re-apply after search; fix pre-search layout so #left-generator-context stays anchored at bottom; fix redacted preview iframe fill/centering; version bump) ---
+const APP_VERSION = "v2.6.13";
 const VERSION_HISTORY = {
-    "v2.6.12": "fix generator toggle: #left-generator-context visibility controlled by CSS body.demo-mode class instead of inline style.display; fix sync completeness: cox_db_complete set only when fetchPartition loop exits normally (not on cap/error breaks); resetSync() clears IndexedDB shards before reload; defensive logging for sync completion; version bump",
+    "v2.6.13": "fix Custom PDF Info (Project Context) persistence and placement on tablet/desktop: persist DemoManager.isGeneratorActive to localStorage and restore on startup; re-apply body.demo-mode after SearchEngine.perform() to guarantee visibility; fix pre-search sidebar layout so #results-scroll-area keeps flex:1 in DOM and #left-generator-context stays anchored at bottom instead of floating/elevated; fix redacted preview modal PDF fill/centering: remove display:flex+justify-content:center from #pdf-preview-container inline style; remove conflicting min-height:60vh from injected iframe; add .preview-pdf-frame CSS class for deterministic sizing; version bump",
     "v2.6.11": "regression fixes: results area hidden (display:none) pre-search instead of idle placeholder; Project Context collapse is flush at bottom (context-header position:static; wrapper collapsed-state removes border-top/padding; toggleContext also toggles left-generator-context class); redacted preview modal header refactored to flex row (left: Print/Export+menu, center: title, right: close X); close button no longer absolutely positioned; version bump",
     "v2.6.10": "context header sticky fix: .context-header changed from position:sticky bottom:0 to top:0 so Project Context header stays anchored at top of card (not bottom); version bump",
     "v2.6.9": "professional UI fixes: sidebar pre-search shows compact idle placeholder with results-idle CSS class (flex:0 0 auto, overflow:hidden); #demo-context-panel changed from flex:1 1 auto to flex:0 0 auto so Project Context hugs content up to 40vh cap; #demo-context-content gets max-height + flex:0 1 auto as scroll container; #pdf-preview-container changed to display:block + height:70vh (60vh mobile) + border:none to eliminate left-shift and heavy border; mobile modal card adds box-sizing:border-box; version bump",
@@ -547,6 +547,7 @@ class DemoManager {
             return;
         }
         this.isGeneratorActive = !this.isGeneratorActive;
+        localStorage.setItem('cox_generator_active', String(this.isGeneratorActive));
         const btn = document.getElementById('menu-demo');
         const indicator = document.getElementById('gen-status');
         const panel = document.getElementById('generator-panel');
@@ -622,6 +623,19 @@ class DemoManager {
             this.restorePanel();
         } else {
             this.minimizePanel();
+        }
+    }
+
+    static restoreGeneratorState() {
+        if (UI.isSmallMobile()) return;
+        if (localStorage.getItem('cox_generator_active') === 'true' && !this.isGeneratorActive) {
+            this.toggleGenerator();
+        }
+    }
+
+    static reapplyGeneratorState() {
+        if (this.isGeneratorActive) {
+            document.body.classList.add('demo-mode');
         }
     }
 
@@ -2925,6 +2939,9 @@ class SearchEngine {
         
         UI.toggleSearch(false);
 
+        // Re-apply generator body class to ensure it survives search re-render
+        DemoManager.reapplyGeneratorState();
+
         // === PRELOAD PDFs ===
         if (res.length > 0) {
             setTimeout(() => {
@@ -3010,7 +3027,7 @@ class PdfExporter {
             const blobUrl = URL.createObjectURL(blob);
             this._previewBlobUrl = blobUrl;
             
-            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:100%; min-height:60vh; border:none; display:block;"></iframe>`;
+            container.innerHTML = `<iframe src="${blobUrl}" class="preview-pdf-frame"></iframe>`;
             modal.style.display = 'block';
         } catch (e) {
             console.error(e);
@@ -4437,7 +4454,9 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(err => console.warn('⚠️ Cover sheet template not loaded (app continues without it):', err));
         
-        UI.init(); 
+        UI.init();
+        // Restore generator active state from localStorage (persisted across sessions)
+        DemoManager.restoreGeneratorState();
         if(AuthService.init()) { 
             DataLoader.preload(); 
         }
