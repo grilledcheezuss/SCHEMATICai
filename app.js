@@ -1,7 +1,7 @@
-// --- SCHEMATICA ai v2.6.18 (CSS layout fix: bottom-dock #left-generator-context via margin-top:auto + max-height:45% (sidebar-relative) replacing max-height:40vh; #demo-context-panel flex:1 1 auto; #demo-context-content flex:1 1 auto drops max-height:calc(40vh-40px); #results-scroll-area flex:1 1 auto; version bump) ---
-const APP_VERSION = "v2.6.18";
+// --- SCHEMATICA ai v2.6.19 (pagination fix: move #pagination-footer before #left-generator-context in DOM so it is never clipped by overflow:hidden on sidebar; show pagination only when totalPages>1; add paginationFooter show/hide to renderCurrentPage(); #pagination-footer flex:0 0 auto; remove margin-top:auto from #left-generator-context; #left-generator-context overflow:clip; version bump) ---
+const APP_VERSION = "v2.6.19";
 const VERSION_HISTORY = {
-    "v2.6.18": "CSS layout fix: bottom-dock #left-generator-context via margin-top:auto + max-height:45% (sidebar-relative) replacing max-height:40vh; #demo-context-panel changed flex:0 0 auto→flex:1 1 auto so panel fills wrapper; #demo-context-content drops max-height:calc(40vh-40px) + changed flex:0 1 auto→flex:1 1 auto so content scrolls within panel; #results-scroll-area flex:1→flex:1 1 auto; version bump",
+    "v2.6.19": "pagination fix: move #pagination-footer before #left-generator-context in DOM so it is never clipped by overflow:hidden on sidebar; show pagination only when totalPages>1; add paginationFooter show/hide to renderCurrentPage(); #pagination-footer flex:0 0 auto; remove margin-top:auto from #left-generator-context; #left-generator-context overflow:clip; version bump",
     "v2.6.16": "force-hide #pagination-footer pre-search: add UI.applyPreSearchState() called from DOMContentLoaded and UI.render() when !hasSearched; add DemoManager.syncContextInvariant() to re-sync collapse-state classes on #demo-context-panel and #left-generator-context after every rerender (perform, renderCurrentPage, toggleGenerator); version bump",
     "v2.6.15": "fix generator auto-restore regression: stop calling toggleGenerator() on load from localStorage so generator defaults OFF; make DemoManager.reapplyGeneratorState() symmetric (removes body.demo-mode when generator inactive) to eliminate class drift; replace iframe redacted preview with pdf.js canvas render for deterministic centering on tablet; version bump",
     "v2.6.14": "harden Project Context (left-generator-context) visibility: call DemoManager.reapplyGeneratorState() from SearchEngine.renderCurrentPage() so body.demo-mode is guaranteed on every render including pagination; harden worker CORS: include all three Access-Control headers on PDF proxy success responses; align worker version to app version v2.6.14; version bump",
@@ -2958,12 +2958,6 @@ class SearchEngine {
         this.hasSearched = true;
         this.renderCurrentPage();
         
-        // === UPDATE UI ===
-        const paginationFooter = DOM_CACHE.get('pagination-footer');
-        if (paginationFooter) {
-            paginationFooter.style.display = res.length > 0 ? 'flex' : 'none';
-        }
-        
         UI.toggleSearch(false);
 
         // Re-apply generator body class to ensure it survives search re-render
@@ -2991,6 +2985,11 @@ class SearchEngine {
         const pageInfo = DOM_CACHE.get('page-info');
         const prevBtn = DOM_CACHE.get('page-prev');
         const nextBtn = DOM_CACHE.get('page-next');
+        const paginationFooter = DOM_CACHE.get('pagination-footer');
+        
+        if (paginationFooter) {
+            paginationFooter.style.display = totalPages > 1 ? 'flex' : 'none';
+        }
         
         if (pageInfo) {
             pageInfo.textContent = `Page ${this.currentPage} of ${totalPages}`;

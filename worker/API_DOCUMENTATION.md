@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.6.18
+## Version: v2.6.19
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.6.19**: Align worker version to app version v2.6.19; pagination fix: move #pagination-footer before #left-generator-context in DOM so it is never clipped by overflow:hidden on sidebar; show pagination only when totalPages>1; add paginationFooter show/hide to renderCurrentPage(); #pagination-footer flex:0 0 auto; remove margin-top:auto from #left-generator-context; #left-generator-context overflow:clip
 - **v2.6.18**: Align worker version to app version v2.6.18; CSS layout fix: bottom-dock #left-generator-context via margin-top:auto + max-height:45%; #demo-context-panel flex:1 1 auto; #demo-context-content flex:1 1 auto (drops vh max-height); #results-scroll-area flex:1 1 auto
 - **v2.6.17**: Align worker version to app version v2.6.17; UI fix: pre-search sidebar now shows idle placeholder ("Enter filters and press Search to view results.") instead of blank gray strip; padding:0 added to #results-scroll-area.pre-search
 - **v2.6.15**: Align worker version to app version v2.6.15; UI fixes: disable generator auto-restore on load, symmetric reapplyGeneratorState(), pdf.js canvas preview
