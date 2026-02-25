@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.6.7 (hotfix: restore desktop sidebar layout: #left-generator-context overflow:hidden, #demo-context-panel flex:1 1 auto+min-height:0, #demo-context-content flex:1 1 auto scroll container; context-header position:sticky bottom:0; collapsed-state true collapse via display:none+keep border/bg; preview close button type=button+&times; entity; version bump) ---
-const APP_VERSION = "v2.6.7";
+// --- SCHEMATICA ai v2.6.8 (hotfix: hide results header pre-search via SearchEngine.hasSearched flag + UI.render idle state; fix mobile PDF preview modal: card margin:10px auto on mobile, #pdf-preview-container overflow:hidden+border thinner, iframe display:block width/height 100%; version bump) ---
+const APP_VERSION = "v2.6.8";
 const VERSION_HISTORY = {
+    "v2.6.8": "hotfix: results header/count hidden before first search via SearchEngine.hasSearched flag; UI.render renders idle empty state when hasSearched is false; mobile PDF preview modal card uses margin:10px auto + padding:12px on small screens; #pdf-preview-container overflow:hidden + border reduced to match header weight; iframe fills container with display:block width/height 100%; version bump",
     "v2.6.7": "hotfix: restore desktop sidebar layout regression from v2.6.6: #left-generator-context overflow:hidden eliminates gap below search; #demo-context-panel flex:1 1 auto+min-height:0 fills constrained space without dead space; #demo-context-content flex:1 1 auto as sole scroll container; .context-header position:sticky bottom:0 z-index:2 keeps header visible at bottom; #demo-context-content.collapsed uses display:none for true collapse; #demo-context-panel.collapsed-state keeps border/background (not invisible); preview modal close button adds type=button and uses &times; entity for proper CSS styling; version bump",
     "v2.6.5": "generator-only Custom PDF Info visibility confirmed; fix #left-generator-context flex:0 0 auto + max-height:40vh + overflow-y:auto so results-scroll-area flex:1 is primary scroll region and Custom PDF Info anchors below; iOS Safari viewport: body uses min-height:100dvh (with 100vh fallback) to eliminate bottom gap/top cutoff; tablet-only media query (768-1023px) reduces --sidebar-width and generator panel width; collapse toggle CSS verified; preview iframe injection verified in PdfExporter.preview(); version bump",
     "v2.6.4": "fix left sidebar Custom PDF Info scrolling/cutoff: #left-generator-context flex:1 1 auto + overflow-y:auto + min-height:0, removed max-height:40vh; rename section header to 'Custom PDF Info' + add inline preview button; fix tablet layout shift: #app-container uses flex:1 + height:auto + min-height:0 instead of calc(100dvh - var(--header-base-height)); preview modal close button styled as frosted white icon matching .menu-btn; version bump",
@@ -2699,6 +2700,7 @@ class SearchEngine {
     static currentPage = 1;
     static pageSize = 25;
     static lastCriteria = null;
+    static hasSearched = false;
 
     static perform() {
         // === STOP PREVIOUS PRELOADING ===
@@ -2906,6 +2908,7 @@ class SearchEngine {
         this.currentResults = res;
         this.currentPage = 1;
         this.lastCriteria = crit;
+        this.hasSearched = true;
         this.renderCurrentPage();
         
         // === UPDATE UI ===
@@ -4346,6 +4349,11 @@ static _generateBadges(record, criteria) {
 static render(res, crit, totalCount) {
     const a = DOM_CACHE.get('results-area');
     if (!a) return;
+
+    if (!SearchEngine.hasSearched) {
+        a.innerHTML = '';
+        return;
+    }
     
     a.innerHTML = `Found ${totalCount || res.length} records`; 
     
