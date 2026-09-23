@@ -58,7 +58,7 @@ const VERSION_HISTORY = {
     "v2.4.5": "Fixed PDF scanning errors and preload conflicts",
     "v2.4.4": "Strict keyword boundaries"
 };
-const WORKER_URL = "https://cox-proxy.thomas-85a.workers.dev"; 
+const WORKER_URL = "api.coxpanelfinder.app"; 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 // Feature flags
