@@ -1,14 +1,14 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.59)
+CLOUDFLARE WORKER SCRIPT (v2.5.60)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.59):
+RECENT UPDATES (v2.5.60):
 
-- Mobile Search/Results toggles now stay neutral gray in all states to remain visually distinct from the purple primary Search button
-- Search toggle is compact and tethered beside Search (left of Search button), while Results header is ordered toggle-first and count-second with concise SHOW/HIDE labels
-- Mobile Search spacing is condensed and hidden-state gaps are removed so collapsed Search/Results reclaim vertical space without breaking independent toggles
-- Existing independent toggle state behavior, pagination/header stability, PDF focus/back handling, and mobile no-result behavior remain intact
-- Version strings aligned to v2.5.59 across app.js, index.html, worker.js, and docs
+- Mobile pagination now sits as one compact row with Previous / Page X of Y / Next grouped together inside the Results region instead of stretching to the footer edges
+- Search and Results toggles now occupy complementary corners on mobile, share consistent neutral styling/backdrops, and use corrected ▸ SHOW / ▴ HIDE arrow semantics
+- Mobile Search reset/refresh button now uses the primary purple palette, while viewport-height and safe-area handling reclaim the unintended bottom white-bar space without changing Worker/PDF behavior
+- Existing independent Search/Results state behavior, PDF focus/back handling, no-result behavior, pagination logic, and resize/orientation handling remain intact
+- Version strings aligned to v2.5.60 across app.js, index.html, worker.js, and docs
 
 PREVIOUS UPDATES (v2.5.16 and earlier):
 

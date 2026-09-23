@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.59 ---
-const APP_VERSION = "v2.5.59";
+// --- SCHEMATICA ai v2.5.60 ---
+const APP_VERSION = "v2.5.60";
 const VERSION_HISTORY = {
+    "v2.5.60": "Mobile UX refinement: compact inline pagination row, complementary Search/Results toggle corners, purple mobile reset button, consistent mobile backdrops, corrected SHOW/HIDE arrow semantics, and reclaimed bottom safe-area space",
     "v2.5.59": "Mobile toggle UX polish: neutral gray Search/Results toggles, compact inline Search toggle beside Search button, results header toggle-first order, reclaimed mobile vertical space, and condensed search spacing",
     "v2.5.58": "Mobile UX refinement: independent Search/Results toggles on small screens, Search toggle tethered below filters, compact Results header toggle, condensed mobile results spacing, and stable results header rendering across rerenders/pagination",
     "v2.5.57": "Mobile UX state-flow overhaul: deterministic mobile SEARCH/RESULTS/PDF states with explicit reopen controls, one-third results pane, and removal of implicit PDF-scale search reopening side effects",
@@ -4127,6 +4128,7 @@ class UI {
     static mobilePdfFocus = false;
     static mobileManualPanelState = { search: false, results: false };
     static refineToggleHome = null;
+    static paginationFooterHome = null;
 
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { 
@@ -4249,7 +4251,7 @@ class UI {
 
         if (refineToggleBtn) {
             const searchExpanded = this.isSmallMobile() ? this.mobilePanels.searchVisible : !DOM_CACHE.get('search-controls')?.classList.contains('collapsed');
-            refineToggleBtn.textContent = searchExpanded ? '▾ HIDE' : '▸ SHOW';
+            refineToggleBtn.textContent = searchExpanded ? '▴ HIDE' : '▸ SHOW';
             refineToggleBtn.setAttribute('aria-expanded', searchExpanded ? 'true' : 'false');
             refineToggleBtn.setAttribute('aria-label', searchExpanded ? 'Hide Search panel' : 'Show Search panel');
             refineToggleBtn.setAttribute('title', searchExpanded ? 'Hide Search panel' : 'Show Search panel');
@@ -4257,7 +4259,7 @@ class UI {
 
         if (resultsToggleBtn) {
             const resultsExpanded = this.mobilePanels.resultsVisible && this.hasMobileResultsPanel();
-            resultsToggleBtn.textContent = resultsExpanded ? '▾ HIDE' : '▸ SHOW';
+            resultsToggleBtn.textContent = resultsExpanded ? '▴ HIDE' : '▸ SHOW';
             resultsToggleBtn.setAttribute('aria-expanded', resultsExpanded ? 'true' : 'false');
             resultsToggleBtn.setAttribute('aria-label', resultsExpanded ? 'Hide Results panel' : 'Show Results panel');
             resultsToggleBtn.setAttribute('title', resultsExpanded ? 'Hide Results panel' : 'Show Results panel');
@@ -4290,6 +4292,31 @@ class UI {
         }
     }
 
+    static syncPaginationPlacement() {
+        const paginationFooter = DOM_CACHE.get('pagination-footer');
+        if (!paginationFooter) return;
+
+        if (!this.paginationFooterHome) {
+            this.paginationFooterHome = {
+                parent: paginationFooter.parentElement,
+                nextSibling: paginationFooter.nextElementSibling
+            };
+        }
+
+        const resultsScrollArea = DOM_CACHE.get('results-scroll-area');
+
+        if (this.isSmallMobile() && resultsScrollArea && paginationFooter.parentElement !== resultsScrollArea) {
+            resultsScrollArea.appendChild(paginationFooter);
+        } else if (!this.isSmallMobile() && this.paginationFooterHome?.parent && paginationFooter.parentElement !== this.paginationFooterHome.parent) {
+            const { parent, nextSibling } = this.paginationFooterHome;
+            if (nextSibling && nextSibling.parentElement === parent) {
+                parent.insertBefore(paginationFooter, nextSibling);
+            } else {
+                parent.appendChild(paginationFooter);
+            }
+        }
+    }
+
     static syncMobileLayout() {
         const body = document.body;
         if (!body) return;
@@ -4298,6 +4325,7 @@ class UI {
         const paginationFooter = DOM_CACHE.get('pagination-footer');
         const hasResultsPanel = this.hasMobileResultsPanel();
         this.syncRefineTogglePlacement();
+        this.syncPaginationPlacement();
 
         if (!hasResultsPanel) {
             this.mobilePanels.resultsVisible = false;
