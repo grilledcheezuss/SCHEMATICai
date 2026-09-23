@@ -1,7 +1,17 @@
 name = "cox-proxy"
 main = "worker/worker.js"
 compatibility_date = "2024-01-01"
+keep_vars = true
 
 routes = [
   { pattern = "api.coxpanelfinder.app/*", zone_name = "coxpanelfinder.app" }
 ]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
