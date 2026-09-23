@@ -1,6 +1,7 @@
 name = "cox-proxy"
-main = "worker/worker.js" # Path to your worker file
+main = "worker/worker.js"
 compatibility_date = "2024-01-01"
 
-[vars]
-# Non-sensitive config here
+routes = [
+  { pattern = "api.coxpanelfinder.app/*", zone_name = "coxpanelfinder.app" }
+]
