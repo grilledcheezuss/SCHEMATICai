@@ -1,14 +1,14 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.62)
+CLOUDFLARE WORKER SCRIPT (v2.5.63)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.62):
+RECENT UPDATES (v2.5.63):
 
-- Removed the bulky mobile Search action-row shell so controls sit flush with sidebar chrome while keeping a thin raised/icy separator line
-- Extended the same subtle edge/backdrop polish to related surfaces (Search controls, Results pane, pagination footer, and PDF toolbar) without layout redesign
-- Successful mobile searches now always force Results open, while manual Search/Results toggles remain independent afterward
-- Expanded mobile Results panel sizing to better fit at least two compact cards on common phone viewports when space allows
-- Styled SHOW/HIDE toggles and `Found N records` text closer to parameter label typography with dark-mode-safe purple contrast, and aligned version strings to v2.5.62 across app.js, worker.js, and docs
+- Added one-hour client cache freshness revalidation (`DATA_SYNC_MAX_AGE_MS`) with startup + foreground lifecycle checks and no polling loop
+- Cached encrypted panel data still loads immediately; stale caches now refresh in the background with in-flight locking and timestamp guards
+- MAIN-data refresh now uses full-snapshot semantics (add/update/delete correctness) and swaps active in-memory data only after complete fetch + successful persistence
+- IndexedDB shard persistence is generation-based and non-destructive: new generation is written first, then activated atomically, then old generation is cleaned up
+- PDF.js rendering now uses DPR-aware backing resolution (capped at 2x) plus a pixel-budget guard to improve sharpness on high-DPI mobile screens without excessive memory pressure
 
 PREVIOUS UPDATES (v2.5.16 and earlier):
 

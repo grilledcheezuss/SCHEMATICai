@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.62 ---
-const APP_VERSION = "v2.5.62";
+// --- SCHEMATICA ai v2.5.63 ---
+const APP_VERSION = "v2.5.63";
 const VERSION_HISTORY = {
+    "v2.5.63": "Reliability/performance update: added one-hour stale-cache revalidation with background refresh + in-flight guards, atomic generation-based encrypted snapshot persistence with safe swap semantics, and high-DPI PDF.js rendering (DPR-aware backing store, 2x cap, pixel-budget guard) for sharper mobile PDF quality",
     "v2.5.62": "Mobile UI polish: removed Search action-row balloon shell, unified thin raised/icy edge treatment across key chrome surfaces, successful Search now forces Results open, increased mobile Results height for at least two cards where viewport permits, and aligned SHOW/HIDE + record count typography with parameter labels",
     "v2.5.61": "Mobile/header refinement: centered SHOW/HIDE toggles without glyphs, structurally fixed Results header order, slimmer header with SCHEMATICAai badge, menu-pinned version indicator, subtle surface softening, and dark-mode panel-ID purple lightened one shade",
     "v2.5.60": "Mobile UX refinement: compact inline pagination row, complementary Search/Results toggle corners, purple mobile reset button, consistent mobile backdrops, corrected SHOW/HIDE arrow semantics, and reclaimed bottom safe-area space",
@@ -118,6 +119,11 @@ async function loadTesseract() {
 
 // Preloading configuration
 const PRELOAD_START_DELAY_MS = 500; // Delay before starting preload after search completes
+const DATA_SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+
+// PDF high-DPI rendering bounds
+const PDF_RENDER_MAX_OUTPUT_SCALE = 2;
+const PDF_RENDER_MAX_CANVAS_PIXELS = 12000000;
 
 // PDF status constants
 const PDF_STATUS = {
@@ -282,38 +288,112 @@ class DB {
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
     static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
+    static async deleteChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").delete(k); t.oncomplete = r; t.onerror = j; }); }
     static async deleteLegacy() { try { const d = await this.open(); const t = d.transaction("cache", "readwrite"); t.objectStore("cache").clear(); } catch(e){} }
     static async clear() { const d=await this.open(); return new Promise(r=>{ const t=d.transaction("chunks","readwrite"); t.objectStore("chunks").clear(); t.oncomplete=r; }); }
     static deleteDatabase() { return new Promise((resolve, reject) => { const req = indexedDB.deleteDatabase("CoxSchematicDB"); req.onsuccess = () => resolve(); req.onerror = () => reject(); req.onblocked = () => resolve(); }); }
 }
 
 class CacheService {
+    static ACTIVE_GENERATION_KEY = '__meta_active_generation';
+    static GENERATION_PREFIX = 'gen_';
+    static LEGACY_SHARD_PREFIX = 'shard_';
     static activeKey = null;
     static async prepareKey(p) { if(!p) return null; const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); this.activeKey = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); return this.activeKey; }
     static async saveShard(id, data) { if(!this.activeKey) return; const j = JSON.stringify(data); const e = await this.enc(j); await DB.putChunk(id, e); }
+    static async saveSnapshot(records, { chunkSize = 50 } = {}) {
+        if (!this.activeKey) throw new Error('Cache encryption key missing');
+        const safeRecords = Array.isArray(records) ? records : [];
+        const previousGeneration = await DB.getChunk(this.ACTIVE_GENERATION_KEY).catch(() => null);
+        const generation = `${this.GENERATION_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        let shardCount = 0;
+
+        for (let i = 0; i < safeRecords.length; i += chunkSize) {
+            const chunk = safeRecords.slice(i, i + chunkSize);
+            await this.saveShard(`${generation}:shard:${shardCount++}`, chunk);
+            if (shardCount % 4 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+
+        await DB.putChunk(`${generation}:manifest`, { shardCount, createdAt: Date.now() });
+        await DB.putChunk(this.ACTIVE_GENERATION_KEY, generation);
+
+        if (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== generation) {
+            this.cleanupGeneration(previousGeneration).catch(err => console.warn('Cache cleanup warning:', err));
+        }
+        this.cleanupLegacyShards().catch(err => console.warn('Legacy shard cleanup warning:', err));
+    }
+    static getActiveGenerationShardKeys(keys, generation) {
+        if (!generation || !Array.isArray(keys)) return [];
+        return keys
+            .filter(k => typeof k === 'string' && k.startsWith(`${generation}:shard:`))
+            .sort((a, b) => {
+                const ai = parseInt(String(a).split(':').pop(), 10);
+                const bi = parseInt(String(b).split(':').pop(), 10);
+                return ai - bi;
+            });
+    }
+    static getLegacyShardKeys(keys) {
+        if (!Array.isArray(keys)) return [];
+        return keys
+            .filter(k => typeof k === 'string' && k.startsWith(this.LEGACY_SHARD_PREFIX))
+            .sort();
+    }
+    static async cleanupGeneration(generation) {
+        if (!generation) return;
+        const keys = await DB.getChunkKeys();
+        const pref = `${generation}:`;
+        for (const key of keys) {
+            if (typeof key === 'string' && key.startsWith(pref)) {
+                await DB.deleteChunk(key);
+            }
+        }
+    }
+    static async cleanupLegacyShards() {
+        const keys = await DB.getChunkKeys();
+        for (const key of keys) {
+            if (typeof key === 'string' && key.startsWith(this.LEGACY_SHARD_PREFIX)) {
+                await DB.deleteChunk(key);
+            }
+        }
+    }
     static async loadAllWithProgress(progressCallback) { 
         if(!this.activeKey) return null; 
         const keys = await DB.getChunkKeys(); 
         if(!keys || keys.length === 0) return null; 
-        for(let i = 0; i < keys.length; i++) { 
+        const activeGeneration = await DB.getChunk(this.ACTIVE_GENERATION_KEY).catch(() => null);
+        const activeKeys = this.getActiveGenerationShardKeys(keys, activeGeneration);
+        const shardKeys = activeKeys.length > 0 ? activeKeys : this.getLegacyShardKeys(keys);
+        if (shardKeys.length === 0) return null;
+
+        const stageMap = new Map();
+        const stageMfgs = new Set();
+        const stageEncs = new Set();
+
+        for(let i = 0; i < shardKeys.length; i++) { 
             if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); 
-            const chunk = await DB.getChunk(keys[i]); 
+            const chunk = await DB.getChunk(shardKeys[i]); 
             if(chunk) { 
                 try { 
                     const dec = await this.dec(chunk); 
                     if(dec) { 
                         const data = JSON.parse(dec); 
-                        data.forEach(r => { 
-                            window.LOCAL_DB.push(r); 
-                            window.ID_MAP.set(r.id, r); 
-                            if(r.mfg) window.FOUND_MFGS.add(r.mfg); 
-                            if(r.enc) window.FOUND_ENCS.add(r.enc);
+                        data.forEach(r => {
+                            if (!r || !r.id) return;
+                            stageMap.set(r.id, r);
+                            if(r.mfg) stageMfgs.add(r.mfg); 
+                            if(r.enc) stageEncs.add(r.enc);
                         }); 
                     } 
                 } catch(e) {} 
             } 
-            if(progressCallback) progressCallback(Math.round(((i + 1) / keys.length) * 100)); 
+            if(progressCallback) progressCallback(Math.round(((i + 1) / shardKeys.length) * 100)); 
         } 
+
+        if (stageMap.size === 0) return null;
+        window.LOCAL_DB = Array.from(stageMap.values());
+        window.ID_MAP = stageMap;
+        window.FOUND_MFGS = stageMfgs;
+        window.FOUND_ENCS = stageEncs;
         return true; 
     }
     static async enc(t) { const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, this.activeKey, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
@@ -336,6 +416,60 @@ class NetworkService {
 }
 
 class DataLoader {
+    static SYNC_TIMESTAMP_KEY = 'cox_db_synced_at';
+    static SYNC_LOCK_KEY = 'cox_db_sync_lock_at';
+    static SYNC_LOCK_TTL_MS = 10 * 60 * 1000;
+    static _inFlightSync = false;
+    static _lifecycleRefreshHookInstalled = false;
+
+    static getSyncTimestamp() {
+        const raw = localStorage.getItem(this.SYNC_TIMESTAMP_KEY);
+        const ts = Number(raw);
+        return Number.isFinite(ts) && ts > 0 ? ts : null;
+    }
+    static isSyncFresh(now = Date.now()) {
+        const ts = this.getSyncTimestamp();
+        return !!ts && (now - ts) < DATA_SYNC_MAX_AGE_MS;
+    }
+    static isCacheComplete() {
+        return localStorage.getItem('cox_db_complete') === 'true';
+    }
+    static shouldRefreshStaleCache(now = Date.now()) {
+        if (!this.isCacheComplete()) return false;
+        return !this.isSyncFresh(now);
+    }
+    static canAcquireSyncLock(now = Date.now()) {
+        if (this._inFlightSync) return false;
+        const lockAt = Number(localStorage.getItem(this.SYNC_LOCK_KEY));
+        if (Number.isFinite(lockAt) && lockAt > 0 && (now - lockAt) < this.SYNC_LOCK_TTL_MS) return false;
+        return true;
+    }
+    static acquireSyncLock(now = Date.now()) {
+        if (!this.canAcquireSyncLock(now)) return false;
+        this._inFlightSync = true;
+        localStorage.setItem(this.SYNC_LOCK_KEY, String(now));
+        return true;
+    }
+    static releaseSyncLock() {
+        this._inFlightSync = false;
+        localStorage.removeItem(this.SYNC_LOCK_KEY);
+    }
+    static applySnapshot(snapshot) {
+        const records = Array.isArray(snapshot?.records) ? snapshot.records : [];
+        window.LOCAL_DB = records;
+        window.ID_MAP = snapshot?.idMap instanceof Map ? snapshot.idMap : new Map(records.map(r => [r.id, r]));
+        window.FOUND_MFGS = snapshot?.foundMfgs instanceof Set ? snapshot.foundMfgs : new Set(records.map(r => r?.mfg).filter(Boolean));
+        window.FOUND_ENCS = snapshot?.foundEncs instanceof Set ? snapshot.foundEncs : new Set(records.map(r => r?.enc).filter(Boolean));
+    }
+    static installLifecycleRefreshHooks() {
+        if (this._lifecycleRefreshHookInstalled) return;
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                this.maybeRefreshStaleCache({ reason: 'foreground' });
+            }
+        });
+        this._lifecycleRefreshHookInstalled = true;
+    }
     static async preload() {
         // Guard: credentials must exist before attempting any worker call
         const cox_user = localStorage.getItem('cox_user');
@@ -352,6 +486,8 @@ class DataLoader {
             await DB.deleteDatabase();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem('cox_sync_attempts');
+            localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
+            localStorage.removeItem(this.SYNC_LOCK_KEY);
             localStorage.setItem('cox_version', APP_VERSION);
         }
 
@@ -366,32 +502,86 @@ class DataLoader {
         localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
         
         const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
+        const hasCompleteCache = !!hasData && this.isCacheComplete();
         
-        if(hasData) { 
-            if(window.LOCAL_DB.length > 7000) { localStorage.setItem('cox_db_complete', 'true'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; }
-            if(localStorage.getItem('cox_db_complete')) { localStorage.setItem('cox_sync_attempts', '0'); btn.innerText = "SEARCH"; btn.disabled = false; UI.pop(); return; } else { btn.innerText = "⬇️ RESUMING..."; } 
-        } else { btn.innerText = "⏳ INITIALIZING SYNC..."; await new Promise(r => setTimeout(r, 200)); btn.innerText = "⬇️ SYNCING..."; }
-        
-        await this.fetchPartition('desc', btn);
-        if(!btn.classList.contains('error')) { 
-            btn.innerText = "✅ FINALIZING..."; 
-            localStorage.setItem('cox_sync_attempts', '0'); 
-            UI.pop(); 
+        if(hasCompleteCache) {
+            localStorage.setItem('cox_sync_attempts', '0');
             btn.innerText = "SEARCH"; btn.disabled = false;
+            UI.pop();
+            this.installLifecycleRefreshHooks();
+            this.maybeRefreshStaleCache({ reason: 'startup' });
+            return;
+        }
+
+        if(hasData) {
+            btn.innerText = "⬇️ RESUMING...";
+        } else {
+            btn.innerText = "⏳ INITIALIZING SYNC...";
+            await new Promise(r => setTimeout(r, 200));
+            btn.innerText = "⬇️ SYNCING...";
+        }
+
+        const syncResult = await this.fetchPartition('desc', btn, { background: false });
+        if(syncResult?.success) {
+            btn.innerText = "✅ FINALIZING...";
+            localStorage.setItem('cox_sync_attempts', '0');
+            UI.pop();
+            btn.innerText = "SEARCH"; btn.disabled = false;
+            this.installLifecycleRefreshHooks();
+        } else if (!btn.classList.contains('error')) {
+            btn.classList.add('warning');
+            btn.innerText = "⚠️ SYNC INTERRUPTED";
+            btn.disabled = false;
         }
     }
     
-    static resetSync() { localStorage.removeItem('cox_db_complete'); localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }
+    static resetSync() {
+        localStorage.removeItem('cox_db_complete');
+        localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
+        localStorage.removeItem(this.SYNC_LOCK_KEY);
+        localStorage.setItem('cox_sync_attempts', '0');
+        location.reload();
+    }
+
+    static async maybeRefreshStaleCache({ reason = 'startup' } = {}) {
+        if (!this.shouldRefreshStaleCache()) return;
+        if (!this.acquireSyncLock()) return;
+        try {
+            if (!this.shouldRefreshStaleCache()) return;
+            const result = await this.fetchPartition('desc', null, { background: true, reason });
+            if (result?.success) {
+                UI.pop();
+            }
+        } finally {
+            this.releaseSyncLock();
+        }
+    }
     
-    static async fetchPartition(dir, btn) {
-        let offset = null, loop = 0; let buffer = []; let shardCount = 0;
+    static buildSnapshot(recordsById, foundMfgs, foundEncs) {
+        return {
+            records: Array.from(recordsById.values()),
+            idMap: recordsById,
+            foundMfgs,
+            foundEncs
+        };
+    }
+
+    static async fetchPartition(dir, btn, { background = false, reason = 'sync' } = {}) {
+        if (!background) {
+            if (!this.acquireSyncLock()) return { success: false, skipped: true };
+        }
+        let offset = null, loop = 0;
         let fetchedCount = 0; let retryCount = 0;
+        const recordsById = new Map();
+        const foundMfgs = new Set();
+        const foundEncs = new Set();
         try {
             do {
-                loop++; if(loop > 300 || window.LOCAL_DB.length >= 10000) break;
+                loop++;
+                if (loop > 300) throw new Error('Sync aborted: pagination loop limit exceeded');
                 console.group(`📥 Sync Batch ${loop}`); 
                 
-                if(btn && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
+                if(btn && !background && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
                     if(loop === 1 && fetchedCount === 0) {
                         btn.innerText = `⏳ Initializing...`;
                     } else {
@@ -413,21 +603,23 @@ class DataLoader {
                 }
 
                 if(r.status===401) {
+                    if (background) throw new Error("401 invalid credentials during background refresh");
                     console.error("Sync Failed 401 - Invalid credentials");
                     btn.classList.add('error');
                     btn.innerText = "INVALID CREDENTIALS";
                     btn.disabled = false;
                     btn.onclick = () => { AuthService.logout(); };
-                    break;
+                    return { success: false, status: 401 };
                 }
 
                 if(r.status===503) {
+                    if (background) throw new Error("503 auth backend unavailable during background refresh");
                     console.error("Sync Failed 503 - Auth backend unavailable");
                     btn.classList.add('error');
                     btn.innerText = "SERVICE UNAVAILABLE";
                     btn.disabled = false;
                     btn.onclick = () => { location.reload(); };
-                    break;
+                    return { success: false, status: 503 };
                 }
                 
                 if(r.status!==200) {
@@ -437,36 +629,50 @@ class DataLoader {
                         await new Promise(res => setTimeout(res, 2000 * retryCount)); 
                         continue; 
                     }
+                    if (background) throw new Error(`API ${r.status} during background refresh`);
                     btn.classList.add('error'); btn.innerText=`API ERROR (${r.status})`; 
-                    break; 
+                    return { success: false, status: r.status }; 
                 }
                 
                 retryCount = 0; 
-                const d = await r.json(); 
-                if(!d.records || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
+                let d;
+                try {
+                    d = await r.json();
+                } catch (jsonErr) {
+                    throw new Error(`Malformed sync payload: ${jsonErr.message}`);
+                }
+                if(!Array.isArray(d.records) || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
                 fetchedCount += d.records.length;
                 
                 d.records.forEach(rec => {
                     try {
-                        if(!window.ID_MAP.has(rec.id)) { 
-                            window.LOCAL_DB.push(rec); 
-                            window.ID_MAP.set(rec.id, rec); 
-                            if(rec.mfg) window.FOUND_MFGS.add(rec.mfg); 
-                            if(rec.enc) window.FOUND_ENCS.add(rec.enc); 
-                        }
-                        buffer.push(rec);
+                        if(!rec || !rec.id) return;
+                        recordsById.set(rec.id, rec);
+                        if(rec.mfg) foundMfgs.add(rec.mfg); 
+                        if(rec.enc) foundEncs.add(rec.enc); 
                     } catch(e) { console.warn("Record Skip", e); }
                 });
                 
                 console.groupEnd();
-                if(buffer.length >= 50) { await CacheService.saveShard(`shard_${Date.now()}_${shardCount++}`, buffer); buffer = []; }
                 offset = d.offset; 
+                if(loop % 5 === 0) await new Promise(r => setTimeout(r, 0));
                 
             } while(offset);
-            
-            localStorage.setItem('cox_db_complete', 'true'); 
-            if(buffer.length > 0) { await CacheService.saveShard(`shard_${Date.now()}_final`, buffer); }
-        } catch(e) { console.error("Sync Critical Error", e); } 
+
+            const snapshot = this.buildSnapshot(recordsById, foundMfgs, foundEncs);
+            await CacheService.saveSnapshot(snapshot.records);
+            this.applySnapshot(snapshot);
+            localStorage.setItem('cox_db_complete', 'true');
+            localStorage.setItem(this.SYNC_TIMESTAMP_KEY, String(Date.now()));
+            console.info(`✅ Data sync complete (${snapshot.records.length} records) [${reason}]`);
+            return { success: true, count: snapshot.records.length };
+        } catch(e) {
+            console.error("Sync Critical Error", e);
+            if (background) console.warn('Background refresh failed; keeping existing cache intact');
+            return { success: false, error: e };
+        } finally {
+            if (!background) this.releaseSyncLock();
+        } 
     }
 
     static harvestCSV() { alert('Harvesting...'); }
@@ -3401,6 +3607,37 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
     }
 }
 
+class PdfRenderHelper {
+    static normalizeOutputScale(devicePixelRatio = 1) {
+        const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+        return Math.max(1, Math.min(PDF_RENDER_MAX_OUTPUT_SCALE, dpr));
+    }
+    static getRenderMetrics(viewport, devicePixelRatio = 1) {
+        const cssWidth = Math.max(1, Math.floor(viewport?.width || 1));
+        const cssHeight = Math.max(1, Math.floor(viewport?.height || 1));
+        const maxPixels = Math.max(1, PDF_RENDER_MAX_CANVAS_PIXELS);
+        let outputScale = this.normalizeOutputScale(devicePixelRatio);
+        let backingWidth = Math.max(1, Math.round(cssWidth * outputScale));
+        let backingHeight = Math.max(1, Math.round(cssHeight * outputScale));
+        const pixelArea = backingWidth * backingHeight;
+        if (pixelArea > maxPixels) {
+            const areaScale = Math.sqrt(maxPixels / pixelArea);
+            outputScale = Math.max(1, outputScale * areaScale);
+            backingWidth = Math.max(1, Math.round(cssWidth * outputScale));
+            backingHeight = Math.max(1, Math.round(cssHeight * outputScale));
+        }
+        const useTransform = outputScale > 1;
+        return {
+            cssWidth,
+            cssHeight,
+            outputScale,
+            backingWidth,
+            backingHeight,
+            transform: useTransform ? [outputScale, 0, 0, outputScale, 0, 0] : null
+        };
+    }
+}
+
 class PdfViewer {
     static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
@@ -3821,8 +4058,9 @@ class PdfViewer {
             }
             
             const viewport = page.getViewport({ scale: this.currentScale });
+            const renderMetrics = PdfRenderHelper.getRenderMetrics(viewport, window.devicePixelRatio || 1);
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
-            wrapper.style.width = Math.floor(viewport.width) + "px"; 
+            wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
             wrapper.style.animationDelay = `${Math.min((i - 1) * 0.05, 0.5)}s`; // Staggered animation, max 0.5s delay
             
@@ -3858,11 +4096,14 @@ class PdfViewer {
 
             const contentContainer = document.createElement('div');
             contentContainer.className = 'pdf-content-container';
-            contentContainer.style.width = Math.floor(viewport.width) + "px";
-            contentContainer.style.height = Math.floor(viewport.height) + "px";
+            contentContainer.style.width = renderMetrics.cssWidth + "px";
+            contentContainer.style.height = renderMetrics.cssHeight + "px";
 
             const canvas = document.createElement('canvas'); canvas.className = 'pdf-page-canvas';
-            canvas.width = viewport.width; canvas.height = viewport.height; 
+            canvas.width = renderMetrics.backingWidth;
+            canvas.height = renderMetrics.backingHeight;
+            canvas.style.width = renderMetrics.cssWidth + "px";
+            canvas.style.height = renderMetrics.cssHeight + "px";
             
             const rLayer = document.createElement('div'); rLayer.className = 'redaction-layer';
             if(document.body.classList.contains('demo-mode')) rLayer.classList.add('editing');
@@ -3886,7 +4127,7 @@ class PdfViewer {
             const ctx = canvas.getContext('2d');
             if (ctx) {
                 try {
-                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    await page.render({ canvasContext: ctx, viewport, transform: renderMetrics.transform }).promise;
                 } catch (renderError) {
                     console.warn(`[renderStack] Failed to render page ${i}:`, renderError);
                     // Check for destroyed transport
