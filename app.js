@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.56 ---
-const APP_VERSION = "v2.5.56";
+// --- SCHEMATICA ai v2.5.57 ---
+const APP_VERSION = "v2.5.57";
 const VERSION_HISTORY = {
+    "v2.5.57": "Mobile UX state-flow overhaul: deterministic mobile SEARCH/RESULTS/PDF states with explicit reopen controls, one-third results pane, and removal of implicit PDF-scale search reopening side effects",
     "v2.5.56": "Production reliability fix: centralized absolute Worker URL builder for PDF/PDF_BY_ID/FEEDBACK calls, request-time ML background training gated off by default, wrangler keep_vars/observability persistence, and safe PDF host diagnostics",
     "v2.5.53": "Fix Custom PDF Info input clipping: date/stage and phone/fax rows no longer overflow sidebar; demo-input min-width:0 for flex shrink; date input text-align:left; left-generator-context and demo-context-panel overflow guard; version bump",
     "v2.5.53": "PDF preview header centering fix (absolute-positioned title for true center); tablet sidebar width reduced ~8%; tablet default zoom 80% (matching mobile); version bump",
@@ -128,6 +129,12 @@ const PDF_UI_STATE = {
     READY: 'ready',
     FALLBACK: 'fallback',
     HIDDEN: 'hidden'
+};
+
+const MOBILE_VIEW_STATE = {
+    SEARCH: 'search',
+    RESULTS: 'results',
+    PDF: 'pdf'
 };
 
 // DOM cache for frequently accessed elements
@@ -2278,7 +2285,8 @@ class FeedbackService {
         }
     }
     
-    static down(id, btn) { 
+    static down(id, btn, event) { 
+        if (event) event.stopPropagation(); // Prevent card click
         this.currentId = id; 
         if(btn) this.currentDownBtn = btn;
         
@@ -2912,13 +2920,19 @@ class SearchEngine {
             paginationFooter.style.display = res.length > 0 ? 'flex' : 'none';
         }
         
-        UI.toggleSearch(false);
-
-        // === PRELOAD PDFs ===
         if (res.length > 0) {
+            UI.toggleSearch(false);
+            if (UI.isSmallMobile()) UI.setMobileState(MOBILE_VIEW_STATE.RESULTS);
             setTimeout(() => {
                 PdfController.preloadSearchResults(res);
             }, PRELOAD_START_DELAY_MS);
+        } else {
+            if (UI.isSmallMobile()) {
+                UI.toggleSearch(true);
+                UI.setMobileState(MOBILE_VIEW_STATE.SEARCH);
+            } else {
+                UI.toggleSearch(false);
+            }
         }
     }
 
@@ -3537,7 +3551,6 @@ class PdfViewer {
     static _setScaleForDevice() {
         if (window.innerWidth < 768) {
             this.currentScale = 0.8;
-            UI.toggleSearch(true); 
         } else if (window.innerWidth < 1200) {
             this.currentScale = 0.8;
         } else {
@@ -4111,12 +4124,16 @@ class PdfController {
 }
 
 class UI {
+    static mobileState = MOBILE_VIEW_STATE.SEARCH;
+
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { 
             document.body.classList.add('dark-mode'); 
         } 
         window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
         window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
+        window.addEventListener('resize', () => UI.handleViewportChange());
+        window.addEventListener('orientationchange', () => UI.handleViewportChange());
         document.addEventListener('click', (e) => { 
             const menu = DOM_CACHE.get('main-menu'); 
             const btn = document.querySelector('.menu-btn'); 
@@ -4132,6 +4149,8 @@ class UI {
                 }
             }
         }); 
+
+        this.handleViewportChange();
     }
     
     static isSmallMobile() { return window.innerWidth < 768; }
@@ -4162,7 +4181,7 @@ class UI {
     }
     
     static closeMobilePreview() { 
-        document.body.classList.remove('viewing-pdf'); 
+        this.showMobileResults(); 
     }
     
     static toggleLeftSidebar() { 
@@ -4190,10 +4209,71 @@ class UI {
         if(e) { 
             c.classList.remove('collapsed'); 
             if (refineBtn) refineBtn.classList.remove('visible'); 
+            if (this.isSmallMobile()) this.setMobileState(MOBILE_VIEW_STATE.SEARCH);
         } else { 
             c.classList.add('collapsed'); 
             if (refineBtn) refineBtn.classList.add('visible'); 
+            if (this.isSmallMobile()) {
+                this.setMobileState(this.hasSearchResults() ? MOBILE_VIEW_STATE.RESULTS : MOBILE_VIEW_STATE.SEARCH);
+            }
         } 
+    }
+
+    static hasSearchResults() {
+        return Array.isArray(SearchEngine.currentResults) && SearchEngine.currentResults.length > 0;
+    }
+
+    static setMobileState(state) {
+        const body = document.body;
+        if (!body) return;
+
+        const mobileClasses = ['mobile-state-search', 'mobile-state-results', 'mobile-state-pdf'];
+        if (!this.isSmallMobile()) {
+            body.classList.remove(...mobileClasses);
+            return;
+        }
+
+        if (!Object.values(MOBILE_VIEW_STATE).includes(state)) return;
+        this.mobileState = state;
+        body.classList.remove(...mobileClasses);
+        body.classList.add(`mobile-state-${state}`);
+
+        const controls = DOM_CACHE.get('search-controls');
+        const refineBtn = DOM_CACHE.get('refine-btn-area');
+
+        if (state === MOBILE_VIEW_STATE.SEARCH) {
+            controls?.classList.remove('collapsed');
+            refineBtn?.classList.remove('visible');
+        } else if (state === MOBILE_VIEW_STATE.RESULTS) {
+            controls?.classList.add('collapsed');
+            refineBtn?.classList.add('visible');
+        } else if (state === MOBILE_VIEW_STATE.PDF) {
+            controls?.classList.add('collapsed');
+            refineBtn?.classList.remove('visible');
+        }
+    }
+
+    static showMobileSearch() {
+        this.setMobileState(MOBILE_VIEW_STATE.SEARCH);
+    }
+
+    static showMobileResults() {
+        this.setMobileState(this.hasSearchResults() ? MOBILE_VIEW_STATE.RESULTS : MOBILE_VIEW_STATE.SEARCH);
+    }
+
+    static handleViewportChange() {
+        if (this.isSmallMobile()) {
+            if (this.mobileState === MOBILE_VIEW_STATE.PDF && PdfViewer.isDocumentValid()) {
+                this.setMobileState(MOBILE_VIEW_STATE.PDF);
+            } else if (this.hasSearchResults()) {
+                this.setMobileState(this.mobileState === MOBILE_VIEW_STATE.SEARCH ? MOBILE_VIEW_STATE.SEARCH : MOBILE_VIEW_STATE.RESULTS);
+            } else {
+                this.setMobileState(MOBILE_VIEW_STATE.SEARCH);
+            }
+            return;
+        }
+
+        document.body.classList.remove('mobile-state-search', 'mobile-state-results', 'mobile-state-pdf');
     }
     
     static toggleMenu() { 
@@ -4329,7 +4409,7 @@ static render(res, crit, totalCount) {
             <div class="badge-row">${badges.join(' ') || '<span class="hud-badge unknown">NO MATCH</span>'}</div>
             <div class="card-actions">
                 <button class="thumb-btn up ${FeedbackService.lockout.has(`${i.id}:up`) ? 'voted-up' : ''}" onclick="FeedbackService.up('${i.id}', this, event)">👍</button>
-                <button class="thumb-btn down" onclick="FeedbackService.down('${i.id}', this)">👎</button>
+                <button class="thumb-btn down" onclick="FeedbackService.down('${i.id}', this, event)">👎</button>
             </div>
         `;
 
@@ -4337,6 +4417,7 @@ static render(res, crit, totalCount) {
             c.onclick = () => { 
                 document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
                 c.classList.add('active-view'); 
+                if (UI.isSmallMobile()) UI.setMobileState(MOBILE_VIEW_STATE.PDF);
                 PdfController.load(i.id, i.pdfUrl); 
             };
         } else {
@@ -4398,4 +4479,3 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("System failed to initialize. Please clear cache and reload.");
     }
 });
-

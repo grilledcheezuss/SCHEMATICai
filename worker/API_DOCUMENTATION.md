@@ -317,6 +317,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.57**: Mobile UX state flow update in app shell (deterministic Search/Results/PDF mobile states with explicit reopen controls)
 - **v2.5.56**: Reliability update: request-time ML background training gated off by default, safe PDF diagnostics avoid logging full signed URLs
 - **v2.5.5**: PDF_BY_ID relaxed REGEX lookup for revision suffixes, improved error handling
 - **v2.5.4**: Enhanced error handling and logging

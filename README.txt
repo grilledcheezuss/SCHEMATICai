@@ -1,22 +1,17 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.16)
+CLOUDFLARE WORKER SCRIPT (v2.5.57)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.16):
+RECENT UPDATES (v2.5.57):
 
-Professional-Grade Update with Feedback Lockout Restoration, Voltage Badge Fix, Page Classifier Enhancements, OCR Guards:
-- Positive feedback lockout now enforced: one thumbs-up per panel per search (restored from v2.5.13 implementation)
-- Per-parameter negative feedback lockout maintained: one correction per parameter per panel per search
-- Per-keyword rejection lockout maintained: one rejection per searched keyword per panel
-- Lockout resets on new search (SearchEngine.perform)
-- Voltage badge strictness fix: green badges for strict field matches (volt field exact match), orange only for varied/fuzzy description matches
-- Phase badge strictness fix: green badges for strict field matches, orange only for varied/fuzzy matches
-- Enclosure badge strictness fix: green badges for strict field matches, orange only for varied/fuzzy matches
-- Page toolbar cleanup: fixed profile label duplication issue, single clean dropdown per page
-- OCR minimum size guard: filters out tiny boxes (width < 20px or height < 10px) to prevent tesseract "too small to scale" errors
-- Smarter page classification: enhanced PageClassifier with page-number heuristics (page 1=Title, page 2=Info, pages 3-4=Power/Control schematics)
-- Content-based signals preserved: title/info/schematic keywords, but now augmented with typical PDF ordering expectations
-- Version strings aligned to v2.5.16 across all files
+- Deterministic mobile state flow: Search expanded by default, Results expanded after successful search, PDF-focused layout after selecting a result with PDF
+- Added explicit mobile Search/Results reopen controls (no hidden side-effect dependency)
+- Empty/no-result searches now return to Search-expanded mobile state
+- Removed mobile PDF scale side effect that implicitly reopened Search controls
+- Feedback thumbs-down now receives click event propagation guard to prevent accidental card/PDF selection
+- Version strings aligned to v2.5.57 across app.js, index.html, worker.js, and docs
+
+PREVIOUS UPDATES (v2.5.16 and earlier):
 
 PREVIOUS UPDATES (v2.5.15):
 
