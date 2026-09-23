@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.57)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.58)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -105,7 +105,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.57</span>
+        <span class="app-title-version" id="app-version">v2.5.58</span>
     </div>
 
     <div class="header-controls">
@@ -156,9 +156,15 @@
                 <button id="searchBtn" class="search-btn" onclick="SearchEngine.perform()" disabled>INITIALIZING...</button>
             </div>
         </div>
-        <div id="refine-btn-area"><button class="refine-btn" onclick="UI.toggleSearch(true)">🔍 REFINE SEARCH</button></div>
+        <div id="refine-btn-area"><button id="refine-toggle-btn" class="refine-btn" onclick="UI.toggleMobileSearch()">▾ HIDE SEARCH</button></div>
         <div id="results-scroll-area">
-            <div id="results-area"></div>
+            <div id="results-header">
+                <span id="results-count">Found 0 records</span>
+                <button id="results-toggle-btn" class="results-toggle-btn" onclick="UI.toggleMobileResults()">▸ SHOW RESULTS</button>
+            </div>
+            <div id="results-list">
+                <div id="results-area"></div>
+            </div>
         </div>
 
         <div id="left-generator-context" style="display:none;">
@@ -210,10 +216,6 @@
     <div id="toggle-left" class="collapse-btn" onclick="UI.toggleLeftSidebar()">‹</div>
 
     <div id="preview-pane">
-        <div id="mobile-view-actions">
-            <button class="mobile-view-btn" onclick="UI.showMobileSearch()">🔍 Search</button>
-            <button class="mobile-view-btn" onclick="UI.showMobileResults()">📋 Results</button>
-        </div>
         <div id="pdf-toolbar">
             <button class="pdf-tool-btn" onclick="PdfViewer.print()" title="Print original (unredacted) PDF — For redacted print/export, use Submittal Generator preview">🖨️</button>
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)" title="Zoom Out">-</button>
