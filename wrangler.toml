@@ -6,3 +6,11 @@ routes = [
   { pattern = "api.coxpanelfinder.app/*", zone_name = "coxpanelfinder.app" }
 ]
 
+{
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  }
+}
