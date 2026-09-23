@@ -683,7 +683,7 @@ input[type="date"].demo-input { text-align: left; }
 
 @media (max-width: 767px) {
     #app-container { flex-direction: column; }
-    #sidebar-left { display: contents; }
+    #sidebar-left { width: 0; min-width: 0; overflow: hidden; border: none; }
     #search-controls {
         order: 1;
         width: 100%;
@@ -774,6 +774,23 @@ input[type="date"].demo-input { text-align: left; }
     }
     /* Restore btn not used on tablet */
     #generator-restore-btn { display: none !important; }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+    /* Compact mode: collapse both sidebars by default so viewer gets full width on tablets */
+    #sidebar-left {
+        width: 0;
+        min-width: 0;
+        border: none;
+        overflow: hidden;
+    }
+    #generator-panel {
+        width: 0;
+        min-width: 0;
+        border: none;
+        overflow: hidden;
+    }
+    #generator-restore-btn { display: flex !important; }
 }
 
 /* Tab Navigation Styles */
