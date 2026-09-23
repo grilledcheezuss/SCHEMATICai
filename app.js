@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.61 ---
-const APP_VERSION = "v2.5.61";
+// --- SCHEMATICA ai v2.5.62 ---
+const APP_VERSION = "v2.5.62";
 const VERSION_HISTORY = {
+    "v2.5.62": "Mobile UI polish: removed Search action-row balloon shell, unified thin raised/icy edge treatment across key chrome surfaces, successful Search now forces Results open, increased mobile Results height for at least two cards where viewport permits, and aligned SHOW/HIDE + record count typography with parameter labels",
     "v2.5.61": "Mobile/header refinement: centered SHOW/HIDE toggles without glyphs, structurally fixed Results header order, slimmer header with SCHEMATICAai badge, menu-pinned version indicator, subtle surface softening, and dark-mode panel-ID purple lightened one shade",
     "v2.5.60": "Mobile UX refinement: compact inline pagination row, complementary Search/Results toggle corners, purple mobile reset button, consistent mobile backdrops, corrected SHOW/HIDE arrow semantics, and reclaimed bottom safe-area space",
     "v2.5.59": "Mobile toggle UX polish: neutral gray Search/Results toggles, compact inline Search toggle beside Search button, results header toggle-first order, reclaimed mobile vertical space, and condensed search spacing",
@@ -4385,9 +4386,7 @@ class UI {
         if (!this.isSmallMobile()) return;
 
         if (hasResults) {
-            if (!this.mobileManualPanelState.results) {
-                this.mobilePanels.resultsVisible = true;
-            }
+            this.mobilePanels.resultsVisible = true;
         } else {
             if (!this.mobileManualPanelState.search) {
                 this.mobilePanels.searchVisible = true;
