@@ -117,6 +117,12 @@ const PDF_UI_STATE = {
     HIDDEN: 'hidden'
 };
 
+const MOBILE_VIEW_STATE = {
+    SEARCH_EXPANDED: 'search_expanded',
+    RESULTS_EXPANDED: 'results_expanded',
+    PDF_FOCUS: 'pdf_focus'
+};
+
 // DOM cache for frequently accessed elements
 // Note: Cache can become stale if elements are removed/replaced
 // Call DOM_CACHE.clear() or DOM_CACHE.invalidate(id) if needed
@@ -2900,7 +2906,11 @@ class SearchEngine {
             paginationFooter.style.display = res.length > 0 ? 'flex' : 'none';
         }
         
-        UI.toggleSearch(false);
+        if (UI.isSmallMobile()) {
+            UI.setMobileState(res.length > 0 ? MOBILE_VIEW_STATE.RESULTS_EXPANDED : MOBILE_VIEW_STATE.SEARCH_EXPANDED);
+        } else {
+            UI.toggleSearch(false);
+        }
 
         // === PRELOAD PDFs ===
         if (res.length > 0) {
@@ -3524,8 +3534,7 @@ class PdfViewer {
      */
     static _setScaleForDevice() {
         if (window.innerWidth < 768) {
-            this.currentScale = 0.8;
-            UI.toggleSearch(true); 
+            this.currentScale = 1.0;
         } else if (window.innerWidth < 1200) {
             this.currentScale = 0.8;
         } else {
@@ -4099,12 +4108,15 @@ class PdfController {
 }
 
 class UI {
+    static mobileViewState = MOBILE_VIEW_STATE.SEARCH_EXPANDED;
+
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { 
             document.body.classList.add('dark-mode'); 
         } 
         window.addEventListener('mousemove', (e) => RedactionManager.handleDrag(e)); 
         window.addEventListener('mouseup', () => RedactionManager.endDrag()); 
+        window.addEventListener('resize', () => this.applyMobileStateClasses());
         document.addEventListener('click', (e) => { 
             const menu = DOM_CACHE.get('main-menu'); 
             const btn = document.querySelector('.menu-btn'); 
@@ -4120,6 +4132,7 @@ class UI {
                 }
             }
         }); 
+        this.applyMobileStateClasses();
     }
     
     static isSmallMobile() { return window.innerWidth < 768; }
@@ -4146,7 +4159,11 @@ class UI {
         document.querySelectorAll('select').forEach(s=>s.value="Any"); 
         const keywordInput = DOM_CACHE.get('keywordInput');
         if (keywordInput) keywordInput.value=''; 
-        this.toggleSearch(true); 
+        if (this.isSmallMobile()) {
+            this.setMobileState(MOBILE_VIEW_STATE.SEARCH_EXPANDED);
+        } else {
+            this.toggleSearch(true);
+        }
     }
     
     static closeMobilePreview() { 
@@ -4182,6 +4199,40 @@ class UI {
             c.classList.add('collapsed'); 
             if (refineBtn) refineBtn.classList.add('visible'); 
         } 
+    }
+
+    static applyMobileStateClasses() {
+        if (!document.body) return;
+        document.body.classList.remove('mobile-state-search-expanded', 'mobile-state-results-expanded', 'mobile-state-pdf-focus');
+        if (!this.isSmallMobile()) return;
+        const classByState = {
+            [MOBILE_VIEW_STATE.SEARCH_EXPANDED]: 'mobile-state-search-expanded',
+            [MOBILE_VIEW_STATE.RESULTS_EXPANDED]: 'mobile-state-results-expanded',
+            [MOBILE_VIEW_STATE.PDF_FOCUS]: 'mobile-state-pdf-focus'
+        };
+        const className = classByState[this.mobileViewState] || classByState[MOBILE_VIEW_STATE.SEARCH_EXPANDED];
+        document.body.classList.add(className);
+    }
+
+    static setMobileState(state) {
+        this.mobileViewState = state;
+        if (this.isSmallMobile()) {
+            if (state === MOBILE_VIEW_STATE.SEARCH_EXPANDED) this.toggleSearch(true);
+            else this.toggleSearch(false);
+        }
+        this.applyMobileStateClasses();
+    }
+
+    static openSearchControls() {
+        this.setMobileState(MOBILE_VIEW_STATE.SEARCH_EXPANDED);
+    }
+
+    static openResultsPanel() {
+        if (this.isSmallMobile()) {
+            this.setMobileState(MOBILE_VIEW_STATE.RESULTS_EXPANDED);
+            return;
+        }
+        this.toggleSearch(false);
     }
     
     static toggleMenu() { 
@@ -4233,6 +4284,12 @@ static pop() {
     if (savedValues.keyword) {
         const keywordInput = DOM_CACHE.get('keywordInput');
         if (keywordInput) keywordInput.value = savedValues.keyword;
+    }
+
+    if (this.isSmallMobile()) {
+        this.setMobileState(MOBILE_VIEW_STATE.SEARCH_EXPANDED);
+    } else {
+        this.applyMobileStateClasses();
     }
 }
 
@@ -4325,6 +4382,7 @@ static render(res, crit, totalCount) {
             c.onclick = () => { 
                 document.querySelectorAll('.record-card').forEach(x=>x.classList.remove('active-view')); 
                 c.classList.add('active-view'); 
+                UI.setMobileState(MOBILE_VIEW_STATE.PDF_FOCUS);
                 PdfController.load(i.id, i.pdfUrl); 
             };
         } else {
@@ -4386,5 +4444,3 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("System failed to initialize. Please clear cache and reload.");
     }
 });
-
-

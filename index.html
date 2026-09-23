@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Cox Research | SCHEMATICA ai (v1.0)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
@@ -156,7 +156,11 @@
                 <button id="searchBtn" class="search-btn" onclick="SearchEngine.perform()" disabled>INITIALIZING...</button>
             </div>
         </div>
-        <div id="refine-btn-area"><button class="refine-btn" onclick="UI.toggleSearch(true)">🔍 REFINE SEARCH</button></div>
+        <div id="refine-btn-area"><button class="refine-btn" onclick="UI.openSearchControls()">🔍 REFINE SEARCH</button></div>
+        <div id="mobile-view-controls">
+            <button class="mobile-state-btn" onclick="UI.openSearchControls()">🔎 Search</button>
+            <button class="mobile-state-btn" onclick="UI.openResultsPanel()">📋 Results</button>
+        </div>
         <div id="results-scroll-area">
             <div id="results-area"></div>
         </div>
