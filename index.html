@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.60)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.61)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -105,12 +105,13 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.60</span>
+        <span class="app-title-version" id="app-program-name">SCHEMATICAai</span>
     </div>
 
     <div class="header-controls">
         <button id="main-menu-btn" class="menu-btn" onclick="UI.toggleMenu()">☰</button>
         <div id="main-menu" class="menu-dropdown">
+            <div class="menu-version" id="menu-version">VERSION</div>
             <div class="menu-section" id="admin-tools-section">
                 <div class="menu-header">Admin Tools</div>
                 <button id="menu-demo" class="menu-item" onclick="DemoManager.toggleGenerator(); UI.toggleMenu()">
@@ -154,15 +155,15 @@
                 </div>
             </div>
             <div id="search-action-row" style="display:flex; gap:8px; margin-top:8px;">
-                <div id="refine-btn-area"><button id="refine-toggle-btn" class="refine-btn panel-toggle-btn" onclick="UI.toggleMobileSearch()" aria-expanded="true" aria-label="Hide Search panel" title="Hide Search panel">▴ HIDE</button></div>
+                <div id="refine-btn-area"><button id="refine-toggle-btn" class="refine-btn panel-toggle-btn" onclick="UI.toggleMobileSearch()" aria-expanded="true" aria-label="Hide Search panel" title="Hide Search panel">HIDE</button></div>
                 <button id="searchBtn" class="search-btn" onclick="SearchEngine.perform()" disabled>INITIALIZING...</button>
                 <button class="reset-btn" onclick="UI.resetSearch()" title="Reset Filters" aria-label="Reset Search Filters">↺</button>
             </div>
         </div>
         <div id="results-scroll-area">
             <div id="results-header">
+                <button id="results-toggle-btn" class="results-toggle-btn panel-toggle-btn" onclick="UI.toggleMobileResults()" aria-expanded="false" aria-label="Show Results panel" title="Show Results panel">SHOW</button>
                 <span id="results-count">Found 0 records</span>
-                <button id="results-toggle-btn" class="results-toggle-btn panel-toggle-btn" onclick="UI.toggleMobileResults()" aria-expanded="false" aria-label="Show Results panel" title="Show Results panel">▸ SHOW</button>
             </div>
             <div id="results-list">
                 <div id="results-area"></div>
