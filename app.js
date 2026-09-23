@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v1.0 (Fresh version number for pre show changes) ---
-const APP_VERSION = "v1.0";
+// --- SCHEMATICA ai v2.5.56 ---
+const APP_VERSION = "v2.5.56";
 const VERSION_HISTORY = {
+    "v2.5.56": "Production reliability fix: centralized absolute Worker URL builder for PDF/PDF_BY_ID/FEEDBACK calls, request-time ML background training gated off by default, wrangler keep_vars/observability persistence, and safe PDF host diagnostics",
     "v2.5.53": "Fix Custom PDF Info input clipping: date/stage and phone/fax rows no longer overflow sidebar; demo-input min-width:0 for flex shrink; date input text-align:left; left-generator-context and demo-context-panel overflow guard; version bump",
     "v2.5.53": "PDF preview header centering fix (absolute-positioned title for true center); tablet sidebar width reduced ~8%; tablet default zoom 80% (matching mobile); version bump",
     "v2.5.52": "Fix bottom button clipping with stacked layout; redesign PDF preview modal as full-screen overlay with slim purple header bar; version bump",
@@ -58,7 +59,19 @@ const VERSION_HISTORY = {
     "v2.4.5": "Fixed PDF scanning errors and preload conflicts",
     "v2.4.4": "Strict keyword boundaries"
 };
-const WORKER_URL = "api.coxpanelfinder.app"; 
+const WORKER_URL = "https://api.coxpanelfinder.app";
+
+function buildWorkerUrl(target, params = {}) {
+    const url = new URL(WORKER_URL);
+    url.searchParams.set('target', target);
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    return url.toString();
+}
+
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
 
 // Feature flags
@@ -311,10 +324,9 @@ class AuthService {
 
 class NetworkService {
     static async fetch(t, p='') { 
-        const b = WORKER_URL.startsWith('http') ? WORKER_URL : `https://${WORKER_URL}`;
         const h = AuthService.headers();
         console.log(`🌐 Fetching ${t}...`);
-        return fetch(`${b}?target=${encodeURIComponent(t)}${p}`, { headers: h }); 
+        return fetch(`${buildWorkerUrl(t)}${p}`, { headers: h }); 
     }
 }
 
@@ -2254,7 +2266,7 @@ class FeedbackService {
         
         // Submit feedback
         try {
-            await fetch(`${WORKER_URL}?target=FEEDBACK`, { 
+            await fetch(buildWorkerUrl('FEEDBACK'), { 
                 method: 'POST', 
                 headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, 
                 body: JSON.stringify(payload) 
@@ -2346,7 +2358,7 @@ class FeedbackService {
         
         // Submit in background - fire and forget for instant UI response
         // Note: Using fetch instead of sendBeacon because API requires custom auth headers
-        fetch(`${WORKER_URL}?target=FEEDBACK`, { 
+        fetch(buildWorkerUrl('FEEDBACK'), { 
             method: 'POST', 
             headers: { ...AuthService.headers(), 'Content-Type': 'application/json' }, 
             body: JSON.stringify(payload),
@@ -3347,7 +3359,7 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
     
     try {
         console.log(`[fallback] Attempting fallback fetch for ${panelId}`);
-        const fallbackProxyUrl = `${WORKER_URL}?target=PDF&url=${encodeURIComponent(fallbackUrl)}`;
+        const fallbackProxyUrl = buildWorkerUrl('PDF', { url: fallbackUrl });
         const fallbackResp = await fetch(fallbackProxyUrl, { headers: headers() });
         
         if (!fallbackResp.ok) {
@@ -3405,7 +3417,7 @@ class PdfViewer {
             }
 
             // === PRIMARY FETCH: PDF_BY_ID ===
-            const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(panelId)}`;
+            const proxyUrl = buildWorkerUrl('PDF_BY_ID', { id: panelId });
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             
             if (!resp.ok) {
@@ -3622,7 +3634,7 @@ class PdfViewer {
             }
 
             // === FETCH PDF ===
-            const proxyUrl = `${WORKER_URL}?target=pdf&url=${encodeURIComponent(url)}`;
+            const proxyUrl = buildWorkerUrl('PDF', { url });
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
             if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
             
@@ -3987,7 +3999,7 @@ class PdfController {
             if (!this.isPreloading) break;
             
             try {
-                const proxyUrl = `${WORKER_URL}?target=PDF_BY_ID&id=${encodeURIComponent(result.id)}`;
+                const proxyUrl = buildWorkerUrl('PDF_BY_ID', { id: result.id });
                 const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
                 
                 // === HANDLE 404: ATTEMPT FALLBACK ===
@@ -4386,5 +4398,4 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("System failed to initialize. Please clear cache and reload.");
     }
 });
-
 

@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.45
+## Version: v2.5.56
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.56**: Reliability update: request-time ML background training is now gated off by default via `ENABLE_REQUEST_TIME_ML_TRAINING`; safe PDF diagnostics now log host only (not full signed URLs/tokens)
 - **v2.5.45**: Worker-side enclosure parsing now outputs `enc="Varied / Multiple"` (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with `(?<!208/)` lookbehind guards to prevent 208/220V and 208/230V false positives
 - **v2.5.36**: Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each scoring tier)
 - **v2.5.35**: Hotfix: guard preload against missing credentials; differentiate 401 vs 503; worker returns 503 when auth backend unreachable
@@ -306,7 +307,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ### Cold Start
 - Auth & Feedback cache: < 0.5s
-- ML model build: < 3s (background)
+- ML model build: gated by feature flag (disabled for normal request-time execution by default)
 
 ### Warm Request
 - MAIN target: < 0.2s (with cache)
@@ -316,6 +317,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.56**: Reliability update: request-time ML background training gated off by default, safe PDF diagnostics avoid logging full signed URLs
 - **v2.5.5**: PDF_BY_ID relaxed REGEX lookup for revision suffixes, improved error handling
 - **v2.5.4**: Enhanced error handling and logging
 - **v2.5.3**: Security hardening, SSRF guards, environment secrets
