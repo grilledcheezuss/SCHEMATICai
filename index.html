@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.58)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.59)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -105,7 +105,7 @@
     
     <div class="app-title-group">
         <span class="app-title-main">SCHEMATICA ai</span>
-        <span class="app-title-version" id="app-version">v2.5.58</span>
+        <span class="app-title-version" id="app-version">v2.5.59</span>
     </div>
 
     <div class="header-controls">
@@ -132,35 +132,37 @@
 <div id="app-container">
     <div id="sidebar-left">
         <div id="search-controls" class="sidebar-controls">
-            <div class="input-group">
-                <span class="input-label">Keywords</span>
-                <input type="text" id="keywordInput" class="cox-input" placeholder="e.g. Pump, Fan..." onkeypress="UI.handleEnter(event)">
-            </div>
-            <div class="filter-grid" style="margin-top:5px;">
-                <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Horsepower</span><select id="hpInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group full-width"><span class="input-label">Enclosure</span><select id="encInput" class="cox-input"><option value="Any">Any</option></select></div>
-                <div class="input-group full-width">
-                    <span class="input-label">Panel Type</span>
-                    <select id="catInput" class="cox-input">
-                        <option value="Standard">Standard</option>
-                        <option value="LowVoltage">Low Voltage Only</option>
-                        <option value="Any">Show All</option>
-                    </select>
+            <div id="search-main-fields">
+                <div class="input-group">
+                    <span class="input-label">Keywords</span>
+                    <input type="text" id="keywordInput" class="cox-input" placeholder="e.g. Pump, Fan..." onkeypress="UI.handleEnter(event)">
+                </div>
+                <div class="filter-grid" style="margin-top:5px;">
+                    <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" class="cox-input"><option value="Any">Any</option></select></div>
+                    <div class="input-group"><span class="input-label">Horsepower</span><select id="hpInput" class="cox-input"><option value="Any">Any</option></select></div>
+                    <div class="input-group"><span class="input-label">Voltage</span><select id="voltInput" class="cox-input"><option value="Any">Any</option></select></div>
+                    <div class="input-group"><span class="input-label">Phase</span><select id="phaseInput" class="cox-input"><option value="Any">Any</option></select></div>
+                    <div class="input-group full-width"><span class="input-label">Enclosure</span><select id="encInput" class="cox-input"><option value="Any">Any</option></select></div>
+                    <div class="input-group full-width">
+                        <span class="input-label">Panel Type</span>
+                        <select id="catInput" class="cox-input">
+                            <option value="Standard">Standard</option>
+                            <option value="LowVoltage">Low Voltage Only</option>
+                            <option value="Any">Show All</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            <div style="display:flex; gap:8px; margin-top:8px;">
+            <div id="search-action-row" style="display:flex; gap:8px; margin-top:8px;">
                 <button class="reset-btn" onclick="UI.resetSearch()" title="Reset Filters">↺</button>
+                <div id="refine-btn-area"><button id="refine-toggle-btn" class="refine-btn panel-toggle-btn" onclick="UI.toggleMobileSearch()">▾ HIDE</button></div>
                 <button id="searchBtn" class="search-btn" onclick="SearchEngine.perform()" disabled>INITIALIZING...</button>
             </div>
         </div>
-        <div id="refine-btn-area"><button id="refine-toggle-btn" class="refine-btn" onclick="UI.toggleMobileSearch()">▾ HIDE SEARCH</button></div>
         <div id="results-scroll-area">
             <div id="results-header">
+                <button id="results-toggle-btn" class="results-toggle-btn panel-toggle-btn" onclick="UI.toggleMobileResults()">▸ SHOW</button>
                 <span id="results-count">Found 0 records</span>
-                <button id="results-toggle-btn" class="results-toggle-btn" onclick="UI.toggleMobileResults()">▸ SHOW RESULTS</button>
             </div>
             <div id="results-list">
                 <div id="results-area"></div>

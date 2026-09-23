@@ -238,11 +238,38 @@ body.dark-mode #toggle-right { background: #2a2a2a; border-color: #444; color: #
 
 .sidebar-controls { padding: 8px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 5px; transition: all 0.3s ease; overflow: hidden; max-height: 500px; opacity: 1; flex-shrink: 0; } 
 .sidebar-controls.collapsed { max-height: 0; padding: 0; opacity: 0; border-bottom: none; }
-#refine-btn-area { display: none; padding: 6px; background: var(--bg-controls); border-bottom: 1px solid var(--border-color); text-align: center; flex-shrink: 0; } 
+#refine-btn-area { display: none; flex-shrink: 0; } 
 #refine-btn-area.visible { display: block; }
+#sidebar-left > #refine-btn-area {
+    padding: 6px;
+    background: var(--bg-controls);
+    border-bottom: 1px solid var(--border-color);
+    text-align: center;
+}
+#sidebar-left > #refine-btn-area .refine-btn {
+    width: 100%;
+}
 
-.refine-btn { width: 100%; min-height: 32px; background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--glass-text); border-radius: 4px; font-weight: 700; font-size: 11px; letter-spacing: 0.4px; backdrop-filter: blur(4px); transition: 0.2s; }
-.refine-btn:hover { background: var(--app-primary); color: white; border-color: var(--app-primary); }
+.panel-toggle-btn {
+    min-height: 30px;
+    padding: 5px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.45px;
+    line-height: 1;
+    white-space: nowrap;
+    transition: 0.2s;
+}
+.panel-toggle-btn:hover {
+    background: var(--bg-sidebar);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+.refine-btn { width: auto; }
 
 .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .input-group.full-width { grid-column: span 2; } .input-group { display: flex; flex-direction: column; gap: 1px; } .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--app-primary); margin-left: 2px; letter-spacing: 0.5px; } body.dark-mode .input-label { color: var(--text-secondary); }
 
@@ -276,22 +303,8 @@ body.results-ready #results-header { display: flex; }
 #results-area { display: flex; flex-direction: column; gap: 4px; padding-bottom: 10px; transition: opacity 0.2s ease; }
 .results-toggle-btn {
     display: none;
-    min-height: 32px;
-    padding: 6px 10px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    color: var(--glass-text);
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-    transition: 0.2s;
-}
-.results-toggle-btn:hover {
-    background: var(--app-primary);
-    color: white;
-    border-color: var(--app-primary);
+    align-items: center;
+    justify-content: center;
 }
 
 #left-generator-context {
@@ -721,13 +734,49 @@ input[type="date"].demo-input { text-align: left; }
         z-index: 30;
         background: var(--bg-card);
         flex-shrink: 0;
+        padding: 5px 6px;
+        gap: 4px;
+    }
+    #search-main-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+    #search-controls .filter-grid {
+        margin-top: 3px !important;
+        gap: 3px;
+    }
+    #search-controls .input-group {
+        gap: 0;
+    }
+    #search-controls .cox-input {
+        height: 32px;
+        font-size: 11px;
+        padding: 0 7px;
+    }
+    #search-action-row {
+        margin-top: 5px !important;
+        gap: 6px !important;
+        align-items: center;
+    }
+    #search-action-row .reset-btn,
+    #search-action-row .panel-toggle-btn {
+        width: 34px;
+        min-width: 34px;
+        padding: 0;
+        justify-content: center;
+    }
+    #search-action-row .panel-toggle-btn {
+        min-height: 34px;
+        font-size: 9px;
+        letter-spacing: 0.35px;
+    }
+    #search-action-row #searchBtn {
+        flex: 1;
     }
     #refine-btn-area {
-        display: block;
-        order: 1;
-        width: 100%;
+        display: inline-flex;
         z-index: 31;
-        padding: 4px 6px 6px;
     }
     #preview-pane { order: 2; flex: 1; width: 100%; height: auto; border-left: none; }
     #results-scroll-area {
@@ -737,27 +786,32 @@ input[type="date"].demo-input { text-align: left; }
         max-height: 33vh;
         max-height: 33svh;
         max-height: 33dvh;
-        padding: 4px 6px 6px;
+        padding: 4px 6px 5px;
         border-top: 2px solid var(--lsu-purple);
         border-right: none;
         background: var(--bg-sidebar);
         z-index: 20;
-        box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
         flex-shrink: 0;
+        gap: 4px;
     }
     #results-header {
         align-items: center;
-        min-height: 32px;
+        min-height: 30px;
         gap: 6px;
     }
     #results-toggle-btn {
         display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        min-height: 30px;
+        padding: 0 9px;
+        font-size: 9px;
+        letter-spacing: 0.35px;
     }
     #results-count {
         font-size: 10px;
         line-height: 1.2;
+        margin-left: auto;
+        text-align: right;
     }
     #results-list {
         overflow-y: auto;
@@ -771,14 +825,21 @@ input[type="date"].demo-input { text-align: left; }
     #menu-demo { display: none !important; }
     #generator-panel { display: none !important; }
 
-    body.mobile-search-hidden #search-controls {
+    body.mobile-search-hidden #search-main-fields {
         display: none;
+    }
+    body.mobile-search-hidden #search-controls {
+        padding-top: 4px;
+        padding-bottom: 4px;
+        gap: 0;
     }
     body.mobile-results-available #results-scroll-area {
         display: flex;
     }
     body.mobile-results-available.mobile-results-hidden #results-scroll-area {
-        max-height: none;
+        max-height: 40px;
+        min-height: 40px;
+        padding-bottom: 4px;
         box-shadow: none;
     }
     body.mobile-results-hidden #results-list {
@@ -788,7 +849,7 @@ input[type="date"].demo-input { text-align: left; }
         display: none !important;
     }
     body.mobile-results-available:not(.mobile-results-hidden) #results-scroll-area {
-        min-height: 132px;
+        min-height: 120px;
     }
     .record-card {
         padding: 5px 6px;

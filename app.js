@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.58 ---
-const APP_VERSION = "v2.5.58";
+// --- SCHEMATICA ai v2.5.59 ---
+const APP_VERSION = "v2.5.59";
 const VERSION_HISTORY = {
+    "v2.5.59": "Mobile toggle UX polish: neutral gray Search/Results toggles, compact inline Search toggle beside Search button, results header toggle-first order, reclaimed mobile vertical space, and condensed search spacing",
     "v2.5.58": "Mobile UX refinement: independent Search/Results toggles on small screens, Search toggle tethered below filters, compact Results header toggle, condensed mobile results spacing, and stable results header rendering across rerenders/pagination",
     "v2.5.57": "Mobile UX state-flow overhaul: deterministic mobile SEARCH/RESULTS/PDF states with explicit reopen controls, one-third results pane, and removal of implicit PDF-scale search reopening side effects",
     "v2.5.56": "Production reliability fix: centralized absolute Worker URL builder for PDF/PDF_BY_ID/FEEDBACK calls, request-time ML background training gated off by default, wrangler keep_vars/observability persistence, and safe PDF host diagnostics",
@@ -4125,6 +4126,7 @@ class UI {
     static mobilePanels = { searchVisible: true, resultsVisible: false };
     static mobilePdfFocus = false;
     static mobileManualPanelState = { search: false, results: false };
+    static refineToggleHome = null;
 
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { 
@@ -4204,6 +4206,14 @@ class UI {
     }
     
     static toggleSearch(e) { 
+        if (this.isSmallMobile()) {
+            const shouldShow = typeof e === 'boolean' ? e : !this.mobilePanels.searchVisible;
+            this.mobilePanels.searchVisible = shouldShow;
+            this.mobilePdfFocus = false;
+            this.syncMobileLayout();
+            return;
+        }
+
         const c = DOM_CACHE.get('search-controls'); 
         const refineBtn = DOM_CACHE.get('refine-btn-area');
         if(!c) return; 
@@ -4215,14 +4225,6 @@ class UI {
             c.classList.add('collapsed'); 
             if (refineBtn && !this.isSmallMobile()) refineBtn.classList.add('visible'); 
         } 
-
-        if (this.isSmallMobile()) {
-            this.mobilePanels.searchVisible = shouldShow;
-            this.mobilePdfFocus = false;
-            this.syncMobileLayout();
-            return;
-        }
-
         this.syncMobileToggleLabels();
     }
 
@@ -4247,14 +4249,44 @@ class UI {
 
         if (refineToggleBtn) {
             const searchExpanded = this.isSmallMobile() ? this.mobilePanels.searchVisible : !DOM_CACHE.get('search-controls')?.classList.contains('collapsed');
-            refineToggleBtn.textContent = searchExpanded ? '▾ HIDE SEARCH' : '▸ SHOW SEARCH';
+            refineToggleBtn.textContent = searchExpanded ? '▾ HIDE' : '▸ SHOW';
             refineToggleBtn.setAttribute('aria-expanded', searchExpanded ? 'true' : 'false');
+            refineToggleBtn.setAttribute('aria-label', searchExpanded ? 'Hide Search panel' : 'Show Search panel');
+            refineToggleBtn.setAttribute('title', searchExpanded ? 'Hide Search panel' : 'Show Search panel');
         }
 
         if (resultsToggleBtn) {
             const resultsExpanded = this.mobilePanels.resultsVisible && this.hasMobileResultsPanel();
-            resultsToggleBtn.textContent = resultsExpanded ? '▾ HIDE RESULTS' : '▸ SHOW RESULTS';
+            resultsToggleBtn.textContent = resultsExpanded ? '▾ HIDE' : '▸ SHOW';
             resultsToggleBtn.setAttribute('aria-expanded', resultsExpanded ? 'true' : 'false');
+            resultsToggleBtn.setAttribute('aria-label', resultsExpanded ? 'Hide Results panel' : 'Show Results panel');
+            resultsToggleBtn.setAttribute('title', resultsExpanded ? 'Hide Results panel' : 'Show Results panel');
+        }
+    }
+
+    static syncRefineTogglePlacement() {
+        const refineArea = DOM_CACHE.get('refine-btn-area');
+        if (!refineArea) return;
+
+        if (!this.refineToggleHome) {
+            this.refineToggleHome = {
+                parent: refineArea.parentElement,
+                nextSibling: refineArea.nextElementSibling
+            };
+        }
+
+        const searchActionRow = DOM_CACHE.get('search-action-row');
+        const searchBtn = DOM_CACHE.get('searchBtn');
+
+        if (this.isSmallMobile() && searchActionRow && searchBtn && refineArea.parentElement !== searchActionRow) {
+            searchActionRow.insertBefore(refineArea, searchBtn);
+        } else if (!this.isSmallMobile() && this.refineToggleHome?.parent && refineArea.parentElement !== this.refineToggleHome.parent) {
+            const { parent, nextSibling } = this.refineToggleHome;
+            if (nextSibling && nextSibling.parentElement === parent) {
+                parent.insertBefore(refineArea, nextSibling);
+            } else {
+                parent.appendChild(refineArea);
+            }
         }
     }
 
@@ -4265,6 +4297,7 @@ class UI {
         const refineBtn = DOM_CACHE.get('refine-btn-area');
         const paginationFooter = DOM_CACHE.get('pagination-footer');
         const hasResultsPanel = this.hasMobileResultsPanel();
+        this.syncRefineTogglePlacement();
 
         if (!hasResultsPanel) {
             this.mobilePanels.resultsVisible = false;
@@ -4279,7 +4312,7 @@ class UI {
             return;
         }
 
-        controls?.classList.toggle('collapsed', !this.mobilePanels.searchVisible);
+        controls?.classList.remove('collapsed');
         refineBtn?.classList.add('visible');
 
         body.classList.toggle('mobile-search-hidden', !this.mobilePanels.searchVisible);
@@ -4349,6 +4382,8 @@ class UI {
     }
 
     static handleViewportChange() {
+        this.syncRefineTogglePlacement();
+
         if (this.isSmallMobile()) {
             const controls = DOM_CACHE.get('search-controls');
 
