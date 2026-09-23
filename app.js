@@ -1,5 +1,5 @@
-// --- SCHEMATICA ai v2.5.54 (Fix Custom PDF Info input clipping: date/stage and phone/fax rows no longer overflow sidebar; version bump) ---
-const APP_VERSION = "v2.5.54";
+// --- SCHEMATICA ai v1.0 (Fresh version number for pre show changes) ---
+const APP_VERSION = "v1.0";
 const VERSION_HISTORY = {
     "v2.5.53": "Fix Custom PDF Info input clipping: date/stage and phone/fax rows no longer overflow sidebar; demo-input min-width:0 for flex shrink; date input text-align:left; left-generator-context and demo-context-panel overflow guard; version bump",
     "v2.5.53": "PDF preview header centering fix (absolute-positioned title for true center); tablet sidebar width reduced ~8%; tablet default zoom 80% (matching mobile); version bump",
