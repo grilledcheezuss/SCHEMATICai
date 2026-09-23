@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.56
+## Version: v2.5.59
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.59**: App-shell mobile UX polish: neutral gray Search/Results toggles, compact inline Search toggle beside Search button, Results header toggle-first order, condensed Search spacing, and reclaimed mobile hidden-state space
 - **v2.5.56**: Reliability update: request-time ML background training is now gated off by default via `ENABLE_REQUEST_TIME_ML_TRAINING`; safe PDF diagnostics now log host only (not full signed URLs/tokens)
 - **v2.5.45**: Worker-side enclosure parsing now outputs `enc="Varied / Multiple"` (encV=true) when both 4XSS and 4XFG (or any multi-enclosure combination) remain after spec-table precedence; VOLT_PRIORITY 240 regex hardened with `(?<!208/)` lookbehind guards to prevent 208/220V and 208/230V false positives
 - **v2.5.36**: Enclosure false positives: spec-table context wins (ENCLOSURE MATERIAL / NAMEPLATE / PANEL TYPE forward-window resolves 4XFG vs 4XSS); tier-aware no-PDF sorting (missing-PDF records sorted after PDF-present records within each scoring tier)
@@ -317,6 +318,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.59**: App-shell mobile UX polish (neutral compact Search/Results toggles, Search toggle beside Search button, Results header toggle-first order, condensed mobile spacing, hidden-state space recovery)
 - **v2.5.58**: Mobile UX refinement in app shell (independent Search/Results toggles, tethered compact toggles, stable results header across rerenders/pagination)
 - **v2.5.57**: Mobile UX state flow update in app shell (deterministic Search/Results/PDF mobile states with explicit reopen controls)
 - **v2.5.56**: Reliability update: request-time ML background training gated off by default, safe PDF diagnostics avoid logging full signed URLs
