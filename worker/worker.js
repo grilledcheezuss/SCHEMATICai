@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v1.0 (Pre show version change)
+// 🧠 SCHEMATICA ai WORKER v2.5.56
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -35,6 +35,7 @@ let CACHE_TIME = 0;
 let CACHE_AUTH_PROMISE = null;
 let IS_BUILDING_ML = false;
 const CACHE_DURATION = 1000 * 60 * 60; // 1 Hour
+const ENABLE_REQUEST_TIME_ML_TRAINING = false;
 
 const VOTE_THRESHOLD = 3;
 
@@ -349,17 +350,25 @@ function isAllowedPdfHost(url) {
     }
 }
 
+function getPdfUrlHost(url) {
+    try {
+        return new URL(url).hostname;
+    } catch (e) {
+        return null;
+    }
+}
+
 // Security helper: Fetch PDF with timeout and size limits
 async function fetchPdfWithGuards(url) {
     // Early validation: Check for null, undefined, or empty URL
     if (!url || typeof url !== 'string' || url.trim() === '') {
-        console.error('[fetchPdfWithGuards] Invalid or empty URL provided:', url);
+        console.error('[fetchPdfWithGuards] Invalid or empty URL provided');
         throw new Error('Invalid or empty PDF URL');
     }
     
     // Validate against allowed hosts
     if (!isAllowedPdfHost(url)) {
-        console.error('[fetchPdfWithGuards] PDF host not allowed. URL:', url, 'Allowed hosts:', ALLOWED_PDF_HOSTS);
+        console.error('[fetchPdfWithGuards] PDF host not allowed. Host:', getPdfUrlHost(url), 'Allowed hosts:', ALLOWED_PDF_HOSTS);
         throw new Error(`PDF host not allowed. Only these hosts are permitted: ${ALLOWED_PDF_HOSTS.join(', ')}`);
     }
     
@@ -367,30 +376,30 @@ async function fetchPdfWithGuards(url) {
     const timeoutId = setTimeout(() => controller.abort(), PDF_FETCH_TIMEOUT_MS);
     
     try {
-        console.log('[fetchPdfWithGuards] Fetching PDF from:', url);
+        console.log('[fetchPdfWithGuards] Fetching PDF from allowed host:', getPdfUrlHost(url));
         const response = await fetch(url, { signal: controller.signal });
         
         if (!response.ok) {
-            console.error('[fetchPdfWithGuards] PDF fetch failed. Status:', response.status, 'URL:', url);
+            console.error('[fetchPdfWithGuards] PDF fetch failed. Status:', response.status, 'Host:', getPdfUrlHost(url));
             throw new Error(`PDF fetch failed with status ${response.status}`);
         }
         
         // Check content length if available
         const contentLength = response.headers.get('content-length');
         if (contentLength && parseInt(contentLength) > MAX_PDF_SIZE_BYTES) {
-            console.error('[fetchPdfWithGuards] PDF too large. Size:', contentLength, 'Max allowed:', MAX_PDF_SIZE_BYTES, 'URL:', url);
+            console.error('[fetchPdfWithGuards] PDF too large. Size:', contentLength, 'Max allowed:', MAX_PDF_SIZE_BYTES, 'Host:', getPdfUrlHost(url));
             throw new Error(`PDF too large (${contentLength} bytes). Maximum allowed: ${MAX_PDF_SIZE_BYTES} bytes`);
         }
         
-        console.log('[fetchPdfWithGuards] PDF fetch successful. URL:', url);
+        console.log('[fetchPdfWithGuards] PDF fetch successful from host:', getPdfUrlHost(url));
         return response;
     } catch (error) {
         // Enhanced error logging for debugging
         if (error.name === 'AbortError') {
-            console.error('[fetchPdfWithGuards] PDF fetch timeout after', PDF_FETCH_TIMEOUT_MS, 'ms. URL:', url);
+            console.error('[fetchPdfWithGuards] PDF fetch timeout after', PDF_FETCH_TIMEOUT_MS, 'ms. Host:', getPdfUrlHost(url));
             throw new Error(`PDF fetch timeout after ${PDF_FETCH_TIMEOUT_MS}ms`);
         }
-        console.error('[fetchPdfWithGuards] Error fetching PDF:', error.message, 'URL:', url);
+        console.error('[fetchPdfWithGuards] Error fetching PDF:', error.message, 'Host:', getPdfUrlHost(url));
         throw error;
     } finally {
         clearTimeout(timeoutId);
@@ -650,15 +659,15 @@ export default {
                 
                 // Null/empty URL validation
                 if (typeof pdfUrl !== 'string' || pdfUrl.trim() === '') {
-                    console.error('[PDF] Invalid or empty URL parameter:', pdfUrl);
+                    console.error('[PDF] Invalid or empty URL parameter');
                     return new Response("Invalid URL parameter", { status: 400, headers: corsHeaders });
                 }
                 
-                console.log('[PDF] Processing PDF request. URL:', pdfUrl);
+                console.log('[PDF] Processing PDF request. Host:', getPdfUrlHost(pdfUrl));
                 
                 // Security: Validate PDF URL against allowlist
                 if (!isAllowedPdfHost(pdfUrl)) {
-                    console.error('[PDF] PDF host not allowed. URL:', pdfUrl);
+                    console.error('[PDF] PDF host not allowed. Host:', getPdfUrlHost(pdfUrl));
                     return new Response("PDF host not allowed", { status: 403, headers: corsHeaders });
                 }
                 
@@ -671,7 +680,7 @@ export default {
                     console.log('[PDF] Successfully fetched PDF');
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
                 } catch (e) {
-                    console.error('[PDF] PDF fetch failed. URL:', pdfUrl, 'Error:', e.message);
+                    console.error('[PDF] PDF fetch failed. Host:', getPdfUrlHost(pdfUrl), 'Error:', e.message);
                     return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
                 }
             }
@@ -722,7 +731,7 @@ export default {
                             pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
                             if (pdfUrl) {
                                 foundVariant = variant;
-                                console.log('[PDF_BY_ID] Found record with variant:', variant, 'PDF URL:', pdfUrl);
+                                console.log('[PDF_BY_ID] Found record with variant:', variant, 'PDF host:', getPdfUrlHost(pdfUrl));
                                 break;
                             } else {
                                 console.log('[PDF_BY_ID] Record found for variant:', variant, 'but no PDF URL attached');
@@ -764,7 +773,7 @@ export default {
                                 pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
                                 if (pdfUrl) {
                                     foundVariant = record.fields['Control Panel Name'] || 'regex-match';
-                                    console.log('[PDF_BY_ID] REGEX match found:', foundVariant, 'PDF URL:', pdfUrl);
+                                    console.log('[PDF_BY_ID] REGEX match found:', foundVariant, 'PDF host:', getPdfUrlHost(pdfUrl));
                                 } else {
                                     console.log('[PDF_BY_ID] REGEX matched record but no PDF URL attached');
                                 }
@@ -788,7 +797,7 @@ export default {
                 
                 // Additional null/empty check before proceeding
                 if (typeof pdfUrl !== 'string' || pdfUrl.trim() === '') {
-                    console.error('[PDF_BY_ID] Invalid PDF URL format. Panel ID:', panelId, 'URL value:', pdfUrl);
+                    console.error('[PDF_BY_ID] Invalid PDF URL format. Panel ID:', panelId);
                     return new Response("Invalid PDF URL for panel", { status: 500, headers: corsHeaders });
                 }
                 
@@ -796,7 +805,7 @@ export default {
                 
                 // Security: Validate PDF URL against allowlist
                 if (!isAllowedPdfHost(pdfUrl)) {
-                    console.error('[PDF_BY_ID] PDF host not allowed. Panel ID:', panelId, 'URL:', pdfUrl);
+                    console.error('[PDF_BY_ID] PDF host not allowed. Panel ID:', panelId, 'Host:', getPdfUrlHost(pdfUrl), 'Allowed hosts:', ALLOWED_PDF_HOSTS);
                     return new Response("PDF host not allowed", { status: 403, headers: corsHeaders });
                 }
                 
@@ -809,7 +818,7 @@ export default {
                     console.log('[PDF_BY_ID] Successfully fetched PDF for panel:', panelId);
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
                 } catch (e) {
-                    console.error('[PDF_BY_ID] PDF fetch failed. Panel ID:', panelId, 'URL:', pdfUrl, 'Error:', e.message);
+                    console.error('[PDF_BY_ID] PDF fetch failed. Panel ID:', panelId, 'Host:', getPdfUrlHost(pdfUrl), 'Error:', e.message);
                     return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
                 }
             }
@@ -826,7 +835,7 @@ export default {
             }
 
             // Fire and forget ML training in the background
-            if (!CACHE_NB_MODEL && !IS_BUILDING_ML && ctx && ctx.waitUntil) {
+            if (ENABLE_REQUEST_TIME_ML_TRAINING && !CACHE_NB_MODEL && !IS_BUILDING_ML && ctx && ctx.waitUntil) {
                 ctx.waitUntil(buildMLBackground(env));
             }
 
