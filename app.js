@@ -3616,24 +3616,26 @@ class PdfRenderHelper {
         const cssWidth = Math.max(1, Math.floor(viewport?.width || 1));
         const cssHeight = Math.max(1, Math.floor(viewport?.height || 1));
         const maxPixels = Math.max(1, PDF_RENDER_MAX_CANVAS_PIXELS);
-        let outputScale = this.normalizeOutputScale(devicePixelRatio);
-        let backingWidth = Math.max(1, Math.round(cssWidth * outputScale));
-        let backingHeight = Math.max(1, Math.round(cssHeight * outputScale));
+        const outputScale = this.normalizeOutputScale(devicePixelRatio);
+        let effectiveScale = outputScale;
+        let backingWidth = Math.max(1, Math.round(cssWidth * effectiveScale));
+        let backingHeight = Math.max(1, Math.round(cssHeight * effectiveScale));
         const pixelArea = backingWidth * backingHeight;
         if (pixelArea > maxPixels) {
             const areaScale = Math.sqrt(maxPixels / pixelArea);
-            outputScale = Math.max(1, outputScale * areaScale);
-            backingWidth = Math.max(1, Math.round(cssWidth * outputScale));
-            backingHeight = Math.max(1, Math.round(cssHeight * outputScale));
+            effectiveScale = Math.max(0.1, outputScale * areaScale);
+            backingWidth = Math.max(1, Math.round(cssWidth * effectiveScale));
+            backingHeight = Math.max(1, Math.round(cssHeight * effectiveScale));
         }
-        const useTransform = outputScale > 1;
+        const useTransform = Math.abs(effectiveScale - 1) > 0.001;
         return {
             cssWidth,
             cssHeight,
             outputScale,
+            effectiveScale,
             backingWidth,
             backingHeight,
-            transform: useTransform ? [outputScale, 0, 0, outputScale, 0, 0] : null
+            transform: useTransform ? [effectiveScale, 0, 0, effectiveScale, 0, 0] : null
         };
     }
 }
