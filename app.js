@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.60 ---
-const APP_VERSION = "v2.5.60";
+// --- SCHEMATICA ai v2.5.61 ---
+const APP_VERSION = "v2.5.61";
 const VERSION_HISTORY = {
+    "v2.5.61": "Mobile/header refinement: centered SHOW/HIDE toggles without glyphs, structurally fixed Results header order, slimmer header with SCHEMATICAai badge, menu-pinned version indicator, subtle surface softening, and dark-mode panel-ID purple lightened one shade",
     "v2.5.60": "Mobile UX refinement: compact inline pagination row, complementary Search/Results toggle corners, purple mobile reset button, consistent mobile backdrops, corrected SHOW/HIDE arrow semantics, and reclaimed bottom safe-area space",
     "v2.5.59": "Mobile toggle UX polish: neutral gray Search/Results toggles, compact inline Search toggle beside Search button, results header toggle-first order, reclaimed mobile vertical space, and condensed search spacing",
     "v2.5.58": "Mobile UX refinement: independent Search/Results toggles on small screens, Search toggle tethered below filters, compact Results header toggle, condensed mobile results spacing, and stable results header rendering across rerenders/pagination",
@@ -4251,7 +4252,7 @@ class UI {
 
         if (refineToggleBtn) {
             const searchExpanded = this.isSmallMobile() ? this.mobilePanels.searchVisible : !DOM_CACHE.get('search-controls')?.classList.contains('collapsed');
-            refineToggleBtn.textContent = searchExpanded ? '▴ HIDE' : '▸ SHOW';
+            refineToggleBtn.textContent = searchExpanded ? 'HIDE' : 'SHOW';
             refineToggleBtn.setAttribute('aria-expanded', searchExpanded ? 'true' : 'false');
             refineToggleBtn.setAttribute('aria-label', searchExpanded ? 'Hide Search panel' : 'Show Search panel');
             refineToggleBtn.setAttribute('title', searchExpanded ? 'Hide Search panel' : 'Show Search panel');
@@ -4259,7 +4260,7 @@ class UI {
 
         if (resultsToggleBtn) {
             const resultsExpanded = this.mobilePanels.resultsVisible && this.hasMobileResultsPanel();
-            resultsToggleBtn.textContent = resultsExpanded ? '▴ HIDE' : '▸ SHOW';
+            resultsToggleBtn.textContent = resultsExpanded ? 'HIDE' : 'SHOW';
             resultsToggleBtn.setAttribute('aria-expanded', resultsExpanded ? 'true' : 'false');
             resultsToggleBtn.setAttribute('aria-label', resultsExpanded ? 'Hide Results panel' : 'Show Results panel');
             resultsToggleBtn.setAttribute('title', resultsExpanded ? 'Hide Results panel' : 'Show Results panel');
@@ -4608,8 +4609,8 @@ window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set(); 
 
 document.addEventListener('DOMContentLoaded', () => { 
     try {
-        // Sync version in header
-        const versionEl = document.getElementById('app-version');
+        // Sync version in menu
+        const versionEl = document.getElementById('menu-version');
         if (versionEl) {
             versionEl.textContent = APP_VERSION;
         }

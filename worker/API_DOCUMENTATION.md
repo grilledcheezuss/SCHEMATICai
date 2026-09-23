@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.60
+## Version: v2.5.61
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.61**: App-shell refinement: centered SHOW/HIDE panel toggles without glyphs, structurally fixed Results header ordering, slimmer header with SCHEMATICAai badge + menu-pinned version display, subtle surface softening, and one-shade lighter dark-mode panel-ID purple
 - **v2.5.60**: App-shell mobile UX refinement: compact inline pagination row, complementary Search/Results toggle corners, purple mobile reset button, consistent mobile control backdrops, corrected ▸ SHOW / ▴ HIDE semantics, and reclaimed bottom safe-area space
 - **v2.5.59**: App-shell mobile UX polish: neutral gray Search/Results toggles, compact inline Search toggle beside Search button, Results header toggle-first order, condensed Search spacing, and reclaimed mobile hidden-state space
 - **v2.5.56**: Reliability update: request-time ML background training is now gated off by default via `ENABLE_REQUEST_TIME_ML_TRAINING`; safe PDF diagnostics now log host only (not full signed URLs/tokens)
@@ -319,6 +320,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.61**: App-shell refinement (centered SHOW/HIDE text-only toggles, fixed Results header order, slimmer branded header, menu-top version indicator, subtle surface softening, and one-shade lighter dark-mode panel-ID purple)
 - **v2.5.60**: App-shell mobile UX refinement (compact pagination row inside Results region, complementary Search/Results toggle corners, purple mobile reset button, corrected ▸ SHOW / ▴ HIDE semantics, and matched mobile backdrops)
 - **v2.5.59**: App-shell mobile UX polish (neutral compact Search/Results toggles, Search toggle beside Search button, Results header toggle-first order, condensed mobile spacing, hidden-state space recovery)
 - **v2.5.58**: Mobile UX refinement in app shell (independent Search/Results toggles, tethered compact toggles, stable results header across rerenders/pagination)
