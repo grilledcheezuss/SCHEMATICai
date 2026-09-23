@@ -1,14 +1,14 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.61)
+CLOUDFLARE WORKER SCRIPT (v2.5.62)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.61):
+RECENT UPDATES (v2.5.62):
 
-- Search/Results panel toggles now show centered `SHOW`/`HIDE` text without caret glyphs while preserving accessibility labels and independent panel-state behavior
-- Header is slimmer with tighter edge spacing and a ~5% larger COX/RESEARCH mark; the header badge now reads `SCHEMATICAai` and APP_VERSION displays at the top edge of the hamburger menu
-- Results header order is structurally fixed (toggle left, count right), with stable behavior across rerenders/pagination/PDF focus transitions
-- UI surfaces received restrained soft-edge polish (rounded corners + subtle shading) across header/action rows/results/pagination/cards/menu/modal regions, including dark-mode-safe shading
-- Dark-mode result-card panel-ID purple was lightened one shade only (scoped to panel IDs), and version strings aligned to v2.5.61 across app.js, worker.js, and docs
+- Removed the bulky mobile Search action-row shell so controls sit flush with sidebar chrome while keeping a thin raised/icy separator line
+- Extended the same subtle edge/backdrop polish to related surfaces (Search controls, Results pane, pagination footer, and PDF toolbar) without layout redesign
+- Successful mobile searches now always force Results open, while manual Search/Results toggles remain independent afterward
+- Expanded mobile Results panel sizing to better fit at least two compact cards on common phone viewports when space allows
+- Styled SHOW/HIDE toggles and `Found N records` text closer to parameter label typography with dark-mode-safe purple contrast, and aligned version strings to v2.5.62 across app.js, worker.js, and docs
 
 PREVIOUS UPDATES (v2.5.16 and earlier):
 
