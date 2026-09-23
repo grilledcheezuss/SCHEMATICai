@@ -121,10 +121,6 @@ async function loadTesseract() {
 const PRELOAD_START_DELAY_MS = 500; // Delay before starting preload after search completes
 const DATA_SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
-// PDF high-DPI rendering bounds
-const PDF_RENDER_MAX_OUTPUT_SCALE = 2;
-const PDF_RENDER_MAX_CANVAS_PIXELS = 12000000;
-
 // PDF status constants
 const PDF_STATUS = {
     MISSING: 'missing',
@@ -289,6 +285,44 @@ class DB {
     static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async deleteChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").delete(k); t.oncomplete = r; t.onerror = j; }); }
+    static async claimLock(k, token, ttlMs) {
+        const d = await this.open();
+        return new Promise((resolve, reject) => {
+            const t = d.transaction("chunks", "readwrite");
+            const store = t.objectStore("chunks");
+            const q = store.get(k);
+            let granted = false;
+            q.onsuccess = () => {
+                const existing = q.result;
+                const now = Date.now();
+                const lockAt = Number(existing?.at);
+                const isLocked = Number.isFinite(lockAt) && lockAt > 0 && (now - lockAt) < ttlMs;
+                if (isLocked) return;
+                store.put({ token, at: now }, k);
+                granted = true;
+            };
+            q.onerror = () => reject(q.error);
+            t.oncomplete = () => resolve(granted);
+            t.onerror = () => reject(t.error);
+        });
+    }
+    static async releaseLock(k, token) {
+        const d = await this.open();
+        return new Promise((resolve, reject) => {
+            const t = d.transaction("chunks", "readwrite");
+            const store = t.objectStore("chunks");
+            const q = store.get(k);
+            q.onsuccess = () => {
+                const existing = q.result;
+                if (!existing || existing.token === token) {
+                    store.delete(k);
+                }
+            };
+            q.onerror = () => reject(q.error);
+            t.oncomplete = () => resolve();
+            t.onerror = () => reject(t.error);
+        });
+    }
     static async deleteLegacy() { try { const d = await this.open(); const t = d.transaction("cache", "readwrite"); t.objectStore("cache").clear(); } catch(e){} }
     static async clear() { const d=await this.open(); return new Promise(r=>{ const t=d.transaction("chunks","readwrite"); t.objectStore("chunks").clear(); t.oncomplete=r; }); }
     static deleteDatabase() { return new Promise((resolve, reject) => { const req = indexedDB.deleteDatabase("CoxSchematicDB"); req.onsuccess = () => resolve(); req.onerror = () => reject(); req.onblocked = () => resolve(); }); }
@@ -390,10 +424,17 @@ class CacheService {
         } 
 
         if (stageMap.size === 0) return null;
-        window.LOCAL_DB = Array.from(stageMap.values());
-        window.ID_MAP = stageMap;
-        window.FOUND_MFGS = stageMfgs;
-        window.FOUND_ENCS = stageEncs;
+        window.LOCAL_DB.length = 0;
+        stageMap.forEach(rec => window.LOCAL_DB.push(rec));
+        if (!(window.ID_MAP instanceof Map)) window.ID_MAP = new Map();
+        if (!(window.FOUND_MFGS instanceof Set)) window.FOUND_MFGS = new Set();
+        if (!(window.FOUND_ENCS instanceof Set)) window.FOUND_ENCS = new Set();
+        window.ID_MAP.clear();
+        window.FOUND_MFGS.clear();
+        window.FOUND_ENCS.clear();
+        stageMap.forEach((rec, id) => window.ID_MAP.set(id, rec));
+        stageMfgs.forEach(v => window.FOUND_MFGS.add(v));
+        stageEncs.forEach(v => window.FOUND_ENCS.add(v));
         return true; 
     }
     static async enc(t) { const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, this.activeKey, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
@@ -418,8 +459,10 @@ class NetworkService {
 class DataLoader {
     static SYNC_TIMESTAMP_KEY = 'cox_db_synced_at';
     static SYNC_LOCK_KEY = 'cox_db_sync_lock_at';
+    static SYNC_DB_LOCK_KEY = '__cox_db_sync_lock';
     static SYNC_LOCK_TTL_MS = 10 * 60 * 1000;
     static _inFlightSync = false;
+    static _lockToken = null;
     static _lifecycleRefreshHookInstalled = false;
 
     static getSyncTimestamp() {
@@ -438,28 +481,44 @@ class DataLoader {
         if (!this.isCacheComplete()) return false;
         return !this.isSyncFresh(now);
     }
-    static canAcquireSyncLock(now = Date.now()) {
+    static shouldAbortEmptySync({ fetchedCount, hadExistingData }) {
+        return fetchedCount === 0 && (hadExistingData || this.isCacheComplete());
+    }
+    static async acquireSyncLock(now = Date.now()) {
         if (this._inFlightSync) return false;
-        const lockAt = Number(localStorage.getItem(this.SYNC_LOCK_KEY));
-        if (Number.isFinite(lockAt) && lockAt > 0 && (now - lockAt) < this.SYNC_LOCK_TTL_MS) return false;
-        return true;
+        const token = `${now}_${Math.random().toString(36).slice(2, 10)}`;
+        const won = await DB.claimLock(this.SYNC_DB_LOCK_KEY, token, this.SYNC_LOCK_TTL_MS);
+        if (won) {
+            this._inFlightSync = true;
+            this._lockToken = token;
+            localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: now, token }));
+        }
+        return won;
     }
-    static acquireSyncLock(now = Date.now()) {
-        if (!this.canAcquireSyncLock(now)) return false;
-        this._inFlightSync = true;
-        localStorage.setItem(this.SYNC_LOCK_KEY, String(now));
-        return true;
-    }
-    static releaseSyncLock() {
+    static async releaseSyncLock() {
+        if (this._lockToken) {
+            await DB.releaseLock(this.SYNC_DB_LOCK_KEY, this._lockToken).catch(() => {});
+        }
         this._inFlightSync = false;
+        this._lockToken = null;
         localStorage.removeItem(this.SYNC_LOCK_KEY);
     }
     static applySnapshot(snapshot) {
         const records = Array.isArray(snapshot?.records) ? snapshot.records : [];
-        window.LOCAL_DB = records;
-        window.ID_MAP = snapshot?.idMap instanceof Map ? snapshot.idMap : new Map(records.map(r => [r.id, r]));
-        window.FOUND_MFGS = snapshot?.foundMfgs instanceof Set ? snapshot.foundMfgs : new Set(records.map(r => r?.mfg).filter(Boolean));
-        window.FOUND_ENCS = snapshot?.foundEncs instanceof Set ? snapshot.foundEncs : new Set(records.map(r => r?.enc).filter(Boolean));
+        const idMap = snapshot?.idMap instanceof Map ? snapshot.idMap : new Map(records.map(r => [r.id, r]));
+        const foundMfgs = snapshot?.foundMfgs instanceof Set ? snapshot.foundMfgs : new Set(records.map(r => r?.mfg).filter(Boolean));
+        const foundEncs = snapshot?.foundEncs instanceof Set ? snapshot.foundEncs : new Set(records.map(r => r?.enc).filter(Boolean));
+        window.LOCAL_DB.length = 0;
+        records.forEach(rec => window.LOCAL_DB.push(rec));
+        if (!(window.ID_MAP instanceof Map)) window.ID_MAP = new Map();
+        if (!(window.FOUND_MFGS instanceof Set)) window.FOUND_MFGS = new Set();
+        if (!(window.FOUND_ENCS instanceof Set)) window.FOUND_ENCS = new Set();
+        window.ID_MAP.clear();
+        window.FOUND_MFGS.clear();
+        window.FOUND_ENCS.clear();
+        idMap.forEach((rec, id) => window.ID_MAP.set(id, rec));
+        foundMfgs.forEach(v => window.FOUND_MFGS.add(v));
+        foundEncs.forEach(v => window.FOUND_ENCS.add(v));
     }
     static installLifecycleRefreshHooks() {
         if (this._lifecycleRefreshHookInstalled) return;
@@ -540,12 +599,12 @@ class DataLoader {
         localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
         localStorage.removeItem(this.SYNC_LOCK_KEY);
         localStorage.setItem('cox_sync_attempts', '0');
-        location.reload();
+        DB.deleteChunk(this.SYNC_DB_LOCK_KEY).finally(() => location.reload());
     }
 
     static async maybeRefreshStaleCache({ reason = 'startup' } = {}) {
         if (!this.shouldRefreshStaleCache()) return;
-        if (!this.acquireSyncLock()) return;
+        if (!await this.acquireSyncLock()) return;
         try {
             if (!this.shouldRefreshStaleCache()) return;
             const result = await this.fetchPartition('desc', null, { background: true, reason });
@@ -553,7 +612,7 @@ class DataLoader {
                 UI.pop();
             }
         } finally {
-            this.releaseSyncLock();
+            await this.releaseSyncLock();
         }
     }
     
@@ -568,13 +627,14 @@ class DataLoader {
 
     static async fetchPartition(dir, btn, { background = false, reason = 'sync' } = {}) {
         if (!background) {
-            if (!this.acquireSyncLock()) return { success: false, skipped: true };
+            if (!await this.acquireSyncLock()) return { success: false, skipped: true };
         }
         let offset = null, loop = 0;
         let fetchedCount = 0; let retryCount = 0;
         const recordsById = new Map();
         const foundMfgs = new Set();
         const foundEncs = new Set();
+        const hadExistingData = window.LOCAL_DB.length > 0;
         try {
             do {
                 loop++;
@@ -641,7 +701,13 @@ class DataLoader {
                 } catch (jsonErr) {
                     throw new Error(`Malformed sync payload: ${jsonErr.message}`);
                 }
-                if(!Array.isArray(d.records) || d.records.length === 0) { console.log("✅ Sync Complete"); break; }
+                if(!Array.isArray(d.records) || d.records.length === 0) {
+                    if (this.shouldAbortEmptySync({ fetchedCount, hadExistingData })) {
+                        throw new Error('Empty first sync page received; keeping existing snapshot');
+                    }
+                    console.log("✅ Sync Complete");
+                    break;
+                }
                 fetchedCount += d.records.length;
                 
                 d.records.forEach(rec => {
@@ -671,7 +737,7 @@ class DataLoader {
             if (background) console.warn('Background refresh failed; keeping existing cache intact');
             return { success: false, error: e };
         } finally {
-            if (!background) this.releaseSyncLock();
+            if (!background) await this.releaseSyncLock();
         } 
     }
 
@@ -3607,39 +3673,6 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
     }
 }
 
-class PdfRenderHelper {
-    static normalizeOutputScale(devicePixelRatio = 1) {
-        const dpr = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
-        return Math.max(1, Math.min(PDF_RENDER_MAX_OUTPUT_SCALE, dpr));
-    }
-    static getRenderMetrics(viewport, devicePixelRatio = 1) {
-        const cssWidth = Math.max(1, Math.floor(viewport?.width || 1));
-        const cssHeight = Math.max(1, Math.floor(viewport?.height || 1));
-        const maxPixels = Math.max(1, PDF_RENDER_MAX_CANVAS_PIXELS);
-        const outputScale = this.normalizeOutputScale(devicePixelRatio);
-        let effectiveScale = outputScale;
-        let backingWidth = Math.max(1, Math.round(cssWidth * effectiveScale));
-        let backingHeight = Math.max(1, Math.round(cssHeight * effectiveScale));
-        const pixelArea = backingWidth * backingHeight;
-        if (pixelArea > maxPixels) {
-            const areaScale = Math.sqrt(maxPixels / pixelArea);
-            effectiveScale = Math.max(0.1, outputScale * areaScale);
-            backingWidth = Math.max(1, Math.round(cssWidth * effectiveScale));
-            backingHeight = Math.max(1, Math.round(cssHeight * effectiveScale));
-        }
-        const useTransform = Math.abs(effectiveScale - 1) > 0.001;
-        return {
-            cssWidth,
-            cssHeight,
-            outputScale,
-            effectiveScale,
-            backingWidth,
-            backingHeight,
-            transform: useTransform ? [effectiveScale, 0, 0, effectiveScale, 0, 0] : null
-        };
-    }
-}
-
 class PdfViewer {
     static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = "";
     static currentFetchId = 0;
@@ -4060,7 +4093,15 @@ class PdfViewer {
             }
             
             const viewport = page.getViewport({ scale: this.currentScale });
-            const renderMetrics = PdfRenderHelper.getRenderMetrics(viewport, window.devicePixelRatio || 1);
+            const renderMetrics = (typeof PdfRenderHelper !== 'undefined' && PdfRenderHelper?.getRenderMetrics)
+                ? PdfRenderHelper.getRenderMetrics(viewport, window.devicePixelRatio || 1)
+                : {
+                    cssWidth: Math.max(1, Math.floor(viewport.width)),
+                    cssHeight: Math.max(1, Math.floor(viewport.height)),
+                    backingWidth: Math.max(1, Math.floor(viewport.width)),
+                    backingHeight: Math.max(1, Math.floor(viewport.height)),
+                    transform: null
+                };
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
             wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
