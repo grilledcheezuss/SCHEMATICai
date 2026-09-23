@@ -1,4 +1,4 @@
-worker name = "cox-proxy"
+name = "cox-proxy"
 main = "worker/worker.js" # Path to your worker file
 compatibility_date = "2024-01-01"
 
