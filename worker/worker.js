@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.75
+// 🧠 SCHEMATICA ai WORKER v2.5.76
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -31,16 +31,25 @@ const PDF_FETCH_TIMEOUT_MS = 30000; // 30 seconds
 let CACHE_USERS = null;
 let CACHE_HEALED = {};
 let CACHE_NB_MODEL = null;
-let CACHE_TIME = 0;
-let CACHE_AUTH_PROMISE = null;
+let CACHE_USERS_TIME = 0;
+let CACHE_FEEDBACK_TIME = 0;
+let CACHE_USERS_PROMISE = null;
+let CACHE_FEEDBACK_PROMISE = null;
 let IS_BUILDING_ML = false;
 const CACHE_DURATION = 1000 * 60 * 60; // 1 Hour
+const FEEDBACK_CACHE_DURATION_MS = 1000 * 60 * 10; // 10 Minutes
 const ENABLE_REQUEST_TIME_ML_TRAINING = false;
-const MAIN_PAGE_CACHE_TTL_SECONDS = 120;
-const MAIN_PAGE_CACHE_CONTROL = `public, max-age=${MAIN_PAGE_CACHE_TTL_SECONDS}`;
-const MAIN_PAGE_CACHE_TTL_MS = MAIN_PAGE_CACHE_TTL_SECONDS * 1000;
+const MAIN_PAGE_FRESH_TTL_SECONDS = 600;
+const MAIN_PAGE_MAX_STALE_SECONDS = 900;
+const MAIN_PAGE_CACHE_CONTROL = `public, max-age=${MAIN_PAGE_FRESH_TTL_SECONDS}, stale-while-revalidate=${Math.max(0, MAIN_PAGE_MAX_STALE_SECONDS - MAIN_PAGE_FRESH_TTL_SECONDS)}`;
+const MAIN_PAGE_FRESH_TTL_MS = MAIN_PAGE_FRESH_TTL_SECONDS * 1000;
+const MAIN_PAGE_MAX_STALE_TTL_MS = MAIN_PAGE_MAX_STALE_SECONDS * 1000;
+const TRANSIENT_RETRY_AFTER_SECONDS = 10;
 let FEEDBACK_CACHE_VERSION = 0;
 const MAIN_PAGE_INFLIGHT = new Map();
+const PDF_LOOKUP_CACHE_TTL_MS = 1000 * 60 * 60;
+const PDF_BY_ID_LOOKUP_CACHE = new Map();
+const PDF_BY_ID_LOOKUP_INFLIGHT = new Map();
 
 const VOTE_THRESHOLD = 3;
 
@@ -117,19 +126,18 @@ function normalizeMainOffset(rawOffset) {
     return rawOffset.trim();
 }
 
-function getMainCacheVersionBucket(now = Date.now()) {
-    const tick = Math.floor(now / MAIN_PAGE_CACHE_TTL_MS);
-    return `${FEEDBACK_CACHE_VERSION}:${tick}`;
+function normalizePanelLookupId(panelId) {
+    if (!panelId || typeof panelId !== 'string') return '';
+    return panelId.trim().replace(/^CP-|\.(?:dwg|pdf)$/gi, '');
 }
 
-function buildMainCacheKey(requestUrl, { pageSize, direction, offset, versionBucket }) {
+function buildMainCacheKey(requestUrl, { pageSize, direction, offset }) {
     const cacheUrl = new URL(requestUrl);
     cacheUrl.search = '';
     cacheUrl.searchParams.set('target', 'MAIN');
     cacheUrl.searchParams.set('pageSize', String(pageSize));
     cacheUrl.searchParams.set('sortDirection', direction);
     cacheUrl.searchParams.set('offset', offset || '');
-    cacheUrl.searchParams.set('cacheVersion', versionBucket);
     return cacheUrl.toString();
 }
 
@@ -140,6 +148,63 @@ function setMainTimingHeaders(headers, { cacheStatus, authMs = 0, upstreamMs = 0
     headers.set('X-SCHEMATICA-MAIN-PROCESS-MS', String(Math.max(0, Math.round(processMs))));
     headers.set('X-SCHEMATICA-MAIN-SERIALIZE-MS', String(Math.max(0, Math.round(serializeMs))));
     headers.set('X-SCHEMATICA-MAIN-TOTAL-MS', String(Math.max(0, Math.round(totalMs))));
+}
+
+function getMainCacheMetadata(headers, now = Date.now()) {
+    const cachedAt = Number.parseInt(headers?.get('X-SCHEMATICA-CACHED-AT') || '', 10);
+    const feedbackVersion = Number.parseInt(headers?.get('X-SCHEMATICA-FEEDBACK-VERSION') || '', 10);
+    const normalizedCachedAt = Number.isFinite(cachedAt) ? cachedAt : 0;
+    return {
+        cachedAt: normalizedCachedAt,
+        feedbackVersion: Number.isFinite(feedbackVersion) ? feedbackVersion : -1,
+        ageMs: normalizedCachedAt > 0 ? Math.max(0, now - normalizedCachedAt) : Number.POSITIVE_INFINITY
+    };
+}
+
+function classifyMainCacheEntry(metadata, {
+    now = Date.now(),
+    currentFeedbackVersion = FEEDBACK_CACHE_VERSION,
+    freshTtlMs = MAIN_PAGE_FRESH_TTL_MS,
+    maxStaleTtlMs = MAIN_PAGE_MAX_STALE_TTL_MS
+} = {}) {
+    if (!metadata || !Number.isFinite(metadata.cachedAt) || metadata.cachedAt <= 0) {
+        return { status: 'MISS', shouldServe: false, shouldRefresh: true, canServeStaleOnError: false, ageMs: Number.POSITIVE_INFINITY };
+    }
+
+    const ageMs = Number.isFinite(metadata.ageMs) ? metadata.ageMs : Math.max(0, now - metadata.cachedAt);
+    const feedbackMatches = metadata.feedbackVersion === currentFeedbackVersion;
+    if (!feedbackMatches) {
+        return { status: 'REFRESH', shouldServe: false, shouldRefresh: true, canServeStaleOnError: false, ageMs };
+    }
+    if (ageMs <= freshTtlMs) {
+        return { status: 'HIT', shouldServe: true, shouldRefresh: false, canServeStaleOnError: true, ageMs };
+    }
+    if (ageMs <= maxStaleTtlMs) {
+        return { status: 'STALE', shouldServe: true, shouldRefresh: true, canServeStaleOnError: true, ageMs };
+    }
+    return { status: 'REFRESH', shouldServe: false, shouldRefresh: true, canServeStaleOnError: false, ageMs };
+}
+
+function sanitizeDownloadFilename(rawValue, fallbackBase = 'schematic') {
+    const safeBase = String(rawValue || fallbackBase)
+        .replace(/[\\/:*?"<>|]+/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 80) || fallbackBase;
+    return safeBase.toLowerCase().endsWith('.pdf') ? safeBase : `${safeBase}.pdf`;
+}
+
+function buildAttachmentContentDisposition(filename) {
+    const safeFilename = sanitizeDownloadFilename(filename);
+    const quotedFilename = safeFilename.replace(/["\\]/g, '_');
+    return `attachment; filename="${quotedFilename}"; filename*=UTF-8''${encodeURIComponent(safeFilename)}`;
+}
+
+function withRetryAfter(headers, seconds = TRANSIENT_RETRY_AFTER_SECONDS) {
+    const nextHeaders = new Headers(headers || {});
+    nextHeaders.set('Retry-After', String(Math.max(1, Math.round(seconds))));
+    return nextHeaders;
 }
 
 class NaiveBayes {
@@ -251,28 +316,42 @@ async function fetchAirtablePages(table, maxPages, fields = [], env) {
     return records;
 }
 
-// 1. FAST CORE CACHE: Only fetches Auth and Feedback (Takes < 0.5s)
-async function ensureAuthAndFeedback(env) {
-    if (CACHE_USERS && (Date.now() - CACHE_TIME < CACHE_DURATION)) return;
-    if (CACHE_AUTH_PROMISE) return CACHE_AUTH_PROMISE;
-    
-    CACHE_AUTH_PROMISE = (async () => {
-        console.log("Fetching Auth & Feedback...");
+// 1. FAST CORE CACHE: auth stays warm for 1 hour while feedback heals refresh independently every 10 minutes.
+async function ensureUsersCache(env) {
+    if (CACHE_USERS && (Date.now() - CACHE_USERS_TIME < CACHE_DURATION)) return;
+    if (CACHE_USERS_PROMISE) return CACHE_USERS_PROMISE;
+
+    CACHE_USERS_PROMISE = (async () => {
+        console.log("Fetching auth users...");
         const usersResp = await fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } });
         if (!usersResp.ok) {
             const err = new Error(`AuthBackendUnavailable: Users fetch returned HTTP ${usersResp.status}`);
             err.isAuthBackendUnavailable = true;
             throw err;
         }
-        const [usersData, fbData] = await Promise.all([
-            usersResp.json(),
-            fetchAirtablePages(TABLE_FEEDBACK, 5, ['Panel ID', 'Corrections'], env) // Cap at 500 to keep it fast
-        ]);
-
+        const usersData = await usersResp.json();
         CACHE_USERS = usersData.records || [];
-        
-        CACHE_HEALED = {};
+        CACHE_USERS_TIME = Date.now();
+    })();
+    try {
+        await CACHE_USERS_PROMISE;
+    } catch (e) {
+        CACHE_USERS_PROMISE = null;
+        throw e;
+    }
+    CACHE_USERS_PROMISE = null;
+}
+
+async function ensureFeedbackCache(env) {
+    if (CACHE_FEEDBACK_TIME && (Date.now() - CACHE_FEEDBACK_TIME < FEEDBACK_CACHE_DURATION_MS)) return;
+    if (CACHE_FEEDBACK_PROMISE) return CACHE_FEEDBACK_PROMISE;
+
+    CACHE_FEEDBACK_PROMISE = (async () => {
+        console.log("Refreshing feedback heals...");
+        const fbData = await fetchAirtablePages(TABLE_FEEDBACK, 5, ['Panel ID', 'Corrections'], env);
+        const nextHealed = {};
         const tallies = {};
+
         fbData.forEach(r => {
             const rawJson = r.fields['Corrections'];
             const id = r.fields['Panel ID'];
@@ -288,7 +367,7 @@ async function ensureAuthAndFeedback(env) {
                             }
                         });
                     }
-                } catch(e) {}
+                } catch (_err) {}
             }
         });
 
@@ -296,25 +375,34 @@ async function ensureAuthAndFeedback(env) {
             if (count >= VOTE_THRESHOLD) {
                 const parts = key.split('|');
                 const id = parts[0]; const param = parts[1]; const value = parts.slice(2).join('|');
-                if (!CACHE_HEALED[id]) CACHE_HEALED[id] = {};
+                if (!nextHealed[id]) nextHealed[id] = {};
                 if (param === 'reject_keyword') {
-                    if (!CACHE_HEALED[id].reject_keywords) CACHE_HEALED[id].reject_keywords = [];
-                    CACHE_HEALED[id].reject_keywords.push(value);
+                    if (!nextHealed[id].reject_keywords) nextHealed[id].reject_keywords = [];
+                    nextHealed[id].reject_keywords.push(value);
                 } else {
-                    CACHE_HEALED[id][param] = value;
+                    nextHealed[id][param] = value;
                 }
             }
         }
-        CACHE_TIME = Date.now();
+
+        CACHE_HEALED = nextHealed;
+        CACHE_FEEDBACK_TIME = Date.now();
         FEEDBACK_CACHE_VERSION++;
     })();
     try {
-        await CACHE_AUTH_PROMISE;
-    } catch(e) {
-        CACHE_AUTH_PROMISE = null;
+        await CACHE_FEEDBACK_PROMISE;
+    } catch (e) {
+        CACHE_FEEDBACK_PROMISE = null;
         throw e;
     }
-    CACHE_AUTH_PROMISE = null;
+    CACHE_FEEDBACK_PROMISE = null;
+}
+
+async function ensureAuthAndFeedback(env) {
+    await Promise.all([
+        ensureUsersCache(env),
+        ensureFeedbackCache(env)
+    ]);
 }
 
 // 2. BACKGROUND ML CACHE: Runs completely decoupled from User Requests
@@ -676,6 +764,265 @@ function extractSpecsStrict(t) {
     return s;
 }
 
+function buildMainCacheHeaders(corsHeaders, cachedAt = Date.now(), feedbackVersion = FEEDBACK_CACHE_VERSION) {
+    const headers = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
+    headers.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
+    headers.set('X-SCHEMATICA-CACHED-AT', String(Math.max(0, Math.round(cachedAt))));
+    headers.set('X-SCHEMATICA-FEEDBACK-VERSION', String(Math.max(0, Math.round(feedbackVersion))));
+    return headers;
+}
+
+function buildMainResponseFromCache(cachedResponse, corsHeaders, {
+    cacheStatus,
+    authMs = 0,
+    upstreamMs = 0,
+    processMs = 0,
+    serializeMs = 0,
+    totalMs = 0,
+    refreshStatus = 'NONE'
+} = {}) {
+    const responseHeaders = new Headers(cachedResponse.headers);
+    responseHeaders.set('Access-Control-Allow-Origin', corsHeaders['Access-Control-Allow-Origin']);
+    setMainTimingHeaders(responseHeaders, { cacheStatus, authMs, upstreamMs, processMs, serializeMs, totalMs });
+    responseHeaders.set('X-SCHEMATICA-MAIN-REFRESH', refreshStatus);
+    return new Response(cachedResponse.body, { status: cachedResponse.status, headers: responseHeaders });
+}
+
+function buildTransientJsonResponse(corsHeaders, {
+    status = 503,
+    error = 'ServiceUnavailable',
+    message = 'Transient upstream failure',
+    retryAfterSeconds = TRANSIENT_RETRY_AFTER_SECONDS
+} = {}) {
+    return new Response(
+        JSON.stringify({ error, message }),
+        {
+            status,
+            headers: withRetryAfter({ ...corsHeaders, 'Content-Type': 'application/json' }, retryAfterSeconds)
+        }
+    );
+}
+
+function normalizePdfLookupEntry(entry) {
+    if (!entry || typeof entry.pdfUrl !== 'string' || !entry.pdfUrl) return null;
+    if (!Number.isFinite(entry.cachedAt) || (Date.now() - entry.cachedAt) > PDF_LOOKUP_CACHE_TTL_MS) return null;
+    return entry;
+}
+
+function getCachedPdfLookup(cleanId) {
+    const cached = normalizePdfLookupEntry(PDF_BY_ID_LOOKUP_CACHE.get(cleanId));
+    if (!cached) {
+        PDF_BY_ID_LOOKUP_CACHE.delete(cleanId);
+        return null;
+    }
+    return cached;
+}
+
+function buildPdfLookupVariants(cleanId) {
+    return [
+        cleanId,
+        `CP-${cleanId}`,
+        `${cleanId}.dwg`,
+        `${cleanId}.pdf`,
+        `CP-${cleanId}.dwg`,
+        `CP-${cleanId}.pdf`
+    ];
+}
+
+async function lookupPdfUrlByPanelId(panelId, env) {
+    const cleanId = normalizePanelLookupId(panelId);
+    if (!cleanId) return null;
+
+    const cached = getCachedPdfLookup(cleanId);
+    if (cached) {
+        return { ...cached, cacheStatus: 'HIT' };
+    }
+
+    const existingPromise = PDF_BY_ID_LOOKUP_INFLIGHT.get(cleanId);
+    if (existingPromise) {
+        const coalesced = await existingPromise;
+        return coalesced ? { ...coalesced, cacheStatus: 'COALESCED' } : null;
+    }
+
+    const lookupPromise = (async () => {
+        const variations = buildPdfLookupVariants(cleanId);
+
+        for (const variant of variations) {
+            try {
+                const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
+                    `filterByFormula=${encodeURIComponent(`{Control Panel Name}="${variant}"`)}` +
+                    `&fields%5B%5D=Control%20Panel%20PDF`;
+
+                const searchResp = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } });
+
+                if (!searchResp.ok) continue;
+                const searchData = await searchResp.json();
+                if (searchData.records && searchData.records.length > 0) {
+                    const record = searchData.records[0];
+                    const pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
+                    if (pdfUrl) {
+                        const found = { cleanId, foundVariant: variant, pdfUrl, cachedAt: Date.now() };
+                        PDF_BY_ID_LOOKUP_CACHE.set(cleanId, found);
+                        return found;
+                    }
+                }
+            } catch (_error) {}
+        }
+
+        try {
+            const escapedId = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regexPattern = `^CP-${escapedId}(?:[rR]\\d+|-REV|-rev|\\s*[A-Z])?(?:\\.dwg|\\.pdf)?$`;
+            const regexFormula = `REGEX_MATCH({Control Panel Name}, "${regexPattern}")`;
+            const regexSearchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
+                `filterByFormula=${encodeURIComponent(regexFormula)}` +
+                `&fields%5B%5D=Control%20Panel%20PDF&fields%5B%5D=Control%20Panel%20Name`;
+
+            const regexResp = await fetch(regexSearchUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } });
+
+            if (regexResp.ok) {
+                const regexData = await regexResp.json();
+                if (regexData.records && regexData.records.length > 0) {
+                    const record = regexData.records[0];
+                    const pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
+                    if (pdfUrl) {
+                        const found = {
+                            cleanId,
+                            foundVariant: record.fields['Control Panel Name'] || 'regex-match',
+                            pdfUrl,
+                            cachedAt: Date.now()
+                        };
+                        PDF_BY_ID_LOOKUP_CACHE.set(cleanId, found);
+                        return found;
+                    }
+                }
+            }
+        } catch (_error) {}
+
+        return null;
+    })();
+
+    PDF_BY_ID_LOOKUP_INFLIGHT.set(cleanId, lookupPromise);
+    try {
+        const found = await lookupPromise;
+        return found ? { ...found, cacheStatus: 'MISS' } : null;
+    } finally {
+        if (PDF_BY_ID_LOOKUP_INFLIGHT.get(cleanId) === lookupPromise) {
+            PDF_BY_ID_LOOKUP_INFLIGHT.delete(cleanId);
+        }
+    }
+}
+
+async function buildMainPageResult({ pageSize, direction, offset }) {
+    const upstreamStart = Date.now();
+    let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
+        `&fields%5B%5D=Control%20Panel%20Name` +
+        `&fields%5B%5D=Items` +
+        `&fields%5B%5D=Control%20Panel%20PDF` +
+        `&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name` +
+        `&sort%5B0%5D%5Bdirection%5D=${direction}`;
+
+    if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
+    const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
+    if (!mainResp.ok) {
+        const err = new Error(`Airtable Main Data HTTP ${mainResp.status}`);
+        err.status = mainResp.status;
+        err.retryAfter = mainResp.headers.get('Retry-After');
+        err.isTransient = mainResp.status === 429 || mainResp.status >= 500;
+        throw err;
+    }
+    const mainJson = await mainResp.json();
+    const upstreamMs = Date.now() - upstreamStart;
+
+    const processStart = Date.now();
+    const activeRecords = (mainJson.records || []).map(r => {
+        const rawId = String(r.fields['Control Panel Name'] || "");
+        const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+
+        const rawItems = r.fields['Items'];
+        let fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
+
+        fullDesc = normalizeCADText(fullDesc).toUpperCase();
+
+        const textToParse = fullDesc + " " + cleanId;
+        const explicit = extractSpecsStrict(textToParse);
+
+        let finalMfg = explicit.mfg;
+        let finalEnc = explicit.enc;
+        let finalHp = explicit.hp;
+        let finalVolt = explicit.volt;
+        let finalPhase = explicit.phase;
+
+        if (CACHE_NB_MODEL) {
+            const bayesText = textToParse.slice(0, 1500);
+            if (!finalMfg) finalMfg = CACHE_NB_MODEL.predict(bayesText, 'mfg');
+            if (!finalEnc) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
+            if (!finalHp) {
+                const predictedHp = CACHE_NB_MODEL.predict(bayesText, 'hp');
+                if (predictedHp && isValidHP(predictedHp)) finalHp = predictedHp;
+            }
+            if (!finalVolt) {
+                const predictedVolt = CACHE_NB_MODEL.predict(bayesText, 'volt');
+                if (predictedVolt && isValidVoltage(predictedVolt)) finalVolt = predictedVolt;
+            }
+            if (!finalPhase) {
+                const predictedPhase = CACHE_NB_MODEL.predict(bayesText, 'phase');
+                if (predictedPhase && isValidPhase(predictedPhase)) finalPhase = predictedPhase;
+            }
+        }
+
+        let finalCategory = null;
+
+        const overrides = CACHE_HEALED[cleanId];
+        if (overrides) {
+            if (overrides.mfg) finalMfg = overrides.mfg;
+            if (overrides.hp) finalHp = overrides.hp;
+            if (overrides.volt) finalVolt = overrides.volt;
+            if (overrides.phase) finalPhase = overrides.phase;
+            if (overrides.enc) finalEnc = overrides.enc;
+            if (overrides.category) finalCategory = overrides.category;
+        }
+
+        const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
+        const pdfStatus = pdfUrl ? "present" : "missing";
+
+        return {
+            id: cleanId,
+            displayId: "CP-" + cleanId,
+            desc: fullDesc,
+            pdfUrl,
+            pdfStatus,
+            mfg: finalMfg,
+            hp: finalHp,
+            volt: finalVolt,
+            phase: finalPhase,
+            enc: finalEnc,
+            category: finalCategory,
+            reject_keywords: overrides ? (overrides.reject_keywords || []) : [],
+            mfgV: explicit.mfgV || false,
+            hpV: explicit.hpV || false,
+            voltV: explicit.voltV || false,
+            phaseV: explicit.phaseV || false,
+            encV: explicit.encV || false
+        };
+    });
+    const processMs = Date.now() - processStart;
+    const serializeStart = Date.now();
+    const body = JSON.stringify({ records: activeRecords, offset: mainJson.offset });
+    const serializeMs = Date.now() - serializeStart;
+    return { body, upstreamMs, processMs, serializeMs, cachedAt: Date.now(), feedbackVersion: FEEDBACK_CACHE_VERSION };
+}
+
+function startMainRefresh(inflightKey, refreshFactory) {
+    const refreshPromise = (async () => refreshFactory())();
+    MAIN_PAGE_INFLIGHT.set(inflightKey, refreshPromise);
+    refreshPromise.finally(() => {
+        if (MAIN_PAGE_INFLIGHT.get(inflightKey) === refreshPromise) {
+            MAIN_PAGE_INFLIGHT.delete(inflightKey);
+        }
+    });
+    return refreshPromise;
+}
+
 export default {
     async fetch(request, env, ctx) {
         const corsHeaders = {
@@ -692,6 +1039,7 @@ export default {
             
             if (target === 'PDF') {
                 const pdfUrl = url.searchParams.get('url');
+                const downloadRequested = url.searchParams.get('download') === '1';
                 if (!pdfUrl) {
                     console.error('[PDF] Missing URL parameter');
                     return new Response("Missing URL", { status: 400, headers: corsHeaders });
@@ -717,6 +1065,9 @@ export default {
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
                     newHeaders.set('Content-Type', 'application/pdf');
+                    if (downloadRequested) {
+                        newHeaders.set('Content-Disposition', buildAttachmentContentDisposition(url.searchParams.get('filename') || 'schematic'));
+                    }
                     console.log('[PDF] Successfully fetched PDF');
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
                 } catch (e) {
@@ -728,137 +1079,40 @@ export default {
             if (target === 'PDF_BY_ID') {
                 const panelId = url.searchParams.get('id');
                 if (!panelId) return new Response("Missing ID", { status: 400, headers: corsHeaders });
-                
-                // Normalize the panel ID - remove CP- prefix, .dwg, .pdf extensions
-                const cleanId = panelId.trim().replace(/^CP-|\.(?:dwg|pdf)$/gi, '');
-                
-                console.log('[PDF_BY_ID] Searching for panel. Original ID:', panelId, 'Clean ID:', cleanId);
-                
-                // Try multiple variations to find the record (most likely to least likely)
-                // This typically matches on the first try with cleanId
-                const variations = [
-                    cleanId,
-                    `CP-${cleanId}`,
-                    `${cleanId}.dwg`,
-                    `${cleanId}.pdf`,
-                    `CP-${cleanId}.dwg`,
-                    `CP-${cleanId}.pdf`
-                ];
-                
-                let pdfUrl = null;
-                let foundVariant = null;
-                
-                // Search for the record in the main database
-                for (const variant of variations) {
-                    try {
-                        console.log('[PDF_BY_ID] Trying variant:', variant);
-                        const searchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
-                                        `filterByFormula=${encodeURIComponent(`{Control Panel Name}="${variant}"`)}` +
-                                        `&fields%5B%5D=Control%20Panel%20PDF`;
-                        
-                        const searchResp = await fetch(searchUrl, { 
-                            headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
-                        });
-                        
-                        if (!searchResp.ok) {
-                            console.error('[PDF_BY_ID] Search failed for variant:', variant, 'Status:', searchResp.status);
-                            continue;
-                        }
-                        
-                        const searchData = await searchResp.json();
-                        if (searchData.records && searchData.records.length > 0) {
-                            const record = searchData.records[0];
-                            pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
-                            if (pdfUrl) {
-                                foundVariant = variant;
-                                console.log('[PDF_BY_ID] Found record with variant:', variant, 'PDF host:', getPdfUrlHost(pdfUrl));
-                                break;
-                            } else {
-                                console.log('[PDF_BY_ID] Record found for variant:', variant, 'but no PDF URL attached');
-                            }
-                        } else {
-                            console.log('[PDF_BY_ID] No records found for variant:', variant);
-                        }
-                    } catch (error) {
-                        console.error('[PDF_BY_ID] Error searching variant:', variant, 'Error:', error.message);
-                        // Continue to next variant on error
-                    }
-                }
-                
-                // If exact matches failed, try relaxed regex lookup for revision suffixes
-                if (!pdfUrl) {
-                    console.log('[PDF_BY_ID] Exact matches failed, attempting relaxed REGEX lookup for panel:', cleanId);
-                    try {
-                        // Escape special regex characters in cleanId for safe interpolation
-                        const escapedId = cleanId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        
-                        // Use REGEX_MATCH to handle revision suffixes like r1, -REV, A, etc.
-                        // This matches: CP-4167, CP-4167r1, CP-4167-REV, CP-4167 A, etc.
-                        const regexPattern = `^CP-${escapedId}(?:[rR]\\d+|-REV|-rev|\\s*[A-Z])?(?:\\.dwg|\\.pdf)?$`;
-                        const regexFormula = `REGEX_MATCH({Control Panel Name}, "${regexPattern}")`;
-                        const regexSearchUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?` +
-                                              `filterByFormula=${encodeURIComponent(regexFormula)}` +
-                                              `&fields%5B%5D=Control%20Panel%20PDF&fields%5B%5D=Control%20Panel%20Name`;
-                        
-                        console.log('[PDF_BY_ID] Trying REGEX pattern:', regexPattern);
-                        const regexResp = await fetch(regexSearchUrl, { 
-                            headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } 
-                        });
-                        
-                        if (regexResp.ok) {
-                            const regexData = await regexResp.json();
-                            if (regexData.records && regexData.records.length > 0) {
-                                // Use first match from regex search
-                                const record = regexData.records[0];
-                                pdfUrl = record.fields['Control Panel PDF']?.[0]?.url;
-                                if (pdfUrl) {
-                                    foundVariant = record.fields['Control Panel Name'] || 'regex-match';
-                                    console.log('[PDF_BY_ID] REGEX match found:', foundVariant, 'PDF host:', getPdfUrlHost(pdfUrl));
-                                } else {
-                                    console.log('[PDF_BY_ID] REGEX matched record but no PDF URL attached');
-                                }
-                            } else {
-                                console.log('[PDF_BY_ID] No REGEX matches found for pattern:', regexPattern);
-                            }
-                        } else {
-                            console.warn('[PDF_BY_ID] REGEX search failed with status:', regexResp.status);
-                        }
-                    } catch (regexError) {
-                        console.error('[PDF_BY_ID] REGEX lookup error:', regexError.message);
-                        // Fall through to 404
-                    }
-                }
-                
-                // Null-URL validation
-                if (!pdfUrl) {
-                    console.error('[PDF_BY_ID] PDF not found. Panel ID:', panelId, 'Tried variations:', variations.join(', '));
+
+                const downloadRequested = url.searchParams.get('download') === '1';
+                const lookupStart = Date.now();
+                const lookupResult = await lookupPdfUrlByPanelId(panelId, env);
+                const cleanId = normalizePanelLookupId(panelId);
+
+                if (!lookupResult?.pdfUrl) {
+                    console.error('[PDF_BY_ID] PDF not found for requested panel ID');
                     return new Response("PDF not found for panel ID", { status: 404, headers: corsHeaders });
                 }
-                
-                // Additional null/empty check before proceeding
+
+                const pdfUrl = lookupResult.pdfUrl;
                 if (typeof pdfUrl !== 'string' || pdfUrl.trim() === '') {
-                    console.error('[PDF_BY_ID] Invalid PDF URL format. Panel ID:', panelId);
+                    console.error('[PDF_BY_ID] Invalid PDF URL format for requested panel');
                     return new Response("Invalid PDF URL for panel", { status: 500, headers: corsHeaders });
                 }
-                
-                console.log('[PDF_BY_ID] Validated PDF URL for panel:', panelId, 'Variant used:', foundVariant);
-                
-                // Security: Validate PDF URL against allowlist
+
                 if (!isAllowedPdfHost(pdfUrl)) {
-                    console.error('[PDF_BY_ID] PDF host not allowed. Panel ID:', panelId, 'Host:', getPdfUrlHost(pdfUrl), 'Allowed hosts:', ALLOWED_PDF_HOSTS);
+                    console.error('[PDF_BY_ID] PDF host not allowed. Host:', getPdfUrlHost(pdfUrl), 'Allowed hosts:', ALLOWED_PDF_HOSTS);
                     return new Response("PDF host not allowed", { status: 403, headers: corsHeaders });
                 }
-                
-                // Security: Fetch with timeout and size guards
+
                 try {
                     const pdfResponse = await fetchPdfWithGuards(pdfUrl);
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
                     newHeaders.set('Content-Type', 'application/pdf');
-                    console.log('[PDF_BY_ID] Successfully fetched PDF for panel:', panelId);
+                    if (downloadRequested) {
+                        newHeaders.set('Content-Disposition', buildAttachmentContentDisposition(url.searchParams.get('filename') || cleanId || panelId));
+                    }
+                    console.info(`[PDF_BY_ID] lookup=${lookupResult.cacheStatus || 'MISS'} lookupMs=${Date.now() - lookupStart} download=${downloadRequested ? '1' : '0'} host=${getPdfUrlHost(pdfUrl)}`);
                     return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
                 } catch (e) {
-                    console.error('[PDF_BY_ID] PDF fetch failed. Panel ID:', panelId, 'Host:', getPdfUrlHost(pdfUrl), 'Error:', e.message);
+                    console.error('[PDF_BY_ID] PDF fetch failed. Host:', getPdfUrlHost(pdfUrl), 'Error:', e.message);
                     return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
                 }
             }
@@ -870,7 +1124,11 @@ export default {
             } catch(e) {
                 if (e.isAuthBackendUnavailable) {
                     console.error("Auth backend unavailable:", e.message);
-                    return new Response(JSON.stringify({ error: "AuthBackendUnavailable" }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                    return buildTransientJsonResponse(corsHeaders, {
+                        status: 503,
+                        error: "AuthBackendUnavailable",
+                        message: e.message
+                    });
                 }
                 throw e;
             }
@@ -891,147 +1149,103 @@ export default {
                 const offset = normalizeMainOffset(url.searchParams.get('offset'));
                 const direction = normalizeMainSortDirection(url.searchParams.get('sort[0][direction]'));
 
-                // Security: Validate and clamp pageSize
                 const pageSizeParam = url.searchParams.get('pageSize');
                 const pageSize = validatePageSize(pageSizeParam);
                 const mainStart = Date.now();
-                const cacheVersionBucket = getMainCacheVersionBucket();
-                const cacheKeyUrl = buildMainCacheKey(request.url, { pageSize, direction, offset, versionBucket: cacheVersionBucket });
+                const cacheKeyUrl = buildMainCacheKey(request.url, { pageSize, direction, offset });
                 const cacheKeyRequest = new Request(cacheKeyUrl, { method: 'GET' });
                 const workerCache = (typeof caches !== 'undefined' && caches.default) ? caches.default : null;
+                const cached = workerCache ? await workerCache.match(cacheKeyRequest) : null;
+                const cacheMetadata = cached ? getMainCacheMetadata(cached.headers, mainStart) : null;
+                const cacheState = classifyMainCacheEntry(cacheMetadata, { now: mainStart, currentFeedbackVersion: FEEDBACK_CACHE_VERSION });
+                const inflightKey = cacheKeyUrl;
+                const existingInflight = MAIN_PAGE_INFLIGHT.get(inflightKey);
 
-                if (workerCache) {
-                    const cached = await workerCache.match(cacheKeyRequest);
-                    if (cached) {
-                        const hitHeaders = new Headers(cached.headers);
-                        setMainTimingHeaders(hitHeaders, {
-                            cacheStatus: 'HIT',
-                            authMs,
-                            upstreamMs: 0,
-                            processMs: 0,
-                            serializeMs: 0,
-                            totalMs: Date.now() - mainStart
-                        });
-                        console.info(`[MAIN] cache=HIT authMs=${authMs} totalMs=${Date.now() - mainStart} pageSize=${pageSize} offset=${offset ? 'set' : 'none'} direction=${direction}`);
-                        return new Response(cached.body, { status: cached.status, headers: hitHeaders });
-                    }
+                if (cached && cacheState.status === 'HIT') {
+                    const totalMs = Date.now() - mainStart;
+                    console.info(`[MAIN] cache=HIT refresh=${existingInflight ? 'INFLIGHT' : 'NONE'} authMs=${authMs} totalMs=${totalMs} pageSize=${pageSize} offset=${offset ? 'set' : 'none'} direction=${direction}`);
+                    return buildMainResponseFromCache(cached, corsHeaders, {
+                        cacheStatus: 'HIT',
+                        authMs,
+                        totalMs,
+                        refreshStatus: existingInflight ? 'INFLIGHT' : 'NONE'
+                    });
                 }
 
-                const inflightKey = cacheKeyUrl;
-                const hasInflight = MAIN_PAGE_INFLIGHT.has(inflightKey);
-                let mainPromise = MAIN_PAGE_INFLIGHT.get(inflightKey);
-
-                if (!mainPromise) {
-                    mainPromise = (async () => {
-                        const upstreamStart = Date.now();
-                        let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
-                                    `&fields%5B%5D=Control%20Panel%20Name` +
-                                    `&fields%5B%5D=Items` +
-                                    `&fields%5B%5D=Control%20Panel%20PDF` +
-                                    `&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name` +
-                                    `&sort%5B0%5D%5Bdirection%5D=${direction}`;
-
-                        if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
-                        const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
-                        if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
-                        const mainJson = await mainResp.json();
-                        const upstreamMs = Date.now() - upstreamStart;
-
-                        const processStart = Date.now();
-                        const activeRecords = (mainJson.records || []).map(r => {
-                            const rawId = String(r.fields['Control Panel Name'] || "");
-                            const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-
-                            const rawItems = r.fields['Items'];
-                            let fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
-
-                            // Normalize CAD control codes before case conversion to ensure lowercase codes are also removed
-                            fullDesc = normalizeCADText(fullDesc).toUpperCase();
-
-                            const textToParse = fullDesc + " " + cleanId;
-                            const explicit = extractSpecsStrict(textToParse);
-
-                            let finalMfg = explicit.mfg;
-                            let finalEnc = explicit.enc;
-                            let finalHp = explicit.hp;
-                            let finalVolt = explicit.volt;
-                            let finalPhase = explicit.phase;
-
-                            if (CACHE_NB_MODEL) {
-                                const bayesText = textToParse.slice(0, 1500);
-                                if (!finalMfg) finalMfg = CACHE_NB_MODEL.predict(bayesText, 'mfg');
-                                if (!finalEnc) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
-                                if (!finalHp) {
-                                    const predictedHp = CACHE_NB_MODEL.predict(bayesText, 'hp');
-                                    if (predictedHp && isValidHP(predictedHp)) finalHp = predictedHp;
-                                }
-                                if (!finalVolt) {
-                                    const predictedVolt = CACHE_NB_MODEL.predict(bayesText, 'volt');
-                                    if (predictedVolt && isValidVoltage(predictedVolt)) finalVolt = predictedVolt;
-                                }
-                                if (!finalPhase) {
-                                    const predictedPhase = CACHE_NB_MODEL.predict(bayesText, 'phase');
-                                    if (predictedPhase && isValidPhase(predictedPhase)) finalPhase = predictedPhase;
-                                }
+                if (cached && cacheState.status === 'STALE') {
+                    const refreshStatus = existingInflight ? 'INFLIGHT' : 'SCHEDULED';
+                    if (!existingInflight) {
+                        const refreshPromise = startMainRefresh(inflightKey, async () => {
+                            const result = await buildMainPageResult({ pageSize, direction, offset });
+                            if (workerCache) {
+                                const cacheHeaders = buildMainCacheHeaders(corsHeaders, result.cachedAt, result.feedbackVersion);
+                                const cacheResponse = new Response(result.body, { headers: cacheHeaders });
+                                if (ctx && ctx.waitUntil) ctx.waitUntil(workerCache.put(cacheKeyRequest, cacheResponse));
+                                else await workerCache.put(cacheKeyRequest, cacheResponse);
                             }
-
-                            let finalCategory = null;
-
-                            const overrides = CACHE_HEALED[cleanId];
-                            if (overrides) {
-                                if (overrides.mfg) finalMfg = overrides.mfg;
-                                if (overrides.hp) finalHp = overrides.hp;
-                                if (overrides.volt) finalVolt = overrides.volt;
-                                if (overrides.phase) finalPhase = overrides.phase;
-                                if (overrides.enc) finalEnc = overrides.enc;
-                                if (overrides.category) finalCategory = overrides.category;
-                            }
-
-                            const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
-                            const pdfStatus = pdfUrl ? "present" : "missing";
-
-                            return {
-                                id: cleanId,
-                                displayId: "CP-" + cleanId,
-                                desc: fullDesc,
-                                pdfUrl,
-                                pdfStatus,
-                                mfg: finalMfg,
-                                hp: finalHp,
-                                volt: finalVolt,
-                                phase: finalPhase,
-                                enc: finalEnc,
-                                category: finalCategory,
-                                reject_keywords: overrides ? (overrides.reject_keywords || []) : [],
-                                mfgV: explicit.mfgV || false,
-                                hpV: explicit.hpV || false,
-                                voltV: explicit.voltV || false,
-                                phaseV: explicit.phaseV || false,
-                                encV: explicit.encV || false
-                            };
+                            return result;
                         });
-                        const processMs = Date.now() - processStart;
-                        const serializeStart = Date.now();
-                        const body = JSON.stringify({ records: activeRecords, offset: mainJson.offset });
-                        const serializeMs = Date.now() - serializeStart;
-                        return { body, upstreamMs, processMs, serializeMs };
-                    })();
-                    MAIN_PAGE_INFLIGHT.set(inflightKey, mainPromise);
+                        const safeRefreshPromise = refreshPromise.catch((error) => {
+                            console.warn(`[MAIN] background refresh failed status=${error?.status || 'exception'} message=${error?.message || 'unknown'}`);
+                        });
+                        if (ctx && ctx.waitUntil) ctx.waitUntil(safeRefreshPromise);
+                    }
+
+                    const totalMs = Date.now() - mainStart;
+                    console.info(`[MAIN] cache=STALE refresh=${refreshStatus} authMs=${authMs} totalMs=${totalMs} ageMs=${Math.round(cacheState.ageMs || 0)} pageSize=${pageSize} offset=${offset ? 'set' : 'none'} direction=${direction}`);
+                    return buildMainResponseFromCache(cached, corsHeaders, {
+                        cacheStatus: 'STALE',
+                        authMs,
+                        totalMs,
+                        refreshStatus
+                    });
+                }
+
+                let startedRefresh = false;
+                let mainPromise = existingInflight;
+                if (!mainPromise) {
+                    startedRefresh = true;
+                    mainPromise = startMainRefresh(inflightKey, async () => {
+                        const result = await buildMainPageResult({ pageSize, direction, offset });
+                        if (workerCache) {
+                            const cacheHeaders = buildMainCacheHeaders(corsHeaders, result.cachedAt, result.feedbackVersion);
+                            const cacheResponse = new Response(result.body, { headers: cacheHeaders });
+                            if (ctx && ctx.waitUntil) ctx.waitUntil(workerCache.put(cacheKeyRequest, cacheResponse));
+                            else await workerCache.put(cacheKeyRequest, cacheResponse);
+                        }
+                        return result;
+                    });
                 }
 
                 let mainResult;
                 try {
                     mainResult = await mainPromise;
-                } finally {
-                    if (!hasInflight && MAIN_PAGE_INFLIGHT.get(inflightKey) === mainPromise) {
-                        MAIN_PAGE_INFLIGHT.delete(inflightKey);
+                } catch (error) {
+                    if (cached && cacheState.canServeStaleOnError) {
+                        const totalMs = Date.now() - mainStart;
+                        console.warn(`[MAIN] cache=STALE refresh=FAILED authMs=${authMs} totalMs=${totalMs} status=${error?.status || 'exception'} message=${error?.message || 'unknown'}`);
+                        return buildMainResponseFromCache(cached, corsHeaders, {
+                            cacheStatus: 'STALE',
+                            authMs,
+                            totalMs,
+                            refreshStatus: 'FAILED'
+                        });
                     }
+                    if (error?.isTransient) {
+                        const retryAfterSeconds = Number.parseInt(error.retryAfter || '', 10);
+                        return buildTransientJsonResponse(corsHeaders, {
+                            status: 503,
+                            error: 'MainBackendUnavailable',
+                            message: error.message,
+                            retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : TRANSIENT_RETRY_AFTER_SECONDS
+                        });
+                    }
+                    throw error;
                 }
 
                 const totalMs = Date.now() - mainStart;
-                const cacheStatus = hasInflight ? 'COALESCED' : 'MISS';
-                const responseHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
-                responseHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
+                const cacheStatus = existingInflight ? 'COALESCED' : (startedRefresh && cached ? 'REFRESH' : 'MISS');
+                const responseHeaders = buildMainCacheHeaders(corsHeaders, mainResult.cachedAt, mainResult.feedbackVersion);
                 setMainTimingHeaders(responseHeaders, {
                     cacheStatus,
                     authMs,
@@ -1040,18 +1254,9 @@ export default {
                     serializeMs: mainResult.serializeMs,
                     totalMs
                 });
-                const response = new Response(mainResult.body, { headers: responseHeaders });
-
-                if (workerCache) {
-                    const cacheHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
-                    cacheHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
-                    const cacheResponse = new Response(mainResult.body, { headers: cacheHeaders });
-                    if (ctx && ctx.waitUntil) ctx.waitUntil(workerCache.put(cacheKeyRequest, cacheResponse));
-                    else await workerCache.put(cacheKeyRequest, cacheResponse);
-                }
-
+                responseHeaders.set('X-SCHEMATICA-MAIN-REFRESH', 'NONE');
                 console.info(`[MAIN] cache=${cacheStatus} authMs=${authMs} upstreamMs=${mainResult.upstreamMs} processMs=${mainResult.processMs} serializeMs=${mainResult.serializeMs} totalMs=${totalMs} pageSize=${pageSize} offset=${offset ? 'set' : 'none'} direction=${direction}`);
-                return response;
+                return new Response(mainResult.body, { headers: responseHeaders });
             }
 
             if (target === 'FEEDBACK') {
@@ -1062,7 +1267,7 @@ export default {
                     headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                CACHE_TIME = 0; CACHE_USERS = null; CACHE_HEALED = {}; CACHE_AUTH_PROMISE = null; FEEDBACK_CACHE_VERSION++;
+                CACHE_FEEDBACK_TIME = 0; CACHE_HEALED = {}; CACHE_FEEDBACK_PROMISE = null; FEEDBACK_CACHE_VERSION++;
                 return new Response(JSON.stringify(await resp.json()), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
@@ -1072,4 +1277,13 @@ export default {
             return new Response(JSON.stringify({ error: "Worker Exception", message: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
     }
+};
+
+export {
+    buildAttachmentContentDisposition,
+    buildMainCacheKey,
+    classifyMainCacheEntry,
+    getMainCacheMetadata,
+    normalizePanelLookupId,
+    sanitizeDownloadFilename
 };

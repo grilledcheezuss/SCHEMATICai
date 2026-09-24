@@ -108,9 +108,10 @@ function wait(ms) {
                 return {
                     href: '',
                     download: '',
+                    target: '',
                     rel: '',
                     click() {
-                        anchorsClicked.push({ href: this.href, download: this.download, rel: this.rel });
+                        anchorsClicked.push({ href: this.href, download: this.download, target: this.target, rel: this.rel });
                     }
                 };
             }
@@ -169,6 +170,13 @@ function wait(ms) {
             revokedUrls.push(url);
         }
     };
+    const buildWorkerUrl = (target, params = {}) => {
+        const query = new URLSearchParams({ target });
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+        });
+        return `https://worker.example/?${query.toString()}`;
+    };
 
     const PdfViewer = new Function(
         'window',
@@ -176,12 +184,15 @@ function wait(ms) {
         'DOM_CACHE',
         'navigator',
         'URL',
+        'buildWorkerUrl',
         'alert',
         `${pdfViewerClassCode}; return PdfViewer;`
-    )(windowState, documentState, DOM_CACHE, navigatorState, URLState, (message) => alerts.push(message));
+    )(windowState, documentState, DOM_CACHE, navigatorState, URLState, buildWorkerUrl, (message) => alerts.push(message));
 
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
     PdfViewer.currentPdfBlob = { tag: 'pdf-blob' };
+    PdfViewer.currentPanelId = '1234';
+    PdfViewer.currentDisplayPanelId = 'CP/12:34 ?';
     PdfViewer.PRINT_CLEANUP_TIMEOUT_MS = 5;
     PdfViewer.PRINT_MAX_TIMEOUT_MS = 30;
     PdfViewer.PRINT_IFRAME_LOAD_TIMEOUT_MS = 5;
@@ -226,6 +237,10 @@ function wait(ms) {
     assert(PdfViewer.isPrinting === false, 'popup-open failure should release the print guard');
     popupBlocked = false;
 
+    navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
+    navigatorState.vendor = 'Google Inc.';
+    navigatorState.platform = 'Linux x86_64';
+    navigatorState.maxTouchPoints = 0;
     PdfViewer.download();
     assert(anchorsClicked.length === 1, 'download should trigger one anchor click when PDF is loaded');
     assert(anchorsClicked[0].href === 'blob:viewer-pdf', 'download should use current viewer blob URL');
@@ -233,7 +248,23 @@ function wait(ms) {
     assert(!/[\\/:*?"<>|]/.test(anchorsClicked[0].download), 'download filename should be sanitized');
 
     anchorsClicked = [];
+    navigatorState.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+    navigatorState.vendor = 'Apple Computer, Inc.';
+    navigatorState.platform = 'iPhone';
+    navigatorState.maxTouchPoints = 5;
+    PdfViewer.download();
+    assert(anchorsClicked.length === 1, 'Safari/iOS download should trigger one attachment link click');
+    assert(/target=PDF_BY_ID/.test(anchorsClicked[0].href), 'Safari/iOS download should use the worker PDF_BY_ID attachment route');
+    assert(/download=1/.test(anchorsClicked[0].href), 'Safari/iOS download should request attachment mode');
+    assert(anchorsClicked[0].target === '_blank', 'Safari/iOS download should avoid navigating the current tab away');
+    assert(anchorsClicked[0].download === '', 'Safari/iOS attachment path should rely on worker Content-Disposition');
+
+    anchorsClicked = [];
     PdfViewer.currentBlobUrl = '';
+    navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
+    navigatorState.vendor = 'Google Inc.';
+    navigatorState.platform = 'Linux x86_64';
+    navigatorState.maxTouchPoints = 0;
     PdfViewer.download();
     assert(anchorsClicked.length === 0, 'download should no-op when no PDF is loaded');
 

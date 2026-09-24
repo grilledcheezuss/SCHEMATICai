@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.75
+## Version: v2.5.76
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.76**: Production follow-up: MAIN page processing now uses stable per-page cache keys with a 10-minute fresh window plus bounded stale-while-refresh fallback (up to 15 minutes total age), independent feedback-heal refreshes, honest isolate/PoP-local coalescing diagnostics (`HIT`/`MISS`/`STALE`/`REFRESH`/`COALESCED` + refresh status), Safari/iOS-friendly original-PDF attachment downloads, and cached PDF lookup reuse without weakening existing PDF guards
 - **v2.5.75**: Reliability/performance hardening for concurrent sync load: MAIN page responses now use short-lived Cloudflare Cache + isolate single-flight coalescing with duration/status diagnostics, FEEDBACK bumps cache versioning with bounded staleness (120s TTL), and client sync now enforces per-page request timeout, Retry-After-aware jittered backoff, and duplicate background refresh suppression while preserving complete-snapshot safety
 - **v2.5.74**: PDF viewer geometry/print follow-up: commit zoom and pan back into real scroll extents so all pages stay reachable without phantom space, and harden original-PDF printing with isolated targets plus reusable cleanup across Safari/iOS and repeated attempts
 - **v2.5.73**: PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action
@@ -77,6 +78,8 @@ The Worker supports four primary targets, specified via the `?target=` query par
 
 **Query Parameters**:
 - `url` (required): The URL of the PDF to fetch
+- `download` (optional): Set to `1` to request `Content-Disposition: attachment`
+- `filename` (optional): Preferred download filename; sanitized server-side before use
 
 **Security**:
 - URL must be from an allowed host (see Host Allowlist)
@@ -105,6 +108,8 @@ GET /?target=PDF&url=https://dl.airtable.com/example.pdf
 
 **Query Parameters**:
 - `id` (required): Control Panel ID (e.g., "1234", "CP-1234", "1234.dwg")
+- `download` (optional): Set to `1` to request `Content-Disposition: attachment`
+- `filename` (optional): Preferred download filename; sanitized server-side before use
 
 **ID Normalization**:
 The worker automatically tries multiple variations:
@@ -157,8 +162,19 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
 **Response**:
 - Success (200): JSON with control panel records
 - Error (401): Unauthorized (invalid credentials)
-- Error (503): Service Unavailable (auth backend unreachable)
+- Error (503): Service Unavailable (auth backend unreachable or transient upstream failure; includes `Retry-After`)
 - Error (500): Server error
+
+**Cache / Freshness Notes (v2.5.76)**:
+- Cache keys are stable per normalized page request (`pageSize`, direction, Airtable `offset`) instead of a synchronized 120-second time bucket.
+- The Worker serves a **fresh** cached MAIN page for up to **10 minutes** and may serve a bounded **stale** page for up to **15 minutes total age** while a background refresh runs or a transient upstream fault clears.
+- Feedback healer data refreshes independently; same-isolate feedback submissions invalidate the local healer version immediately, while other isolates/PoPs observe the new healer state within the bounded refresh window.
+- `MAIN_PAGE_INFLIGHT` only coalesces requests inside the current isolate. It does **not** provide cross-isolate or cross-PoP single-flight guarantees.
+
+**Diagnostics Headers (v2.5.76)**:
+- `X-SCHEMATICA-MAIN-CACHE`: `HIT`, `MISS`, `STALE`, `REFRESH`, or `COALESCED`
+- `X-SCHEMATICA-MAIN-REFRESH`: `NONE`, `SCHEDULED`, `INFLIGHT`, or `FAILED`
+- `X-SCHEMATICA-AUTH-MS`, `X-SCHEMATICA-MAIN-UPSTREAM-MS`, `X-SCHEMATICA-MAIN-PROCESS-MS`, `X-SCHEMATICA-MAIN-SERIALIZE-MS`, `X-SCHEMATICA-MAIN-TOTAL-MS`
 
 **Response Format**:
 ```json

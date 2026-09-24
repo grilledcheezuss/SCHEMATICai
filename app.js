@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.75 ---
-const APP_VERSION = "v2.5.75";
+// --- SCHEMATICA ai v2.5.76 ---
+const APP_VERSION = "v2.5.76";
 const VERSION_HISTORY = {
+    "v2.5.76": "Production follow-up: MAIN Worker caching now uses stable per-page keys with bounded stale refresh, feedback heals refresh independently, PDF gesture commits stage and atomically swap crisp rerenders without blanking, and original-PDF downloads use explicit attachment fallbacks for Safari/iOS while preserving direct blob downloads elsewhere",
     "v2.5.75": "Urgent reliability/performance hardening: Worker MAIN page responses now use short-lived shared cache + isolate single-flight processing to reduce duplicate CPU under concurrency, while client sync adds per-page timeout, Retry-After-aware jittered backoff, and stronger recoverable startup refresh behavior",
     "v2.5.74": "PDF viewer geometry/print follow-up: commit zoom and pan back into real scroll extents so all pages stay reachable without phantom space, and harden original-PDF printing with isolated targets plus reusable cleanup across Safari/iOS and repeated attempts",
     "v2.5.73": "PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action",
@@ -4043,6 +4044,7 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
 
 class PdfViewer {
     static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = ""; static currentPdfBlob = null;
+    static currentPanelId = ""; static currentDisplayPanelId = "";
     static currentFetchId = 0;
     static currentRenderToken = 0;
     static loadingTask = null;
@@ -4062,6 +4064,7 @@ class PdfViewer {
     static _committedPanY = 0;
     static _liveScale = 1;
     static _activeGesture = null;
+    static _pendingRenderCommit = null;
     static _iosGestureNoticeLogged = false;
     static _documentLoadToken = 0;
     static isPrinting = false;
@@ -4091,6 +4094,7 @@ class PdfViewer {
         this._liveScale = 1;
         this._committedPanX = 0;
         this._committedPanY = 0;
+        this._pendingRenderCommit = null;
         this._clearActiveGesture();
     }
 
@@ -4120,9 +4124,50 @@ class PdfViewer {
             return this._gestureStageElement;
         }
         const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
-        const stage = viewer?.querySelector('.pdf-gesture-stage') || null;
+        const stage = viewer?.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)') || viewer?.querySelector('.pdf-gesture-stage') || null;
         this._gestureStageElement = stage;
         return stage;
+    }
+
+    static _createRenderStage(container, renderToken) {
+        if (!container) return null;
+        const stage = document.createElement('div');
+        stage.className = 'pdf-gesture-stage pdf-gesture-stage--staging';
+        stage.dataset.renderToken = String(renderToken);
+        container.appendChild(stage);
+        return stage;
+    }
+
+    static _removeStagingStages(container, exceptToken = null) {
+        if (!container) return;
+        container.querySelectorAll('.pdf-gesture-stage--staging').forEach((stage) => {
+            if (exceptToken !== null && stage.dataset.renderToken === String(exceptToken)) return;
+            stage.remove();
+        });
+    }
+
+    static _disposeRenderStage(stage) {
+        if (!stage) return;
+        if (this._gestureStageElement === stage) {
+            this._gestureStageElement = null;
+        }
+        if (stage.isConnected) {
+            stage.remove();
+        }
+    }
+
+    static _activateRenderStage(container, nextStage) {
+        if (!container || !nextStage) return nextStage;
+        const currentStage = this._getGestureStage();
+        nextStage.classList.remove('pdf-gesture-stage--staging');
+        if (currentStage && currentStage !== nextStage && currentStage.parentNode === container) {
+            container.insertBefore(nextStage, currentStage);
+            currentStage.remove();
+        }
+        this._gestureStageElement = nextStage;
+        this._pendingRenderCommit = null;
+        this._removeStagingStages(container);
+        return nextStage;
     }
 
     static _getPanBounds(scaleMultiplier = 1) {
@@ -4270,10 +4315,11 @@ class PdfViewer {
             this.currentScale = finalScale;
             this._userHasAdjustedZoom = true;
             this._updateZoomLabel();
-            this._liveScale = 1;
-            this._committedPanX = 0;
-            this._committedPanY = 0;
-            this._applyViewerTransform(1, 0, 0);
+            this._pendingRenderCommit = {
+                baseScale: Math.max(priorScale || 0, 0.0001),
+                panX: finalPan.x,
+                panY: finalPan.y
+            };
             this._clearZoomTimer();
             if (this.isDocumentValid()) {
                 this.renderStack({
@@ -4330,7 +4376,8 @@ class PdfViewer {
             if (touches.length >= 2) {
                 const t0 = touches[0];
                 const t1 = touches[1];
-                const visualScale = this._clampScale(this.currentScale * (this._liveScale || 1));
+                const baseScale = this._pendingRenderCommit?.baseScale > 0 ? this._pendingRenderCommit.baseScale : this.currentScale;
+                const visualScale = this._clampScale(baseScale * (this._liveScale || 1));
                 this._activeGesture = {
                     mode: 'pinch',
                     documentLoadToken: this._documentLoadToken,
@@ -4381,7 +4428,8 @@ class PdfViewer {
                 if (!(this._activeGesture.startDistance > 0)) return;
 
                 const nextScale = this._clampScale(this._activeGesture.startScale * (distance / this._activeGesture.startDistance));
-                const liveScaleMultiplier = nextScale / this.currentScale;
+                const baseScale = this._pendingRenderCommit?.baseScale > 0 ? this._pendingRenderCommit.baseScale : this.currentScale;
+                const liveScaleMultiplier = nextScale / Math.max(baseScale, 0.0001);
                 const panX = this._activeGesture.startPanX + (midpoint.x - this._activeGesture.startMidpoint.x);
                 const panY = this._activeGesture.startPanY + (midpoint.y - this._activeGesture.startMidpoint.y);
                 this._applyViewerTransform(liveScaleMultiplier, panX, panY);
@@ -4463,6 +4511,10 @@ class PdfViewer {
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
         const loadStartMs = getNowMs();
+        const normalizedPanelId = String(panelId || '').trim();
+        const activeRecord = normalizedPanelId ? window.ID_MAP?.get(normalizedPanelId) : null;
+        this.currentPanelId = normalizedPanelId;
+        this.currentDisplayPanelId = activeRecord?.displayId || (normalizedPanelId ? `CP-${normalizedPanelId.replace(/^CP-/i, '')}` : '');
         
         // === INITIALIZATION ===
         this.url = fallbackUrl || "";
@@ -4636,6 +4688,10 @@ class PdfViewer {
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
         const loadStartMs = getNowMs();
+        const normalizedPanelId = String(panelId || '').trim();
+        const activeRecord = normalizedPanelId ? window.ID_MAP?.get(normalizedPanelId) : null;
+        this.currentPanelId = normalizedPanelId;
+        this.currentDisplayPanelId = activeRecord?.displayId || (normalizedPanelId ? `CP-${normalizedPanelId.replace(/^CP-/i, '')}` : '');
         
         // === VALIDATE CACHED DATA ===
         if (!cached || !cached.arrayBuffer || !cached.blob) {
@@ -4712,6 +4768,8 @@ class PdfViewer {
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
         const loadStartMs = getNowMs();
+        this.currentPanelId = '';
+        this.currentDisplayPanelId = '';
         
         // === INITIALIZATION ===
         this.url = url;
@@ -4791,7 +4849,7 @@ class PdfViewer {
         }
     }
     static _buildDownloadFilename() {
-        const rawPanelId = (DOM_CACHE.get('demo-panel-id')?.value || '').trim();
+        const rawPanelId = (this.currentDisplayPanelId || this.currentPanelId || DOM_CACHE.get('demo-panel-id')?.value || '').trim();
         const safePanelId = rawPanelId
             .replace(/[\\/:*?"<>|]+/g, '_')
             .replace(/\s+/g, '_')
@@ -4802,17 +4860,47 @@ class PdfViewer {
         return baseName.toLowerCase().endsWith('.pdf') ? baseName : `${baseName}.pdf`;
     }
 
-    static download() {
-        if (!this.currentBlobUrl) return;
+    static _shouldUseAttachmentDownload() {
+        return this._isIsolatedPdfPrintBrowser();
+    }
+
+    static _buildAttachmentDownloadUrl(filename) {
+        if (this.currentPanelId) {
+            return buildWorkerUrl('PDF_BY_ID', { id: this.currentPanelId, download: '1', filename });
+        }
+        if (this.url) {
+            return buildWorkerUrl('PDF', { url: this.url, download: '1', filename });
+        }
+        return '';
+    }
+
+    static _clickDownloadLink({ href, download = '', target = '', rel = 'noopener' }) {
+        if (!href) return false;
         const link = document.createElement('a');
-        link.href = this.currentBlobUrl;
-        link.download = this._buildDownloadFilename();
-        link.rel = 'noopener';
+        link.href = href;
+        if (download) link.download = download;
+        if (target) link.target = target;
+        link.rel = rel;
         document.body.appendChild(link);
         link.click();
         if (link.parentNode === document.body) {
             document.body.removeChild(link);
         }
+        return true;
+    }
+
+    static download() {
+        if (!this.currentBlobUrl && !this.currentPanelId && !this.url) return;
+        const filename = this._buildDownloadFilename();
+        if (this._shouldUseAttachmentDownload()) {
+            const attachmentUrl = this._buildAttachmentDownloadUrl(filename);
+            if (attachmentUrl) {
+                this._clickDownloadLink({ href: attachmentUrl, target: '_blank' });
+                return;
+            }
+        }
+        if (!this.currentBlobUrl) return;
+        this._clickDownloadLink({ href: this.currentBlobUrl, download: filename });
     }
 
     static _isIsolatedPdfPrintBrowser() {
@@ -5040,8 +5128,7 @@ class PdfViewer {
                 ? (container.scrollTop + priorAnchorOffsetY - priorStageOffsetTop) / priorStageHeight
                 : Number.NaN
         };
-        container.innerHTML = ''; 
-        const stage = this._ensureGestureStage(container);
+        this._removeStagingStages(container);
         this._updateZoomLabel();
         
         if (!this.doc) {
@@ -5051,6 +5138,8 @@ class PdfViewer {
         
         // Capture render token to detect if rendering is superseded
         const renderToken = ++this.currentRenderToken;
+        const stage = this._createRenderStage(container, renderToken);
+        if (!stage) return;
         
         let coverDoc = this.doc;
         if (DemoManager.isGeneratorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
@@ -5062,7 +5151,7 @@ class PdfViewer {
             // Check if render has been superseded
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
-                this._removeRenderArtifactsForToken(container, renderToken);
+                this._disposeRenderStage(stage);
                 return;
             }
             
@@ -5162,21 +5251,17 @@ class PdfViewer {
 
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled before attaching page ${i} (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
-                this._removeRenderArtifactsForToken(container, renderToken);
+                this._disposeRenderStage(stage);
                 return;
             }
 
             wrapper.appendChild(contentContainer); 
             stage.appendChild(wrapper); 
-            
-            console.log(`📄 Created layer structure for page ${i}`);
-            console.log(`  - Container: ${contentContainer.offsetWidth}x${contentContainer.offsetHeight}`);
-            console.log(`  - Redaction layer: ${rLayer.offsetWidth}x${rLayer.offsetHeight}`);
 
             // Check again if render has been superseded before rendering canvas
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled before canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
-                this._removeRenderArtifactsForToken(container, renderToken);
+                this._disposeRenderStage(stage);
                 return;
             }
 
@@ -5200,7 +5285,7 @@ class PdfViewer {
             }
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled after canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
-                this._removeRenderArtifactsForToken(container, renderToken);
+                this._disposeRenderStage(stage);
                 return;
             }
             // Re-scale any existing overlay zones to match new page dimensions
@@ -5210,8 +5295,14 @@ class PdfViewer {
             requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
         }
         await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
-        if (!this._restoreScrollFromAnchorContext(container, stage, anchorContext)) {
-            this._restoreScrollFromPriorRatios(container, stage, priorState);
+        if (this.currentRenderToken !== renderToken) {
+            this._disposeRenderStage(stage);
+            return;
+        }
+        const liveStage = this._activateRenderStage(container, stage);
+        await PdfViewer.waitForLayoutStable(liveStage, { minWidth: 1, minHeight: 1 });
+        if (!this._restoreScrollFromAnchorContext(container, liveStage, anchorContext)) {
+            this._restoreScrollFromPriorRatios(container, liveStage, priorState);
         }
         if (this._activeGesture) {
             this._applyViewerTransform(this._liveScale || 1, this._committedPanX, this._committedPanY);
@@ -5219,6 +5310,7 @@ class PdfViewer {
             this._liveScale = 1;
             this._committedPanX = 0;
             this._committedPanY = 0;
+            this._pendingRenderCommit = null;
             this._applyViewerTransform(1, 0, 0);
         }
         logPdfTiming('full_render_complete', getNowMs() - renderStartMs, { source: timingSource, pages: this.doc?.numPages || 0 });
