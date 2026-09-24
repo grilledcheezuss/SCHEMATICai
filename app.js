@@ -4521,7 +4521,8 @@ class MobileScrollCoordinator {
             if (inOwnerRegion) return;
             if (event.cancelable) event.preventDefault();
             event.stopPropagation();
-            if (this._owner === 'viewer' && PdfViewer?._activeGesture) return;
+            const viewerPinchActive = this._owner === 'viewer' && PdfViewer?._activeGesture?.mode === 'pinch';
+            if (viewerPinchActive) return;
             this._applyOwnedScrollDelta(this._owner, deltaY);
         };
         this._touchEndHandler = (event) => {
