@@ -4458,6 +4458,10 @@ class MobileScrollCoordinator {
         return document.getElementById('results-scroll-area') || document.getElementById('results-list');
     }
 
+    static _hasOwnerRegions() {
+        return !!(this._getViewerElement() && this._getResultsElement());
+    }
+
     static _isWithinOwnerRegion(target, owner) {
         if (!target) return false;
         const region = owner === 'viewer' ? this._getViewerElement() : this._getResultsElement();
@@ -4488,6 +4492,10 @@ class MobileScrollCoordinator {
                 this.resetGestureOwnership('non-mobile-touchstart');
                 return;
             }
+            if (!this._hasOwnerRegions()) {
+                this.resetGestureOwnership('owner-regions-missing');
+                return;
+            }
             const touches = event.touches;
             if (!touches || touches.length === 0) return;
             const target = event.target;
@@ -4507,6 +4515,10 @@ class MobileScrollCoordinator {
             if (!this._owner) return;
             if (!this._isSmallMobileViewport()) {
                 this.resetGestureOwnership('non-mobile-touchmove');
+                return;
+            }
+            if (!this._hasOwnerRegions()) {
+                this.resetGestureOwnership('owner-regions-missing');
                 return;
             }
             const touches = event.touches;
