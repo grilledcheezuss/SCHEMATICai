@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.65 ---
-const APP_VERSION = "v2.5.65";
+// --- SCHEMATICA ai v2.5.66 ---
+const APP_VERSION = "v2.5.66";
 const VERSION_HISTORY = {
+    "v2.5.66": "Desktop CSS safety-net and surface polish: large-screen search/results regions now defensively ignore mobile hidden-state classes, collapse arrows are more legible/symmetric, result card seams are clearer, and the PDF toolbar better matches adjacent shell chrome",
     "v2.5.65": "Reliability hardening: blocking sync attempts now only guard cache-miss/resume sync, cached startup clears stale attempt poison before re-enabling Search, and background refresh failures stay non-blocking",
     "v2.5.64": "Desktop/tablet shell consistency pass: compact large-screen collapse toggles, softer/slimmer shell borders and spacing, aligned neutral/brand color treatment with mobile UX, and safe symmetric corner treatment for collapse bars",
     "v2.5.63": "Reliability/performance update: added one-hour stale-cache revalidation with background refresh + in-flight guards, atomic generation-based encrypted snapshot persistence with safe swap semantics, and high-DPI PDF.js rendering (DPR-aware backing store, 2x cap, pixel-budget guard) for sharper mobile PDF quality",
