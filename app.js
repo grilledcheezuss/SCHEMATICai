@@ -4445,6 +4445,10 @@ class MobileScrollCoordinator {
     static _touchMoveHandler = null;
     static _touchEndHandler = null;
     static _viewportResetHandler = null;
+    static _touchStartOptions = { passive: true, capture: true };
+    static _touchMoveOptions = { passive: false, capture: true };
+    static _touchEndOptions = { passive: true, capture: true };
+    static _viewportListenerOptions = { passive: true };
 
     static _isSmallMobileViewport() {
         return (window?.innerWidth || 0) <= 767;
@@ -4545,23 +4549,23 @@ class MobileScrollCoordinator {
             }
         };
         this._viewportResetHandler = () => this.resetGestureOwnership('viewport-change');
-        document.addEventListener('touchstart', this._touchStartHandler, { passive: true, capture: true });
-        document.addEventListener('touchmove', this._touchMoveHandler, { passive: false, capture: true });
-        document.addEventListener('touchend', this._touchEndHandler, { passive: true, capture: true });
-        document.addEventListener('touchcancel', this._touchEndHandler, { passive: true, capture: true });
-        window.addEventListener('resize', this._viewportResetHandler, { passive: true });
-        window.addEventListener('orientationchange', this._viewportResetHandler, { passive: true });
+        document.addEventListener('touchstart', this._touchStartHandler, this._touchStartOptions);
+        document.addEventListener('touchmove', this._touchMoveHandler, this._touchMoveOptions);
+        document.addEventListener('touchend', this._touchEndHandler, this._touchEndOptions);
+        document.addEventListener('touchcancel', this._touchEndHandler, this._touchEndOptions);
+        window.addEventListener('resize', this._viewportResetHandler, this._viewportListenerOptions);
+        window.addEventListener('orientationchange', this._viewportResetHandler, this._viewportListenerOptions);
         this._initialized = true;
     }
 
     static teardown() {
         if (!this._initialized) return;
-        document.removeEventListener('touchstart', this._touchStartHandler, { capture: true });
-        document.removeEventListener('touchmove', this._touchMoveHandler, { capture: true });
-        document.removeEventListener('touchend', this._touchEndHandler, { capture: true });
-        document.removeEventListener('touchcancel', this._touchEndHandler, { capture: true });
-        window.removeEventListener('resize', this._viewportResetHandler);
-        window.removeEventListener('orientationchange', this._viewportResetHandler);
+        document.removeEventListener('touchstart', this._touchStartHandler, this._touchStartOptions);
+        document.removeEventListener('touchmove', this._touchMoveHandler, this._touchMoveOptions);
+        document.removeEventListener('touchend', this._touchEndHandler, this._touchEndOptions);
+        document.removeEventListener('touchcancel', this._touchEndHandler, this._touchEndOptions);
+        window.removeEventListener('resize', this._viewportResetHandler, this._viewportListenerOptions);
+        window.removeEventListener('orientationchange', this._viewportResetHandler, this._viewportListenerOptions);
         this._touchStartHandler = null;
         this._touchMoveHandler = null;
         this._touchEndHandler = null;
