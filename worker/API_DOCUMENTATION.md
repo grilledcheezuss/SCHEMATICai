@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.64
+## Version: v2.5.65
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.65**: Reliability hardening: `cox_sync_attempts` now guards only blocking cache-miss/resume sync, cached startup clears stale attempt poison before restoring Search, and stale-cache background refresh failures stay non-blocking
 - **v2.5.64**: Desktop/tablet shell consistency pass: compact large-screen collapse toggles, softer/slimmer shell borders and spacing, aligned neutral/brand color treatment with the refined mobile UX language, and safe symmetric corner treatment for collapse rails
 - **v2.5.63**: Reliability/performance update: one-hour client cache staleness revalidation with background refresh and in-flight guards, generation-based encrypted snapshot persistence + safe cache swap semantics, and DPR-aware PDF canvas rendering (2x cap + pixel-budget guard) for sharper high-DPI mobile viewing
 - **v2.5.61**: App-shell refinement: centered SHOW/HIDE panel toggles without glyphs, structurally fixed Results header ordering, slimmer header with SCHEMATICAai badge + menu-pinned version display, subtle surface softening, and one-shade lighter dark-mode panel-ID purple
@@ -322,6 +323,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.65**: Reliability hardening (`cox_sync_attempts` limited to blocking cache-miss/resume sync, cached startup restores Search before optional stale-cache refresh, and background refresh failures stay non-blocking)
 - **v2.5.64**: Desktop/tablet shell consistency pass (compact large-screen collapse toggles, slimmer shell borders/spacing, mobile-aligned neutral/brand chrome palette, and symmetric safe corner treatment on collapse rails)
 - **v2.5.63**: Reliability/performance update (hourly stale-cache revalidation at startup/foreground with lock+timestamp guard, full snapshot fetch/swap with generation-based persistence safety, and high-DPI PDF render sharpening via DPR-aware backing scale cap + canvas pixel budget)
 - **v2.5.62**: Mobile UI polish (Search action-row balloon shell removed while retaining thin raised/icy edges, shared chrome-edge polish across Search/Results/pagination/PDF surfaces, successful Search forces Results open on mobile, taller expanded Results panel for two-card visibility where possible, and label-style SHOW/HIDE + record count typography)
