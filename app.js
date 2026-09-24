@@ -4610,6 +4610,7 @@ class PdfViewer {
     static _pendingGestureCommitGeneration = 0;
     static _currentDocumentIdentity = '';
     static _viewportClampHandler = null;
+    static _viewportClampListenerOptions = { passive: true };
     static isPrinting = false;
     static _activePrintSession = null;
     static PRINT_CLEANUP_TIMEOUT_MS = 15000;
@@ -5153,8 +5154,8 @@ class PdfViewer {
         viewer.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
         viewer.addEventListener('touchend', this._touchEndHandler, { passive: false });
         viewer.addEventListener('touchcancel', this._touchEndHandler, { passive: false });
-        window.addEventListener('resize', this._viewportClampHandler, { passive: true });
-        window.addEventListener('orientationchange', this._viewportClampHandler, { passive: true });
+        window.addEventListener('resize', this._viewportClampHandler, this._viewportClampListenerOptions);
+        window.addEventListener('orientationchange', this._viewportClampHandler, this._viewportClampListenerOptions);
 
         const userAgent = (typeof navigator !== 'undefined' && navigator?.userAgent) ? navigator.userAgent : '';
         const isIPadDesktopUA = typeof navigator !== 'undefined'
@@ -5177,8 +5178,8 @@ class PdfViewer {
             this._zoomInteractionElement.removeEventListener('touchcancel', this._touchEndHandler);
         }
         if (this._viewportClampHandler) {
-            window.removeEventListener('resize', this._viewportClampHandler, { passive: true });
-            window.removeEventListener('orientationchange', this._viewportClampHandler, { passive: true });
+            window.removeEventListener('resize', this._viewportClampHandler, this._viewportClampListenerOptions);
+            window.removeEventListener('orientationchange', this._viewportClampHandler, this._viewportClampListenerOptions);
         }
         this._zoomInteractionElement = null;
         this._wheelZoomHandler = null;
