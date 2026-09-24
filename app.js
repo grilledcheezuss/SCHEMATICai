@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.67 ---
-const APP_VERSION = "v2.5.67";
+// --- SCHEMATICA ai v2.5.68 ---
+const APP_VERSION = "v2.5.68";
 const VERSION_HISTORY = {
+    "v2.5.68": "Restore full-height large-screen collapse rails and keep Search parameter collapse reachable after searches by collapsing only the main fields while preserving the action row/toggle across mobile and desktop flows",
     "v2.5.67": "Visual shell follow-up: removed the badge-row bubble treatment and strengthened light-mode seams between cards, results chrome, collapse rails, and the PDF toolbar without changing behavior",
     "v2.5.66": "Desktop CSS safety-net and surface polish: large-screen search/results regions now defensively ignore mobile hidden-state classes, collapse arrows are more legible/symmetric, result card seams are clearer, and the PDF toolbar better matches adjacent shell chrome",
     "v2.5.65": "Reliability hardening: blocking sync attempts now only guard cache-miss/resume sync, cached startup clears stale attempt poison before re-enabling Search, and background refresh failures stay non-blocking",
@@ -3276,20 +3277,12 @@ class SearchEngine {
         }
         
         if (res.length > 0) {
-            if (UI.isSmallMobile()) {
-                UI.handleSearchCompletion(true);
-            } else {
-                UI.toggleSearch(false);
-            }
+            UI.handleSearchCompletion(true);
             setTimeout(() => {
                 PdfController.preloadSearchResults(res);
             }, PRELOAD_START_DELAY_MS);
         } else {
-            if (UI.isSmallMobile()) {
-                UI.handleSearchCompletion(false);
-            } else {
-                UI.toggleSearch(false);
-            }
+            UI.handleSearchCompletion(false);
         }
     }
 
@@ -4750,18 +4743,13 @@ class UI {
 
     static handleSearchCompletion(hasResults) {
         this.mobilePdfFocus = false;
-        if (!this.isSmallMobile()) return;
-
-        if (hasResults) {
-            this.mobilePanels.resultsVisible = true;
-        } else {
-            if (!this.mobileManualPanelState.search) {
-                this.mobilePanels.searchVisible = true;
-            }
-            if (!this.mobileManualPanelState.results) {
-                this.mobilePanels.resultsVisible = false;
-            }
+        if (!this.isSmallMobile()) {
+            this.toggleSearch(false);
+            return;
         }
+
+        this.mobilePanels.searchVisible = false;
+        this.mobilePanels.resultsVisible = !!hasResults;
 
         this.syncMobileLayout();
     }
@@ -4791,7 +4779,7 @@ class UI {
                 }
             } else if (SearchEngine.lastCriteria !== null) {
                 if (!this.mobileManualPanelState.search) {
-                    this.mobilePanels.searchVisible = true;
+                    this.mobilePanels.searchVisible = !controls?.classList.contains('collapsed');
                 }
                 if (!this.mobileManualPanelState.results) {
                     this.mobilePanels.resultsVisible = false;
