@@ -43,10 +43,22 @@ async function wait(ms) {
 
     const zoomLabel = { innerText: '' };
     const viewerListeners = new Map();
+    const stageEl = {
+        offsetWidth: 1200,
+        offsetHeight: 2400,
+        offsetTop: 20,
+        offsetLeft: 60,
+        style: {}
+    };
     const viewerEl = {
         clientWidth: 900,
         clientHeight: 700,
-        querySelector: () => null,
+        scrollLeft: 200,
+        scrollTop: 400,
+        scrollWidth: 2200,
+        scrollHeight: 3400,
+        querySelector: () => stageEl,
+        getBoundingClientRect: () => ({ left: 0, top: 0 }),
         addEventListener: (name, fn) => {
             viewerListeners.set(name, fn);
         },
@@ -122,5 +134,21 @@ async function wait(ms) {
     assert(viewerListeners.has('touchcancel'), 'initViewerInteractions should attach touchcancel listener');
     PdfViewer.teardownViewerInteractions();
     assert(viewerListeners.size === 0, 'teardownViewerInteractions should remove attached listeners');
+
+    PdfViewer._zoomInteractionElement = viewerEl;
+    PdfViewer._gestureStageElement = stageEl;
+    PdfViewer._committedPanX = -120;
+    PdfViewer._committedPanY = 150;
+    PdfViewer._liveScale = 1.25;
+    const anchorContext = PdfViewer._captureAnchorContext({ x: 300, y: 250 }, 1.5);
+    assert(Math.abs(anchorContext.contentX - 448) < 1e-9, `anchor contentX should account for scroll + pan, got ${anchorContext.contentX}`);
+    assert(Math.abs(anchorContext.contentY - 384) < 1e-9, `anchor contentY should account for scroll + pan, got ${anchorContext.contentY}`);
+
+    PdfViewer._commitPanToScroll(-120, 150);
+    assert(viewerEl.scrollLeft === 320, `committed pan should become horizontal scroll, got ${viewerEl.scrollLeft}`);
+    assert(viewerEl.scrollTop === 250, `committed pan should become vertical scroll, got ${viewerEl.scrollTop}`);
+    assert(PdfViewer._committedPanX === 0 && PdfViewer._committedPanY === 0, 'pan commit should reset committed pan offsets');
+    assert(stageEl.style.transform === 'translate3d(0px, 0px, 0) scale(1)', `pan commit should reset transform, got ${stageEl.style.transform}`);
+
     console.log('✅ PdfViewer scale/zoom tests passed');
 })();

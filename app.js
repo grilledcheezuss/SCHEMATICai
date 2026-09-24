@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.73 ---
-const APP_VERSION = "v2.5.73";
+// --- SCHEMATICA ai v2.5.74 ---
+const APP_VERSION = "v2.5.74";
 const VERSION_HISTORY = {
+    "v2.5.74": "PDF viewer geometry/print follow-up: commit zoom and pan back into real scroll extents so all pages stay reachable without phantom space, and harden original-PDF printing with isolated targets plus reusable cleanup across Safari/iOS and repeated attempts",
     "v2.5.73": "PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action",
     "v2.5.72": "PDF interaction/performance follow-up on current main: live viewer-scoped pinch feedback with constrained pan and gesture-end crisp rerender, bounded first-page preload concurrency with in-flight reuse, and duration-only PDF timing diagnostics for preload/cache/network/render stages",
     "v2.5.71": "PDF viewer responsiveness hardening: deterministic 60/80/100/120 start-scale tiers, bounded/coalesced zoom rendering, viewer-scoped ctrl/cmd+wheel zoom handling, and stale-render cleanup during rapid zoom/document replacement",
@@ -3937,7 +3938,7 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
 }
 
 class PdfViewer {
-    static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = "";
+    static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = ""; static currentPdfBlob = null;
     static currentFetchId = 0;
     static currentRenderToken = 0;
     static loadingTask = null;
@@ -3960,8 +3961,11 @@ class PdfViewer {
     static _iosGestureNoticeLogged = false;
     static _documentLoadToken = 0;
     static isPrinting = false;
-    static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
-    static PRINT_MAX_TIMEOUT_MS = 120000; // 2 minute hard maximum
+    static _activePrintSession = null;
+    static PRINT_CLEANUP_TIMEOUT_MS = 15000;
+    static PRINT_MAX_TIMEOUT_MS = 30000;
+    static PRINT_IFRAME_LOAD_TIMEOUT_MS = 8000;
+    static PRINT_DIALOG_RELEASE_DELAY_MS = 1500;
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -3976,6 +3980,7 @@ class PdfViewer {
 
     static _beginDocumentLoad() {
         this._clearZoomTimer();
+        this._releasePrintSession('document-load');
         this._documentLoadToken++;
         this.currentRenderToken++;
         this._userHasAdjustedZoom = false;
@@ -4065,18 +4070,76 @@ class PdfViewer {
         if (!viewer || !stage) return null;
 
         const viewerRect = viewer.getBoundingClientRect();
+        const anchorOffsetXRaw = Number.isFinite(anchorPoint?.x)
+            ? (anchorPoint.x - viewerRect.left)
+            : (viewer.clientWidth / 2);
         const anchorOffsetYRaw = Number.isFinite(anchorPoint?.y)
             ? (anchorPoint.y - viewerRect.top)
             : (viewer.clientHeight / 2);
+        const anchorOffsetX = Math.max(0, Math.min(viewer.clientWidth || 0, anchorOffsetXRaw));
         const anchorOffsetY = Math.max(0, Math.min(viewer.clientHeight || 0, anchorOffsetYRaw));
         const liveScale = this._liveScale > 0 ? this._liveScale : 1;
+        const contentX = (viewer.scrollLeft + anchorOffsetX - stage.offsetLeft - this._committedPanX) / liveScale;
         const contentY = (viewer.scrollTop + anchorOffsetY - stage.offsetTop - this._committedPanY) / liveScale;
 
         return {
+            anchorOffsetX,
             anchorOffsetY,
+            contentX,
             contentY,
             scaleRatio: Number.isFinite(scaleRatio) ? scaleRatio : 1
         };
+    }
+
+    static _applyScrollPosition(viewer, nextScrollLeft, nextScrollTop) {
+        if (!viewer) return;
+        const maxScrollLeft = Math.max(0, (viewer.scrollWidth || 0) - (viewer.clientWidth || 0));
+        const maxScrollTop = Math.max(0, (viewer.scrollHeight || 0) - (viewer.clientHeight || 0));
+        viewer.scrollLeft = Math.max(0, Math.min(maxScrollLeft, Number.isFinite(nextScrollLeft) ? nextScrollLeft : viewer.scrollLeft || 0));
+        viewer.scrollTop = Math.max(0, Math.min(maxScrollTop, Number.isFinite(nextScrollTop) ? nextScrollTop : viewer.scrollTop || 0));
+    }
+
+    static _commitPanToScroll(panX = this._committedPanX, panY = this._committedPanY) {
+        const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
+        if (!viewer) return;
+        this._applyScrollPosition(
+            viewer,
+            (viewer.scrollLeft || 0) - (Number.isFinite(panX) ? panX : 0),
+            (viewer.scrollTop || 0) - (Number.isFinite(panY) ? panY : 0)
+        );
+        this._liveScale = 1;
+        this._committedPanX = 0;
+        this._committedPanY = 0;
+        this._applyViewerTransform(1, 0, 0);
+    }
+
+    static _restoreScrollFromAnchorContext(viewer, stage, anchorContext) {
+        if (!viewer || !stage || !anchorContext) return false;
+        if (!Number.isFinite(anchorContext.contentX) || !Number.isFinite(anchorContext.contentY)) return false;
+        const scaleRatio = Number.isFinite(anchorContext.scaleRatio) ? anchorContext.scaleRatio : 1;
+        this._applyScrollPosition(
+            viewer,
+            stage.offsetLeft + (anchorContext.contentX * scaleRatio) - (anchorContext.anchorOffsetX || 0),
+            stage.offsetTop + (anchorContext.contentY * scaleRatio) - (anchorContext.anchorOffsetY || 0)
+        );
+        return true;
+    }
+
+    static _restoreScrollFromPriorRatios(viewer, stage, priorState = null) {
+        if (!viewer || !stage || !priorState) return false;
+        const hasX = Number.isFinite(priorState.scrollRatioX);
+        const hasY = Number.isFinite(priorState.scrollRatioY);
+        if (!hasX && !hasY) return false;
+        const nextStageWidth = Math.max(1, stage.offsetWidth || 1);
+        const nextStageHeight = Math.max(1, stage.offsetHeight || 1);
+        const nextScrollLeft = hasX
+            ? ((priorState.scrollRatioX * nextStageWidth) + stage.offsetLeft - (priorState.anchorOffsetX || 0))
+            : viewer.scrollLeft || 0;
+        const nextScrollTop = hasY
+            ? ((priorState.scrollRatioY * nextStageHeight) + stage.offsetTop - (priorState.anchorOffsetY || 0))
+            : viewer.scrollTop || 0;
+        this._applyScrollPosition(viewer, nextScrollLeft, nextScrollTop);
+        return true;
     }
 
     static _finalizeGesture() {
@@ -4085,7 +4148,7 @@ class PdfViewer {
         if (gesture.documentLoadToken !== this._documentLoadToken) {
             this._clearActiveGesture();
             this._liveScale = 1;
-            this._applyViewerTransform(1, this._committedPanX, this._committedPanY);
+            this._applyViewerTransform(1, 0, 0);
             return;
         }
 
@@ -4104,6 +4167,9 @@ class PdfViewer {
             this._userHasAdjustedZoom = true;
             this._updateZoomLabel();
             this._liveScale = 1;
+            this._committedPanX = 0;
+            this._committedPanY = 0;
+            this._applyViewerTransform(1, 0, 0);
             this._clearZoomTimer();
             if (this.isDocumentValid()) {
                 this.renderStack({
@@ -4115,8 +4181,7 @@ class PdfViewer {
             return;
         }
 
-        this._liveScale = 1;
-        this._applyViewerTransform(1, this._committedPanX, this._committedPanY);
+        this._commitPanToScroll(finalPan.x, finalPan.y);
     }
 
     static _distanceBetweenTouches(t0, t1) {
@@ -4322,6 +4387,7 @@ class PdfViewer {
                     if (fallbackResult) {
                         // === FALLBACK SUCCESS: LOAD AND RENDER ===
                         if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+                        this.currentPdfBlob = fallbackResult.blob;
                         this.currentBlobUrl = URL.createObjectURL(fallbackResult.blob);
                         
                         try {
@@ -4391,6 +4457,7 @@ class PdfViewer {
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentPdfBlob = blob;
             this.currentBlobUrl = URL.createObjectURL(blob);
             
             try {
@@ -4495,6 +4562,7 @@ class PdfViewer {
 
             // === LOAD FROM CACHE ===
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentPdfBlob = cached.blob;
             this.currentBlobUrl = URL.createObjectURL(cached.blob);
             
             try {
@@ -4578,6 +4646,7 @@ class PdfViewer {
             // === LOAD PDF ===
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
             if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentPdfBlob = blob;
             this.currentBlobUrl = URL.createObjectURL(blob);
             
             try {
@@ -4642,79 +4711,202 @@ class PdfViewer {
         }
     }
 
+    static _isIsolatedPdfPrintBrowser() {
+        const ua = navigator?.userAgent || '';
+        const vendor = navigator?.vendor || '';
+        const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/i.test(ua) && /Apple/i.test(vendor || 'Apple');
+        return isSafari;
+    }
+
+    static _createPrintTargetUrl() {
+        if (this.currentPdfBlob && typeof URL?.createObjectURL === 'function') {
+            return { url: URL.createObjectURL(this.currentPdfBlob), revokeOnCleanup: true };
+        }
+        return { url: this.currentBlobUrl || '', revokeOnCleanup: false };
+    }
+
+    static _releasePrintSession(reason = 'cleanup') {
+        const session = this._activePrintSession;
+        this._activePrintSession = null;
+        this.isPrinting = false;
+        if (!session || session.cleaned) return;
+        session.cleaned = true;
+        ['releaseTimerId', 'cleanupTimerId', 'maxTimerId', 'loadTimerId'].forEach((timerKey) => {
+            if (session[timerKey]) {
+                clearTimeout(session[timerKey]);
+                session[timerKey] = null;
+            }
+        });
+        if (session.iframeWindow && session.afterPrintHandler) {
+            try {
+                session.iframeWindow.removeEventListener('afterprint', session.afterPrintHandler);
+            } catch (_err) {}
+        }
+        if (session.focusHandler && typeof window?.removeEventListener === 'function') {
+            try {
+                window.removeEventListener('focus', session.focusHandler);
+            } catch (_err) {}
+        }
+        if (session.visibilityHandler && typeof document?.removeEventListener === 'function') {
+            try {
+                document.removeEventListener('visibilitychange', session.visibilityHandler);
+            } catch (_err) {}
+        }
+        if (session.iframe) {
+            session.iframe.onload = null;
+            session.iframe.onerror = null;
+            if (session.iframe.parentNode === document.body) {
+                try {
+                    document.body.removeChild(session.iframe);
+                } catch (_err) {}
+            }
+        }
+        if (session.revokeOnCleanup && session.printUrl && typeof URL?.revokeObjectURL === 'function') {
+            try {
+                URL.revokeObjectURL(session.printUrl);
+            } catch (_err) {}
+        }
+        if (reason) {
+            console.log(`[pdf-print] Released print session (${reason})`);
+        }
+    }
+
+    static _schedulePrintSessionRelease(delay = this.PRINT_DIALOG_RELEASE_DELAY_MS, reason = 'release-scheduled') {
+        const session = this._activePrintSession;
+        if (!session || session.cleaned) return;
+        if (session.releaseTimerId) {
+            clearTimeout(session.releaseTimerId);
+        }
+        session.releaseTimerId = setTimeout(() => this._releasePrintSession(reason), Math.max(0, delay));
+    }
+
+    static _createPrintSession(printTarget) {
+        this._releasePrintSession('reset-before-print');
+        const session = {
+            cleaned: false,
+            iframe: null,
+            iframeWindow: null,
+            popup: null,
+            printUrl: printTarget.url,
+            revokeOnCleanup: !!printTarget.revokeOnCleanup,
+            afterPrintHandler: null,
+            focusHandler: null,
+            visibilityHandler: null,
+            releaseTimerId: null,
+            cleanupTimerId: null,
+            maxTimerId: null,
+            loadTimerId: null
+        };
+        this._activePrintSession = session;
+        this.isPrinting = true;
+        session.focusHandler = () => this._schedulePrintSessionRelease(this.PRINT_DIALOG_RELEASE_DELAY_MS, 'window-focus');
+        session.visibilityHandler = () => {
+            if ((document?.visibilityState || 'visible') === 'visible') {
+                this._schedulePrintSessionRelease(this.PRINT_DIALOG_RELEASE_DELAY_MS, 'visibility-return');
+            }
+        };
+        if (typeof window?.addEventListener === 'function') {
+            window.addEventListener('focus', session.focusHandler);
+        }
+        if (typeof document?.addEventListener === 'function') {
+            document.addEventListener('visibilitychange', session.visibilityHandler);
+        }
+        session.maxTimerId = setTimeout(() => this._releasePrintSession('max-timeout'), this.PRINT_MAX_TIMEOUT_MS);
+        return session;
+    }
+
+    static _printViaIsolatedWindow(printTarget) {
+        const session = this._createPrintSession(printTarget);
+        let popup = null;
+        try {
+            popup = typeof window?.open === 'function' ? window.open(printTarget.url, '_blank') : null;
+        } catch (error) {
+            console.error('PDF print window failed to open:', error);
+        }
+        if (!popup) {
+            this._releasePrintSession('popup-open-failed');
+            alert('Unable to open the PDF print tab. Please allow pop-ups for this site or use Download PDF.');
+            return;
+        }
+        session.popup = popup;
+        const safariMessage = 'Opened the PDF in a new tab because this browser may print the app shell instead of the PDF from the embedded viewer. If the print dialog does not appear automatically, use the browser Print/Share action in that PDF tab.';
+        let autoPrintStarted = false;
+        try {
+            popup.focus?.();
+            if (typeof popup.print === 'function') {
+                popup.print();
+                autoPrintStarted = true;
+            }
+        } catch (error) {
+            console.warn('Isolated PDF print invocation failed:', error);
+        }
+        if (!autoPrintStarted) {
+            alert(safariMessage);
+        }
+        session.cleanupTimerId = setTimeout(() => this._releasePrintSession('isolated-window-timeout'), this.PRINT_CLEANUP_TIMEOUT_MS);
+    }
+
+    static _printViaIframe(printTarget) {
+        const session = this._createPrintSession(printTarget);
+        const iframe = document.createElement('iframe');
+        session.iframe = iframe;
+        iframe.style.position = 'fixed';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.opacity = '0';
+        iframe.setAttribute('aria-hidden', 'true');
+        iframe.src = printTarget.url;
+        session.loadTimerId = setTimeout(() => this._releasePrintSession('iframe-load-timeout'), this.PRINT_IFRAME_LOAD_TIMEOUT_MS);
+        iframe.onload = () => {
+            if (session.loadTimerId) {
+                clearTimeout(session.loadTimerId);
+                session.loadTimerId = null;
+            }
+            try {
+                session.iframeWindow = iframe.contentWindow;
+                if (!session.iframeWindow) {
+                    this._releasePrintSession('missing-iframe-window');
+                    return;
+                }
+                session.afterPrintHandler = () => this._releasePrintSession('afterprint');
+                session.iframeWindow.addEventListener('afterprint', session.afterPrintHandler, { once: true });
+                session.iframeWindow.focus();
+                session.iframeWindow.print();
+                session.cleanupTimerId = setTimeout(() => this._releasePrintSession('cleanup-timeout'), this.PRINT_CLEANUP_TIMEOUT_MS);
+            } catch (error) {
+                console.error('Print error:', error);
+                this._releasePrintSession('iframe-print-error');
+            }
+        };
+        iframe.onerror = () => {
+            console.error('Print iframe failed to load');
+            this._releasePrintSession('iframe-error');
+        };
+        try {
+            document.body.appendChild(iframe);
+        } catch (error) {
+            console.error('Print iframe append failed:', error);
+            this._releasePrintSession('iframe-append-error');
+        }
+    }
+
     static print() {
-        if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
+        if (!this.currentBlobUrl && !this.currentPdfBlob) return alert("No PDF loaded to print.");
         if (this.isPrinting) {
             console.warn('Print already in progress, ignoring duplicate print request');
             return;
         }
-        this.isPrinting = true;
-
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = this.currentBlobUrl;
-
-        let fallbackTimeoutId = null;
-        let maxTimeoutId = null;
-        let cleaned = false;
-        let afterPrintHandler = null;
-        let iframeWindow = null;
-
-        const cleanup = () => {
-            if (cleaned) return;
-            cleaned = true;
-            if (fallbackTimeoutId) {
-                clearTimeout(fallbackTimeoutId);
-                fallbackTimeoutId = null;
-            }
-            if (maxTimeoutId) {
-                clearTimeout(maxTimeoutId);
-                maxTimeoutId = null;
-            }
-            if (iframeWindow && afterPrintHandler) {
-                try {
-                    iframeWindow.removeEventListener('afterprint', afterPrintHandler);
-                } catch (_err) {}
-            }
-            iframe.onload = null;
-            iframe.onerror = null;
-            if (iframe.parentNode === document.body) {
-                document.body.removeChild(iframe);
-            }
-            this.isPrinting = false;
-        };
-
-        iframe.onload = () => {
-            try {
-                iframeWindow = iframe.contentWindow;
-                if (!iframeWindow) {
-                    cleanup();
-                    return;
-                }
-                afterPrintHandler = () => cleanup();
-                iframeWindow.addEventListener('afterprint', afterPrintHandler, { once: true });
-                iframeWindow.focus();
-                iframeWindow.print();
-                fallbackTimeoutId = setTimeout(cleanup, this.PRINT_CLEANUP_TIMEOUT_MS);
-            } catch (e) {
-                console.error('Print error:', e);
-                cleanup();
-            }
-        };
-
-        iframe.onerror = () => {
-            console.error('Print iframe failed to load');
-            cleanup();
-        };
-
-        maxTimeoutId = setTimeout(cleanup, this.PRINT_MAX_TIMEOUT_MS);
-
-        try {
-            document.body.appendChild(iframe);
-        } catch (e) {
-            console.error('Print iframe append failed:', e);
-            cleanup();
+        const printTarget = this._createPrintTargetUrl();
+        if (!printTarget.url) {
+            alert('Unable to prepare the loaded PDF for printing right now. Please reload the PDF and try again.');
+            return;
         }
+        if (this._isIsolatedPdfPrintBrowser()) {
+            this._printViaIsolatedWindow(printTarget);
+            return;
+        }
+        this._printViaIframe(printTarget);
     }
     static async renderStack({ timingSource = 'unspecified', expectedDocumentLoadToken = null, anchorContext = null } = {}) {
         const container = document.getElementById('pdf-main-view'); 
@@ -4728,12 +4920,22 @@ class PdfViewer {
         const renderStartMs = getNowMs();
         let firstPageReadyMs = null;
         const priorStage = this._getGestureStage();
+        const priorStageWidth = priorStage ? Math.max(1, priorStage.offsetWidth || 1) : 0;
         const priorStageHeight = priorStage ? Math.max(1, priorStage.offsetHeight || 1) : 0;
+        const priorStageOffsetLeft = priorStage ? priorStage.offsetLeft : 0;
         const priorStageOffsetTop = priorStage ? priorStage.offsetTop : 0;
+        const priorAnchorOffsetX = Math.max(0, Math.min(container.clientWidth || 0, (container.clientWidth || 0) / 2));
         const priorAnchorOffsetY = Math.max(0, Math.min(container.clientHeight || 0, (container.clientHeight || 0) / 2));
-        const priorScrollRatio = priorStageHeight > 0
-            ? (container.scrollTop + priorAnchorOffsetY - priorStageOffsetTop) / priorStageHeight
-            : 0;
+        const priorState = {
+            anchorOffsetX: priorAnchorOffsetX,
+            anchorOffsetY: priorAnchorOffsetY,
+            scrollRatioX: priorStageWidth > 0
+                ? (container.scrollLeft + priorAnchorOffsetX - priorStageOffsetLeft) / priorStageWidth
+                : Number.NaN,
+            scrollRatioY: priorStageHeight > 0
+                ? (container.scrollTop + priorAnchorOffsetY - priorStageOffsetTop) / priorStageHeight
+                : Number.NaN
+        };
         container.innerHTML = ''; 
         const stage = this._ensureGestureStage(container);
         this._updateZoomLabel();
@@ -4903,22 +5105,18 @@ class PdfViewer {
             // Second pass after fade-in animation may alter layout
             requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
         }
-        if (anchorContext && Number.isFinite(anchorContext.contentY) && Number.isFinite(anchorContext.anchorOffsetY)) {
-            const scaledContentY = anchorContext.contentY * (Number.isFinite(anchorContext.scaleRatio) ? anchorContext.scaleRatio : 1);
-            const committedPan = this._clampPan(this._committedPanX, this._committedPanY, 1);
-            this._committedPanX = committedPan.x;
-            this._committedPanY = committedPan.y;
-            const targetScrollTop = stage.offsetTop + scaledContentY + committedPan.y - anchorContext.anchorOffsetY;
-            const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-            container.scrollTop = Math.max(0, Math.min(maxScrollTop, targetScrollTop));
-        } else if (Number.isFinite(priorScrollRatio)) {
-            const nextStageHeight = Math.max(1, stage.offsetHeight || 1);
-            const targetScrollTop = (priorScrollRatio * nextStageHeight) + stage.offsetTop - priorAnchorOffsetY;
-            const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-            container.scrollTop = Math.max(0, Math.min(maxScrollTop, targetScrollTop));
+        await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
+        if (!this._restoreScrollFromAnchorContext(container, stage, anchorContext)) {
+            this._restoreScrollFromPriorRatios(container, stage, priorState);
         }
-        const liveScaleToApply = this._activeGesture ? (this._liveScale || 1) : 1;
-        this._applyViewerTransform(liveScaleToApply, this._committedPanX, this._committedPanY);
+        if (this._activeGesture) {
+            this._applyViewerTransform(this._liveScale || 1, this._committedPanX, this._committedPanY);
+        } else {
+            this._liveScale = 1;
+            this._committedPanX = 0;
+            this._committedPanY = 0;
+            this._applyViewerTransform(1, 0, 0);
+        }
         logPdfTiming('full_render_complete', getNowMs() - renderStartMs, { source: timingSource, pages: this.doc?.numPages || 0 });
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
