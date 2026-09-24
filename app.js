@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.79 ---
-const APP_VERSION = "v2.5.79";
+// --- SCHEMATICA ai v2.5.80 ---
+const APP_VERSION = "v2.5.80";
 const VERSION_HISTORY = {
+    "v2.5.80": "PDF result-swap transition fix: keep the active viewer surface/toolbar stable while replacement documents stage in, clear only stale staging surfaces at load start, and swap rendered stages atomically so rapid document changes do not flicker or expose placeholder gaps",
     "v2.5.79": "PDF/mobile interaction hardening: gesture-release commits now preserve release anchor through crisp rerender swaps without snap-back, and mobile touch ownership locks Results vs PDF scrolling to gesture origin until lift/cancel",
     "v2.5.78": "Follow-up to PR #169: restore explicit Airtable token routing (Users/Feedback reads + FEEDBACK POST use write key; MAIN/PDF_BY_ID reads use read key) and classify 401/403 credential access failures distinctly from transient 503 outages",
     "v2.5.77": "Mobile sync + PDF transition stability: classify suspension/network-transition interruptions as resumable with bounded restart flow and explicit quota messaging, clear stale PDF stage on document switch, and keep pinch-release scale continuous until crisp commit",
@@ -4354,6 +4355,9 @@ function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbac
         printBtn: DOM_CACHE.get('pdf-print-btn'),
         downloadBtn: DOM_CACHE.get('pdf-download-btn')
     };
+    const viewerSurface = document.getElementById('pdf-main-view');
+    const hasActiveRenderedSurface = !!viewerSurface?.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)');
+    const preserveActiveSurfaceDuringLoad = state === PDF_UI_STATE.LOADING && hasActiveRenderedSurface;
     
     // Reset all states
     if (elements.placeholder) elements.placeholder.style.display = 'none';
@@ -4365,7 +4369,10 @@ function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbac
     // Apply specific state
     switch (state) {
         case PDF_UI_STATE.LOADING:
-            if (elements.placeholder) {
+            if (preserveActiveSurfaceDuringLoad) {
+                if (elements.toolbar) elements.toolbar.style.display = 'flex';
+                if (elements.viewer) elements.viewer.style.display = 'flex';
+            } else if (elements.placeholder) {
                 elements.placeholder.style.display = 'flex';
                 elements.placeholder.innerText = loadingMessage;
             }
@@ -4631,16 +4638,21 @@ class PdfViewer {
         this._committedPanX = 0;
         this._committedPanY = 0;
         this._clearActiveGesture();
-        this._clearStagedPdfSurface();
+        this._clearStagedPdfSurface({ preserveActiveSurface: true });
         if (typeof MobileScrollCoordinator !== 'undefined') {
             MobileScrollCoordinator.resetGestureOwnership('document-load');
         }
     }
-    static _clearStagedPdfSurface() {
+    static _clearStagedPdfSurface({ preserveActiveSurface = false } = {}) {
         const viewer = document.getElementById('pdf-main-view');
         if (!viewer) return;
-        viewer.querySelectorAll('.pdf-gesture-stage').forEach((stage) => stage.remove());
-        this._gestureStageElement = null;
+        viewer.querySelectorAll('.pdf-gesture-stage').forEach((stage) => {
+            if (preserveActiveSurface && !stage.classList.contains('pdf-gesture-stage--staging')) return;
+            stage.remove();
+        });
+        if (!preserveActiveSurface || (this._gestureStageElement && !this._gestureStageElement.isConnected)) {
+            this._gestureStageElement = viewer.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)') || null;
+        }
     }
 
     static _clampScale(scale) {
@@ -5644,11 +5656,11 @@ class PdfViewer {
         stage.className = 'pdf-gesture-stage pdf-gesture-stage--staging';
         stage.setAttribute('aria-hidden', 'true');
         container.appendChild(stage);
-        this._gestureStageElement = stage;
         this._updateZoomLabel();
         
         if (!this.doc) {
             console.error('No PDF document loaded');
+            if (stage.parentNode === container) stage.remove();
             return;
         }
         
@@ -6009,9 +6021,6 @@ class PdfController {
     }
 
     static async load(id, url) {
-        const placeholderEl = DOM_CACHE.get('pdf-placeholder-text');
-        if (placeholderEl) placeholderEl.style.display = 'none';
-        
         const rec = window.ID_MAP.get(id);
         if(rec && rec.displayId) {
             const panelIdEl = DOM_CACHE.get('demo-panel-id');
