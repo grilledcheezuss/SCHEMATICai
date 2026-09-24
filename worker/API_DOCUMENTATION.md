@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.79
+## Version: v2.5.80
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.80**: PDF result-swap transition follow-up: document replacements now keep the active viewer surface/toolbar visible while the next PDF stages, remove only stale staging surfaces at load start, and swap the new rendered stage in atomically to avoid flicker/placeholder gaps during rapid result changes
 - **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform → crisp-render handoff without snap-back, and mobile touch ownership is origin-locked between Results and PDF scrolling until touch end/cancel
 - **v2.5.78**: Follow-up to PR #169: Airtable token routing is explicit by base purpose (Users/Feedback reads + FEEDBACK POST use write key; MAIN and PDF_BY_ID reads use read key), and Airtable 401/403 credential/access failures now surface as configuration diagnostics instead of retry-looping 503 outages
 - **v2.5.77**: Mobile sync/PDF viewer stability pass: suspension/network-transition sync interrupts are now treated as resumable with bounded restart + lock revalidation and explicit quota messaging, document switches clear stale render stages immediately, and pinch-finalize keeps visual zoom continuity until crisp commit

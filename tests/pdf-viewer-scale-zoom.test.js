@@ -30,6 +30,29 @@ function extractClass(className, content) {
     return content.substring(startIdx, endIdx);
 }
 
+function extractFunction(functionName, content) {
+    const startIdx = content.indexOf(`function ${functionName}(`);
+    if (startIdx === -1) throw new Error(`Could not find ${functionName} function in app.js`);
+
+    let braceCount = 0;
+    let inFunction = false;
+    let endIdx = startIdx;
+    for (let i = startIdx; i < content.length; i++) {
+        const ch = content[i];
+        if (ch === '{') {
+            braceCount++;
+            inFunction = true;
+        } else if (ch === '}') {
+            braceCount--;
+            if (inFunction && braceCount === 0) {
+                endIdx = i + 1;
+                break;
+            }
+        }
+    }
+    return content.substring(startIdx, endIdx);
+}
+
 async function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -40,22 +63,41 @@ async function wait(ms) {
     const appJsPath = path.join(__dirname, '..', 'app.js');
     const appJsContent = fs.readFileSync(appJsPath, 'utf8');
     const pdfViewerClassCode = extractClass('PdfViewer', appJsContent);
+    const setPdfUiStateCode = extractFunction('setPdfUiState', appJsContent);
 
     const zoomLabel = { innerText: '' };
     const viewerListeners = new Map();
-    const stageEl = {
+    const activeStage = {
         offsetWidth: 1200,
         offsetHeight: 2400,
         offsetTop: 20,
         offsetLeft: 60,
-        style: {}
-    };
-    const staleStage = {
-        removed: false,
-        remove() {
-            this.removed = true;
+        style: {},
+        isConnected: true,
+        classList: {
+            contains: (name) => name === 'pdf-gesture-stage'
         }
     };
+    const stagingStage = {
+        removed: false,
+        isConnected: true,
+        classList: {
+            contains: (name) => name === 'pdf-gesture-stage' || name === 'pdf-gesture-stage--staging'
+        },
+        remove() {
+            this.removed = true;
+            this.isConnected = false;
+        }
+    };
+    const stageList = [activeStage, stagingStage];
+    const placeholder = { style: { display: 'flex' }, innerText: '📄 Select a schematic' };
+    const toolbar = { style: { display: 'none' } };
+    const viewerShell = { style: { display: 'none' } };
+    const fallback = { style: { display: 'none' } };
+    const fallbackLink = { href: '' };
+    const frame = { style: { display: 'none' } };
+    const printBtn = { disabled: false };
+    const downloadBtn = { disabled: false };
     const viewerEl = {
         clientWidth: 900,
         clientHeight: 700,
@@ -63,8 +105,12 @@ async function wait(ms) {
         scrollTop: 400,
         scrollWidth: 2200,
         scrollHeight: 3400,
-        querySelector: () => stageEl,
-        querySelectorAll: (selector) => selector === '.pdf-gesture-stage' ? [staleStage] : [],
+        querySelector: (selector) => {
+            if (selector === '.pdf-gesture-stage') return activeStage;
+            if (selector === '.pdf-gesture-stage:not(.pdf-gesture-stage--staging)') return activeStage;
+            return null;
+        },
+        querySelectorAll: (selector) => selector === '.pdf-gesture-stage' ? stageList.filter((stage) => stage.isConnected) : [],
         getBoundingClientRect: () => ({ left: 0, top: 0 }),
         addEventListener: (name, fn) => {
             viewerListeners.set(name, fn);
@@ -77,6 +123,14 @@ async function wait(ms) {
         getElementById: (id) => {
             if (id === 'pdf-zoom-level') return zoomLabel;
             if (id === 'pdf-main-view') return viewerEl;
+            if (id === 'pdf-placeholder-text') return placeholder;
+            if (id === 'pdf-toolbar') return toolbar;
+            if (id === 'custom-pdf-viewer') return viewerShell;
+            if (id === 'pdf-fallback') return fallback;
+            if (id === 'pdf-fallback-link') return fallbackLink;
+            if (id === 'pdf-viewer-frame') return frame;
+            if (id === 'pdf-print-btn') return printBtn;
+            if (id === 'pdf-download-btn') return downloadBtn;
             return null;
         },
         querySelectorAll: () => [],
@@ -91,12 +145,30 @@ async function wait(ms) {
         innerHeight: 0,
         addEventListener: () => {}
     };
+    const DOM_CACHE = {
+        get(id) {
+            return documentState.getElementById(id);
+        }
+    };
+    const PDF_UI_STATE = {
+        LOADING: 'loading',
+        READY: 'ready',
+        FALLBACK: 'fallback',
+        HIDDEN: 'hidden'
+    };
 
     const PdfViewer = new Function(
         'window',
         'document',
         `${pdfViewerClassCode}; return PdfViewer;`
     )(windowState, documentState);
+    const setPdfUiState = new Function(
+        'DOM_CACHE',
+        'document',
+        'PdfViewer',
+        'PDF_UI_STATE',
+        `${setPdfUiStateCode}; return setPdfUiState;`
+    )(DOM_CACHE, documentState, PdfViewer, PDF_UI_STATE);
 
     const checkStartScale = (width, height, expected, label) => {
         windowState.innerWidth = width;
@@ -143,7 +215,7 @@ async function wait(ms) {
     assert(viewerListeners.size === 0, 'teardownViewerInteractions should remove attached listeners');
 
     PdfViewer._zoomInteractionElement = viewerEl;
-    PdfViewer._gestureStageElement = stageEl;
+    PdfViewer._gestureStageElement = activeStage;
     PdfViewer._committedPanX = -120;
     PdfViewer._committedPanY = 150;
     PdfViewer._liveScale = 1.25;
@@ -155,19 +227,27 @@ async function wait(ms) {
     assert(viewerEl.scrollLeft === 320, `committed pan should become horizontal scroll, got ${viewerEl.scrollLeft}`);
     assert(viewerEl.scrollTop === 250, `committed pan should become vertical scroll, got ${viewerEl.scrollTop}`);
     assert(PdfViewer._committedPanX === 0 && PdfViewer._committedPanY === 0, 'pan commit should reset committed pan offsets');
-    assert(stageEl.style.transform === 'translate3d(0px, 0px, 0) scale(1)', `pan commit should reset transform, got ${stageEl.style.transform}`);
+    assert(activeStage.style.transform === 'translate3d(0px, 0px, 0) scale(1)', `pan commit should reset transform, got ${activeStage.style.transform}`);
 
     const restored = PdfViewer._restoreScrollFromAnchorContext(
         viewerEl,
-        stageEl,
+        activeStage,
         { anchorOffsetX: 300, anchorOffsetY: 200, contentX: 610, contentY: 420, scaleRatio: 1.25 }
     );
     assert(restored === true, 'anchor restore should succeed for non-centered anchor context');
     assert(Math.abs(viewerEl.scrollLeft - 522.5) < 1e-9, `anchor restore should preserve horizontal release position, got ${viewerEl.scrollLeft}`);
     assert(Math.abs(viewerEl.scrollTop - 345) < 1e-9, `anchor restore should preserve vertical release position, got ${viewerEl.scrollTop}`);
 
+    setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
+    assert(toolbar.style.display === 'flex', 'loading with an active rendered surface should keep toolbar visible');
+    assert(viewerShell.style.display === 'flex', 'loading with an active rendered surface should keep viewer visible');
+    assert(placeholder.style.display === 'none', 'loading with an active rendered surface should suppress placeholder copy');
+    assert(printBtn.disabled === true && downloadBtn.disabled === true, 'loading state should keep PDF actions disabled during replacement');
+
     PdfViewer._beginDocumentLoad();
-    assert(staleStage.removed === true, 'beginDocumentLoad should clear stale rendered stages immediately');
+    assert(stagingStage.removed === true, 'beginDocumentLoad should clear only stale staging surfaces');
+    assert(activeStage.isConnected === true, 'beginDocumentLoad should preserve the active rendered surface during replacement');
+    assert(PdfViewer._gestureStageElement === activeStage, 'beginDocumentLoad should keep the active stage wired for continuity');
 
     let finalizeRenderOptions = null;
     PdfViewer.renderStack = (options) => { finalizeRenderOptions = options; };
