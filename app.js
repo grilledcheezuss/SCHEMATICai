@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.68 ---
-const APP_VERSION = "v2.5.68";
+// --- SCHEMATICA ai v2.5.69 ---
+const APP_VERSION = "v2.5.69";
 const VERSION_HISTORY = {
+    "v2.5.69": "Regression fix: restore light/dark search action-row divider seam and make SHOW/HIDE reliably toggle the shared Search parameter collapse target after search completion/reset flows",
     "v2.5.68": "Restore full-height large-screen collapse rails and keep Search parameter collapse reachable after searches by collapsing only the main fields while preserving the action row/toggle across mobile and desktop flows",
     "v2.5.67": "Visual shell follow-up: removed the badge-row bubble treatment and strengthened light-mode seams between cards, results chrome, collapse rails, and the PDF toolbar without changing behavior",
     "v2.5.66": "Desktop CSS safety-net and surface polish: large-screen search/results regions now defensively ignore mobile hidden-state classes, collapse arrows are more legible/symmetric, result card seams are clearer, and the PDF toolbar better matches adjacent shell chrome",
@@ -4596,6 +4597,11 @@ class UI {
         return Array.isArray(SearchEngine.currentResults) && SearchEngine.currentResults.length > 0;
     }
 
+    static isSearchPanelExpanded() {
+        if (this.isSmallMobile()) return this.mobilePanels.searchVisible;
+        return !DOM_CACHE.get('search-controls')?.classList.contains('collapsed');
+    }
+
     static hasMobileResultsPanel() {
         return this.hasSearchResults() || SearchEngine.lastCriteria !== null;
     }
@@ -4612,7 +4618,7 @@ class UI {
         const resultsToggleBtn = DOM_CACHE.get('results-toggle-btn');
 
         if (refineToggleBtn) {
-            const searchExpanded = this.isSmallMobile() ? this.mobilePanels.searchVisible : !DOM_CACHE.get('search-controls')?.classList.contains('collapsed');
+            const searchExpanded = this.isSearchPanelExpanded();
             refineToggleBtn.textContent = searchExpanded ? 'HIDE' : 'SHOW';
             refineToggleBtn.setAttribute('aria-expanded', searchExpanded ? 'true' : 'false');
             refineToggleBtn.setAttribute('aria-label', searchExpanded ? 'Hide Search panel' : 'Show Search panel');
@@ -4730,7 +4736,7 @@ class UI {
 
     static toggleMobileSearch() {
         this.mobileManualPanelState.search = true;
-        this.toggleSearch(!this.mobilePanels.searchVisible);
+        this.toggleSearch(!this.isSearchPanelExpanded());
     }
 
     static toggleMobileResults(forceVisible) {
@@ -4744,7 +4750,7 @@ class UI {
     static handleSearchCompletion(hasResults) {
         this.mobilePdfFocus = false;
         if (!this.isSmallMobile()) {
-            this.toggleSearch(false);
+            this.toggleSearch(!hasResults);
             return;
         }
 
