@@ -4973,7 +4973,6 @@ class PdfViewer {
             if (this._activeGesture.mode === 'pinch') {
                 if ((event.touches?.length || 0) < 2) {
                     if (event.cancelable) event.preventDefault();
-                    event.stopPropagation();
                     this._finalizeGesture();
                 }
                 return;
@@ -4981,7 +4980,6 @@ class PdfViewer {
 
             if ((event.touches?.length || 0) === 0) {
                 if (event.cancelable) event.preventDefault();
-                event.stopPropagation();
                 this._finalizeGesture();
             }
         };
