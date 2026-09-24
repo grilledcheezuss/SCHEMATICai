@@ -48,6 +48,7 @@ function wait(ms) {
     const documentListeners = new Map();
     const popupPrintCalls = [];
     let objectUrlCounter = 0;
+    let popupBlocked = false;
     let navigatorState = {
         userAgent: 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36',
         vendor: 'Google Inc.',
@@ -148,6 +149,7 @@ function wait(ms) {
             windowListeners.delete(name);
         },
         open(url) {
+            if (popupBlocked) return null;
             return {
                 url,
                 focus() {},
@@ -208,6 +210,13 @@ function wait(ms) {
     assert(popupPrintCalls.length === 1, 'Safari/iOS print path should target an isolated popup window');
     assert(alerts.some((message) => /Opened the PDF in a new tab/i.test(message)), 'Safari/iOS print path should explain the isolated PDF print fallback');
     assert(PdfViewer.isPrinting === false, 'isolated print path should also release the print guard');
+
+    popupBlocked = true;
+    PdfViewer.print();
+    await wait(5);
+    assert(alerts.some((message) => /Unable to open the PDF print tab/i.test(message)), 'popup-open failure should alert the user');
+    assert(PdfViewer.isPrinting === false, 'popup-open failure should release the print guard');
+    popupBlocked = false;
 
     PdfViewer.download();
     assert(anchorsClicked.length === 1, 'download should trigger one anchor click when PDF is loaded');

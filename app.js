@@ -4821,7 +4821,7 @@ class PdfViewer {
         const session = this._createPrintSession(printTarget);
         let popup = null;
         try {
-            popup = typeof window?.open === 'function' ? window.open(printTarget.url, '_blank', 'noopener,noreferrer') : null;
+            popup = typeof window?.open === 'function' ? window.open(printTarget.url, '_blank') : null;
         } catch (error) {
             console.error('PDF print window failed to open:', error);
         }
