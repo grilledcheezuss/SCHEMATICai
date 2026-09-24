@@ -289,14 +289,21 @@ const AI_TRAINING_DATA = {
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
-    static async putChunks(entries) {
+    static async putChunks(entries, progressCallback) {
         const safeEntries = Array.isArray(entries) ? entries : [];
         if (safeEntries.length === 0) return;
         const d = await this.open();
         return new Promise((resolve, reject) => {
             const t = d.transaction("chunks", "readwrite");
             const store = t.objectStore("chunks");
-            safeEntries.forEach(([k, v]) => store.put(v, k));
+            let completed = 0;
+            safeEntries.forEach(([k, v]) => {
+                const req = store.put(v, k);
+                req.onsuccess = () => {
+                    completed++;
+                    if (progressCallback) progressCallback(completed, safeEntries.length);
+                };
+            });
             t.oncomplete = resolve;
             t.onerror = () => reject(t.error);
             t.onabort = () => reject(t.error);
@@ -394,11 +401,17 @@ class CacheService {
         if (progressCallback) {
             progressCallback({ phase: 'saving', completed: 0, total: writeEntries.length, pct: 0 });
         }
-        await DB.putChunks(writeEntries);
+        await DB.putChunks(writeEntries, (completed, total) => {
+            if (progressCallback) {
+                progressCallback({
+                    phase: 'saving',
+                    completed,
+                    total,
+                    pct: Math.round((completed / total) * 100)
+                });
+            }
+        });
         const writeMs = Math.round(this.now() - writeStart);
-        if (progressCallback) {
-            progressCallback({ phase: 'saving', completed: writeEntries.length, total: writeEntries.length, pct: 100 });
-        }
 
         if (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== generation) {
             this.cleanupGeneration(previousGeneration).catch(err => console.warn('Cache cleanup warning:', err));
