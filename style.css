@@ -48,6 +48,9 @@
     --glass-text: var(--lsu-purple);
     --surface-soft-border: rgba(148, 163, 184, 0.42);
     --surface-seam-border: rgba(148, 163, 184, 0.56);
+    --shell-divider-soft: #c4cfdd;
+    --shell-divider-strong: #b0becf;
+    --shell-divider-highlight: rgba(255, 255, 255, 0.76);
     --surface-soft-shadow: 0 1px 4px rgba(15, 23, 42, 0.09);
     --panel-id-color: var(--app-primary);
     
@@ -398,7 +401,7 @@ body.dark-mode #results-count { color: #c4b5fd; }
 .record-card:hover { transform: translateY(-1px); box-shadow: 0 2px 5px rgba(0,0,0,0.1); } 
 .record-card.active-view { background: rgba(70, 29, 124, 0.1); border-color: var(--app-primary); }
 .panel-name { font-size: 14px; font-weight: 800; color: var(--panel-id-color); margin: 0; letter-spacing: -0.3px; line-height: 1.1; } 
-.badge-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; padding: 4px 5px; background: var(--bg-sidebar); border: 1px solid var(--surface-seam-border); border-radius: 5px; }
+.badge-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; padding: 0; background: none; border: none; border-radius: 0; }
 
 .hud-badge { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.3px; } 
 .hud-badge.match-green { background: var(--match-green-bg); color: var(--match-green-text); } 
@@ -454,6 +457,60 @@ body.dark-mode .thumb-btn:hover { background: #3f3f46; }
 }
 #pdf-toolbar .pdf-tool-btn:hover { filter: brightness(1.06); }
 #pdf-zoom-level { color: var(--text-primary); font-weight: 700; min-width: 40px; text-align: center; }
+
+body:not(.dark-mode) #sidebar-left {
+    border-right-color: var(--shell-divider-strong);
+    box-shadow: inset -1px 0 0 var(--shell-divider-highlight);
+}
+
+body:not(.dark-mode) #results-scroll-area,
+body:not(.dark-mode) #pagination-footer,
+body:not(.dark-mode) .record-card,
+body:not(.dark-mode) #pdf-toolbar,
+body:not(.dark-mode) #pdf-toolbar .pdf-tool-btn,
+body:not(.dark-mode) .collapse-btn {
+    box-shadow: inset 0 1px 0 var(--shell-divider-highlight), var(--surface-soft-shadow);
+}
+
+body:not(.dark-mode) #results-scroll-area,
+body:not(.dark-mode) #pagination-footer {
+    border-color: var(--shell-divider-strong);
+}
+
+body:not(.dark-mode) .record-card {
+    border-color: var(--shell-divider-strong);
+}
+
+body:not(.dark-mode) .record-card:hover {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 2px 5px rgba(15, 23, 42, 0.12);
+}
+
+body:not(.dark-mode) .collapse-btn {
+    background: rgba(255,255,255,0.94);
+    border-color: var(--shell-divider-strong);
+}
+
+body:not(.dark-mode) .collapse-btn:hover {
+    border-color: #9fafc3;
+}
+
+body:not(.dark-mode) #toggle-left {
+    box-shadow: inset 0 1px 0 var(--shell-divider-highlight), -1px 0 0 rgba(176, 190, 207, 0.72), var(--surface-soft-shadow);
+}
+
+body:not(.dark-mode) #toggle-right {
+    box-shadow: inset 0 1px 0 var(--shell-divider-highlight), 1px 0 0 rgba(176, 190, 207, 0.72), var(--surface-soft-shadow);
+}
+
+body:not(.dark-mode) #pdf-toolbar {
+    background: #f2f5fa;
+    border-bottom-color: var(--shell-divider-strong);
+    border-left: 1px solid var(--shell-divider-soft);
+}
+
+body:not(.dark-mode) #pdf-toolbar .pdf-tool-btn {
+    border-color: var(--shell-divider-strong);
+}
 
 #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; z-index: 1; }
 #custom-pdf-viewer { flex: 1; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; opacity: 0; transition: opacity 0.3s ease-in; }

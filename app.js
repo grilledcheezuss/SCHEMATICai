@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.66 ---
-const APP_VERSION = "v2.5.66";
+// --- SCHEMATICA ai v2.5.67 ---
+const APP_VERSION = "v2.5.67";
 const VERSION_HISTORY = {
+    "v2.5.67": "Visual shell follow-up: removed the badge-row bubble treatment and strengthened light-mode seams between cards, results chrome, collapse rails, and the PDF toolbar without changing behavior",
     "v2.5.66": "Desktop CSS safety-net and surface polish: large-screen search/results regions now defensively ignore mobile hidden-state classes, collapse arrows are more legible/symmetric, result card seams are clearer, and the PDF toolbar better matches adjacent shell chrome",
     "v2.5.65": "Reliability hardening: blocking sync attempts now only guard cache-miss/resume sync, cached startup clears stale attempt poison before re-enabling Search, and background refresh failures stay non-blocking",
     "v2.5.64": "Desktop/tablet shell consistency pass: compact large-screen collapse toggles, softer/slimmer shell borders and spacing, aligned neutral/brand color treatment with mobile UX, and safe symmetric corner treatment for collapse bars",
