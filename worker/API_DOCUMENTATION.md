@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.75
+## Version: v2.5.76
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.76**: Trade-show reliability emergency: app version no longer purges persisted snapshots unless explicit cache schema changes, startup lock contention now waits/restores instead of surfacing false interruption, snapshot generation loads reject partial/corrupt shards with fallback recovery, and Worker MAIN uses stable fresh/stale page keys with isolate-local refresh coalescing plus attachment-mode PDF download support
 - **v2.5.75**: Reliability/performance hardening for concurrent sync load: MAIN page responses now use short-lived Cloudflare Cache + isolate single-flight coalescing with duration/status diagnostics, FEEDBACK bumps cache versioning with bounded staleness (120s TTL), and client sync now enforces per-page request timeout, Retry-After-aware jittered backoff, and duplicate background refresh suppression while preserving complete-snapshot safety
 - **v2.5.74**: PDF viewer geometry/print follow-up: commit zoom and pan back into real scroll extents so all pages stay reachable without phantom space, and harden original-PDF printing with isolated targets plus reusable cleanup across Safari/iOS and repeated attempts
 - **v2.5.73**: PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action
