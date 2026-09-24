@@ -853,7 +853,7 @@ async function lookupPdfUrlByPanelId(panelId, env) {
                     `filterByFormula=${encodeURIComponent(`{Control Panel Name}="${variant}"`)}` +
                     `&fields%5B%5D=Control%20Panel%20PDF`;
 
-                const searchResp = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } });
+                const searchResp = await fetch(searchUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
 
                 if (!searchResp.ok) continue;
                 const searchData = await searchResp.json();
@@ -877,7 +877,7 @@ async function lookupPdfUrlByPanelId(panelId, env) {
                 `filterByFormula=${encodeURIComponent(regexFormula)}` +
                 `&fields%5B%5D=Control%20Panel%20PDF&fields%5B%5D=Control%20Panel%20Name`;
 
-            const regexResp = await fetch(regexSearchUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}` } });
+            const regexResp = await fetch(regexSearchUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
 
             if (regexResp.ok) {
                 const regexData = await regexResp.json();
@@ -912,7 +912,7 @@ async function lookupPdfUrlByPanelId(panelId, env) {
     }
 }
 
-async function buildMainPageResult({ pageSize, direction, offset }) {
+async function buildMainPageResult({ env, pageSize, direction, offset }) {
     const upstreamStart = Date.now();
     let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
         `&fields%5B%5D=Control%20Panel%20Name` +
@@ -1176,7 +1176,7 @@ export default {
                     const refreshStatus = existingInflight ? 'INFLIGHT' : 'SCHEDULED';
                     if (!existingInflight) {
                         const refreshPromise = startMainRefresh(inflightKey, async () => {
-                            const result = await buildMainPageResult({ pageSize, direction, offset });
+                            const result = await buildMainPageResult({ env, pageSize, direction, offset });
                             if (workerCache) {
                                 const cacheHeaders = buildMainCacheHeaders(corsHeaders, result.cachedAt, result.feedbackVersion);
                                 const cacheResponse = new Response(result.body, { headers: cacheHeaders });
@@ -1206,7 +1206,7 @@ export default {
                 if (!mainPromise) {
                     startedRefresh = true;
                     mainPromise = startMainRefresh(inflightKey, async () => {
-                        const result = await buildMainPageResult({ pageSize, direction, offset });
+                        const result = await buildMainPageResult({ env, pageSize, direction, offset });
                         if (workerCache) {
                             const cacheHeaders = buildMainCacheHeaders(corsHeaders, result.cachedAt, result.feedbackVersion);
                             const cacheResponse = new Response(result.body, { headers: cacheHeaders });
