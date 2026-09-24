@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.77
+// 🧠 SCHEMATICA ai WORKER v2.5.78
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -160,19 +160,34 @@ function applyAttachmentDisposition(headers, filename) {
     headers.set('X-Content-Type-Options', 'nosniff');
 }
 
-function readAirtableHeaders(env) {
-    const key = env && env.AIRTABLE_READ_KEY;
-    if (!key) throw new Error('Worker configuration error: missing AIRTABLE_READ_KEY');
+function getRequiredSecret(env, name) {
+    const key = env && env[name];
+    if (!key) {
+        const err = new Error(`Worker configuration error: missing ${name}`);
+        err.isWorkerConfigError = true;
+        throw err;
+    }
+    return key;
+}
+
+function createAirtableCredentialError(scope, status, context) {
+    const err = new Error(`Airtable ${scope} access denied${context ? ` (${context})` : ''}: HTTP ${status}`);
+    err.isAirtableCredentialError = true;
+    err.airtableScope = scope;
+    err.upstreamStatus = status;
+    return err;
+}
+
+function mainBaseHeaders(env) {
+    const key = getRequiredSecret(env, 'AIRTABLE_READ_KEY');
     return { 'Authorization': 'Bearer ' + key };
 }
 
-function writeAirtableHeaders(env) {
-    const key = env && env.AIRTABLE_WRITE_KEY;
-    if (!key) throw new Error('Worker configuration error: missing AIRTABLE_WRITE_KEY');
-    return {
-        'Authorization': 'Bearer ' + key,
-        'Content-Type': 'application/json'
-    };
+function usersBaseHeaders(env, { json = false } = {}) {
+    const key = getRequiredSecret(env, 'AIRTABLE_WRITE_KEY');
+    const headers = { 'Authorization': 'Bearer ' + key };
+    if (json) headers['Content-Type'] = 'application/json';
+    return headers;
 }
 
 class NaiveBayes {
@@ -275,8 +290,16 @@ async function fetchAirtablePages(table, maxPages, fields = [], env) {
     do {
         let url = `https://api.airtable.com/v0/${BASE_USERS_ID}/${table}?pageSize=100${fieldQuery}`;
         if (offset) url += `&offset=${encodeURIComponent(offset)}`;
-        const resp = await fetch(url, { headers: readAirtableHeaders(env) });
-        if (!resp.ok) { if (resp.status === 429) { await new Promise(r => setTimeout(r, 500)); continue; } break; }
+        const resp = await fetch(url, { headers: usersBaseHeaders(env) });
+        if (!resp.ok) {
+            if (resp.status === 429) { await new Promise(r => setTimeout(r, 500)); continue; }
+            if (resp.status === 401 || resp.status === 403) {
+                throw createAirtableCredentialError('Users', resp.status, `${table} page fetch`);
+            }
+            const err = new Error(`Airtable ${table} fetch HTTP ${resp.status}`);
+            err.upstreamStatus = resp.status;
+            throw err;
+        }
         const data = await resp.json();
         if (data.records) records.push(...data.records);
         offset = data.offset; pages++;
@@ -289,10 +312,14 @@ async function ensureUsersCache(env) {
     if (CACHE_USERS && (Date.now() - CACHE_USERS_TIME < CACHE_DURATION)) return;
     if (CACHE_USERS_PROMISE) return CACHE_USERS_PROMISE;
     CACHE_USERS_PROMISE = (async () => {
-        const usersResp = await fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: readAirtableHeaders(env) });
+        const usersResp = await fetch(`https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_USERS}`, { headers: usersBaseHeaders(env) });
         if (!usersResp.ok) {
+            if (usersResp.status === 401 || usersResp.status === 403) {
+                throw createAirtableCredentialError('Users', usersResp.status, 'auth bootstrap');
+            }
             const err = new Error(`AuthBackendUnavailable: Users fetch returned HTTP ${usersResp.status}`);
             err.isAuthBackendUnavailable = true;
+            err.upstreamStatus = usersResp.status;
             throw err;
         }
         const usersData = await usersResp.json();
@@ -379,11 +406,14 @@ async function buildMLBackground(env) {
                           `&fields%5B%5D=Items`;
             if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
             
-            const resp = await fetch(mainUrl, { headers: readAirtableHeaders(env) });
+            const resp = await fetch(mainUrl, { headers: mainBaseHeaders(env) });
             if (!resp.ok) {
                 if (resp.status === 429) { 
                     await new Promise(r => setTimeout(r, 500)); 
                     continue; 
+                }
+                if (resp.status === 401 || resp.status === 403) {
+                    throw createAirtableCredentialError('Main', resp.status, 'ML background fetch');
                 }
                 break;
             }
@@ -806,10 +836,13 @@ export default {
                                         `&fields%5B%5D=Control%20Panel%20PDF`;
                         
                         const searchResp = await fetch(searchUrl, { 
-                            headers: readAirtableHeaders(env)
+                            headers: mainBaseHeaders(env)
                         });
                         
                         if (!searchResp.ok) {
+                            if (searchResp.status === 401 || searchResp.status === 403) {
+                                throw createAirtableCredentialError('Main', searchResp.status, 'PDF_BY_ID exact lookup');
+                            }
                             console.error('[PDF_BY_ID] Search failed for variant:', variant, 'Status:', searchResp.status);
                             continue;
                         }
@@ -829,6 +862,7 @@ export default {
                             console.log('[PDF_BY_ID] No records found for variant:', variant);
                         }
                     } catch (error) {
+                        if (error?.isWorkerConfigError || error?.isAirtableCredentialError) throw error;
                         console.error('[PDF_BY_ID] Error searching variant:', variant, 'Error:', error.message);
                         // Continue to next variant on error
                     }
@@ -851,7 +885,7 @@ export default {
                         
                         console.log('[PDF_BY_ID] Trying REGEX pattern:', regexPattern);
                         const regexResp = await fetch(regexSearchUrl, { 
-                            headers: readAirtableHeaders(env)
+                            headers: mainBaseHeaders(env)
                         });
                         
                         if (regexResp.ok) {
@@ -870,9 +904,13 @@ export default {
                                 console.log('[PDF_BY_ID] No REGEX matches found for pattern:', regexPattern);
                             }
                         } else {
+                            if (regexResp.status === 401 || regexResp.status === 403) {
+                                throw createAirtableCredentialError('Main', regexResp.status, 'PDF_BY_ID regex lookup');
+                            }
                             console.warn('[PDF_BY_ID] REGEX search failed with status:', regexResp.status);
                         }
                     } catch (regexError) {
+                        if (regexError?.isWorkerConfigError || regexError?.isAirtableCredentialError) throw regexError;
                         console.error('[PDF_BY_ID] REGEX lookup error:', regexError.message);
                         // Fall through to 404
                     }
@@ -918,6 +956,14 @@ export default {
             try {
                 await ensureAuthAndFeedback(env);
             } catch(e) {
+                if (e.isWorkerConfigError) {
+                    console.error("Worker configuration error:", e.message);
+                    return new Response(JSON.stringify({ error: "AirtableCredentialConfigurationError", scope: "WorkerConfig", message: e.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                }
+                if (e.isAirtableCredentialError) {
+                    console.error("Airtable credential/configuration error:", e.message);
+                    return new Response(JSON.stringify({ error: "AirtableCredentialConfigurationError", scope: e.airtableScope, status: e.upstreamStatus }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                }
                 if (e.isAuthBackendUnavailable) {
                     console.error("Auth backend unavailable:", e.message);
                     return new Response(JSON.stringify({ error: "AuthBackendUnavailable" }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '15' } });
@@ -958,8 +1004,11 @@ export default {
                                 `&sort%5B0%5D%5Bdirection%5D=${direction}`;
 
                     if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
-                    const mainResp = await fetch(mainUrl, { headers: readAirtableHeaders(env) });
+                    const mainResp = await fetch(mainUrl, { headers: mainBaseHeaders(env) });
                     if (!mainResp.ok) {
+                        if (mainResp.status === 401 || mainResp.status === 403) {
+                            throw createAirtableCredentialError('Main', mainResp.status, 'MAIN fetch');
+                        }
                         const err = new Error(`Airtable Main Data HTTP ${mainResp.status}`);
                         err.upstreamStatus = mainResp.status;
                         throw err;
@@ -1120,7 +1169,7 @@ export default {
                 const body = await request.json();
                 const resp = await fetch(fbUrl, {
                     method: 'POST',
-                    headers: writeAirtableHeaders(env),
+                    headers: usersBaseHeaders(env, { json: true }),
                     body: JSON.stringify(body)
                 });
                 if (resp.ok) {
@@ -1144,6 +1193,12 @@ export default {
             return new Response("Invalid Target", { status: 400, headers: corsHeaders });
 
         } catch (error) {
+            if (error?.isWorkerConfigError) {
+                return new Response(JSON.stringify({ error: "AirtableCredentialConfigurationError", scope: "WorkerConfig", message: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+            if (error?.isAirtableCredentialError) {
+                return new Response(JSON.stringify({ error: "AirtableCredentialConfigurationError", scope: error.airtableScope, status: error.upstreamStatus }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
             const status = Number(error?.upstreamStatus) === 429 || Number(error?.upstreamStatus) >= 500 ? 503 : 500;
             const headers = { ...corsHeaders, 'Content-Type': 'application/json' };
             if (status === 503) headers['Retry-After'] = '15';

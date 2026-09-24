@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.77 ---
-const APP_VERSION = "v2.5.77";
+// --- SCHEMATICA ai v2.5.78 ---
+const APP_VERSION = "v2.5.78";
 const VERSION_HISTORY = {
+    "v2.5.78": "Follow-up to PR #169: restore explicit Airtable token routing (Users/Feedback reads + FEEDBACK POST use write key; MAIN/PDF_BY_ID reads use read key) and classify 401/403 credential access failures distinctly from transient 503 outages",
     "v2.5.77": "Mobile sync + PDF transition stability: classify suspension/network-transition interruptions as resumable with bounded restart flow and explicit quota messaging, clear stale PDF stage on document switch, and keep pinch-release scale continuous until crisp commit",
     "v2.5.76": "Trade-show reliability emergency: decouple app version from cache schema to prevent patch-release purges, treat sync-lock contention as WAITING FOR UPDATE with stale-lock heartbeat recovery, reject partial/corrupt snapshot generations, and harden Worker/PDF update stability paths",
     "v2.5.75": "Urgent reliability/performance hardening: Worker MAIN page responses now use short-lived shared cache + isolate single-flight processing to reduce duplicate CPU under concurrency, while client sync adds per-page timeout, Retry-After-aware jittered backoff, and stronger recoverable startup refresh behavior",
