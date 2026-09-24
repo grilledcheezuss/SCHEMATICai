@@ -4714,10 +4714,8 @@ class PdfViewer {
     static _isIsolatedPdfPrintBrowser() {
         const ua = navigator?.userAgent || '';
         const vendor = navigator?.vendor || '';
-        const isIPadDesktopUA = navigator?.platform === 'MacIntel' && Number(navigator?.maxTouchPoints || 0) > 1;
-        const isIOS = /iPad|iPhone|iPod/.test(ua) || isIPadDesktopUA;
         const isSafari = /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/i.test(ua) && /Apple/i.test(vendor || 'Apple');
-        return isIOS || isSafari;
+        return isSafari;
     }
 
     static _createPrintTargetUrl() {
@@ -4832,13 +4830,19 @@ class PdfViewer {
         }
         session.popup = popup;
         const safariMessage = 'Opened the PDF in a new tab because this browser may print the app shell instead of the PDF from the embedded viewer. If the print dialog does not appear automatically, use the browser Print/Share action in that PDF tab.';
+        let autoPrintStarted = false;
         try {
             popup.focus?.();
-            popup.print?.();
+            if (typeof popup.print === 'function') {
+                popup.print();
+                autoPrintStarted = true;
+            }
         } catch (error) {
             console.warn('Isolated PDF print invocation failed:', error);
         }
-        alert(safariMessage);
+        if (!autoPrintStarted) {
+            alert(safariMessage);
+        }
         session.cleanupTimerId = setTimeout(() => this._releasePrintSession('isolated-window-timeout'), this.PRINT_CLEANUP_TIMEOUT_MS);
     }
 

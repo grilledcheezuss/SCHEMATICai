@@ -49,6 +49,7 @@ function wait(ms) {
     const popupPrintCalls = [];
     let objectUrlCounter = 0;
     let popupBlocked = false;
+    let popupPrintMissing = false;
     let navigatorState = {
         userAgent: 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36',
         vendor: 'Google Inc.',
@@ -153,7 +154,7 @@ function wait(ms) {
             return {
                 url,
                 focus() {},
-                print() {
+                print: popupPrintMissing ? undefined : () => {
                     popupPrintCalls.push(url);
                 }
             };
@@ -208,8 +209,15 @@ function wait(ms) {
     PdfViewer.print();
     await wait(10);
     assert(popupPrintCalls.length === 1, 'Safari/iOS print path should target an isolated popup window');
-    assert(alerts.some((message) => /Opened the PDF in a new tab/i.test(message)), 'Safari/iOS print path should explain the isolated PDF print fallback');
+    assert(!alerts.some((message) => /Opened the PDF in a new tab/i.test(message)), 'successful isolated print should not show fallback guidance');
     assert(PdfViewer.isPrinting === false, 'isolated print path should also release the print guard');
+
+    popupPrintMissing = true;
+    PdfViewer.print();
+    await wait(10);
+    assert(alerts.some((message) => /Opened the PDF in a new tab/i.test(message)), 'missing isolated print support should explain the PDF-tab fallback');
+    assert(PdfViewer.isPrinting === false, 'missing isolated print support should also release the print guard');
+    popupPrintMissing = false;
 
     popupBlocked = true;
     PdfViewer.print();
