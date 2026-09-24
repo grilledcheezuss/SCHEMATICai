@@ -4124,6 +4124,8 @@ class PdfViewer {
         viewer.addEventListener('pointermove', this._pointerMoveHandler, { passive: false });
         viewer.addEventListener('pointerup', this._pointerUpHandler, { passive: true });
         viewer.addEventListener('pointercancel', this._pointerUpHandler, { passive: true });
+        viewer.addEventListener('pointerleave', this._pointerUpHandler, { passive: true });
+        viewer.addEventListener('pointerout', this._pointerUpHandler, { passive: true });
         viewer.addEventListener('touchstart', this._touchStartHandler, { passive: true });
         viewer.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
         viewer.addEventListener('touchend', this._touchEndHandler, { passive: true });
@@ -4146,6 +4148,8 @@ class PdfViewer {
             this._zoomInteractionElement.removeEventListener('pointermove', this._pointerMoveHandler);
             this._zoomInteractionElement.removeEventListener('pointerup', this._pointerUpHandler);
             this._zoomInteractionElement.removeEventListener('pointercancel', this._pointerUpHandler);
+            this._zoomInteractionElement.removeEventListener('pointerleave', this._pointerUpHandler);
+            this._zoomInteractionElement.removeEventListener('pointerout', this._pointerUpHandler);
             this._zoomInteractionElement.removeEventListener('touchstart', this._touchStartHandler);
             this._zoomInteractionElement.removeEventListener('touchmove', this._touchMoveHandler);
             this._zoomInteractionElement.removeEventListener('touchend', this._touchEndHandler);
@@ -4659,7 +4663,11 @@ class PdfViewer {
             wrapper.dataset.renderToken = String(renderToken);
             wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
-            if (disablePageAnimations) wrapper.classList.add('no-fade');
+            if (disablePageAnimations) {
+                wrapper.classList.add('no-fade');
+            } else {
+                wrapper.style.animationDelay = `${Math.min((i - 1) * 0.05, 0.5)}s`;
+            }
             
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
