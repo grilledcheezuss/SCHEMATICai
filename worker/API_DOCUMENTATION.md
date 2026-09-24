@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.72
+## Version: v2.5.73
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.73**: PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action
 - **v2.5.72**: PDF interaction/performance follow-up on current main: live viewer-scoped pinch feedback with constrained pan and gesture-end crisp rerender, bounded first-page preload concurrency with in-flight reuse, and duration-only PDF timing diagnostics for preload/cache/network/render stages
 - **v2.5.71**: PDF viewer responsiveness hardening: deterministic 60/80/100/120 start-scale tiers, bounded and coalesced zoom renders, viewer-scoped ctrl/cmd+wheel zoom handling, and stale-render cleanup to avoid overlap during rapid zoom/document replacement
 - **v2.5.70**: Startup/update follow-up: instrumented sync phase timings, replaced the static 99% plateau with fetch/encrypt/save/apply progress, batched snapshot shard persistence into one IndexedDB write, aligned `.reset-btn` styling across breakpoints, and stabilized `.record-card` hover seams without changing `.badge-row`
