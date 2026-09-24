@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.74
+// 🧠 SCHEMATICA ai WORKER v2.5.75
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -36,6 +36,11 @@ let CACHE_AUTH_PROMISE = null;
 let IS_BUILDING_ML = false;
 const CACHE_DURATION = 1000 * 60 * 60; // 1 Hour
 const ENABLE_REQUEST_TIME_ML_TRAINING = false;
+const MAIN_PAGE_CACHE_TTL_SECONDS = 120;
+const MAIN_PAGE_CACHE_CONTROL = `public, max-age=${MAIN_PAGE_CACHE_TTL_SECONDS}`;
+const MAIN_PAGE_CACHE_TTL_MS = MAIN_PAGE_CACHE_TTL_SECONDS * 1000;
+let FEEDBACK_CACHE_VERSION = 0;
+const MAIN_PAGE_INFLIGHT = new Map();
 
 const VOTE_THRESHOLD = 3;
 
@@ -101,6 +106,40 @@ function isValidVoltage(volt) {
 
 function isValidPhase(phase) {
     return ['1', '3'].includes(String(phase));
+}
+
+function normalizeMainSortDirection(rawDirection) {
+    return String(rawDirection || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
+}
+
+function normalizeMainOffset(rawOffset) {
+    if (!rawOffset || typeof rawOffset !== 'string') return '';
+    return rawOffset.trim();
+}
+
+function getMainCacheVersionBucket(now = Date.now()) {
+    const tick = Math.floor(now / MAIN_PAGE_CACHE_TTL_MS);
+    return `${FEEDBACK_CACHE_VERSION}:${tick}`;
+}
+
+function buildMainCacheKey(requestUrl, { pageSize, direction, offset, versionBucket }) {
+    const cacheUrl = new URL(requestUrl);
+    cacheUrl.search = '';
+    cacheUrl.searchParams.set('target', 'MAIN');
+    cacheUrl.searchParams.set('pageSize', String(pageSize));
+    cacheUrl.searchParams.set('sortDirection', direction);
+    cacheUrl.searchParams.set('offset', offset || '');
+    cacheUrl.searchParams.set('cacheVersion', versionBucket);
+    return cacheUrl.toString();
+}
+
+function setMainTimingHeaders(headers, { cacheStatus, authMs = 0, upstreamMs = 0, processMs = 0, serializeMs = 0, totalMs = 0 }) {
+    headers.set('X-SCHEMATICA-MAIN-CACHE', cacheStatus);
+    headers.set('X-SCHEMATICA-AUTH-MS', String(Math.max(0, Math.round(authMs))));
+    headers.set('X-SCHEMATICA-MAIN-UPSTREAM-MS', String(Math.max(0, Math.round(upstreamMs))));
+    headers.set('X-SCHEMATICA-MAIN-PROCESS-MS', String(Math.max(0, Math.round(processMs))));
+    headers.set('X-SCHEMATICA-MAIN-SERIALIZE-MS', String(Math.max(0, Math.round(serializeMs))));
+    headers.set('X-SCHEMATICA-MAIN-TOTAL-MS', String(Math.max(0, Math.round(totalMs))));
 }
 
 class NaiveBayes {
@@ -267,6 +306,7 @@ async function ensureAuthAndFeedback(env) {
             }
         }
         CACHE_TIME = Date.now();
+        FEEDBACK_CACHE_VERSION++;
     })();
     try {
         await CACHE_AUTH_PROMISE;
@@ -823,6 +863,7 @@ export default {
                 }
             }
 
+            const authStart = Date.now();
             // Immediately ready to authenticate!
             try {
                 await ensureAuthAndFeedback(env);
@@ -833,6 +874,7 @@ export default {
                 }
                 throw e;
             }
+            const authMs = Date.now() - authStart;
 
             // Fire and forget ML training in the background
             if (ENABLE_REQUEST_TIME_ML_TRAINING && !CACHE_NB_MODEL && !IS_BUILDING_ML && ctx && ctx.waitUntil) {
@@ -846,102 +888,170 @@ export default {
             }
 
             if (target === 'MAIN') {
-                const offset = url.searchParams.get('offset');
-                const direction = url.searchParams.get('sort[0][direction]') || 'desc';
-                
+                const offset = normalizeMainOffset(url.searchParams.get('offset'));
+                const direction = normalizeMainSortDirection(url.searchParams.get('sort[0][direction]'));
+
                 // Security: Validate and clamp pageSize
                 const pageSizeParam = url.searchParams.get('pageSize');
                 const pageSize = validatePageSize(pageSizeParam);
+                const mainStart = Date.now();
+                const cacheVersionBucket = getMainCacheVersionBucket();
+                const cacheKeyUrl = buildMainCacheKey(request.url, { pageSize, direction, offset, versionBucket: cacheVersionBucket });
+                const cacheKeyRequest = new Request(cacheKeyUrl, { method: 'GET' });
+                const workerCache = (typeof caches !== 'undefined' && caches.default) ? caches.default : null;
 
-                let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
-                              `&fields%5B%5D=Control%20Panel%20Name` +
-                              `&fields%5B%5D=Items` +
-                              `&fields%5B%5D=Control%20Panel%20PDF` +
-                              `&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name` +
-                              `&sort%5B0%5D%5Bdirection%5D=${direction}`;
-                
-                if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
-
-                const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
-                if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
-                const mainJson = await mainResp.json();
-                
-                const activeRecords = (mainJson.records || []).map(r => {
-                    const rawId = String(r.fields['Control Panel Name'] || "");
-                    const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
-                    
-                    const rawItems = r.fields['Items'];
-                    let fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
-                    
-                    // Normalize CAD control codes before case conversion to ensure lowercase codes are also removed
-                    fullDesc = normalizeCADText(fullDesc).toUpperCase();
-                    
-                    const textToParse = fullDesc + " " + cleanId;
-                    const explicit = extractSpecsStrict(textToParse);
-
-                    let finalMfg = explicit.mfg;
-                    let finalEnc = explicit.enc;
-                    let finalHp = explicit.hp;
-                    let finalVolt = explicit.volt;
-                    let finalPhase = explicit.phase;
-                    
-                    if (CACHE_NB_MODEL) {
-                        const bayesText = textToParse.slice(0, 1500); 
-                        if (!finalMfg) finalMfg = CACHE_NB_MODEL.predict(bayesText, 'mfg');
-                        if (!finalEnc) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
-                        if (!finalHp) {
-                            const predictedHp = CACHE_NB_MODEL.predict(bayesText, 'hp');
-                            if (predictedHp && isValidHP(predictedHp)) finalHp = predictedHp;
-                        }
-                        if (!finalVolt) {
-                            const predictedVolt = CACHE_NB_MODEL.predict(bayesText, 'volt');
-                            if (predictedVolt && isValidVoltage(predictedVolt)) finalVolt = predictedVolt;
-                        }
-                        if (!finalPhase) {
-                            const predictedPhase = CACHE_NB_MODEL.predict(bayesText, 'phase');
-                            if (predictedPhase && isValidPhase(predictedPhase)) finalPhase = predictedPhase;
-                        }
+                if (workerCache) {
+                    const cached = await workerCache.match(cacheKeyRequest);
+                    if (cached) {
+                        const hitHeaders = new Headers(cached.headers);
+                        setMainTimingHeaders(hitHeaders, {
+                            cacheStatus: 'HIT',
+                            authMs,
+                            upstreamMs: 0,
+                            processMs: 0,
+                            serializeMs: 0,
+                            totalMs: Date.now() - mainStart
+                        });
+                        console.info(`[MAIN] cache=HIT authMs=${authMs} totalMs=${Date.now() - mainStart} pageSize=${pageSize} offset=${offset ? 'set' : 'none'} direction=${direction}`);
+                        return new Response(cached.body, { status: cached.status, headers: hitHeaders });
                     }
+                }
 
-                    let finalCategory = null;
+                const inflightKey = cacheKeyUrl;
+                const hasInflight = MAIN_PAGE_INFLIGHT.has(inflightKey);
+                let mainPromise = MAIN_PAGE_INFLIGHT.get(inflightKey);
 
-                    const overrides = CACHE_HEALED[cleanId];
-                    if (overrides) {
-                        if (overrides.mfg) finalMfg = overrides.mfg;
-                        if (overrides.hp) finalHp = overrides.hp;
-                        if (overrides.volt) finalVolt = overrides.volt;
-                        if (overrides.phase) finalPhase = overrides.phase;
-                        if (overrides.enc) finalEnc = overrides.enc;
-                        if (overrides.category) finalCategory = overrides.category;
+                if (!mainPromise) {
+                    mainPromise = (async () => {
+                        const upstreamStart = Date.now();
+                        let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
+                                    `&fields%5B%5D=Control%20Panel%20Name` +
+                                    `&fields%5B%5D=Items` +
+                                    `&fields%5B%5D=Control%20Panel%20PDF` +
+                                    `&sort%5B0%5D%5Bfield%5D=Control%20Panel%20Name` +
+                                    `&sort%5B0%5D%5Bdirection%5D=${direction}`;
+
+                        if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
+                        const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
+                        if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
+                        const mainJson = await mainResp.json();
+                        const upstreamMs = Date.now() - upstreamStart;
+
+                        const processStart = Date.now();
+                        const activeRecords = (mainJson.records || []).map(r => {
+                            const rawId = String(r.fields['Control Panel Name'] || "");
+                            const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
+
+                            const rawItems = r.fields['Items'];
+                            let fullDesc = (typeof rawItems === 'string' ? rawItems : Array.isArray(rawItems) ? rawItems.join(' ') : "");
+
+                            // Normalize CAD control codes before case conversion to ensure lowercase codes are also removed
+                            fullDesc = normalizeCADText(fullDesc).toUpperCase();
+
+                            const textToParse = fullDesc + " " + cleanId;
+                            const explicit = extractSpecsStrict(textToParse);
+
+                            let finalMfg = explicit.mfg;
+                            let finalEnc = explicit.enc;
+                            let finalHp = explicit.hp;
+                            let finalVolt = explicit.volt;
+                            let finalPhase = explicit.phase;
+
+                            if (CACHE_NB_MODEL) {
+                                const bayesText = textToParse.slice(0, 1500);
+                                if (!finalMfg) finalMfg = CACHE_NB_MODEL.predict(bayesText, 'mfg');
+                                if (!finalEnc) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
+                                if (!finalHp) {
+                                    const predictedHp = CACHE_NB_MODEL.predict(bayesText, 'hp');
+                                    if (predictedHp && isValidHP(predictedHp)) finalHp = predictedHp;
+                                }
+                                if (!finalVolt) {
+                                    const predictedVolt = CACHE_NB_MODEL.predict(bayesText, 'volt');
+                                    if (predictedVolt && isValidVoltage(predictedVolt)) finalVolt = predictedVolt;
+                                }
+                                if (!finalPhase) {
+                                    const predictedPhase = CACHE_NB_MODEL.predict(bayesText, 'phase');
+                                    if (predictedPhase && isValidPhase(predictedPhase)) finalPhase = predictedPhase;
+                                }
+                            }
+
+                            let finalCategory = null;
+
+                            const overrides = CACHE_HEALED[cleanId];
+                            if (overrides) {
+                                if (overrides.mfg) finalMfg = overrides.mfg;
+                                if (overrides.hp) finalHp = overrides.hp;
+                                if (overrides.volt) finalVolt = overrides.volt;
+                                if (overrides.phase) finalPhase = overrides.phase;
+                                if (overrides.enc) finalEnc = overrides.enc;
+                                if (overrides.category) finalCategory = overrides.category;
+                            }
+
+                            const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
+                            const pdfStatus = pdfUrl ? "present" : "missing";
+
+                            return {
+                                id: cleanId,
+                                displayId: "CP-" + cleanId,
+                                desc: fullDesc,
+                                pdfUrl,
+                                pdfStatus,
+                                mfg: finalMfg,
+                                hp: finalHp,
+                                volt: finalVolt,
+                                phase: finalPhase,
+                                enc: finalEnc,
+                                category: finalCategory,
+                                reject_keywords: overrides ? (overrides.reject_keywords || []) : [],
+                                mfgV: explicit.mfgV || false,
+                                hpV: explicit.hpV || false,
+                                voltV: explicit.voltV || false,
+                                phaseV: explicit.phaseV || false,
+                                encV: explicit.encV || false
+                            };
+                        });
+                        const processMs = Date.now() - processStart;
+                        const serializeStart = Date.now();
+                        const body = JSON.stringify({ records: activeRecords, offset: mainJson.offset });
+                        const serializeMs = Date.now() - serializeStart;
+                        return { body, upstreamMs, processMs, serializeMs };
+                    })();
+                    MAIN_PAGE_INFLIGHT.set(inflightKey, mainPromise);
+                }
+
+                let mainResult;
+                try {
+                    mainResult = await mainPromise;
+                } finally {
+                    if (!hasInflight && MAIN_PAGE_INFLIGHT.get(inflightKey) === mainPromise) {
+                        MAIN_PAGE_INFLIGHT.delete(inflightKey);
                     }
+                }
 
-                    const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
-                    const pdfStatus = pdfUrl ? "present" : "missing";
-
-                    return {
-                        id: cleanId,
-                        displayId: "CP-" + cleanId,
-                        desc: fullDesc,
-                        pdfUrl,
-                        pdfStatus,
-                        mfg: finalMfg,
-                        hp: finalHp,
-                        volt: finalVolt,
-                        phase: finalPhase,
-                        enc: finalEnc,
-                        category: finalCategory,
-                        reject_keywords: overrides ? (overrides.reject_keywords || []) : [],
-                        mfgV: explicit.mfgV || false,
-                        hpV: explicit.hpV || false,
-                        voltV: explicit.voltV || false,
-                        phaseV: explicit.phaseV || false,
-                        encV: explicit.encV || false
-                    };
+                const totalMs = Date.now() - mainStart;
+                const cacheStatus = hasInflight ? 'COALESCED' : 'MISS';
+                const responseHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
+                responseHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
+                setMainTimingHeaders(responseHeaders, {
+                    cacheStatus,
+                    authMs,
+                    upstreamMs: mainResult.upstreamMs,
+                    processMs: mainResult.processMs,
+                    serializeMs: mainResult.serializeMs,
+                    totalMs
                 });
+                const response = new Response(mainResult.body, { headers: responseHeaders });
 
-                return new Response(JSON.stringify({ records: activeRecords, offset: mainJson.offset }), { 
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-                });
+                if (workerCache) {
+                    const cacheHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
+                    cacheHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
+                    const cacheResponse = new Response(mainResult.body, { headers: cacheHeaders });
+                    if (ctx && ctx.waitUntil) ctx.waitUntil(workerCache.put(cacheKeyRequest, cacheResponse));
+                    else await workerCache.put(cacheKeyRequest, cacheResponse);
+                }
+
+                console.info(`[MAIN] cache=${cacheStatus} authMs=${authMs} upstreamMs=${mainResult.upstreamMs} processMs=${mainResult.processMs} serializeMs=${mainResult.serializeMs} totalMs=${totalMs} pageSize=${pageSize} offset=${offset ? 'set' : 'none'} direction=${direction}`);
+                return response;
             }
 
             if (target === 'FEEDBACK') {
@@ -952,7 +1062,7 @@ export default {
                     headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                CACHE_TIME = 0; CACHE_USERS = null;
+                CACHE_TIME = 0; CACHE_USERS = null; CACHE_HEALED = {}; CACHE_AUTH_PROMISE = null; FEEDBACK_CACHE_VERSION++;
                 return new Response(JSON.stringify(await resp.json()), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
