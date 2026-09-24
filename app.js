@@ -1091,10 +1091,10 @@ class DemoManager {
             if (rail) rail.style.display = 'none';
             if (restoreBtn) restoreBtn.style.display = 'none';
             if (leftCtx) leftCtx.style.display = 'none';
+            document.body.classList.remove('demo-mode', 'editor-active', 'gen-minimized');
             return;
         }
 
-        if (leftCtx) leftCtx.style.display = 'block';
         document.body.classList.add('demo-mode');
 
         if (UI.isSmallMobile()) {
@@ -1102,10 +1102,12 @@ class DemoManager {
             panel.classList.remove('minimized');
             if (rail) rail.style.display = 'none';
             if (restoreBtn) restoreBtn.style.display = 'none';
+            if (leftCtx) leftCtx.style.display = 'none';
             document.body.classList.remove('editor-active', 'gen-minimized');
             return;
         }
 
+        if (leftCtx) leftCtx.style.display = 'block';
         panel.classList.remove('minimized');
         panel.style.display = '';
         if (restoreBtn) restoreBtn.style.display = 'none';
@@ -1121,9 +1123,6 @@ class DemoManager {
             document.body.classList.remove('gen-minimized');
         }
 
-        document.querySelectorAll('button[onclick="PdfExporter.preview()"]').forEach((previewBtn) => {
-            previewBtn.disabled = false;
-        });
     }
 
     static toggleGeneratorSidebar() {
@@ -3499,8 +3498,15 @@ class PdfExporter {
         const btn = (window.event && window.event.currentTarget && window.event.currentTarget.tagName === 'BUTTON')
             ? window.event.currentTarget
             : document.querySelector('#generator-panel button[onclick="PdfExporter.preview()"], #context-preview-btn');
-        const origText = btn ? btn.innerText : '';
-        if (btn) { btn.innerText = "⏳ GENERATING..."; btn.disabled = true; }
+        const previewButtons = Array.from(document.querySelectorAll('button[onclick="PdfExporter.preview()"]'));
+        const previewButtonState = new Map(previewButtons.map((previewBtn) => [previewBtn, {
+            text: previewBtn.innerText,
+            disabled: previewBtn.disabled
+        }]));
+        previewButtons.forEach((previewBtn) => {
+            previewBtn.disabled = true;
+        });
+        if (btn) btn.innerText = "⏳ GENERATING...";
         
         try {
             const pdfBytes = await this.generateRedactedPdf();
@@ -3515,9 +3521,9 @@ class PdfExporter {
             console.error(e);
             alert("Preview Failed: " + e.message);
         } finally {
-            if (btn) { btn.innerText = origText; btn.disabled = false; }
-            document.querySelectorAll('button[onclick="PdfExporter.preview()"]').forEach((previewBtn) => {
-                previewBtn.disabled = false;
+            previewButtonState.forEach((state, previewBtn) => {
+                previewBtn.innerText = state.text;
+                previewBtn.disabled = state.disabled;
             });
         }
     }
@@ -4629,7 +4635,11 @@ class PdfViewer {
         link.href = this.currentBlobUrl;
         link.download = this._buildDownloadFilename();
         link.rel = 'noopener';
+        document.body.appendChild(link);
         link.click();
+        if (link.parentNode === document.body) {
+            document.body.removeChild(link);
+        }
     }
 
     static print() {
@@ -4895,7 +4905,10 @@ class PdfViewer {
         }
         if (anchorContext && Number.isFinite(anchorContext.contentY) && Number.isFinite(anchorContext.anchorOffsetY)) {
             const scaledContentY = anchorContext.contentY * (Number.isFinite(anchorContext.scaleRatio) ? anchorContext.scaleRatio : 1);
-            const targetScrollTop = stage.offsetTop + scaledContentY + this._committedPanY - anchorContext.anchorOffsetY;
+            const committedPan = this._clampPan(this._committedPanX, this._committedPanY, 1);
+            this._committedPanX = committedPan.x;
+            this._committedPanY = committedPan.y;
+            const targetScrollTop = stage.offsetTop + scaledContentY + committedPan.y - anchorContext.anchorOffsetY;
             const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
             container.scrollTop = Math.max(0, Math.min(maxScrollTop, targetScrollTop));
         } else if (Number.isFinite(priorScrollRatio)) {
