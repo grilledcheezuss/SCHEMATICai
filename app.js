@@ -4748,8 +4748,17 @@ class UI {
             return;
         }
 
-        this.mobilePanels.searchVisible = false;
-        this.mobilePanels.resultsVisible = !!hasResults;
+        if (hasResults) {
+            this.mobilePanels.searchVisible = false;
+            this.mobilePanels.resultsVisible = true;
+        } else {
+            if (!this.mobileManualPanelState.search) {
+                this.mobilePanels.searchVisible = true;
+            }
+            if (!this.mobileManualPanelState.results) {
+                this.mobilePanels.resultsVisible = false;
+            }
+        }
 
         this.syncMobileLayout();
     }
@@ -4779,7 +4788,7 @@ class UI {
                 }
             } else if (SearchEngine.lastCriteria !== null) {
                 if (!this.mobileManualPanelState.search) {
-                    this.mobilePanels.searchVisible = !controls?.classList.contains('collapsed');
+                    this.mobilePanels.searchVisible = true;
                 }
                 if (!this.mobileManualPanelState.results) {
                     this.mobilePanels.resultsVisible = false;
