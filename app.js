@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.64 ---
-const APP_VERSION = "v2.5.64";
+// --- SCHEMATICA ai v2.5.65 ---
+const APP_VERSION = "v2.5.65";
 const VERSION_HISTORY = {
+    "v2.5.65": "Reliability hardening: blocking sync attempts now only guard cache-miss/resume sync, cached startup clears stale attempt poison before re-enabling Search, and background refresh failures stay non-blocking",
     "v2.5.64": "Desktop/tablet shell consistency pass: compact large-screen collapse toggles, softer/slimmer shell borders and spacing, aligned neutral/brand color treatment with mobile UX, and safe symmetric corner treatment for collapse bars",
     "v2.5.63": "Reliability/performance update: added one-hour stale-cache revalidation with background refresh + in-flight guards, atomic generation-based encrypted snapshot persistence with safe swap semantics, and high-DPI PDF.js rendering (DPR-aware backing store, 2x cap, pixel-budget guard) for sharper mobile PDF quality",
     "v2.5.62": "Mobile UI polish: removed Search action-row balloon shell, unified thin raised/icy edge treatment across key chrome surfaces, successful Search now forces Results open, increased mobile Results height for at least two cards where viewport permits, and aligned SHOW/HIDE + record count typography with parameter labels",
@@ -458,6 +459,8 @@ class NetworkService {
 }
 
 class DataLoader {
+    static INITIAL_SYNC_ATTEMPTS_KEY = 'cox_sync_attempts';
+    static MAX_INITIAL_SYNC_ATTEMPTS = 5;
     static SYNC_TIMESTAMP_KEY = 'cox_db_synced_at';
     static SYNC_LOCK_KEY = 'cox_db_sync_lock_at';
     static SYNC_DB_LOCK_KEY = '__cox_db_sync_lock';
@@ -484,6 +487,43 @@ class DataLoader {
     }
     static shouldAbortEmptySync({ fetchedCount, hadExistingData }) {
         return fetchedCount === 0 && (hadExistingData || this.isCacheComplete());
+    }
+    static getBlockingSyncAttempts() {
+        const attempts = parseInt(localStorage.getItem(this.INITIAL_SYNC_ATTEMPTS_KEY) || '0', 10);
+        return Number.isFinite(attempts) && attempts > 0 ? attempts : 0;
+    }
+    static clearBlockingSyncAttempts() {
+        localStorage.setItem(this.INITIAL_SYNC_ATTEMPTS_KEY, '0');
+    }
+    static incrementBlockingSyncAttempts() {
+        const next = this.getBlockingSyncAttempts() + 1;
+        localStorage.setItem(this.INITIAL_SYNC_ATTEMPTS_KEY, String(next));
+        return next;
+    }
+    static restoreSearchReadyState(btn) {
+        if (!btn) return;
+        btn.classList.remove('warning', 'error');
+        btn.disabled = false;
+        btn.innerText = "SEARCH";
+    }
+    static showSyncInterrupted(btn) {
+        if (!btn) return;
+        btn.classList.remove('error');
+        btn.classList.add('warning');
+        btn.innerText = "⚠️ SYNC INTERRUPTED";
+        btn.disabled = false;
+        btn.onclick = () => {
+            this.clearBlockingSyncAttempts();
+            localStorage.removeItem(this.SYNC_LOCK_KEY);
+            DB.deleteChunk(this.SYNC_DB_LOCK_KEY)
+                .catch(() => {})
+                .finally(() => location.reload());
+        };
+    }
+    static queueBackgroundRefresh(options = {}) {
+        Promise.resolve()
+            .then(() => this.maybeRefreshStaleCache(options))
+            .catch(err => console.warn('Background refresh bootstrap failed; keeping existing cache intact', err));
     }
     static async acquireSyncLock(now = Date.now()) {
         if (this._inFlightSync) return false;
@@ -552,46 +592,80 @@ class DataLoader {
         }
 
         console.log("🚀 Starting Preload...");
-        const btn = document.getElementById('searchBtn'); btn.disabled = true; btn.innerText = "⏳ INITIALIZING...";
+        const btn = document.getElementById('searchBtn');
+        let restoredFromCache = false;
+        let queueStartupRefresh = false;
+        let blockingSyncStarted = false;
+        let blockingSyncSucceeded = false;
 
-        btn.innerText = "🔒 PREPARING...";
-        await new Promise(r => setTimeout(r, 100)); 
-        const p = localStorage.getItem('cox_pass'); await CacheService.prepareKey(p); await DB.deleteLegacy();
-        let attempts = parseInt(localStorage.getItem('cox_sync_attempts') || '0');
-        if(attempts > 5) { btn.innerText = "⚠️ SYNC INTERRUPTED"; btn.classList.add('warning'); btn.disabled = false; btn.onclick = () => { localStorage.setItem('cox_sync_attempts', '0'); location.reload(); }; return; }
-        localStorage.setItem('cox_sync_attempts', (attempts + 1).toString());
-        
-        const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
-        const hasCompleteCache = !!hasData && this.isCacheComplete();
-        
-        if(hasCompleteCache) {
-            localStorage.setItem('cox_sync_attempts', '0');
-            btn.innerText = "SEARCH"; btn.disabled = false;
-            UI.pop();
-            this.installLifecycleRefreshHooks();
-            this.maybeRefreshStaleCache({ reason: 'startup' });
-            return;
-        }
+        btn.disabled = true;
+        btn.classList.remove('warning', 'error');
+        btn.innerText = "⏳ INITIALIZING...";
 
-        if(hasData) {
-            btn.innerText = "⬇️ RESUMING...";
-        } else {
-            btn.innerText = "⏳ INITIALIZING SYNC...";
-            await new Promise(r => setTimeout(r, 200));
-            btn.innerText = "⬇️ SYNCING...";
-        }
+        try {
+            btn.innerText = "🔒 PREPARING...";
+            await new Promise(r => setTimeout(r, 100)); 
+            const p = localStorage.getItem('cox_pass');
+            await CacheService.prepareKey(p);
+            await DB.deleteLegacy();
 
-        const syncResult = await this.fetchPartition('desc', btn, { background: false });
-        if(syncResult?.success) {
-            btn.innerText = "✅ FINALIZING...";
-            localStorage.setItem('cox_sync_attempts', '0');
-            UI.pop();
-            btn.innerText = "SEARCH"; btn.disabled = false;
-            this.installLifecycleRefreshHooks();
-        } else if (!btn.classList.contains('error')) {
-            btn.classList.add('warning');
-            btn.innerText = "⚠️ SYNC INTERRUPTED";
-            btn.disabled = false;
+            const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
+            const hasCompleteCache = !!hasData && this.isCacheComplete();
+            
+            if (hasCompleteCache) {
+                restoredFromCache = true;
+                UI.pop();
+                this.installLifecycleRefreshHooks();
+                queueStartupRefresh = true;
+                return;
+            }
+
+            const attempts = this.getBlockingSyncAttempts();
+            if (attempts > this.MAX_INITIAL_SYNC_ATTEMPTS) {
+                this.showSyncInterrupted(btn);
+                return;
+            }
+
+            blockingSyncStarted = true;
+            this.incrementBlockingSyncAttempts();
+
+            if(hasData) {
+                btn.innerText = "⬇️ RESUMING...";
+            } else {
+                btn.innerText = "⏳ INITIALIZING SYNC...";
+                await new Promise(r => setTimeout(r, 200));
+                btn.innerText = "⬇️ SYNCING...";
+            }
+
+            const syncResult = await this.fetchPartition('desc', btn, { background: false });
+            if(syncResult?.success) {
+                blockingSyncSucceeded = true;
+                btn.innerText = "✅ FINALIZING...";
+                UI.pop();
+                this.installLifecycleRefreshHooks();
+                return;
+            }
+
+            if (!btn.classList.contains('error')) {
+                this.showSyncInterrupted(btn);
+            }
+        } catch (e) {
+            console.error("Preload Error", e);
+            if (!restoredFromCache && !btn.classList.contains('error')) {
+                this.showSyncInterrupted(btn);
+            }
+        } finally {
+            if (restoredFromCache || blockingSyncSucceeded) {
+                this.clearBlockingSyncAttempts();
+                this.restoreSearchReadyState(btn);
+            } else if (blockingSyncStarted) {
+                this.clearBlockingSyncAttempts();
+                if (!btn.classList.contains('error') && btn.disabled) this.showSyncInterrupted(btn);
+            }
+
+            if (restoredFromCache && queueStartupRefresh) {
+                this.queueBackgroundRefresh({ reason: 'startup' });
+            }
         }
     }
     
@@ -599,21 +673,27 @@ class DataLoader {
         localStorage.removeItem('cox_db_complete');
         localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
         localStorage.removeItem(this.SYNC_LOCK_KEY);
-        localStorage.setItem('cox_sync_attempts', '0');
+        this.clearBlockingSyncAttempts();
         DB.deleteChunk(this.SYNC_DB_LOCK_KEY).finally(() => location.reload());
     }
 
     static async maybeRefreshStaleCache({ reason = 'startup' } = {}) {
-        if (!this.shouldRefreshStaleCache()) return;
-        if (!await this.acquireSyncLock()) return;
+        let hasLock = false;
         try {
-            if (!this.shouldRefreshStaleCache()) return;
+            if (!this.shouldRefreshStaleCache()) return { success: false, skipped: true };
+            hasLock = await this.acquireSyncLock();
+            if (!hasLock) return { success: false, skipped: true };
+            if (!this.shouldRefreshStaleCache()) return { success: false, skipped: true };
             const result = await this.fetchPartition('desc', null, { background: true, reason });
             if (result?.success) {
                 UI.pop();
             }
+            return result;
+        } catch (e) {
+            console.warn('Background refresh failed before completion; keeping existing cache intact', e);
+            return { success: false, error: e };
         } finally {
-            await this.releaseSyncLock();
+            if (hasLock) await this.releaseSyncLock();
         }
     }
     

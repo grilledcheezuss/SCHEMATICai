@@ -3,6 +3,9 @@ const path = require('path');
 
 const appJsPath = path.join(__dirname, '..', 'app.js');
 const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+const appVersionMatch = appJsContent.match(/const APP_VERSION = "(v[^"]+)"/);
+if (!appVersionMatch) throw new Error('Could not determine APP_VERSION from app.js');
+const APP_VERSION = appVersionMatch[1];
 
 function assert(condition, message) {
     if (!condition) {
@@ -42,10 +45,56 @@ function createLocalStorage() {
     };
 }
 
+function createClassList() {
+    const classes = new Set();
+    return {
+        add: (...tokens) => tokens.forEach(token => classes.add(token)),
+        remove: (...tokens) => tokens.forEach(token => classes.delete(token)),
+        contains: token => classes.has(token),
+        toArray: () => [...classes]
+    };
+}
+
+function createSearchButton() {
+    return {
+        disabled: false,
+        innerText: 'SEARCH',
+        onclick: null,
+        classList: createClassList()
+    };
+}
+
 const localStorage = createLocalStorage();
 const uiState = { pop: () => {} };
+const dbState = {
+    claimLock: async () => false,
+    releaseLock: async () => {},
+    deleteChunk: async () => {},
+    deleteLegacy: async () => {},
+    deleteDatabase: async () => {}
+};
+const cacheState = {};
+const searchBtn = createSearchButton();
+const authOverlay = { classList: createClassList() };
+const documentState = {
+    visibilityState: 'visible',
+    addEventListener: () => {},
+    getElementById: id => {
+        if (id === 'searchBtn') return searchBtn;
+        if (id === 'auth-overlay') return authOverlay;
+        return null;
+    }
+};
+const windowState = { LOCAL_DB: [] };
+const locationState = {
+    reloadCalls: 0,
+    reload() {
+        this.reloadCalls++;
+    }
+};
 const DataLoaderClassCode = extractClass('DataLoader', appJsContent);
 const DataLoader = new Function(
+    'APP_VERSION',
     'DATA_SYNC_MAX_AGE_MS',
     'DB',
     'localStorage',
@@ -59,21 +108,75 @@ const DataLoader = new Function(
     'location',
     `${DataLoaderClassCode}; return DataLoader;`
 )(
+    APP_VERSION,
     60 * 60 * 1000,
-    { claimLock: async () => false, releaseLock: async () => {}, deleteChunk: async () => {} },
+    dbState,
     localStorage,
-    { LOCAL_DB: [] },
-    { addEventListener: () => {}, visibilityState: 'visible' },
+    windowState,
+    documentState,
     uiState,
     {},
+    cacheState,
     {},
     {},
-    {},
-    {}
+    locationState
 );
+const originalMethods = {
+    acquireSyncLock: DataLoader.acquireSyncLock,
+    releaseSyncLock: DataLoader.releaseSyncLock,
+    fetchPartition: DataLoader.fetchPartition,
+    installLifecycleRefreshHooks: DataLoader.installLifecycleRefreshHooks,
+    maybeRefreshStaleCache: DataLoader.maybeRefreshStaleCache
+};
+
+function resetHarness() {
+    ['cox_db_complete', 'cox_db_synced_at', 'cox_db_sync_lock_at', 'cox_sync_attempts', 'cox_user', 'cox_pass', 'cox_version'].forEach(key => localStorage.removeItem(key));
+    windowState.LOCAL_DB.length = 0;
+    windowState.ID_MAP = new Map();
+    windowState.FOUND_MFGS = new Set();
+    windowState.FOUND_ENCS = new Set();
+    searchBtn.disabled = false;
+    searchBtn.innerText = 'SEARCH';
+    searchBtn.onclick = null;
+    searchBtn.classList = createClassList();
+    authOverlay.classList = createClassList();
+    locationState.reloadCalls = 0;
+    uiState.pop = () => {};
+    documentState.addEventListener = () => {};
+    documentState.visibilityState = 'visible';
+    Object.assign(dbState, {
+        claimLock: async () => false,
+        releaseLock: async () => {},
+        deleteChunk: async () => {},
+        deleteLegacy: async () => {},
+        deleteDatabase: async () => {}
+    });
+    Object.assign(cacheState, {
+        prepareKey: async () => {},
+        loadAllWithProgress: async () => null,
+        saveSnapshot: async () => {}
+    });
+    DataLoader.acquireSyncLock = originalMethods.acquireSyncLock;
+    DataLoader.releaseSyncLock = originalMethods.releaseSyncLock;
+    DataLoader.fetchPartition = originalMethods.fetchPartition;
+    DataLoader.installLifecycleRefreshHooks = originalMethods.installLifecycleRefreshHooks;
+    DataLoader.maybeRefreshStaleCache = originalMethods.maybeRefreshStaleCache;
+}
+
+function assertEqual(actual, expected, message) {
+    if (actual !== expected) {
+        throw new Error(`Assertion failed: ${message}. Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    }
+}
+
+async function flushAsync() {
+    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 0));
+}
 
 (async () => {
     console.log('🧪 Testing DataLoader stale-refresh orchestration');
+    resetHarness();
 
     // shouldAbortEmptySync: preserves snapshot when cache already complete
     localStorage.setItem('cox_db_complete', 'true');
@@ -114,6 +217,87 @@ const DataLoader = new Function(
     await DataLoader.maybeRefreshStaleCache({ reason: 'test-failure' });
     assert(popCalls === 1, 'failed stale refresh should not call UI.pop');
     assert(releaseCalls === 2, 'failed stale refresh should still release lock');
+
+    resetHarness();
+    console.log('🧪 Testing preload cached-startup recovery');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_version', APP_VERSION);
+    localStorage.setItem('cox_db_complete', 'true');
+    localStorage.setItem('cox_sync_attempts', '7');
+    cacheState.loadAllWithProgress = async () => true;
+    let preloadPopCalls = 0;
+    let backgroundRefreshCalls = 0;
+    uiState.pop = () => { preloadPopCalls++; };
+    DataLoader.installLifecycleRefreshHooks = () => {};
+    DataLoader.maybeRefreshStaleCache = async () => {
+        backgroundRefreshCalls++;
+        throw new Error('background refresh failure');
+    };
+    await DataLoader.preload();
+    await flushAsync();
+    assertEqual(preloadPopCalls, 1, 'cached startup should populate UI once');
+    assertEqual(backgroundRefreshCalls, 1, 'cached startup should queue one non-blocking refresh attempt');
+    assertEqual(searchBtn.innerText, 'SEARCH', 'cached startup should restore search button label');
+    assert(searchBtn.disabled === false, 'cached startup should re-enable search button');
+    assertEqual(localStorage.getItem('cox_sync_attempts'), '0', 'cached startup should clear stale blocking sync attempts');
+    assert(!searchBtn.classList.contains('warning'), 'cached startup should not leave warning styling behind');
+
+    resetHarness();
+    console.log('🧪 Testing preload interrupt recovery path');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_version', APP_VERSION);
+    localStorage.setItem('cox_sync_attempts', '6');
+    cacheState.loadAllWithProgress = async () => null;
+    let deleteLockCalls = 0;
+    dbState.deleteChunk = async () => { deleteLockCalls++; };
+    await DataLoader.preload();
+    assertEqual(searchBtn.innerText, '⚠️ SYNC INTERRUPTED', 'stale blocking attempts with no cache should show recovery state');
+    assert(searchBtn.disabled === false, 'recovery state should leave the search button clickable');
+    assert(typeof searchBtn.onclick === 'function', 'recovery state should provide a click handler');
+    await searchBtn.onclick();
+    await flushAsync();
+    assertEqual(localStorage.getItem('cox_sync_attempts'), '0', 'recovery click should clear stale blocking sync attempts');
+    assertEqual(deleteLockCalls, 1, 'recovery click should clear the sync lock metadata');
+    assertEqual(locationState.reloadCalls, 1, 'recovery click should reload the app');
+
+    resetHarness();
+    console.log('🧪 Testing preload handled blocking-sync failure');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_version', APP_VERSION);
+    cacheState.loadAllWithProgress = async () => null;
+    DataLoader.fetchPartition = async () => ({ success: false });
+    await DataLoader.preload();
+    assertEqual(searchBtn.innerText, '⚠️ SYNC INTERRUPTED', 'handled blocking sync failure should show interrupted state');
+    assert(searchBtn.disabled === false, 'handled blocking sync failure should re-enable the button');
+    assertEqual(localStorage.getItem('cox_sync_attempts'), '0', 'handled blocking sync failure should clear the blocking sync attempts');
+
+    resetHarness();
+    console.log('🧪 Testing preload handled auth/service/API-style failure recovery');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_version', APP_VERSION);
+    cacheState.loadAllWithProgress = async () => null;
+    DataLoader.fetchPartition = async (_dir, btn) => {
+        btn.classList.add('error');
+        btn.disabled = false;
+        btn.innerText = 'INVALID CREDENTIALS';
+        return { success: false, status: 401 };
+    };
+    await DataLoader.preload();
+    assertEqual(searchBtn.innerText, 'INVALID CREDENTIALS', 'handled auth/service/API failure should preserve the blocking error UI');
+    assert(searchBtn.classList.contains('error'), 'handled auth/service/API failure should preserve error styling');
+    assertEqual(localStorage.getItem('cox_sync_attempts'), '0', 'handled auth/service/API failure should still clear blocking sync attempts');
+
+    resetHarness();
+    console.log('🧪 Testing background refresh guard failure');
+    localStorage.setItem('cox_db_complete', 'true');
+    localStorage.setItem('cox_db_synced_at', String(Date.now() - (2 * 60 * 60 * 1000)));
+    DataLoader.acquireSyncLock = async () => { throw new Error('lock failure'); };
+    const guardedRefreshResult = await DataLoader.maybeRefreshStaleCache({ reason: 'test-lock-failure' });
+    assert(guardedRefreshResult && guardedRefreshResult.success === false, 'background refresh lock failure should be returned as a handled failure');
 
     console.log('✅ DataLoader stale-refresh tests passed');
 })().catch((err) => {

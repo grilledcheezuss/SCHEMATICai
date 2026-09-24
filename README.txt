@@ -1,14 +1,14 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.63)
+CLOUDFLARE WORKER SCRIPT (v2.5.65)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.63):
+RECENT UPDATES (v2.5.65):
 
-- Added one-hour client cache freshness revalidation (`DATA_SYNC_MAX_AGE_MS`) with startup + foreground lifecycle checks and no polling loop
-- Cached encrypted panel data still loads immediately; stale caches now refresh in the background with in-flight locking and timestamp guards
-- MAIN-data refresh now uses full-snapshot semantics (add/update/delete correctness) and swaps active in-memory data only after complete fetch + successful persistence
-- IndexedDB shard persistence is generation-based and non-destructive: new generation is written first, then activated atomically, then old generation is cleaned up
-- PDF.js rendering now uses DPR-aware backing resolution (capped at 2x) plus a pixel-budget guard to improve sharpness on high-DPI mobile screens without excessive memory pressure
+- Hardened `DataLoader.preload()` so valid encrypted cache startup always restores the Search UI before any non-blocking stale-cache refresh work
+- Reserved `cox_sync_attempts` for blocking full/resume sync only; cached startup and background refresh no longer mutate that key
+- Handled blocking-sync failures now clear stale attempt poison instead of persisting immediate `SYNC INTERRUPTED` across reloads
+- Background refresh errors are caught behind the existing lock/timestamp guard so stale-cache revalidation cannot blank the sidebar or strand the app disabled
+- Force Reset/recovery continue clearing sync metadata without changing snapshot format, Worker routing, PDF rendering, or cache pagination/parsing
 
 PREVIOUS UPDATES (v2.5.16 and earlier):
 
