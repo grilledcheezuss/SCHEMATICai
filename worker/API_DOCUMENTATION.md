@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.78
+## Version: v2.5.79
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform → crisp-render handoff without snap-back, and mobile touch ownership is origin-locked between Results and PDF scrolling until touch end/cancel
 - **v2.5.78**: Follow-up to PR #169: Airtable token routing is explicit by base purpose (Users/Feedback reads + FEEDBACK POST use write key; MAIN and PDF_BY_ID reads use read key), and Airtable 401/403 credential/access failures now surface as configuration diagnostics instead of retry-looping 503 outages
 - **v2.5.77**: Mobile sync/PDF viewer stability pass: suspension/network-transition sync interrupts are now treated as resumable with bounded restart + lock revalidation and explicit quota messaging, document switches clear stale render stages immediately, and pinch-finalize keeps visual zoom continuity until crisp commit
 - **v2.5.76**: Trade-show reliability emergency: app version no longer purges persisted snapshots unless explicit cache schema changes, startup lock contention now waits/restores instead of surfacing false interruption, snapshot generation loads reject partial/corrupt shards with fallback recovery, and Worker MAIN uses stable fresh/stale page keys with isolate-local refresh coalescing plus attachment-mode PDF download support
@@ -336,6 +337,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform to crisp-render swap, and mobile Results/PDF scrolling stays origin-locked for each touch gesture
 - **v2.5.78**: Follow-up to PR #169: explicit Airtable token routing by base-purpose and clearer 401/403 credential/access diagnostics (no transient retry classification)
 - **v2.5.65**: Reliability hardening (`cox_sync_attempts` limited to blocking cache-miss/resume sync, cached startup restores Search before optional stale-cache refresh, and background refresh failures stay non-blocking)
 - **v2.5.64**: Desktop/tablet shell consistency pass (compact large-screen collapse toggles, slimmer shell borders/spacing, mobile-aligned neutral/brand chrome palette, and symmetric safe corner treatment on collapse rails)

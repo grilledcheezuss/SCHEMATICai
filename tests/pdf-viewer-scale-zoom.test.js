@@ -157,6 +157,15 @@ async function wait(ms) {
     assert(PdfViewer._committedPanX === 0 && PdfViewer._committedPanY === 0, 'pan commit should reset committed pan offsets');
     assert(stageEl.style.transform === 'translate3d(0px, 0px, 0) scale(1)', `pan commit should reset transform, got ${stageEl.style.transform}`);
 
+    const restored = PdfViewer._restoreScrollFromAnchorContext(
+        viewerEl,
+        stageEl,
+        { anchorOffsetX: 300, anchorOffsetY: 200, contentX: 610, contentY: 420, scaleRatio: 1.25 }
+    );
+    assert(restored === true, 'anchor restore should succeed for non-centered anchor context');
+    assert(Math.abs(viewerEl.scrollLeft - 522.5) < 1e-9, `anchor restore should preserve horizontal release position, got ${viewerEl.scrollLeft}`);
+    assert(Math.abs(viewerEl.scrollTop - 345) < 1e-9, `anchor restore should preserve vertical release position, got ${viewerEl.scrollTop}`);
+
     PdfViewer._beginDocumentLoad();
     assert(staleStage.removed === true, 'beginDocumentLoad should clear stale rendered stages immediately');
 
@@ -178,6 +187,25 @@ async function wait(ms) {
     assert(Math.abs(PdfViewer.currentScale - 1.35) < 1e-9, `pinch finalize should commit final scale, got ${PdfViewer.currentScale}`);
     assert(PdfViewer._liveScale > 1, `pinch finalize should keep live transform until crisp render commit, got ${PdfViewer._liveScale}`);
     assert(finalizeRenderOptions && finalizeRenderOptions.timingSource === 'gesture-commit', 'pinch finalize should trigger gesture-commit render');
+    assert(PdfViewer._pendingGestureCommitGeneration > 0, 'pinch finalize should register pending crisp commit generation');
+
+    const pendingGeneration = PdfViewer._pendingGestureCommitGeneration;
+    const priorRenderToken = PdfViewer.currentRenderToken;
+    PdfViewer._zoomInteractionElement = null;
+    PdfViewer.initViewerInteractions();
+    const touchStartHandler = PdfViewer._touchStartHandler;
+    assert(typeof touchStartHandler === 'function', 'touchstart handler should exist for pending commit supersession test');
+    touchStartHandler({
+        touches: [{ clientX: 10, clientY: 15 }],
+        preventDefault() {},
+        stopPropagation() {}
+    });
+    assert(PdfViewer._pendingGestureCommitGeneration === 0, 'new gesture should supersede pending crisp commit');
+    assert(PdfViewer.currentRenderToken >= priorRenderToken, 'new gesture supersession should not roll back render token state');
+
+    PdfViewer._pendingGestureCommitGeneration = pendingGeneration + 1;
+    PdfViewer._beginDocumentLoad();
+    assert(PdfViewer._pendingGestureCommitGeneration === 0, 'document replacement should clear pending gesture commit generation');
 
     console.log('✅ PdfViewer scale/zoom tests passed');
 })();
