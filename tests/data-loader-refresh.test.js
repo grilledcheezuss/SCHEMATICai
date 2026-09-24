@@ -137,7 +137,8 @@ const originalMethods = {
     installLifecycleRefreshHooks: DataLoader.installLifecycleRefreshHooks,
     maybeRefreshStaleCache: DataLoader.maybeRefreshStaleCache
     ,
-    waitForPeerSyncAndRestore: DataLoader.waitForPeerSyncAndRestore
+    waitForPeerSyncAndRestore: DataLoader.waitForPeerSyncAndRestore,
+    waitForResumeReady: DataLoader.waitForResumeReady
 };
 
 function resetHarness() {
@@ -184,6 +185,7 @@ function resetHarness() {
     DataLoader.installLifecycleRefreshHooks = originalMethods.installLifecycleRefreshHooks;
     DataLoader.maybeRefreshStaleCache = originalMethods.maybeRefreshStaleCache;
     DataLoader.waitForPeerSyncAndRestore = originalMethods.waitForPeerSyncAndRestore;
+    DataLoader.waitForResumeReady = originalMethods.waitForResumeReady;
     DataLoader.STARTUP_REFRESH_JITTER_MAX_MS = 0;
     DataLoader.SYNC_LOCK_WAIT_BASE_DELAY_MS = 1;
     DataLoader._backgroundRefreshCooldownUntil = 0;
@@ -438,6 +440,49 @@ async function flushAsync() {
     assert(syncProgressUpdates.includes('💾 SAVING 98%'), 'saving phase should report completion without claiming 100%');
     assert(syncProgressUpdates.includes('✅ APPLYING 99%'), 'apply phase should remain below 100% until sync fully completes');
     assertEqual(localStorage.getItem('cox_db_complete'), 'true', 'successful sync should still mark cache complete');
+
+    resetHarness();
+    console.log('🧪 Testing recoverable mobile interruption resumes without terminal sync state');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_version', APP_VERSION);
+    cacheState.loadAllWithProgress = async () => null;
+    let mobileRecoverableCalls = 0;
+    DataLoader.fetchPartition = async () => {
+        mobileRecoverableCalls++;
+        if (mobileRecoverableCalls === 1) {
+            return { success: false, recoverable: true, reason: 'suspension', message: '⏳ APP RESUMING...' };
+        }
+        return { success: true, count: 2 };
+    };
+    DataLoader.waitForResumeReady = async () => true;
+    let recoverablePopCalls = 0;
+    uiState.pop = () => { recoverablePopCalls++; };
+    DataLoader.installLifecycleRefreshHooks = () => {};
+    await DataLoader.preload();
+    assertEqual(mobileRecoverableCalls, 2, 'recoverable startup interruption should restart blocking sync');
+    assertEqual(recoverablePopCalls, 1, 'recoverable startup interruption should still restore UI on eventual success');
+    assertEqual(searchBtn.innerText, 'SEARCH', 'recoverable startup interruption should not leave interrupted state');
+    assert(searchBtn.disabled === false, 'recoverable startup interruption should re-enable search');
+
+    resetHarness();
+    console.log('🧪 Testing quota failure classification');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    DataLoader.acquireSyncLock = async () => true;
+    DataLoader.releaseSyncLock = async () => {};
+    networkState.fetch = async () => ({
+        status: 200,
+        json: async () => ({ records: [] })
+    });
+    cacheState.saveSnapshot = async () => {
+        const quotaErr = new Error('Quota exceeded while writing snapshot');
+        quotaErr.name = 'QuotaExceededError';
+        throw quotaErr;
+    };
+    const quotaResult = await DataLoader.fetchPartition('desc', searchBtn, { background: false, reason: 'test-quota' });
+    assert(quotaResult && quotaResult.success === false && quotaResult.reason === 'quota', 'quota write failures should be classified explicitly');
+    assertEqual(searchBtn.innerText, '💾 STORAGE FULL - FREE SPACE', 'quota write failures should expose actionable message');
 
     console.log('✅ DataLoader stale-refresh tests passed');
 })().catch((err) => {
