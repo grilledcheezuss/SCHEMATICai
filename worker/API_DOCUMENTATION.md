@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.64
+## Version: v2.5.65
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.65**: Desktop/tablet edge cleanup: results/pagination and PDF toolbar seams squared off where they meet flat surfaces, compact dual-side collapse controls, and slightly larger PDF toolbar action buttons for easier interaction
 - **v2.5.64**: Desktop/tablet shell consistency pass: compact large-screen collapse toggles, softer/slimmer shell borders and spacing, aligned neutral/brand color treatment with the refined mobile UX language, and safe symmetric corner treatment for collapse rails
 - **v2.5.63**: Reliability/performance update: one-hour client cache staleness revalidation with background refresh and in-flight guards, generation-based encrypted snapshot persistence + safe cache swap semantics, and DPR-aware PDF canvas rendering (2x cap + pixel-budget guard) for sharper high-DPI mobile viewing
 - **v2.5.61**: App-shell refinement: centered SHOW/HIDE panel toggles without glyphs, structurally fixed Results header ordering, slimmer header with SCHEMATICAai badge + menu-pinned version display, subtle surface softening, and one-shade lighter dark-mode panel-ID purple
