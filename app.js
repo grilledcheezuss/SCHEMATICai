@@ -4927,10 +4927,10 @@ class PdfViewer {
             anchorOffsetY: priorAnchorOffsetY,
             scrollRatioX: priorStageWidth > 0
                 ? (container.scrollLeft + priorAnchorOffsetX - priorStageOffsetLeft) / priorStageWidth
-                : 0,
+                : Number.NaN,
             scrollRatioY: priorStageHeight > 0
                 ? (container.scrollTop + priorAnchorOffsetY - priorStageOffsetTop) / priorStageHeight
-                : 0
+                : Number.NaN
         };
         container.innerHTML = ''; 
         const stage = this._ensureGestureStage(container);
