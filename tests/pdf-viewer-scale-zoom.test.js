@@ -96,6 +96,29 @@ async function wait(ms) {
     await checkStartScale(1366, 768, 1080, 1.026, 'small monitor follows geometry-fit baseline');
     await checkStartScale(1920, 1080, 1800, 1.2, 'large monitor clamp allows up to 120%');
 
+    PdfViewer.doc = {
+        destroyed: false,
+        fingerprint: 'doc-geometry-fallback',
+        getPage: async () => { throw new Error('geometry read failed'); }
+    };
+    PdfViewer._documentGeometryCache = null;
+    windowState.innerWidth = 1366;
+    windowState.innerHeight = 768;
+    viewerElement.clientWidth = 1080;
+    previewPaneElement.clientWidth = 1080;
+    PdfViewer._userHasAdjustedZoom = false;
+    await PdfViewer._setScaleForDevice();
+    assert(Math.abs(PdfViewer.currentScale - 1.0) < 1e-9, 'geometry failure should gracefully fall back to viewer-derived scale');
+
+    PdfViewer.doc = {
+        destroyed: false,
+        fingerprint: 'doc-1',
+        getPage: async () => ({
+            getViewport: ({ scale }) => ({ width: 1000 * scale, height: 1400 * scale })
+        })
+    };
+    PdfViewer._documentGeometryCache = null;
+
     PdfViewer.currentScale = 1.17;
     PdfViewer._userHasAdjustedZoom = true;
     windowState.innerWidth = 1280;
