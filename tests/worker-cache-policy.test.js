@@ -59,8 +59,18 @@ function assert(condition, message) {
         freshTtlMs: 5_000,
         maxStaleTtlMs: 15_000
     });
-    assert(versionMismatchState.status === 'REFRESH', `feedback version mismatch should REFRESH, got ${versionMismatchState.status}`);
-    assert(versionMismatchState.canServeStaleOnError === false, 'feedback version mismatch should not serve stale');
+    assert(versionMismatchState.status === 'STALE', `cross-isolate feedback version mismatch should STALE, got ${versionMismatchState.status}`);
+    assert(versionMismatchState.canServeStaleOnError === true, 'cross-isolate feedback version mismatch should still allow bounded stale serving');
+
+    const localInvalidationState = classifyMainCacheEntry(staleMeta, {
+        now,
+        currentFeedbackVersion: 8,
+        feedbackInvalidationTime: now - 1_000,
+        freshTtlMs: 5_000,
+        maxStaleTtlMs: 15_000
+    });
+    assert(localInvalidationState.status === 'REFRESH', `same-isolate feedback invalidation should REFRESH, got ${localInvalidationState.status}`);
+    assert(localInvalidationState.canServeStaleOnError === false, 'same-isolate feedback invalidation should not serve stale');
 
     assert(normalizePanelLookupId(' CP-1234.pdf ') === '1234', 'panel lookup normalization should strip prefix, extension, and spaces');
     const sanitizedFilename = sanitizeDownloadFilename('CP/12:34 ?');

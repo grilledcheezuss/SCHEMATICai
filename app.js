@@ -4865,11 +4865,11 @@ class PdfViewer {
     }
 
     static _buildAttachmentDownloadUrl(filename) {
-        if (this.currentPanelId) {
-            return buildWorkerUrl('PDF_BY_ID', { id: this.currentPanelId, download: '1', filename });
-        }
         if (this.url) {
             return buildWorkerUrl('PDF', { url: this.url, download: '1', filename });
+        }
+        if (this.currentPanelId) {
+            return buildWorkerUrl('PDF_BY_ID', { id: this.currentPanelId, download: '1', filename });
         }
         return '';
     }

@@ -46,6 +46,8 @@ const MAIN_PAGE_FRESH_TTL_MS = MAIN_PAGE_FRESH_TTL_SECONDS * 1000;
 const MAIN_PAGE_MAX_STALE_TTL_MS = MAIN_PAGE_MAX_STALE_SECONDS * 1000;
 const TRANSIENT_RETRY_AFTER_SECONDS = 10;
 let FEEDBACK_CACHE_VERSION = 0;
+let FEEDBACK_INVALIDATION_TIME = 0;
+let CACHE_HEALED_SIGNATURE = '';
 const MAIN_PAGE_INFLIGHT = new Map();
 const PDF_LOOKUP_CACHE_TTL_MS = 1000 * 60 * 60;
 const PDF_BY_ID_LOOKUP_CACHE = new Map();
@@ -164,6 +166,7 @@ function getMainCacheMetadata(headers, now = Date.now()) {
 function classifyMainCacheEntry(metadata, {
     now = Date.now(),
     currentFeedbackVersion = FEEDBACK_CACHE_VERSION,
+    feedbackInvalidationTime = FEEDBACK_INVALIDATION_TIME,
     freshTtlMs = MAIN_PAGE_FRESH_TTL_MS,
     maxStaleTtlMs = MAIN_PAGE_MAX_STALE_TTL_MS
 } = {}) {
@@ -174,6 +177,12 @@ function classifyMainCacheEntry(metadata, {
     const ageMs = Number.isFinite(metadata.ageMs) ? metadata.ageMs : Math.max(0, now - metadata.cachedAt);
     const feedbackMatches = metadata.feedbackVersion === currentFeedbackVersion;
     if (!feedbackMatches) {
+        const invalidatedLocally = Number.isFinite(feedbackInvalidationTime)
+            && feedbackInvalidationTime > 0
+            && metadata.cachedAt < feedbackInvalidationTime;
+        if (!invalidatedLocally && ageMs <= maxStaleTtlMs) {
+            return { status: 'STALE', shouldServe: true, shouldRefresh: true, canServeStaleOnError: true, ageMs };
+        }
         return { status: 'REFRESH', shouldServe: false, shouldRefresh: true, canServeStaleOnError: false, ageMs };
     }
     if (ageMs <= freshTtlMs) {
@@ -385,9 +394,14 @@ async function ensureFeedbackCache(env) {
             }
         }
 
+        const nextSignature = JSON.stringify(nextHealed);
         CACHE_HEALED = nextHealed;
         CACHE_FEEDBACK_TIME = Date.now();
-        FEEDBACK_CACHE_VERSION++;
+        if (nextSignature !== CACHE_HEALED_SIGNATURE) {
+            CACHE_HEALED_SIGNATURE = nextSignature;
+            FEEDBACK_CACHE_VERSION++;
+            FEEDBACK_INVALIDATION_TIME = CACHE_FEEDBACK_TIME;
+        }
     })();
     try {
         await CACHE_FEEDBACK_PROMISE;
@@ -1267,7 +1281,14 @@ export default {
                     headers: { 'Authorization': `Bearer ${env.AIRTABLE_WRITE_KEY}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
                 });
-                CACHE_FEEDBACK_TIME = 0; CACHE_HEALED = {}; CACHE_FEEDBACK_PROMISE = null; FEEDBACK_CACHE_VERSION++;
+                if (resp.ok) {
+                    CACHE_FEEDBACK_TIME = 0;
+                    CACHE_HEALED = {};
+                    CACHE_HEALED_SIGNATURE = '';
+                    CACHE_FEEDBACK_PROMISE = null;
+                    FEEDBACK_CACHE_VERSION++;
+                    FEEDBACK_INVALIDATION_TIME = Date.now();
+                }
                 return new Response(JSON.stringify(await resp.json()), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 
