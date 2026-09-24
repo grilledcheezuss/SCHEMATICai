@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.78 ---
-const APP_VERSION = "v2.5.78";
+// --- SCHEMATICA ai v2.5.79 ---
+const APP_VERSION = "v2.5.79";
 const VERSION_HISTORY = {
+    "v2.5.79": "PDF/mobile interaction hardening: gesture-release commits now preserve release anchor through crisp rerender swaps without snap-back, and mobile touch ownership locks Results vs PDF scrolling to gesture origin until lift/cancel",
     "v2.5.78": "Follow-up to PR #169: restore explicit Airtable token routing (Users/Feedback reads + FEEDBACK POST use write key; MAIN/PDF_BY_ID reads use read key) and classify 401/403 credential access failures distinctly from transient 503 outages",
     "v2.5.77": "Mobile sync + PDF transition stability: classify suspension/network-transition interruptions as resumable with bounded restart flow and explicit quota messaging, clear stale PDF stage on document switch, and keep pinch-release scale continuous until crisp commit",
     "v2.5.76": "Trade-show reliability emergency: decouple app version from cache schema to prevent patch-release purges, treat sync-lock contention as WAITING FOR UPDATE with stale-lock heartbeat recovery, reject partial/corrupt snapshot generations, and harden Worker/PDF update stability paths",
@@ -4435,6 +4436,128 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
     }
 }
 
+class MobileScrollCoordinator {
+    static _initialized = false;
+    static _owner = null; // 'viewer' | 'results'
+    static _lastTouchY = null;
+    static _startTouchY = null;
+    static _touchStartHandler = null;
+    static _touchMoveHandler = null;
+    static _touchEndHandler = null;
+    static _viewportResetHandler = null;
+
+    static _isSmallMobileViewport() {
+        return (window?.innerWidth || 0) <= 767;
+    }
+
+    static _getViewerElement() {
+        return document.getElementById('pdf-main-view');
+    }
+
+    static _getResultsElement() {
+        return document.getElementById('results-scroll-area') || document.getElementById('results-list');
+    }
+
+    static _isWithinOwnerRegion(target, owner) {
+        if (!target) return false;
+        const region = owner === 'viewer' ? this._getViewerElement() : this._getResultsElement();
+        return !!region && region.contains(target);
+    }
+
+    static resetGestureOwnership(_reason = 'unspecified') {
+        this._owner = null;
+        this._lastTouchY = null;
+        this._startTouchY = null;
+    }
+
+    static shouldAllowPdfTouchStart() {
+        return this._owner !== 'results';
+    }
+
+    static _applyOwnedScrollDelta(owner, deltaY) {
+        if (!Number.isFinite(deltaY) || deltaY === 0) return;
+        const target = owner === 'viewer' ? this._getViewerElement() : this._getResultsElement();
+        if (!target) return;
+        target.scrollTop += deltaY;
+    }
+
+    static init() {
+        if (this._initialized) return;
+        this._touchStartHandler = (event) => {
+            if (!this._isSmallMobileViewport()) {
+                this.resetGestureOwnership('non-mobile-touchstart');
+                return;
+            }
+            const touches = event.touches;
+            if (!touches || touches.length === 0) return;
+            const target = event.target;
+            if (!this._owner) {
+                if (this._isWithinOwnerRegion(target, 'viewer')) {
+                    this._owner = 'viewer';
+                } else if (this._isWithinOwnerRegion(target, 'results')) {
+                    this._owner = 'results';
+                }
+            }
+            const primaryTouch = touches[0];
+            if (!primaryTouch) return;
+            this._lastTouchY = primaryTouch.clientY;
+            this._startTouchY = primaryTouch.clientY;
+        };
+        this._touchMoveHandler = (event) => {
+            if (!this._owner) return;
+            if (!this._isSmallMobileViewport()) {
+                this.resetGestureOwnership('non-mobile-touchmove');
+                return;
+            }
+            const touches = event.touches;
+            const primaryTouch = touches && touches[0];
+            if (!primaryTouch) return;
+            const currentY = primaryTouch.clientY;
+            const priorY = Number.isFinite(this._lastTouchY) ? this._lastTouchY : currentY;
+            const deltaY = priorY - currentY;
+            this._lastTouchY = currentY;
+            const target = event.target;
+            const inOwnerRegion = this._isWithinOwnerRegion(target, this._owner);
+            if (inOwnerRegion) return;
+            if (event.cancelable) event.preventDefault();
+            event.stopPropagation();
+            if (this._owner === 'viewer' && PdfViewer?._activeGesture) return;
+            this._applyOwnedScrollDelta(this._owner, deltaY);
+        };
+        this._touchEndHandler = (event) => {
+            if ((event.touches?.length || 0) === 0) {
+                this.resetGestureOwnership('all-touches-ended');
+            } else if (event.touches && event.touches[0]) {
+                this._lastTouchY = event.touches[0].clientY;
+            }
+        };
+        this._viewportResetHandler = () => this.resetGestureOwnership('viewport-change');
+        document.addEventListener('touchstart', this._touchStartHandler, { passive: true, capture: true });
+        document.addEventListener('touchmove', this._touchMoveHandler, { passive: false, capture: true });
+        document.addEventListener('touchend', this._touchEndHandler, { passive: true, capture: true });
+        document.addEventListener('touchcancel', this._touchEndHandler, { passive: true, capture: true });
+        window.addEventListener('resize', this._viewportResetHandler, { passive: true });
+        window.addEventListener('orientationchange', this._viewportResetHandler, { passive: true });
+        this._initialized = true;
+    }
+
+    static teardown() {
+        if (!this._initialized) return;
+        document.removeEventListener('touchstart', this._touchStartHandler, { capture: true });
+        document.removeEventListener('touchmove', this._touchMoveHandler, { capture: true });
+        document.removeEventListener('touchend', this._touchEndHandler, { capture: true });
+        document.removeEventListener('touchcancel', this._touchEndHandler, { capture: true });
+        window.removeEventListener('resize', this._viewportResetHandler);
+        window.removeEventListener('orientationchange', this._viewportResetHandler);
+        this._touchStartHandler = null;
+        this._touchMoveHandler = null;
+        this._touchEndHandler = null;
+        this._viewportResetHandler = null;
+        this._initialized = false;
+        this.resetGestureOwnership('teardown');
+    }
+}
+
 class PdfViewer {
     static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = ""; static currentPdfBlob = null;
     static currentFetchId = 0;
@@ -4458,6 +4581,8 @@ class PdfViewer {
     static _activeGesture = null;
     static _iosGestureNoticeLogged = false;
     static _documentLoadToken = 0;
+    static _gestureCommitGeneration = 0;
+    static _pendingGestureCommitGeneration = 0;
     static isPrinting = false;
     static _activePrintSession = null;
     static PRINT_CLEANUP_TIMEOUT_MS = 15000;
@@ -4482,12 +4607,17 @@ class PdfViewer {
         this._releasePrintSession('document-load');
         this._documentLoadToken++;
         this.currentRenderToken++;
+        this._gestureCommitGeneration++;
+        this._pendingGestureCommitGeneration = 0;
         this._userHasAdjustedZoom = false;
         this._liveScale = 1;
         this._committedPanX = 0;
         this._committedPanY = 0;
         this._clearActiveGesture();
         this._clearStagedPdfSurface();
+        if (typeof MobileScrollCoordinator !== 'undefined') {
+            MobileScrollCoordinator.resetGestureOwnership('document-load');
+        }
     }
     static _clearStagedPdfSurface() {
         const viewer = document.getElementById('pdf-main-view');
@@ -4605,7 +4735,7 @@ class PdfViewer {
         viewer.scrollTop = Math.max(0, Math.min(maxScrollTop, Number.isFinite(nextScrollTop) ? nextScrollTop : viewer.scrollTop || 0));
     }
 
-    static _commitPanToScroll(panX = this._committedPanX, panY = this._committedPanY) {
+    static _commitPanToScroll(panX = this._committedPanX, panY = this._committedPanY, { resetTransform = true } = {}) {
         const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
         if (!viewer) return;
         this._applyScrollPosition(
@@ -4613,10 +4743,12 @@ class PdfViewer {
             (viewer.scrollLeft || 0) - (Number.isFinite(panX) ? panX : 0),
             (viewer.scrollTop || 0) - (Number.isFinite(panY) ? panY : 0)
         );
-        this._liveScale = 1;
-        this._committedPanX = 0;
-        this._committedPanY = 0;
-        this._applyViewerTransform(1, 0, 0);
+        if (resetTransform) {
+            this._liveScale = 1;
+            this._committedPanX = 0;
+            this._committedPanY = 0;
+            this._applyViewerTransform(1, 0, 0);
+        }
     }
 
     static _restoreScrollFromAnchorContext(viewer, stage, anchorContext) {
@@ -4678,9 +4810,12 @@ class PdfViewer {
             this._applyViewerTransform(this._liveScale, this._committedPanX, this._committedPanY);
             this._clearZoomTimer();
             if (this.isDocumentValid()) {
+                const commitGeneration = ++this._gestureCommitGeneration;
+                this._pendingGestureCommitGeneration = commitGeneration;
                 this.renderStack({
                     timingSource: 'gesture-commit',
                     expectedDocumentLoadToken: gesture.documentLoadToken,
+                    expectedGestureCommitGeneration: commitGeneration,
                     anchorContext: anchorContext || this._captureAnchorContext(null, finalScale / Math.max(priorScale, 0.0001))
                 });
             }
@@ -4726,8 +4861,17 @@ class PdfViewer {
         this._touchStartHandler = (event) => {
             if (!this.isDocumentValid()) return;
             if (document.body.classList.contains('editor-active')) return;
+            const allowPdfTouchStart = typeof MobileScrollCoordinator === 'undefined'
+                ? true
+                : MobileScrollCoordinator.shouldAllowPdfTouchStart();
+            if (!allowPdfTouchStart) return;
             const touches = event.touches;
             if (!touches || touches.length === 0) return;
+            if (this._pendingGestureCommitGeneration) {
+                this._gestureCommitGeneration++;
+                this._pendingGestureCommitGeneration = 0;
+                this.currentRenderToken++;
+            }
 
             if (touches.length >= 2) {
                 const t0 = touches[0];
@@ -4811,12 +4955,16 @@ class PdfViewer {
 
             if (this._activeGesture.mode === 'pinch') {
                 if ((event.touches?.length || 0) < 2) {
+                    if (event.cancelable) event.preventDefault();
+                    event.stopPropagation();
                     this._finalizeGesture();
                 }
                 return;
             }
 
             if ((event.touches?.length || 0) === 0) {
+                if (event.cancelable) event.preventDefault();
+                event.stopPropagation();
                 this._finalizeGesture();
             }
         };
@@ -4858,6 +5006,10 @@ class PdfViewer {
         this._committedPanY = 0;
         this._clearActiveGesture();
         this._clearZoomTimer();
+        this._pendingGestureCommitGeneration = 0;
+        if (typeof MobileScrollCoordinator !== 'undefined') {
+            MobileScrollCoordinator.resetGestureOwnership('viewer-teardown');
+        }
     }
 
     static async loadById(panelId, fallbackUrl) {
@@ -5442,13 +5594,16 @@ class PdfViewer {
         }
         this._printViaIframe(printTarget);
     }
-    static async renderStack({ timingSource = 'unspecified', expectedDocumentLoadToken = null, anchorContext = null } = {}) {
+    static async renderStack({ timingSource = 'unspecified', expectedDocumentLoadToken = null, expectedGestureCommitGeneration = null, anchorContext = null } = {}) {
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
             return;
         }
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
+            return;
+        }
+        if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration !== this._pendingGestureCommitGeneration) {
             return;
         }
         const renderStartMs = getNowMs();
@@ -5647,16 +5802,16 @@ class PdfViewer {
             requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
         }
         await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
+        if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
+            if (stage.parentNode === container) stage.remove();
+            return;
+        }
+        if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration !== this._pendingGestureCommitGeneration) {
+            if (stage.parentNode === container) stage.remove();
+            return;
+        }
         if (!this._restoreScrollFromAnchorContext(container, stage, anchorContext)) {
             this._restoreScrollFromPriorRatios(container, stage, priorState);
-        }
-        if (this._activeGesture) {
-            this._applyViewerTransform(this._liveScale || 1, this._committedPanX, this._committedPanY);
-        } else {
-            this._liveScale = 1;
-            this._committedPanX = 0;
-            this._committedPanY = 0;
-            this._applyViewerTransform(1, 0, 0);
         }
         const existingStages = Array.from(container.querySelectorAll('.pdf-gesture-stage'));
         existingStages.forEach(existingStage => {
@@ -5665,6 +5820,17 @@ class PdfViewer {
         stage.classList.remove('pdf-gesture-stage--staging');
         stage.removeAttribute('aria-hidden');
         this._gestureStageElement = stage;
+        if (this._activeGesture) {
+            this._applyViewerTransform(this._liveScale || 1, this._committedPanX, this._committedPanY);
+        } else {
+            this._liveScale = 1;
+            this._committedPanX = 0;
+            this._committedPanY = 0;
+            this._applyViewerTransform(1, 0, 0);
+            if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration === this._pendingGestureCommitGeneration) {
+                this._pendingGestureCommitGeneration = 0;
+            }
+        }
         logPdfTiming('full_render_complete', getNowMs() - renderStartMs, { source: timingSource, pages: this.doc?.numPages || 0 });
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
@@ -6190,6 +6356,9 @@ class UI {
         body.classList.toggle('results-ready', hasResultsPanel);
 
         if (!this.isSmallMobile()) {
+            if (typeof MobileScrollCoordinator !== 'undefined') {
+                MobileScrollCoordinator.resetGestureOwnership('desktop-layout');
+            }
             body.classList.remove('mobile-search-hidden', 'mobile-results-hidden', 'mobile-results-available', 'mobile-pdf-focus');
             refineBtn?.classList.toggle('visible', !!controls?.classList.contains('collapsed'));
             this.syncMobileToggleLabels();
@@ -6499,8 +6668,16 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.warn('⚠️ Cover sheet template not loaded (app continues without it):', err));
         
         UI.init(); 
+        if (typeof MobileScrollCoordinator !== 'undefined') {
+            MobileScrollCoordinator.init();
+        }
         PdfViewer.initViewerInteractions();
-        window.addEventListener('beforeunload', () => PdfViewer.teardownViewerInteractions(), { once: true });
+        window.addEventListener('beforeunload', () => {
+            PdfViewer.teardownViewerInteractions();
+            if (typeof MobileScrollCoordinator !== 'undefined') {
+                MobileScrollCoordinator.teardown();
+            }
+        }, { once: true });
         if(AuthService.init()) { 
             DataLoader.preload(); 
         }
