@@ -3872,6 +3872,7 @@ class PdfViewer {
     static _gestureStartHandler = null;
     static _gestureChangeHandler = null;
     static _gestureEndHandler = null;
+    static _gestureEventsSupported = false;
     static _resizeHandler = null;
     static _orientationHandler = null;
     static _pointerCache = new Map();
@@ -4116,6 +4117,7 @@ class PdfViewer {
 
         this._resizeHandler = () => this.scheduleAutoFitToViewer();
         this._orientationHandler = () => this.scheduleAutoFitToViewer();
+        this._gestureEventsSupported = typeof window !== 'undefined' && ('ongesturestart' in window);
 
         viewer.addEventListener('wheel', this._wheelZoomHandler, { passive: false });
         viewer.addEventListener('pointerdown', this._pointerDownHandler, { passive: true });
@@ -4126,9 +4128,11 @@ class PdfViewer {
         viewer.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
         viewer.addEventListener('touchend', this._touchEndHandler, { passive: true });
         viewer.addEventListener('touchcancel', this._touchEndHandler, { passive: true });
-        viewer.addEventListener('gesturestart', this._gestureStartHandler, { passive: false });
-        viewer.addEventListener('gesturechange', this._gestureChangeHandler, { passive: false });
-        viewer.addEventListener('gestureend', this._gestureEndHandler, { passive: true });
+        if (this._gestureEventsSupported) {
+            viewer.addEventListener('gesturestart', this._gestureStartHandler, { passive: false });
+            viewer.addEventListener('gesturechange', this._gestureChangeHandler, { passive: false });
+            viewer.addEventListener('gestureend', this._gestureEndHandler, { passive: true });
+        }
         window.addEventListener('resize', this._resizeHandler, { passive: true });
         window.addEventListener('orientationchange', this._orientationHandler, { passive: true });
     }
@@ -4146,9 +4150,11 @@ class PdfViewer {
             this._zoomInteractionElement.removeEventListener('touchmove', this._touchMoveHandler);
             this._zoomInteractionElement.removeEventListener('touchend', this._touchEndHandler);
             this._zoomInteractionElement.removeEventListener('touchcancel', this._touchEndHandler);
-            this._zoomInteractionElement.removeEventListener('gesturestart', this._gestureStartHandler);
-            this._zoomInteractionElement.removeEventListener('gesturechange', this._gestureChangeHandler);
-            this._zoomInteractionElement.removeEventListener('gestureend', this._gestureEndHandler);
+            if (this._gestureEventsSupported) {
+                this._zoomInteractionElement.removeEventListener('gesturestart', this._gestureStartHandler);
+                this._zoomInteractionElement.removeEventListener('gesturechange', this._gestureChangeHandler);
+                this._zoomInteractionElement.removeEventListener('gestureend', this._gestureEndHandler);
+            }
         }
         if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
         if (this._orientationHandler) window.removeEventListener('orientationchange', this._orientationHandler);
@@ -4163,6 +4169,7 @@ class PdfViewer {
         this._gestureStartHandler = null;
         this._gestureChangeHandler = null;
         this._gestureEndHandler = null;
+        this._gestureEventsSupported = false;
         this._resizeHandler = null;
         this._orientationHandler = null;
         this._resetPinchTracking();
