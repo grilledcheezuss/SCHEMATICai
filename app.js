@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.74 ---
-const APP_VERSION = "v2.5.74";
+// --- SCHEMATICA ai v2.5.75 ---
+const APP_VERSION = "v2.5.75";
 const VERSION_HISTORY = {
+    "v2.5.75": "Urgent reliability/performance hardening: Worker MAIN page responses now use short-lived shared cache + isolate single-flight processing to reduce duplicate CPU under concurrency, while client sync adds per-page timeout, Retry-After-aware jittered backoff, and stronger recoverable startup refresh behavior",
     "v2.5.74": "PDF viewer geometry/print follow-up: commit zoom and pan back into real scroll extents so all pages stay reachable without phantom space, and harden original-PDF printing with isolated targets plus reusable cleanup across Safari/iOS and repeated attempts",
     "v2.5.73": "PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action",
     "v2.5.72": "PDF interaction/performance follow-up on current main: live viewer-scoped pinch feedback with constrained pan and gesture-end crisp rerender, bounded first-page preload concurrency with in-flight reuse, and duration-only PDF timing diagnostics for preload/cache/network/render stages",
@@ -520,10 +521,23 @@ class AuthService {
 }
 
 class NetworkService {
-    static async fetch(t, p='') { 
+    static async fetch(t, p='', { timeoutMs = 0 } = {}) { 
         const h = AuthService.headers();
+        const requestUrl = `${buildWorkerUrl(t)}${p}`;
         console.log(`🌐 Fetching ${t}...`);
-        return fetch(`${buildWorkerUrl(t)}${p}`, { headers: h }); 
+        let timeoutId = null;
+        let controller = null;
+        const fetchOptions = { headers: h };
+        if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+            controller = new AbortController();
+            fetchOptions.signal = controller.signal;
+            timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+        }
+        try {
+            return await fetch(requestUrl, fetchOptions);
+        } finally {
+            if (timeoutId) clearTimeout(timeoutId);
+        }
     }
 }
 
@@ -537,6 +551,48 @@ class DataLoader {
     static _inFlightSync = false;
     static _lockToken = null;
     static _lifecycleRefreshHookInstalled = false;
+    static _backgroundRefreshPromise = null;
+    static _lastBackgroundRefreshAt = 0;
+    static BACKGROUND_REFRESH_DEBOUNCE_MS = 30000;
+    static PAGE_REQUEST_TIMEOUT_MS = 25000;
+    static MAX_PAGE_RETRIES = 5;
+    static RETRY_BASE_DELAY_MS = 600;
+    static RETRY_MAX_DELAY_MS = 10000;
+    static JITTER_MIN = 0.85;
+    static JITTER_MAX = 1.25;
+
+    static sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
+    }
+    static async yieldMainThread() {
+        await this.sleep(0);
+    }
+    static parseRetryAfterMs(rawValue) {
+        if (!rawValue) return null;
+        const asSeconds = Number(rawValue);
+        if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+            return Math.round(asSeconds * 1000);
+        }
+        const asDate = Date.parse(rawValue);
+        if (!Number.isFinite(asDate)) return null;
+        return Math.max(0, asDate - Date.now());
+    }
+    static computeRetryDelayMs({ attempt = 1, retryAfterMs = null } = {}) {
+        const safeAttempt = Math.max(1, Number.isFinite(attempt) ? attempt : 1);
+        const exponentialMs = Math.min(this.RETRY_MAX_DELAY_MS, this.RETRY_BASE_DELAY_MS * (2 ** (safeAttempt - 1)));
+        const jitterFactor = this.JITTER_MIN + (Math.random() * (this.JITTER_MAX - this.JITTER_MIN));
+        const jitteredMs = Math.min(this.RETRY_MAX_DELAY_MS, Math.round(exponentialMs * jitterFactor));
+        return Math.max(jitteredMs, Number.isFinite(retryAfterMs) ? retryAfterMs : 0);
+    }
+    static isRetryableStatus(status) {
+        return status === 429 || status === 408 || status === 425 || status >= 500;
+    }
+    static isRetryableNetworkError(err) {
+        if (!err) return false;
+        if (err.name === 'AbortError') return true;
+        const msg = String(err.message || '').toLowerCase();
+        return msg.includes('network') || msg.includes('fetch') || msg.includes('timeout') || msg.includes('abort');
+    }
 
     static getSyncTimestamp() {
         const raw = localStorage.getItem(this.SYNC_TIMESTAMP_KEY);
@@ -637,6 +693,11 @@ class DataLoader {
                 this.maybeRefreshStaleCache({ reason: 'foreground' });
             }
         });
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            window.addEventListener('online', () => {
+                this.maybeRefreshStaleCache({ reason: 'reconnect' });
+            });
+        }
         this._lifecycleRefreshHookInstalled = true;
     }
     static async preload() {
@@ -747,6 +808,17 @@ class DataLoader {
     }
 
     static async maybeRefreshStaleCache({ reason = 'startup' } = {}) {
+        if (this._backgroundRefreshPromise) return this._backgroundRefreshPromise;
+        const shouldDebounce = reason === 'startup' || reason === 'foreground' || reason === 'reconnect';
+        if (shouldDebounce) {
+            const now = Date.now();
+            if ((now - this._lastBackgroundRefreshAt) < this.BACKGROUND_REFRESH_DEBOUNCE_MS) {
+                return { success: false, skipped: true };
+            }
+            this._lastBackgroundRefreshAt = now;
+        }
+
+        this._backgroundRefreshPromise = (async () => {
         let hasLock = false;
         try {
             if (!this.shouldRefreshStaleCache()) return { success: false, skipped: true };
@@ -763,6 +835,12 @@ class DataLoader {
             return { success: false, error: e };
         } finally {
             if (hasLock) await this.releaseSyncLock();
+        }
+        })();
+        try {
+            return await this._backgroundRefreshPromise;
+        } finally {
+            this._backgroundRefreshPromise = null;
         }
     }
     
@@ -821,27 +899,56 @@ class DataLoader {
                 
                 const urlParams = `&pageSize=100${offset ? '&offset='+encodeURIComponent(offset) : ''}&sort%5B0%5D%5Bdirection%5D=${dir}`;
                 
-                let r;
-                try {
-                    r = await NetworkService.fetch(CONFIG.mainTable, urlParams);
-                } catch(e) {
-                    console.warn(`Fetch Disconnect. Retrying ${retryCount}/5...`);
-                    retryCount++;
-                    if (retryCount <= 5) { await new Promise(res => setTimeout(res, 2000 * retryCount)); continue; }
-                    throw e; 
+                let r = null;
+                let pageDurationMs = 0;
+                while (true) {
+                    const pageFetchStart = this.now();
+                    try {
+                        r = await NetworkService.fetch(CONFIG.mainTable, urlParams, { timeoutMs: this.PAGE_REQUEST_TIMEOUT_MS });
+                    } catch (e) {
+                        pageDurationMs = Math.round(this.now() - pageFetchStart);
+                        const retryableError = this.isRetryableNetworkError(e);
+                        if (retryableError) {
+                            retryCount++;
+                            if (retryCount <= this.MAX_PAGE_RETRIES) {
+                                const delayMs = this.computeRetryDelayMs({ attempt: retryCount });
+                                console.warn(`[SyncPage] page=${loop} attempt=${retryCount} status=network-error durationMs=${pageDurationMs} retryInMs=${delayMs}`);
+                                if (btn && !background) this.setSyncProgress(btn, `🔁 RETRY ${retryCount}/${this.MAX_PAGE_RETRIES}`, this.scalePhaseProgress(fetchedCount, CONFIG.estTotal, 0, 78));
+                                await this.sleep(delayMs);
+                                continue;
+                            }
+                        }
+                        throw e;
+                    }
+
+                    pageDurationMs = Math.round(this.now() - pageFetchStart);
+                    const retryAfterMs = this.parseRetryAfterMs(r.headers?.get('Retry-After'));
+                    const retryableStatus = this.isRetryableStatus(r.status);
+
+                    if (r.status === 401) {
+                        if (background) throw new Error("401 invalid credentials during background refresh");
+                        console.error("Sync Failed 401 - Invalid credentials");
+                        btn.classList.add('error');
+                        btn.innerText = "INVALID CREDENTIALS";
+                        btn.disabled = false;
+                        btn.onclick = () => { AuthService.logout(); };
+                        return { success: false, status: 401 };
+                    }
+
+                    if (r.status !== 200 && retryableStatus) {
+                        retryCount++;
+                        if (retryCount <= this.MAX_PAGE_RETRIES) {
+                            const delayMs = this.computeRetryDelayMs({ attempt: retryCount, retryAfterMs });
+                            console.warn(`[SyncPage] page=${loop} attempt=${retryCount} status=${r.status} durationMs=${pageDurationMs} retryInMs=${delayMs}`);
+                            if (btn && !background) this.setSyncProgress(btn, `🔁 RETRY ${retryCount}/${this.MAX_PAGE_RETRIES}`, this.scalePhaseProgress(fetchedCount, CONFIG.estTotal, 0, 78));
+                            await this.sleep(delayMs);
+                            continue;
+                        }
+                    }
+                    break;
                 }
 
-                if(r.status===401) {
-                    if (background) throw new Error("401 invalid credentials during background refresh");
-                    console.error("Sync Failed 401 - Invalid credentials");
-                    btn.classList.add('error');
-                    btn.innerText = "INVALID CREDENTIALS";
-                    btn.disabled = false;
-                    btn.onclick = () => { AuthService.logout(); };
-                    return { success: false, status: 401 };
-                }
-
-                if(r.status===503) {
+                if (r.status === 503) {
                     if (background) throw new Error("503 auth backend unavailable during background refresh");
                     console.error("Sync Failed 503 - Auth backend unavailable");
                     btn.classList.add('error');
@@ -852,17 +959,12 @@ class DataLoader {
                 }
                 
                 if(r.status!==200) {
-                    console.warn(`🔥 Server returned ${r.status}. Pausing to let network breathe...`);
-                    retryCount++;
-                    if (retryCount <= 5) { 
-                        await new Promise(res => setTimeout(res, 2000 * retryCount)); 
-                        continue; 
-                    }
                     if (background) throw new Error(`API ${r.status} during background refresh`);
                     btn.classList.add('error'); btn.innerText=`API ERROR (${r.status})`; 
                     return { success: false, status: r.status }; 
                 }
                 
+                console.info(`[SyncPage] page=${loop} attempt=${retryCount + 1} status=${r.status} durationMs=${pageDurationMs} workerCache=${r.headers?.get('X-SCHEMATICA-MAIN-CACHE') || 'n/a'}`);
                 retryCount = 0; 
                 let d;
                 try {
@@ -899,6 +1001,7 @@ class DataLoader {
             this.setSyncProgress(btn, '⚙️ FINALIZING', 82);
             const snapshot = this.buildSnapshot(recordsById, foundMfgs, foundEncs);
             const snapshotMs = Math.round(this.now() - snapshotStart);
+            await this.yieldMainThread();
             const persistStats = await CacheService.saveSnapshot(snapshot.records, {
                 progressCallback: ({ phase, pct = 0 }) => {
                     if (!btn || background) return;
@@ -910,6 +1013,7 @@ class DataLoader {
                 }
             });
             const applyStart = this.now();
+            await this.yieldMainThread();
             this.setSyncProgress(btn, '✅ APPLYING', 99);
             this.applySnapshot(snapshot);
             const applyMs = Math.round(this.now() - applyStart);

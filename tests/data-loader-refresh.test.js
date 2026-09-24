@@ -187,6 +187,25 @@ async function flushAsync() {
     console.log('🧪 Testing DataLoader stale-refresh orchestration');
     resetHarness();
 
+    // Retry policy helpers: Retry-After parsing + bounded jittered backoff
+    const realNow = Date.now;
+    const fixedNow = new Date('2026-01-01T00:00:00.000Z').getTime();
+    Date.now = () => fixedNow;
+    assertEqual(DataLoader.parseRetryAfterMs('3'), 3000, 'Retry-After seconds should convert to milliseconds');
+    assertEqual(DataLoader.parseRetryAfterMs('Thu, 01 Jan 2026 00:00:05 GMT'), 5000, 'Retry-After HTTP-date should convert to relative milliseconds');
+    assertEqual(DataLoader.parseRetryAfterMs('bad-value'), null, 'Invalid Retry-After should return null');
+    Date.now = realNow;
+
+    const realRandom = Math.random;
+    Math.random = () => 0;
+    assertEqual(DataLoader.computeRetryDelayMs({ attempt: 1 }), Math.round(DataLoader.RETRY_BASE_DELAY_MS * DataLoader.JITTER_MIN), 'Backoff delay should apply minimum jitter at attempt 1');
+    const retryAfterDominant = DataLoader.computeRetryDelayMs({ attempt: 1, retryAfterMs: 8000 });
+    assert(retryAfterDominant >= 8000, 'Retry-After should dominate computed backoff when larger');
+    Math.random = realRandom;
+    assert(DataLoader.isRetryableStatus(429) === true, '429 should be retryable');
+    assert(DataLoader.isRetryableStatus(503) === true, '503 should be retryable');
+    assert(DataLoader.isRetryableStatus(401) === false, '401 should not be retryable');
+
     // shouldAbortEmptySync: preserves snapshot when cache already complete
     localStorage.setItem('cox_db_complete', 'true');
     assert(DataLoader.shouldAbortEmptySync({ fetchedCount: 0, hadExistingData: false }) === true, 'empty first page should abort when cache marked complete');
