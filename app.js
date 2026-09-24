@@ -4631,6 +4631,13 @@ class PdfViewer {
     }
 
     static _beginDocumentLoad() {
+        const activeStage = this._getGestureStage();
+        if (activeStage?.isConnected) {
+            if (!this._currentDocumentIdentity) {
+                this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
+            }
+            this._annotateStage(activeStage);
+        }
         this._clearZoomTimer();
         this._releasePrintSession('document-load');
         this._documentLoadToken++;

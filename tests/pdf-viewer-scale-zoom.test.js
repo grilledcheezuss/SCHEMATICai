@@ -245,10 +245,17 @@ async function wait(ms) {
     assert(placeholder.style.display === 'none', 'loading with an active rendered surface should suppress placeholder copy');
     assert(printBtn.disabled === true && downloadBtn.disabled === true, 'loading state should keep PDF actions disabled during replacement');
 
+    activeStage.dataset = {};
+    PdfViewer.doc = { destroyed: false, numPages: 2 };
+    PdfViewer._activePanelId = 'CP-4242';
+    PdfViewer.url = 'https://example.test/current.pdf';
+    PdfViewer._setCurrentDocumentIdentity({ panelId: PdfViewer._activePanelId, url: PdfViewer.url });
     PdfViewer._beginDocumentLoad();
     assert(stagingStage.removed === true, 'beginDocumentLoad should clear only stale staging surfaces');
     assert(activeStage.isConnected === true, 'beginDocumentLoad should preserve the active rendered surface during replacement');
     assert(PdfViewer._gestureStageElement === activeStage, 'beginDocumentLoad should keep the active stage wired for continuity');
+    assert(activeStage.dataset.documentLoadToken === '0', `beginDocumentLoad should annotate the preserved active stage with its original load token, got ${activeStage.dataset.documentLoadToken}`);
+    assert(activeStage.dataset.documentIdentity === 'panel:CP-4242', `beginDocumentLoad should annotate the preserved active stage identity, got ${activeStage.dataset.documentIdentity}`);
 
     let finalizeRenderOptions = null;
     PdfViewer.renderStack = (options) => { finalizeRenderOptions = options; };
