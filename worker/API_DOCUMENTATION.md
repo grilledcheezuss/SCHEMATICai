@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.68
+## Version: v2.5.69
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.69**: Regression fix: restored the search parameter/action-row divider seam in light mode (while preserving dark-mode treatment) and unified SHOW/HIDE collapse-state handling so Search parameters reliably reopen after auto-collapse, reset, and no-result flows
 - **v2.5.68**: UI regression fix: restore full-height large-screen collapse rails and keep Search parameter collapse reachable after searches by collapsing only the main fields while preserving the action row/toggle across mobile and desktop flows
 - **v2.5.67**: Visual shell follow-up: remove the badge-row bubble treatment and strengthen light-mode card/shell seams across the results chrome, collapse rails, and PDF toolbar junction without changing behavior
 - **v2.5.66**: Desktop CSS safety-net + shell polish: desktop/tablet search/results regions defensively stay visible even if mobile body classes are present, collapse arrows are more legible/symmetric, result card + badge seams are clearer, and the PDF toolbar aligns with adjacent shell chrome without behavior changes
