@@ -4903,7 +4903,14 @@ class PdfViewer {
                 return;
             }
         }
-        if (!this.currentBlobUrl) return;
+        if (!this.currentBlobUrl) {
+            if (!this.url) return;
+            this._clickDownloadLink({
+                href: buildWorkerUrl('PDF', { url: this.url, download: '1', filename }),
+                target: '_blank'
+            });
+            return;
+        }
         this._clickDownloadLink({ href: this.currentBlobUrl, download: filename });
     }
 

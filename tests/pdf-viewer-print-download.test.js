@@ -261,12 +261,21 @@ function wait(ms) {
 
     anchorsClicked = [];
     PdfViewer.currentBlobUrl = '';
+    PdfViewer.currentPanelId = '';
+    PdfViewer.url = 'https://dl.airtable.com/example.pdf';
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
     navigatorState.vendor = 'Google Inc.';
     navigatorState.platform = 'Linux x86_64';
     navigatorState.maxTouchPoints = 0;
     PdfViewer.download();
-    assert(anchorsClicked.length === 0, 'download should no-op when no PDF is loaded');
+    assert(anchorsClicked.length === 1, 'download should fall back to the current source URL when no blob URL is loaded');
+    assert(/target=PDF/.test(anchorsClicked[0].href), 'non-panel fallback should use the worker PDF route');
+    assert(/download=1/.test(anchorsClicked[0].href), 'non-panel fallback should request attachment mode');
+
+    anchorsClicked = [];
+    PdfViewer.url = '';
+    PdfViewer.download();
+    assert(anchorsClicked.length === 0, 'download should no-op when no PDF source is available');
 
     console.log('✅ PdfViewer print/download tests passed');
 })();
