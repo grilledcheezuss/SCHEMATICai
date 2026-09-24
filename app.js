@@ -4920,8 +4920,8 @@ class PdfViewer {
         const priorStageHeight = priorStage ? Math.max(1, priorStage.offsetHeight || 1) : 0;
         const priorStageOffsetLeft = priorStage ? priorStage.offsetLeft : 0;
         const priorStageOffsetTop = priorStage ? priorStage.offsetTop : 0;
-        const priorAnchorOffsetX = 0;
-        const priorAnchorOffsetY = 0;
+        const priorAnchorOffsetX = Math.max(0, Math.min(container.clientWidth || 0, (container.clientWidth || 0) / 2));
+        const priorAnchorOffsetY = Math.max(0, Math.min(container.clientHeight || 0, (container.clientHeight || 0) / 2));
         const priorState = {
             anchorOffsetX: priorAnchorOffsetX,
             anchorOffsetY: priorAnchorOffsetY,
