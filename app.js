@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.71 ---
-const APP_VERSION = "v2.5.71";
+// --- SCHEMATICA ai v2.5.72 ---
+const APP_VERSION = "v2.5.72";
 const VERSION_HISTORY = {
+    "v2.5.72": "PDF interaction/performance follow-up on current main: live viewer-scoped pinch feedback with constrained pan and gesture-end crisp rerender, bounded first-page preload concurrency with in-flight reuse, and duration-only PDF timing diagnostics for preload/cache/network/render stages",
     "v2.5.71": "PDF viewer responsiveness hardening: deterministic 60/80/100/120 start-scale tiers, bounded/coalesced zoom rendering, viewer-scoped ctrl/cmd+wheel zoom handling, and stale-render cleanup during rapid zoom/document replacement",
     "v2.5.70": "Startup/update follow-up: instrument sync phase timings, replace the static 99% plateau with fetch/encrypt/save/apply progress, batch snapshot shard persistence into one IndexedDB write, and polish reset/result-card styling without changing behavior",
     "v2.5.69": "Regression fix: restore light/dark search action-row divider seam and make SHOW/HIDE reliably toggle the shared Search parameter collapse target after search completion/reset flows",
@@ -126,7 +127,7 @@ async function loadTesseract() {
 }
 
 // Preloading configuration
-const PRELOAD_START_DELAY_MS = 500; // Delay before starting preload after search completes
+const PRELOAD_START_DELAY_MS = 120; // Short delay before first-page preload starts after search completes
 const DATA_SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
 // PDF status constants
@@ -3755,6 +3756,23 @@ function validatePdfWithContext(resp, arrayBuffer, location, id = '') {
     return validatePdfResponse(resp, arrayBuffer, context);
 }
 
+function getNowMs() {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+        return performance.now();
+    }
+    return Date.now();
+}
+
+function logPdfTiming(metric, durationMs, fields = {}) {
+    if (!Number.isFinite(durationMs)) return;
+    const safeFields = Object.entries(fields)
+        .filter(([, value]) => value !== undefined && value !== null && value !== '')
+        .map(([key, value]) => `${key}=${value}`)
+        .join(' ');
+    const suffix = safeFields ? ` ${safeFields}` : '';
+    console.log(`[pdf-timing] ${metric} ms=${durationMs.toFixed(1)}${suffix}`);
+}
+
 /**
  * Centralized PDF UI state transition function
  * Manages visibility of PDF viewer elements based on state
@@ -3811,7 +3829,7 @@ function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbac
  * Shared logic between PdfViewer.loadById and PdfController.preloadSearchResults
  * @param {string} fallbackUrl - Direct PDF URL to try
  * @param {string} panelId - Panel identifier for logging
- * @param {Function} headers - Function to get auth headers
+ * @param {Function|Object} headers - Function returning headers or headers object
  * @returns {Object|null} {arrayBuffer, blob, resp} on success, null on failure
  */
 async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
@@ -3823,7 +3841,8 @@ async function attemptPdfFallbackFetch(fallbackUrl, panelId, headers) {
     try {
         console.log(`[fallback] Attempting fallback fetch for ${panelId}`);
         const fallbackProxyUrl = buildWorkerUrl('PDF', { url: fallbackUrl });
-        const fallbackResp = await fetch(fallbackProxyUrl, { headers: headers() });
+        const resolvedHeaders = typeof headers === 'function' ? headers() : (headers || {});
+        const fallbackResp = await fetch(fallbackProxyUrl, { headers: resolvedHeaders });
         
         if (!fallbackResp.ok) {
             console.warn(`[fallback] Fetch failed for ${panelId}: status ${fallbackResp.status}`);
@@ -3860,7 +3879,16 @@ class PdfViewer {
     static _zoomTimer = null;
     static _zoomInteractionElement = null;
     static _wheelZoomHandler = null;
+    static _touchStartHandler = null;
+    static _touchMoveHandler = null;
+    static _touchEndHandler = null;
     static _userHasAdjustedZoom = false;
+    static _gestureStageElement = null;
+    static _committedPanX = 0;
+    static _committedPanY = 0;
+    static _liveScale = 1;
+    static _activeGesture = null;
+    static _iosGestureNoticeLogged = false;
     static isPrinting = false;
     static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
     static PRINT_MAX_TIMEOUT_MS = 120000; // 2 minute hard maximum
@@ -3880,6 +3908,10 @@ class PdfViewer {
         this._clearZoomTimer();
         this.currentRenderToken++;
         this._userHasAdjustedZoom = false;
+        this._liveScale = 1;
+        this._committedPanX = 0;
+        this._committedPanY = 0;
+        this._clearActiveGesture();
     }
 
     static _clampScale(scale) {
@@ -3889,6 +3921,110 @@ class PdfViewer {
     static _updateZoomLabel() {
         const zoomLabel = document.getElementById('pdf-zoom-level');
         if (zoomLabel) zoomLabel.innerText = Math.round(this.currentScale * 100) + "%";
+    }
+
+    static _ensureGestureStage(container) {
+        if (!container) return null;
+        let stage = container.querySelector('.pdf-gesture-stage');
+        if (!stage) {
+            stage = document.createElement('div');
+            stage.className = 'pdf-gesture-stage';
+            container.appendChild(stage);
+        }
+        this._gestureStageElement = stage;
+        return stage;
+    }
+
+    static _getGestureStage() {
+        if (this._gestureStageElement && this._gestureStageElement.isConnected) {
+            return this._gestureStageElement;
+        }
+        const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
+        const stage = viewer?.querySelector('.pdf-gesture-stage') || null;
+        this._gestureStageElement = stage;
+        return stage;
+    }
+
+    static _getPanBounds(scaleMultiplier = 1) {
+        const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
+        const stage = this._getGestureStage();
+        if (!viewer || !stage) return { maxX: 0, maxY: 0 };
+
+        const viewerWidth = Math.max(1, viewer.clientWidth || 0);
+        const viewerHeight = Math.max(1, viewer.clientHeight || 0);
+        const contentWidth = Math.max(1, stage.offsetWidth || 0) * scaleMultiplier;
+        const contentHeight = Math.max(1, stage.offsetHeight || 0) * scaleMultiplier;
+
+        const maxX = Math.max(0, ((contentWidth - viewerWidth) / 2) + 24);
+        const maxY = Math.max(0, ((contentHeight - viewerHeight) / 2) + 24);
+        return { maxX, maxY };
+    }
+
+    static _clampPan(x, y, scaleMultiplier = 1) {
+        const { maxX, maxY } = this._getPanBounds(scaleMultiplier);
+        return {
+            x: Math.min(maxX, Math.max(-maxX, Number.isFinite(x) ? x : 0)),
+            y: Math.min(maxY, Math.max(-maxY, Number.isFinite(y) ? y : 0))
+        };
+    }
+
+    static _applyViewerTransform(scaleMultiplier = 1, panX = this._committedPanX, panY = this._committedPanY) {
+        const stage = this._getGestureStage();
+        if (!stage) return;
+        const clamped = this._clampPan(panX, panY, scaleMultiplier);
+        stage.style.transform = `translate3d(${clamped.x}px, ${clamped.y}px, 0) scale(${scaleMultiplier})`;
+        this._liveScale = scaleMultiplier;
+        this._committedPanX = clamped.x;
+        this._committedPanY = clamped.y;
+    }
+
+    static _isZoomedForPan() {
+        const scaleMultiplier = this._liveScale || 1;
+        const bounds = this._getPanBounds(scaleMultiplier);
+        return bounds.maxX > 0 || bounds.maxY > 0 || this.currentScale > 1.01;
+    }
+
+    static _clearActiveGesture() {
+        this._activeGesture = null;
+    }
+
+    static _finalizeGesture() {
+        if (!this._activeGesture) return;
+        const finalScale = this._clampScale(this.currentScale * (this._liveScale || 1));
+        const scaleChanged = Math.abs(finalScale - this.currentScale) > 0.001;
+        const clampScaleMultiplier = this.currentScale > 0 ? (finalScale / this.currentScale) : 1;
+        const finalPan = this._clampPan(this._committedPanX, this._committedPanY, clampScaleMultiplier);
+        this._committedPanX = finalPan.x;
+        this._committedPanY = finalPan.y;
+        this._clearActiveGesture();
+
+        if (scaleChanged) {
+            this.currentScale = finalScale;
+            this._userHasAdjustedZoom = true;
+            this._updateZoomLabel();
+            this._liveScale = 1;
+            this._clearZoomTimer();
+            if (this.isDocumentValid()) {
+                this.renderStack({ timingSource: 'gesture-commit' });
+            }
+            return;
+        }
+
+        this._liveScale = 1;
+        this._applyViewerTransform(1, this._committedPanX, this._committedPanY);
+    }
+
+    static _distanceBetweenTouches(t0, t1) {
+        const dx = t1.clientX - t0.clientX;
+        const dy = t1.clientY - t0.clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    static _midpointBetweenTouches(t0, t1) {
+        return {
+            x: (t0.clientX + t1.clientX) / 2,
+            y: (t0.clientY + t1.clientY) / 2
+        };
     }
 
     static _removeRenderArtifactsForToken(container, renderToken) {
@@ -3911,15 +4047,128 @@ class PdfViewer {
             this.zoom(delta, { source: 'wheel' });
         };
 
+        this._touchStartHandler = (event) => {
+            if (!this.isDocumentValid()) return;
+            if (document.body.classList.contains('editor-active')) return;
+            const touches = event.touches;
+            if (!touches || touches.length === 0) return;
+
+            if (touches.length >= 2) {
+                const t0 = touches[0];
+                const t1 = touches[1];
+                const visualScale = this._clampScale(this.currentScale * (this._liveScale || 1));
+                this._activeGesture = {
+                    mode: 'pinch',
+                    startDistance: this._distanceBetweenTouches(t0, t1),
+                    startScale: visualScale,
+                    startMidpoint: this._midpointBetweenTouches(t0, t1),
+                    startPanX: this._committedPanX,
+                    startPanY: this._committedPanY
+                };
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            if (touches.length === 1 && this._isZoomedForPan()) {
+                const touch = touches[0];
+                this._activeGesture = {
+                    mode: 'pan',
+                    startX: touch.clientX,
+                    startY: touch.clientY,
+                    startPanX: this._committedPanX,
+                    startPanY: this._committedPanY
+                };
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+
+        this._touchMoveHandler = (event) => {
+            if (!this.isDocumentValid()) return;
+            if (!this._activeGesture) return;
+            if (document.body.classList.contains('editor-active')) return;
+
+            if (this._activeGesture.mode === 'pinch') {
+                const touches = event.touches;
+                if (!touches || touches.length < 2) return;
+                const t0 = touches[0];
+                const t1 = touches[1];
+                const distance = this._distanceBetweenTouches(t0, t1);
+                const midpoint = this._midpointBetweenTouches(t0, t1);
+                if (!(this._activeGesture.startDistance > 0)) return;
+
+                const nextScale = this._clampScale(this._activeGesture.startScale * (distance / this._activeGesture.startDistance));
+                const liveScaleMultiplier = nextScale / this.currentScale;
+                const panX = this._activeGesture.startPanX + (midpoint.x - this._activeGesture.startMidpoint.x);
+                const panY = this._activeGesture.startPanY + (midpoint.y - this._activeGesture.startMidpoint.y);
+                this._applyViewerTransform(liveScaleMultiplier, panX, panY);
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            if (this._activeGesture.mode === 'pan' && event.touches?.length === 1) {
+                const touch = event.touches[0];
+                const panX = this._activeGesture.startPanX + (touch.clientX - this._activeGesture.startX);
+                const panY = this._activeGesture.startPanY + (touch.clientY - this._activeGesture.startY);
+                this._applyViewerTransform(this._liveScale || 1, panX, panY);
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+
+        this._touchEndHandler = (event) => {
+            if (!this._activeGesture) return;
+
+            if (this._activeGesture.mode === 'pinch') {
+                if ((event.touches?.length || 0) < 2) {
+                    this._finalizeGesture();
+                }
+                return;
+            }
+
+            if ((event.touches?.length || 0) === 0) {
+                this._finalizeGesture();
+            }
+        };
+
         viewer.addEventListener('wheel', this._wheelZoomHandler, { passive: false });
+        viewer.addEventListener('touchstart', this._touchStartHandler, { passive: false });
+        viewer.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
+        viewer.addEventListener('touchend', this._touchEndHandler, { passive: false });
+        viewer.addEventListener('touchcancel', this._touchEndHandler, { passive: false });
+
+        const userAgent = (typeof navigator !== 'undefined' && navigator?.userAgent) ? navigator.userAgent : '';
+        const isIPadDesktopUA = typeof navigator !== 'undefined'
+            && navigator?.platform === 'MacIntel'
+            && Number(navigator?.maxTouchPoints || 0) > 1;
+        if ((/iPad|iPhone|iPod/.test(userAgent) || isIPadDesktopUA) && !this._iosGestureNoticeLogged) {
+            this._iosGestureNoticeLogged = true;
+            console.log('[pdf-gesture] iOS/iPadOS Safari may still allow system page pinch zoom outside viewer-level handlers.');
+        }
     }
 
     static teardownViewerInteractions() {
         if (this._zoomInteractionElement && this._wheelZoomHandler) {
             this._zoomInteractionElement.removeEventListener('wheel', this._wheelZoomHandler);
         }
+        if (this._zoomInteractionElement && this._touchStartHandler) {
+            this._zoomInteractionElement.removeEventListener('touchstart', this._touchStartHandler);
+            this._zoomInteractionElement.removeEventListener('touchmove', this._touchMoveHandler);
+            this._zoomInteractionElement.removeEventListener('touchend', this._touchEndHandler);
+            this._zoomInteractionElement.removeEventListener('touchcancel', this._touchEndHandler);
+        }
         this._zoomInteractionElement = null;
         this._wheelZoomHandler = null;
+        this._touchStartHandler = null;
+        this._touchMoveHandler = null;
+        this._touchEndHandler = null;
+        this._gestureStageElement = null;
+        this._liveScale = 1;
+        this._committedPanX = 0;
+        this._committedPanY = 0;
+        this._clearActiveGesture();
         this._clearZoomTimer();
     }
 
@@ -3927,6 +4176,7 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
+        const loadStartMs = getNowMs();
         
         // === INITIALIZATION ===
         this.url = fallbackUrl || "";
@@ -3958,19 +4208,23 @@ class PdfViewer {
                         this.currentBlobUrl = URL.createObjectURL(fallbackResult.blob);
                         
                         try {
+                            const docInitStartMs = getNowMs();
                             this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fallbackResult.arrayBuffer) });
                             this.doc = await this.loadingTask.promise;
+                            logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-fallback' });
                         } catch (pdfError) {
                             console.error(`[loadById-fallback] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
                             throw pdfError;
                         }
                         
                         // Cache the fallback PDF
+                        const cacheInsertStartMs = getNowMs();
                         PdfController.pdfCache.set(panelId, {
                             arrayBuffer: fallbackResult.arrayBuffer,
                             blob: fallbackResult.blob,
                             timestamp: Date.now()
                         });
+                        logPdfTiming('cache_insert', getNowMs() - cacheInsertStartMs, { source: 'network-fallback' });
                         
                         // Validate and render
                         if (!this.isDocumentValid()) {
@@ -3984,7 +4238,8 @@ class PdfViewer {
                         
                         this._setScaleForDevice();
                         setPdfUiState(PDF_UI_STATE.READY);
-                        await this.renderStack();
+                        await this.renderStack({ timingSource: 'network-fallback' });
+                        logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-fallback' });
                         return; // Success - exit early
                     }
                     
@@ -4022,8 +4277,10 @@ class PdfViewer {
             this.currentBlobUrl = URL.createObjectURL(blob);
             
             try {
+                const docInitStartMs = getNowMs();
                 this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
                 this.doc = await this.loadingTask.promise;
+                logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-by-id' });
             } catch (pdfError) {
                 console.error(`[loadById] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
                 if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
@@ -4044,7 +4301,8 @@ class PdfViewer {
 
             this._setScaleForDevice();
             setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack(); 
+            await this.renderStack({ timingSource: 'network-by-id' });
+            logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-by-id' });
         } catch(e) {
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
@@ -4089,6 +4347,7 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
+        const loadStartMs = getNowMs();
         
         // === VALIDATE CACHED DATA ===
         if (!cached || !cached.arrayBuffer || !cached.blob) {
@@ -4122,8 +4381,10 @@ class PdfViewer {
             this.currentBlobUrl = URL.createObjectURL(cached.blob);
             
             try {
+                const docInitStartMs = getNowMs();
                 this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
                 this.doc = await this.loadingTask.promise;
+                logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'cache-hit' });
             } catch (pdfError) {
                 console.error(`[loadFromCache] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
                 if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
@@ -4147,7 +4408,8 @@ class PdfViewer {
 
             this._setScaleForDevice();
             setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack();
+            await this.renderStack({ timingSource: 'cache-hit' });
+            logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'cache-hit' });
             console.log('✓ Loaded from cache'); 
         } catch(e) {
             console.error("[loadFromCache] Cache Load Error:", e);
@@ -4160,6 +4422,7 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
+        const loadStartMs = getNowMs();
         
         // === INITIALIZATION ===
         this.url = url;
@@ -4201,8 +4464,10 @@ class PdfViewer {
             this.currentBlobUrl = URL.createObjectURL(blob);
             
             try {
+                const docInitStartMs = getNowMs();
                 this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
                 this.doc = await this.loadingTask.promise;
+                logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-url' });
             } catch (pdfError) {
                 console.error(`[load] pdfjsLib.getDocument failed for URL ${url}:`, pdfError);
                 if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
@@ -4223,7 +4488,8 @@ class PdfViewer {
 
             this._setScaleForDevice();
             setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack(); 
+            await this.renderStack({ timingSource: 'network-url' });
+            logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-url' });
         } catch(e) {
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
@@ -4284,15 +4550,18 @@ class PdfViewer {
         // Fallback cleanup in case onload never fires
         fallbackTimeoutId = setTimeout(cleanup, this.PRINT_MAX_TIMEOUT_MS);
     }
-    static async renderStack() {
+    static async renderStack({ timingSource = 'unspecified' } = {}) {
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
             return;
         }
+        const renderStartMs = getNowMs();
+        let firstPageReadyMs = null;
         const priorScrollTop = container.scrollTop;
         const priorScrollHeight = container.scrollHeight || 1;
         container.innerHTML = ''; 
+        const stage = this._ensureGestureStage(container);
         this._updateZoomLabel();
         
         if (!this.doc) {
@@ -4323,7 +4592,6 @@ class PdfViewer {
                 return;
             }
             
-            await new Promise(r => setTimeout(r, 10)); 
             let page; let isTemplate = false;
             
             // Wrap getPage in try/catch
@@ -4364,7 +4632,6 @@ class PdfViewer {
             wrapper.dataset.renderToken = String(renderToken);
             wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
-            wrapper.style.animationDelay = `${Math.min((i - 1) * 0.05, 0.5)}s`; // Staggered animation, max 0.5s delay
             
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
@@ -4420,7 +4687,7 @@ class PdfViewer {
             }
 
             wrapper.appendChild(contentContainer); 
-            container.appendChild(wrapper); 
+            stage.appendChild(wrapper); 
             
             console.log(`📄 Created layer structure for page ${i}`);
             console.log(`  - Container: ${contentContainer.offsetWidth}x${contentContainer.offsetHeight}`);
@@ -4438,6 +4705,10 @@ class PdfViewer {
             if (ctx) {
                 try {
                     await page.render({ canvasContext: ctx, viewport, transform: renderMetrics.transform }).promise;
+                    if (i === 1 && firstPageReadyMs === null) {
+                        firstPageReadyMs = getNowMs() - renderStartMs;
+                        logPdfTiming('first_page_ready', firstPageReadyMs, { source: timingSource });
+                    }
                 } catch (renderError) {
                     console.warn(`[renderStack] Failed to render page ${i}:`, renderError);
                     // Check for destroyed transport
@@ -4463,6 +4734,9 @@ class PdfViewer {
         if (Number.isFinite(scrollRatio) && scrollRatio > 0) {
             container.scrollTop = scrollRatio * nextScrollHeight;
         }
+        const liveScaleToApply = this._activeGesture ? (this._liveScale || 1) : 1;
+        this._applyViewerTransform(liveScaleToApply, this._committedPanX, this._committedPanY);
+        logPdfTiming('full_render_complete', getNowMs() - renderStartMs, { source: timingSource, pages: this.doc?.numPages || 0 });
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
         console.log('[renderStack] All pages rendered, calling refreshProfileOptions()');
@@ -4506,7 +4780,7 @@ class PdfViewer {
         this._zoomTimer = setTimeout(() => {
             this._zoomTimer = null;
             if (!this.isDocumentValid()) return;
-            this.renderStack();
+            this.renderStack({ timingSource: 'toolbar-zoom' });
         }, this.ZOOM_DEBOUNCE_MS);
     }
 
@@ -4530,11 +4804,101 @@ class PdfController {
     static pdfCache = new Map(); // Cache for preloaded PDFs
     static preloadQueue = [];
     static isPreloading = false;
-    static PRELOAD_DELAY_MS = 250; // Delay between preload requests to avoid overwhelming browser/network
+    static preloadInFlight = new Map();
+    static preloadGeneration = 0;
+    static PRELOAD_CONCURRENCY = 3;
     static CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
     static CACHE_MAX_SIZE = 20; // Maximum number of PDFs to cache
 
-    static load(id, url) {
+    static _getPrioritizedFirstPageResults(results) {
+        const visibleIds = Array.from(document.querySelectorAll('#results-area .record-card[data-record-id]'))
+            .map((el) => el.dataset.recordId)
+            .filter(Boolean);
+        if (!visibleIds.length) return results;
+
+        const rank = new Map(visibleIds.map((id, index) => [id, index]));
+        return [...results].sort((a, b) => {
+            const ra = rank.has(a.id) ? rank.get(a.id) : Number.MAX_SAFE_INTEGER;
+            const rb = rank.has(b.id) ? rank.get(b.id) : Number.MAX_SAFE_INTEGER;
+            return ra - rb;
+        });
+    }
+
+    static _cachePdfArrayBuffer(id, arrayBuffer, source) {
+        const cacheInsertStartMs = getNowMs();
+        this.pdfCache.set(id, {
+            arrayBuffer,
+            blob: new Blob([arrayBuffer], { type: "application/pdf" }),
+            timestamp: Date.now()
+        });
+        this.clearCache();
+        logPdfTiming('cache_insert', getNowMs() - cacheInsertStartMs, { source });
+    }
+
+    static _getOrStartPreload(result, generation) {
+        const existing = this.preloadInFlight.get(result.id);
+        if (existing) return existing;
+
+        const preloadPromise = (async () => {
+            const preloadFetchStartMs = getNowMs();
+            try {
+                const proxyUrl = buildWorkerUrl('PDF_BY_ID', { id: result.id });
+                const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+
+                if (!this.isPreloading || generation !== this.preloadGeneration) return;
+
+                if (resp.status === 404) {
+                    console.warn(`[preload] PDF_BY_ID returned 404 for ${result.displayId || result.id}`);
+                    const fallbackResult = await attemptPdfFallbackFetch(result.pdfUrl, result.displayId || result.id, AuthService.headers());
+                    if (fallbackResult && this.isPreloading && generation === this.preloadGeneration) {
+                        logPdfTiming('preload_fetch', getNowMs() - preloadFetchStartMs, { source: 'fallback', status: 'ok' });
+                        this._cachePdfArrayBuffer(result.id, fallbackResult.arrayBuffer, 'preload-fallback');
+                        console.log(`✓ Preloaded PDF (via fallback): ${result.displayId || result.id}`);
+                        return;
+                    }
+
+                    result.pdfStatus = PDF_STATUS.MISSING;
+                    console.log(`[preload] Marked ${result.displayId || result.id} as missing PDF`);
+                    logPdfTiming('preload_fetch', getNowMs() - preloadFetchStartMs, { source: 'fallback', status: 'missing' });
+                    return;
+                }
+
+                if (!resp || !resp.ok) {
+                    console.warn(`[preload] Skipping: Response not OK for ${result.displayId || result.id} (status: ${resp?.status})`);
+                    logPdfTiming('preload_fetch', getNowMs() - preloadFetchStartMs, { source: 'by-id', status: 'error' });
+                    return;
+                }
+
+                const arrayBuffer = await resp.arrayBuffer();
+                if (!this.isPreloading || generation !== this.preloadGeneration) return;
+
+                const validation = validatePdfWithContext(resp, arrayBuffer, 'preload', result.displayId || result.id);
+                if (!validation.valid) {
+                    console.warn(`[preload] Skipping invalid PDF for ${result.displayId || result.id}: ${validation.reason}`);
+                    logPdfTiming('preload_fetch', getNowMs() - preloadFetchStartMs, { source: 'by-id', status: 'invalid' });
+                    return;
+                }
+
+                logPdfTiming('preload_fetch', getNowMs() - preloadFetchStartMs, { source: 'by-id', status: 'ok' });
+                this._cachePdfArrayBuffer(result.id, arrayBuffer, 'preload-by-id');
+                console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
+            } catch (e) {
+                console.warn(`[preload] Failed to preload PDF ${result.id}:`, e);
+                logPdfTiming('preload_fetch', getNowMs() - preloadFetchStartMs, { source: 'by-id', status: 'exception' });
+            }
+        })();
+
+        this.preloadInFlight.set(result.id, preloadPromise);
+        preloadPromise.finally(() => {
+            if (this.preloadInFlight.get(result.id) === preloadPromise) {
+                this.preloadInFlight.delete(result.id);
+            }
+        });
+
+        return preloadPromise;
+    }
+
+    static async load(id, url) {
         const placeholderEl = DOM_CACHE.get('pdf-placeholder-text');
         if (placeholderEl) placeholderEl.style.display = 'none';
         
@@ -4553,10 +4917,34 @@ class PdfController {
         // === CHECK CACHE FIRST ===
         const cached = this.pdfCache.get(id);
         if (cached) {
-            PdfViewer.loadFromCache(cached, id, url);
-        } else {
-            PdfViewer.loadById(id, url);
+            await PdfViewer.loadFromCache(cached, id, url);
+            return;
         }
+
+        const inflight = this.preloadInFlight.get(id);
+        if (inflight) {
+            const waitStartMs = getNowMs();
+            try {
+                await inflight;
+            } catch (e) {
+                console.warn('[load] In-flight preload wait failed; proceeding with direct load', e);
+            }
+            logPdfTiming('preload_inflight_wait', getNowMs() - waitStartMs, { source: 'click-load' });
+            const warmed = this.pdfCache.get(id);
+            if (warmed) {
+                await PdfViewer.loadFromCache(warmed, id, url);
+                return;
+            }
+        }
+
+        const warmedAfterCheck = this.pdfCache.get(id);
+        if (warmedAfterCheck) {
+            logPdfTiming('preload_inflight_wait', 0, { source: 'click-load', status: 'already-warm' });
+            await PdfViewer.loadFromCache(warmedAfterCheck, id, url);
+            return;
+        }
+
+        await PdfViewer.loadById(id, url);
     }
 
     static async preloadSearchResults(results) {
@@ -4571,7 +4959,7 @@ class PdfController {
         // === FILTER PRELOAD QUEUE ===
         // Preload first page of search results (top to bottom)
         // Skip records that are flagged as missing PDFs or already cached
-        this.preloadQueue = results.slice(0, SearchEngine.pageSize)
+        const firstPageResults = results.slice(0, SearchEngine.pageSize)
             .filter(r => {
                 if (!r || !r.id) return false;
                 if (this.pdfCache.has(r.id)) return false;
@@ -4581,70 +4969,24 @@ class PdfController {
                 }
                 return true;
             });
+        const queue = this._getPrioritizedFirstPageResults(firstPageResults);
+        this.preloadQueue = queue;
         this.isPreloading = true;
-        
-        // === PROCESS PRELOAD QUEUE ===
-        for (const result of this.preloadQueue) {
-            if (!this.isPreloading) break;
-            
-            try {
-                const proxyUrl = buildWorkerUrl('PDF_BY_ID', { id: result.id });
-                const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
-                
-                // === HANDLE 404: ATTEMPT FALLBACK ===
-                if (resp.status === 404) {
-                    console.warn(`[preload] PDF_BY_ID returned 404 for ${result.displayId || result.id}`);
-                    
-                    const fallbackResult = await attemptPdfFallbackFetch(result.pdfUrl, result.displayId || result.id, AuthService.headers);
-                    if (fallbackResult && this.isPreloading) {
-                        // Cache the fallback PDF
-                        this.pdfCache.set(result.id, {
-                            arrayBuffer: fallbackResult.arrayBuffer,
-                            blob: fallbackResult.blob,
-                            timestamp: Date.now()
-                        });
-                        console.log(`✓ Preloaded PDF (via fallback): ${result.displayId || result.id}`);
-                        continue; // Success - move to next
-                    }
-                    
-                    // Fallback failed - mark as missing to prevent repeated attempts
-                    result.pdfStatus = PDF_STATUS.MISSING;
-                    console.log(`[preload] Marked ${result.displayId || result.id} as missing PDF`);
-                    continue; // Skip this one, continue with others
-                }
-                
-                // === PRIMARY FETCH SUCCESS: VALIDATE AND CACHE ===
-                if (resp && resp.ok) {
-                    const arrayBuffer = await resp.arrayBuffer();
-                    
-                    if (!this.isPreloading) break;
-                    
-                    const validation = validatePdfWithContext(resp, arrayBuffer, 'preload', result.displayId || result.id);
-                    if (!validation.valid) {
-                        console.warn(`[preload] Skipping invalid PDF for ${result.displayId || result.id}: ${validation.reason}`);
-                        continue;
-                    }
-                    
-                    // Cache valid PDF
-                    this.pdfCache.set(result.id, {
-                        arrayBuffer: arrayBuffer,
-                        blob: new Blob([arrayBuffer], { type: "application/pdf" }),
-                        timestamp: Date.now()
-                    });
-                    console.log(`✓ Preloaded PDF: ${result.displayId || result.id}`);
-                } else {
-                    console.warn(`[preload] Skipping: Response not OK for ${result.displayId || result.id} (status: ${resp.status})`);
-                }
-            } catch (e) {
-                console.warn(`[preload] Failed to preload PDF ${result.id}:`, e);
+        const generation = ++this.preloadGeneration;
+        let queueIndex = 0;
+        const workerCount = Math.max(1, Math.min(this.PRELOAD_CONCURRENCY, queue.length));
+
+        const worker = async () => {
+            while (this.isPreloading && generation === this.preloadGeneration) {
+                const currentIndex = queueIndex++;
+                if (currentIndex >= queue.length) return;
+                const result = queue[currentIndex];
+                await this._getOrStartPreload(result, generation);
             }
-            
-            // === DELAY BETWEEN REQUESTS ===
-            if (this.isPreloading) {
-                await new Promise(resolve => setTimeout(resolve, this.PRELOAD_DELAY_MS));
-            }
-        }
-        
+        };
+
+        await Promise.all(Array.from({ length: workerCount }, () => worker()));
+        if (generation !== this.preloadGeneration) return;
         this.isPreloading = false;
         this.clearCache(); // Clean up old entries after preloading
     }
@@ -4652,6 +4994,7 @@ class PdfController {
     static stopPreloading() {
         this.isPreloading = false;
         this.preloadQueue = [];
+        this.preloadGeneration++;
     }
 
     static evictFromCache(id) {
@@ -5154,6 +5497,7 @@ static render(res, crit, totalCount) {
 
         const c = document.createElement('div'); 
         c.className = `record-card ${isMissingPdf ? 'no-pdf-card' : ''} ${!i.p ? 'varied-result' : ''}`; 
+        c.dataset.recordId = i.id;
         c.innerHTML = `
             <div class="panel-name">${i.displayId || i.id}</div>
             <div class="badge-row">${badges.join(' ') || '<span class="hud-badge unknown">NO MATCH</span>'}</div>
