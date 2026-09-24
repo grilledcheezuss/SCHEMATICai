@@ -161,12 +161,16 @@ function applyAttachmentDisposition(headers, filename) {
 }
 
 function readAirtableHeaders(env) {
-    return { 'Authorization': 'Bearer ' + ((env && env.AIRTABLE_READ_KEY) ? env.AIRTABLE_READ_KEY : '') };
+    const key = env && env.AIRTABLE_READ_KEY;
+    if (!key) throw new Error('Worker configuration error: missing AIRTABLE_READ_KEY');
+    return { 'Authorization': 'Bearer ' + key };
 }
 
 function writeAirtableHeaders(env) {
+    const key = env && env.AIRTABLE_WRITE_KEY;
+    if (!key) throw new Error('Worker configuration error: missing AIRTABLE_WRITE_KEY');
     return {
-        'Authorization': 'Bearer ' + ((env && env.AIRTABLE_WRITE_KEY) ? env.AIRTABLE_WRITE_KEY : ''),
+        'Authorization': 'Bearer ' + key,
         'Content-Type': 'application/json'
     };
 }
@@ -303,7 +307,7 @@ async function ensureUsersCache(env) {
 }
 
 async function ensureHealedCache(env) {
-    if (CACHE_HEALED && (Date.now() - CACHE_HEALED_TIME < HEALER_CACHE_DURATION)) return;
+    if (CACHE_HEALED_TIME > 0 && (Date.now() - CACHE_HEALED_TIME < HEALER_CACHE_DURATION)) return;
     if (CACHE_HEALED_PROMISE) return CACHE_HEALED_PROMISE;
     CACHE_HEALED_PROMISE = (async () => {
         const fbData = await fetchAirtablePages(TABLE_FEEDBACK, 5, ['Panel ID', 'Corrections'], env);
@@ -1076,9 +1080,12 @@ export default {
                         if (isFresh || isStaleServeable) {
                             if (isStaleServeable) {
                                 const refresh = startRefresh();
-                                if (ctx && ctx.waitUntil) ctx.waitUntil(refresh.promise.catch(() => {}));
+                                if (ctx && ctx.waitUntil) ctx.waitUntil(refresh.promise.catch((err) => {
+                                    console.warn('[MAIN] stale-refresh failed:', err?.message || err);
+                                }));
                             }
                             const hitHeaders = new Headers(cached.headers);
+                            hitHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
                             setMainTimingHeaders(hitHeaders, {
                                 cacheStatus: isFresh ? 'HIT' : 'STALE',
                                 authMs,
@@ -1116,10 +1123,21 @@ export default {
                     headers: writeAirtableHeaders(env),
                     body: JSON.stringify(body)
                 });
-                CACHE_HEALED = {};
-                CACHE_HEALED_TIME = 0;
-                CACHE_HEALED_PROMISE = null;
-                FEEDBACK_CACHE_VERSION++;
+                if (resp.ok) {
+                    CACHE_HEALED = {};
+                    CACHE_HEALED_TIME = 0;
+                    const inflightRefresh = CACHE_HEALED_PROMISE;
+                    if (inflightRefresh) {
+                        try {
+                            await inflightRefresh;
+                        } catch (_inflightErr) {}
+                    }
+                    try {
+                        await ensureHealedCache(env);
+                    } catch (_refreshError) {
+                        FEEDBACK_CACHE_VERSION++;
+                    }
+                }
                 return new Response(JSON.stringify(await resp.json()), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
 

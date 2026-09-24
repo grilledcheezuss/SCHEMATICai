@@ -189,6 +189,7 @@ function resetHarness() {
     DataLoader._backgroundRefreshCooldownUntil = 0;
     DataLoader._backgroundRefreshPromise = null;
     DataLoader._lastBackgroundRefreshAt = 0;
+    DataLoader._queuedBackgroundRefreshTimer = null;
 }
 
 function assertEqual(actual, expected, message) {

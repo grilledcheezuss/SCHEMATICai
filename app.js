@@ -669,6 +669,7 @@ class DataLoader {
     static _lockHeartbeatTimer = null;
     static _lifecycleRefreshHookInstalled = false;
     static _backgroundRefreshPromise = null;
+    static _queuedBackgroundRefreshTimer = null;
     static _lastBackgroundRefreshAt = 0;
     static BACKGROUND_REFRESH_DEBOUNCE_MS = 30000;
     static BACKGROUND_REFRESH_COOLDOWN_MS = 120000;
@@ -788,10 +789,12 @@ class DataLoader {
         }
     }
     static queueBackgroundRefresh(options = {}) {
+        if (this._queuedBackgroundRefreshTimer) return;
         const now = Date.now();
         const jitterMs = Math.round(Math.random() * this.STARTUP_REFRESH_JITTER_MAX_MS);
         if (now < this._backgroundRefreshCooldownUntil) return;
-        setTimeout(() => {
+        this._queuedBackgroundRefreshTimer = setTimeout(() => {
+            this._queuedBackgroundRefreshTimer = null;
             Promise.resolve()
                 .then(() => this.maybeRefreshStaleCache(options))
                 .catch(err => console.warn('Background refresh bootstrap failed; keeping existing cache intact', err));
@@ -852,6 +855,10 @@ class DataLoader {
         } else if (currentSchema !== SNAPSHOT_SCHEMA_VERSION) {
             console.warn(`⚡ Cache schema changed (${currentSchema || 'none'} -> ${SNAPSHOT_SCHEMA_VERSION}). Resetting persisted snapshot.`);
             await DB.deleteDatabase();
+            window.LOCAL_DB.length = 0;
+            if (window.ID_MAP instanceof Map) window.ID_MAP.clear();
+            if (window.FOUND_MFGS instanceof Set) window.FOUND_MFGS.clear();
+            if (window.FOUND_ENCS instanceof Set) window.FOUND_ENCS.clear();
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
             localStorage.removeItem(this.SYNC_LOCK_KEY);
