@@ -4511,7 +4511,7 @@ class PdfViewer {
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
         const loadStartMs = getNowMs();
-        const normalizedPanelId = String(panelId || '').trim();
+        const normalizedPanelId = this._normalizePanelId(panelId);
         const activeRecord = normalizedPanelId ? window.ID_MAP?.get(normalizedPanelId) : null;
         this.currentPanelId = normalizedPanelId;
         this.currentDisplayPanelId = activeRecord?.displayId || (normalizedPanelId ? `CP-${normalizedPanelId.replace(/^CP-/i, '')}` : '');
@@ -4688,7 +4688,7 @@ class PdfViewer {
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
         const loadStartMs = getNowMs();
-        const normalizedPanelId = String(panelId || '').trim();
+        const normalizedPanelId = this._normalizePanelId(panelId);
         const activeRecord = normalizedPanelId ? window.ID_MAP?.get(normalizedPanelId) : null;
         this.currentPanelId = normalizedPanelId;
         this.currentDisplayPanelId = activeRecord?.displayId || (normalizedPanelId ? `CP-${normalizedPanelId.replace(/^CP-/i, '')}` : '');
@@ -4864,12 +4864,16 @@ class PdfViewer {
         return this._isIsolatedPdfPrintBrowser();
     }
 
+    static _normalizePanelId(panelId) {
+        return String(panelId || '').trim().replace(/^CP-|\.(?:dwg|pdf)$/gi, '');
+    }
+
     static _buildAttachmentDownloadUrl(filename) {
-        if (this.url) {
-            return buildWorkerUrl('PDF', { url: this.url, download: '1', filename });
-        }
         if (this.currentPanelId) {
             return buildWorkerUrl('PDF_BY_ID', { id: this.currentPanelId, download: '1', filename });
+        }
+        if (this.url) {
+            return buildWorkerUrl('PDF', { url: this.url, download: '1', filename });
         }
         return '';
     }

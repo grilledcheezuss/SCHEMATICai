@@ -172,7 +172,7 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
 - `MAIN_PAGE_INFLIGHT` only coalesces requests inside the current isolate. It does **not** provide cross-isolate or cross-PoP single-flight guarantees.
 
 **Diagnostics Headers (v2.5.76)**:
-- `X-SCHEMATICA-MAIN-CACHE`: `HIT`, `MISS`, `STALE`, `REFRESH`, or `COALESCED`
+- `X-SCHEMATICA-MAIN-CACHE`: `HIT`, `MISS`, `STALE`, `COALESCED`, or `REFRESH` when an expired local entry forces a blocking refresh before the response is returned
 - `X-SCHEMATICA-MAIN-REFRESH`: `NONE`, `SCHEDULED`, `INFLIGHT`, or `FAILED`
 - `X-SCHEMATICA-AUTH-MS`, `X-SCHEMATICA-MAIN-UPSTREAM-MS`, `X-SCHEMATICA-MAIN-PROCESS-MS`, `X-SCHEMATICA-MAIN-SERIALIZE-MS`, `X-SCHEMATICA-MAIN-TOTAL-MS`
 
