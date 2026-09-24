@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.71 ---
-const APP_VERSION = "v2.5.71";
+// --- SCHEMATICA ai v2.5.72 ---
+const APP_VERSION = "v2.5.72";
 const VERSION_HISTORY = {
+    "v2.5.72": "PDF viewer follow-up: geometry-based fit-to-viewer auto-scale with device-class clamps, first-page-ready render gating, removal of artificial per-page render delay, viewer-scoped pinch/wheel zoom handling with safe fallback, and resize auto-fit that respects manual zoom",
     "v2.5.71": "PDF viewer responsiveness hardening: deterministic 60/80/100/120 start-scale tiers, bounded/coalesced zoom rendering, viewer-scoped ctrl/cmd+wheel zoom handling, and stale-render cleanup during rapid zoom/document replacement",
     "v2.5.70": "Startup/update follow-up: instrument sync phase timings, replace the static 99% plateau with fetch/encrypt/save/apply progress, batch snapshot shard persistence into one IndexedDB write, and polish reset/result-card styling without changing behavior",
     "v2.5.69": "Regression fix: restore light/dark search action-row divider seam and make SHOW/HIDE reliably toggle the shared Search parameter collapse target after search completion/reset flows",
@@ -3857,9 +3858,27 @@ class PdfViewer {
     static MAX_SCALE = 2.4;
     static ZOOM_STEP = 0.2;
     static ZOOM_DEBOUNCE_MS = 100;
+    static RENDER_SCROLLBAR_ALLOWANCE_PX = 14;
     static _zoomTimer = null;
+    static _viewportRefitTimer = null;
     static _zoomInteractionElement = null;
     static _wheelZoomHandler = null;
+    static _pointerDownHandler = null;
+    static _pointerMoveHandler = null;
+    static _pointerUpHandler = null;
+    static _touchStartHandler = null;
+    static _touchMoveHandler = null;
+    static _touchEndHandler = null;
+    static _gestureStartHandler = null;
+    static _gestureChangeHandler = null;
+    static _gestureEndHandler = null;
+    static _resizeHandler = null;
+    static _orientationHandler = null;
+    static _pointerCache = new Map();
+    static _pointerPinchState = null;
+    static _touchPinchState = null;
+    static _gesturePinchState = null;
+    static _documentGeometryCache = null;
     static _userHasAdjustedZoom = false;
     static isPrinting = false;
     static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
@@ -3876,10 +3895,20 @@ class PdfViewer {
         }
     }
 
+    static _clearViewportRefitTimer() {
+        if (this._viewportRefitTimer) {
+            clearTimeout(this._viewportRefitTimer);
+            this._viewportRefitTimer = null;
+        }
+    }
+
     static _beginDocumentLoad() {
         this._clearZoomTimer();
+        this._clearViewportRefitTimer();
         this.currentRenderToken++;
         this._userHasAdjustedZoom = false;
+        this._documentGeometryCache = null;
+        this._resetPinchTracking();
     }
 
     static _clampScale(scale) {
@@ -3894,6 +3923,126 @@ class PdfViewer {
     static _removeRenderArtifactsForToken(container, renderToken) {
         if (!container) return;
         container.querySelectorAll(`.pdf-page-wrapper[data-render-token="${renderToken}"]`).forEach((wrapper) => wrapper.remove());
+    }
+
+    static _scheduleRenderStack() {
+        this._clearZoomTimer();
+        this._zoomTimer = setTimeout(() => {
+            this._zoomTimer = null;
+            if (!this.isDocumentValid()) return;
+            this.renderStack();
+        }, this.ZOOM_DEBOUNCE_MS);
+    }
+
+    static _setScaleAndQueueRender(nextScale, { markManual = false } = {}) {
+        const clamped = this._clampScale(nextScale);
+        if (Math.abs(clamped - this.currentScale) < 0.0001) return false;
+        this.currentScale = clamped;
+        if (markManual) this._userHasAdjustedZoom = true;
+        this._updateZoomLabel();
+        this._scheduleRenderStack();
+        return true;
+    }
+
+    static _distanceBetweenPoints(pointA, pointB) {
+        if (!pointA || !pointB) return 0;
+        const dx = pointA.clientX - pointB.clientX;
+        const dy = pointA.clientY - pointB.clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    static _distanceBetweenTouches(touchA, touchB) {
+        if (!touchA || !touchB) return 0;
+        const dx = touchA.clientX - touchB.clientX;
+        const dy = touchA.clientY - touchB.clientY;
+        return Math.hypot(dx, dy);
+    }
+
+    static _beginPinchTracking(startDistance, startScale, mode) {
+        if (!Number.isFinite(startDistance) || startDistance <= 0) return;
+        const state = {
+            active: false,
+            mode,
+            startDistance,
+            startScale
+        };
+        if (mode === 'pointer') this._pointerPinchState = state;
+        if (mode === 'touch') this._touchPinchState = state;
+        if (mode === 'gesture') this._gesturePinchState = state;
+    }
+
+    static _updatePinchScale(currentDistance, state, event) {
+        if (!state || !Number.isFinite(currentDistance) || currentDistance <= 0 || !this.isDocumentValid()) return;
+        const pinchDelta = Math.abs(currentDistance - state.startDistance);
+        if (!state.active && pinchDelta < 6) return;
+        state.active = true;
+        if (event?.preventDefault) event.preventDefault();
+        if (event?.stopPropagation) event.stopPropagation();
+        const desiredScale = state.startScale * (currentDistance / state.startDistance);
+        this._setScaleAndQueueRender(desiredScale, { markManual: true });
+    }
+
+    static _resetPinchTracking() {
+        this._pointerCache.clear();
+        this._pointerPinchState = null;
+        this._touchPinchState = null;
+        this._gesturePinchState = null;
+    }
+
+    static _resolveViewerWidth() {
+        const viewer = document.getElementById('pdf-main-view');
+        const previewPane = document.getElementById('preview-pane');
+        const viewerWidth = viewer?.clientWidth || 0;
+        const previewPaneWidth = previewPane?.clientWidth || 0;
+        const rawWidth = viewerWidth > 0
+            ? viewerWidth
+            : (previewPaneWidth > 0 ? previewPaneWidth : Math.max(0, window.innerWidth || 0));
+        let horizontalPadding = 40;
+        if (viewer && typeof window.getComputedStyle === 'function') {
+            const style = window.getComputedStyle(viewer);
+            horizontalPadding = (parseFloat(style?.paddingLeft || '0') || 0) + (parseFloat(style?.paddingRight || '0') || 0);
+        }
+        const availableWidth = Math.max(1, rawWidth - horizontalPadding - this.RENDER_SCROLLBAR_ALLOWANCE_PX);
+        return availableWidth;
+    }
+
+    static _getScaleClampPolicy() {
+        const viewportWidth = Math.max(0, window.innerWidth || 0);
+        const viewportHeight = Math.max(0, window.innerHeight || 0);
+        const shortSide = Math.min(viewportWidth, viewportHeight);
+        const isPortrait = viewportHeight >= viewportWidth;
+
+        // Geometry-fit is primary; these min/max ranges keep UX sane across device classes.
+        if (shortSide <= 430 && viewportWidth <= 600) return { min: 0.6, max: 0.9 };      // small phones ≈60%
+        if (viewportWidth < 1024) return { min: 0.75, max: 1.15 };                          // large phones/tablets ≈80%+
+        if (viewportWidth >= 1700 && viewportHeight >= 900) return { min: 0.95, max: 1.2 }; // large monitors up to ~120%
+        if (isPortrait && shortSide >= 900) return { min: 0.85, max: 1.15 };                // portrait tablets/displays
+        return { min: 0.9, max: 1.15 };                                                      // small monitors / larger tablet landscape
+    }
+
+    static async _getDocumentGeometry() {
+        if (!this.isDocumentValid()) return null;
+        const docRef = this.doc;
+        const docKey = String(docRef?.fingerprint || this.currentFetchId || 'unknown');
+        if (this._documentGeometryCache?.docKey === docKey) {
+            return this._documentGeometryCache;
+        }
+
+        try {
+            const firstPage = await docRef.getPage(1);
+            if (this.doc !== docRef || !this.isDocumentValid()) return null;
+            const baseViewport = firstPage.getViewport({ scale: 1 });
+            const geometry = {
+                docKey,
+                baseWidth: Math.max(1, baseViewport.width),
+                baseHeight: Math.max(1, baseViewport.height)
+            };
+            this._documentGeometryCache = geometry;
+            return geometry;
+        } catch (error) {
+            console.warn('[PdfViewer] Failed to measure base PDF geometry:', error);
+            return null;
+        }
     }
 
     static initViewerInteractions() {
@@ -3911,16 +4060,114 @@ class PdfViewer {
             this.zoom(delta, { source: 'wheel' });
         };
 
+        this._pointerDownHandler = (event) => {
+            if (!this.isDocumentValid() || event.pointerType !== 'touch') return;
+            this._pointerCache.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+            if (this._pointerCache.size === 2) {
+                const [pointA, pointB] = Array.from(this._pointerCache.values());
+                this._beginPinchTracking(this._distanceBetweenPoints(pointA, pointB), this.currentScale, 'pointer');
+            }
+        };
+
+        this._pointerMoveHandler = (event) => {
+            if (event.pointerType !== 'touch' || !this._pointerCache.has(event.pointerId)) return;
+            this._pointerCache.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+            if (this._pointerCache.size < 2) return;
+            const [pointA, pointB] = Array.from(this._pointerCache.values());
+            this._updatePinchScale(this._distanceBetweenPoints(pointA, pointB), this._pointerPinchState, event);
+        };
+
+        this._pointerUpHandler = (event) => {
+            this._pointerCache.delete(event.pointerId);
+            if (this._pointerCache.size < 2) this._pointerPinchState = null;
+        };
+
+        this._touchStartHandler = (event) => {
+            if (!this.isDocumentValid() || event.touches.length !== 2) return;
+            const [touchA, touchB] = event.touches;
+            this._beginPinchTracking(this._distanceBetweenTouches(touchA, touchB), this.currentScale, 'touch');
+        };
+
+        this._touchMoveHandler = (event) => {
+            if (!this._touchPinchState || event.touches.length !== 2) return;
+            const [touchA, touchB] = event.touches;
+            this._updatePinchScale(this._distanceBetweenTouches(touchA, touchB), this._touchPinchState, event);
+        };
+
+        this._touchEndHandler = () => {
+            this._touchPinchState = null;
+        };
+
+        this._gestureStartHandler = (event) => {
+            if (!this.isDocumentValid()) return;
+            this._beginPinchTracking(1, this.currentScale, 'gesture');
+            event.preventDefault();
+            event.stopPropagation();
+        };
+
+        this._gestureChangeHandler = (event) => {
+            if (!this._gesturePinchState || !Number.isFinite(event.scale)) return;
+            this._updatePinchScale(Math.max(0.01, event.scale), this._gesturePinchState, event);
+        };
+
+        this._gestureEndHandler = () => {
+            this._gesturePinchState = null;
+        };
+
+        this._resizeHandler = () => this.scheduleAutoFitToViewer();
+        this._orientationHandler = () => this.scheduleAutoFitToViewer();
+
         viewer.addEventListener('wheel', this._wheelZoomHandler, { passive: false });
+        viewer.addEventListener('pointerdown', this._pointerDownHandler, { passive: true });
+        viewer.addEventListener('pointermove', this._pointerMoveHandler, { passive: false });
+        viewer.addEventListener('pointerup', this._pointerUpHandler, { passive: true });
+        viewer.addEventListener('pointercancel', this._pointerUpHandler, { passive: true });
+        viewer.addEventListener('touchstart', this._touchStartHandler, { passive: true });
+        viewer.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
+        viewer.addEventListener('touchend', this._touchEndHandler, { passive: true });
+        viewer.addEventListener('touchcancel', this._touchEndHandler, { passive: true });
+        viewer.addEventListener('gesturestart', this._gestureStartHandler, { passive: false });
+        viewer.addEventListener('gesturechange', this._gestureChangeHandler, { passive: false });
+        viewer.addEventListener('gestureend', this._gestureEndHandler, { passive: true });
+        window.addEventListener('resize', this._resizeHandler, { passive: true });
+        window.addEventListener('orientationchange', this._orientationHandler, { passive: true });
     }
 
     static teardownViewerInteractions() {
         if (this._zoomInteractionElement && this._wheelZoomHandler) {
             this._zoomInteractionElement.removeEventListener('wheel', this._wheelZoomHandler);
         }
+        if (this._zoomInteractionElement && this._pointerDownHandler) {
+            this._zoomInteractionElement.removeEventListener('pointerdown', this._pointerDownHandler);
+            this._zoomInteractionElement.removeEventListener('pointermove', this._pointerMoveHandler);
+            this._zoomInteractionElement.removeEventListener('pointerup', this._pointerUpHandler);
+            this._zoomInteractionElement.removeEventListener('pointercancel', this._pointerUpHandler);
+            this._zoomInteractionElement.removeEventListener('touchstart', this._touchStartHandler);
+            this._zoomInteractionElement.removeEventListener('touchmove', this._touchMoveHandler);
+            this._zoomInteractionElement.removeEventListener('touchend', this._touchEndHandler);
+            this._zoomInteractionElement.removeEventListener('touchcancel', this._touchEndHandler);
+            this._zoomInteractionElement.removeEventListener('gesturestart', this._gestureStartHandler);
+            this._zoomInteractionElement.removeEventListener('gesturechange', this._gestureChangeHandler);
+            this._zoomInteractionElement.removeEventListener('gestureend', this._gestureEndHandler);
+        }
+        if (this._resizeHandler) window.removeEventListener('resize', this._resizeHandler);
+        if (this._orientationHandler) window.removeEventListener('orientationchange', this._orientationHandler);
         this._zoomInteractionElement = null;
         this._wheelZoomHandler = null;
+        this._pointerDownHandler = null;
+        this._pointerMoveHandler = null;
+        this._pointerUpHandler = null;
+        this._touchStartHandler = null;
+        this._touchMoveHandler = null;
+        this._touchEndHandler = null;
+        this._gestureStartHandler = null;
+        this._gestureChangeHandler = null;
+        this._gestureEndHandler = null;
+        this._resizeHandler = null;
+        this._orientationHandler = null;
+        this._resetPinchTracking();
         this._clearZoomTimer();
+        this._clearViewportRefitTimer();
     }
 
     static async loadById(panelId, fallbackUrl) {
@@ -3982,9 +4229,18 @@ class PdfViewer {
                             return;
                         }
                         
-                        this._setScaleForDevice();
-                        setPdfUiState(PDF_UI_STATE.READY);
-                        await this.renderStack();
+                        await this._setScaleForDevice();
+                        let readyShown = false;
+                        await this.renderStack({
+                            disablePageAnimations: true,
+                            onFirstPageStable: () => {
+                                if (!readyShown) {
+                                    setPdfUiState(PDF_UI_STATE.READY);
+                                    readyShown = true;
+                                }
+                            }
+                        });
+                        if (!readyShown && this.isDocumentValid() && this.currentFetchId === fetchId) setPdfUiState(PDF_UI_STATE.READY);
                         return; // Success - exit early
                     }
                     
@@ -4042,9 +4298,18 @@ class PdfViewer {
                 return;
             }
 
-            this._setScaleForDevice();
-            setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack(); 
+            await this._setScaleForDevice();
+            let readyShown = false;
+            await this.renderStack({
+                disablePageAnimations: true,
+                onFirstPageStable: () => {
+                    if (!readyShown) {
+                        setPdfUiState(PDF_UI_STATE.READY);
+                        readyShown = true;
+                    }
+                }
+            });
+            if (!readyShown && this.isDocumentValid() && this.currentFetchId === fetchId) setPdfUiState(PDF_UI_STATE.READY);
         } catch(e) {
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
@@ -4057,32 +4322,38 @@ class PdfViewer {
     }
     
     /**
-     * Helper: Set appropriate scale based on device width
+     * Geometry-first initial scale policy:
+     * - Fit page width to the actual viewer width.
+     * - Clamp by device class so the result remains usable across phones/tablets/monitors.
+     * - Preserve user manual zoom unless a new document replaces the current one.
      * @private
      */
-    static _setScaleForDevice({ force = true } = {}) {
+    static async _setScaleForDevice({ force = true } = {}) {
         if (!force && this._userHasAdjustedZoom) return;
-        const viewportWidth = Math.max(0, window.innerWidth || 0);
-        const viewportHeight = Math.max(0, window.innerHeight || 0);
-        const shortSide = Math.min(viewportWidth, viewportHeight);
-        const isPortrait = viewportHeight >= viewportWidth;
-        const isSmallMobile = shortSide <= 430 && viewportWidth <= 600;
-        const isPortraitLargeTabletOrMonitor = isPortrait && viewportWidth >= 820 && viewportHeight >= 1100;
-        const isSmallMonitorOrLargeTablet = viewportWidth >= 1024 || isPortraitLargeTabletOrMonitor;
-        const isLargeMonitor = viewportWidth >= 1600 && viewportHeight >= 900;
 
-        if (isSmallMobile) {
-            this.currentScale = 0.6;
-        } else if (!isSmallMonitorOrLargeTablet) {
-            this.currentScale = 0.8;
-        } else if (isLargeMonitor) {
-            this.currentScale = 1.2;
-        } else {
-            this.currentScale = 1.0;
-        }
-
-        this.currentScale = this._clampScale(this.currentScale);
+        const geometry = await this._getDocumentGeometry();
+        const availableViewerWidth = this._resolveViewerWidth();
+        const baseWidth = geometry?.baseWidth || availableViewerWidth;
+        const fitScale = availableViewerWidth / Math.max(1, baseWidth);
+        const { min, max } = this._getScaleClampPolicy();
+        const clampedPolicyScale = Math.min(max, Math.max(min, fitScale));
+        this.currentScale = this._clampScale(clampedPolicyScale);
         this._userHasAdjustedZoom = false;
+        this._updateZoomLabel();
+    }
+
+    static scheduleAutoFitToViewer() {
+        if (!this.isDocumentValid() || this._userHasAdjustedZoom) return;
+        this._clearViewportRefitTimer();
+        this._viewportRefitTimer = setTimeout(async () => {
+            this._viewportRefitTimer = null;
+            if (!this.isDocumentValid() || this._userHasAdjustedZoom) return;
+            const previousScale = this.currentScale;
+            await this._setScaleForDevice({ force: false });
+            if (Math.abs(previousScale - this.currentScale) >= 0.0001) {
+                this._scheduleRenderStack();
+            }
+        }, 120);
     }
 
     static async loadFromCache(cached, panelId, fallbackUrl) {
@@ -4145,9 +4416,18 @@ class PdfViewer {
                 return;
             }
 
-            this._setScaleForDevice();
-            setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack();
+            await this._setScaleForDevice();
+            let readyShown = false;
+            await this.renderStack({
+                disablePageAnimations: true,
+                onFirstPageStable: () => {
+                    if (!readyShown) {
+                        setPdfUiState(PDF_UI_STATE.READY);
+                        readyShown = true;
+                    }
+                }
+            });
+            if (!readyShown && this.isDocumentValid() && this.currentFetchId === fetchId) setPdfUiState(PDF_UI_STATE.READY);
             console.log('✓ Loaded from cache'); 
         } catch(e) {
             console.error("[loadFromCache] Cache Load Error:", e);
@@ -4221,9 +4501,18 @@ class PdfViewer {
                 return;
             }
 
-            this._setScaleForDevice();
-            setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack(); 
+            await this._setScaleForDevice();
+            let readyShown = false;
+            await this.renderStack({
+                disablePageAnimations: true,
+                onFirstPageStable: () => {
+                    if (!readyShown) {
+                        setPdfUiState(PDF_UI_STATE.READY);
+                        readyShown = true;
+                    }
+                }
+            });
+            if (!readyShown && this.isDocumentValid() && this.currentFetchId === fetchId) setPdfUiState(PDF_UI_STATE.READY);
         } catch(e) {
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
@@ -4284,7 +4573,7 @@ class PdfViewer {
         // Fallback cleanup in case onload never fires
         fallbackTimeoutId = setTimeout(cleanup, this.PRINT_MAX_TIMEOUT_MS);
     }
-    static async renderStack() {
+    static async renderStack({ onFirstPageStable = null, disablePageAnimations = false } = {}) {
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
@@ -4323,7 +4612,6 @@ class PdfViewer {
                 return;
             }
             
-            await new Promise(r => setTimeout(r, 10)); 
             let page; let isTemplate = false;
             
             // Wrap getPage in try/catch
@@ -4364,7 +4652,7 @@ class PdfViewer {
             wrapper.dataset.renderToken = String(renderToken);
             wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
-            wrapper.style.animationDelay = `${Math.min((i - 1) * 0.05, 0.5)}s`; // Staggered animation, max 0.5s delay
+            if (disablePageAnimations) wrapper.classList.add('no-fade');
             
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
@@ -4457,6 +4745,9 @@ class PdfViewer {
             RedactionManager.rescaleZones(wrapper);
             // Second pass after fade-in animation may alter layout
             requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
+            if (i === 1 && typeof onFirstPageStable === 'function') {
+                onFirstPageStable(wrapper);
+            }
         }
         const nextScrollHeight = container.scrollHeight || 1;
         const scrollRatio = priorScrollTop / priorScrollHeight;
@@ -4497,17 +4788,7 @@ class PdfViewer {
     }
     static zoom(delta) {
         if (!Number.isFinite(delta)) return;
-        const nextScale = this._clampScale(this.currentScale + delta);
-        if (nextScale === this.currentScale) return;
-        this.currentScale = nextScale;
-        this._userHasAdjustedZoom = true;
-        this._updateZoomLabel();
-        this._clearZoomTimer();
-        this._zoomTimer = setTimeout(() => {
-            this._zoomTimer = null;
-            if (!this.isDocumentValid()) return;
-            this.renderStack();
-        }, this.ZOOM_DEBOUNCE_MS);
+        this._setScaleAndQueueRender(this.currentScale + delta, { markManual: true });
     }
 
     /** Wait two animation frames so the browser has had a chance to perform layout. */

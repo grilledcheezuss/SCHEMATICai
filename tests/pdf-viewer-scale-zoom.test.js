@@ -35,21 +35,36 @@ async function wait(ms) {
 }
 
 (async () => {
-    console.log('🧪 Testing PdfViewer responsive scale tiers and zoom coalescing');
+    console.log('🧪 Testing PdfViewer geometry-fit scaling and zoom coalescing');
 
     const appJsPath = path.join(__dirname, '..', 'app.js');
     const appJsContent = fs.readFileSync(appJsPath, 'utf8');
     const pdfViewerClassCode = extractClass('PdfViewer', appJsContent);
 
     const zoomLabel = { innerText: '' };
+    const viewerElement = {
+        clientWidth: 0,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        querySelectorAll: () => [],
+        contains: () => true
+    };
+    const previewPaneElement = { clientWidth: 0 };
     const documentState = {
-        getElementById: (id) => (id === 'pdf-zoom-level' ? zoomLabel : null),
+        getElementById: (id) => {
+            if (id === 'pdf-zoom-level') return zoomLabel;
+            if (id === 'pdf-main-view') return viewerElement;
+            if (id === 'preview-pane') return previewPaneElement;
+            return null;
+        },
         querySelectorAll: () => []
     };
     const windowState = {
         innerWidth: 0,
         innerHeight: 0,
-        addEventListener: () => {}
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        getComputedStyle: () => ({ paddingLeft: '20px', paddingRight: '20px' })
     };
 
     const PdfViewer = new Function(
@@ -58,20 +73,37 @@ async function wait(ms) {
         `${pdfViewerClassCode}; return PdfViewer;`
     )(windowState, documentState);
 
-    const checkStartScale = (width, height, expected, label) => {
-        windowState.innerWidth = width;
-        windowState.innerHeight = height;
-        PdfViewer._userHasAdjustedZoom = false;
-        PdfViewer._setScaleForDevice();
-        assert(PdfViewer.currentScale === expected, `${label}: expected ${expected}, got ${PdfViewer.currentScale}`);
+    PdfViewer.doc = {
+        destroyed: false,
+        fingerprint: 'doc-1',
+        getPage: async () => ({
+            getViewport: ({ scale }) => ({ width: 1000 * scale, height: 1400 * scale })
+        })
     };
 
-    checkStartScale(390, 844, 0.6, 'small mobile');
-    checkStartScale(540, 960, 0.8, 'large mobile');
-    checkStartScale(834, 1194, 1.0, 'tablet portrait');
-    checkStartScale(1180, 820, 1.0, 'tablet landscape / small monitor tier');
-    checkStartScale(1366, 768, 1.0, 'small monitor');
-    checkStartScale(1920, 1080, 1.2, 'large monitor');
+    const checkStartScale = async (width, height, viewerWidth, expected, label) => {
+        windowState.innerWidth = width;
+        windowState.innerHeight = height;
+        viewerElement.clientWidth = viewerWidth;
+        previewPaneElement.clientWidth = viewerWidth;
+        PdfViewer._userHasAdjustedZoom = false;
+        await PdfViewer._setScaleForDevice();
+        assert(Math.abs(PdfViewer.currentScale - expected) < 1e-9, `${label}: expected ${expected}, got ${PdfViewer.currentScale}`);
+    };
+
+    await checkStartScale(390, 844, 350, 0.6, 'small mobile floor stays near 60%');
+    await checkStartScale(1024, 1366, 900, 0.85, 'tablet portrait geometry can exceed fixed 80%');
+    await checkStartScale(1366, 768, 1080, 1.026, 'small monitor follows geometry-fit baseline');
+    await checkStartScale(1920, 1080, 1800, 1.2, 'large monitor clamp allows up to 120%');
+
+    PdfViewer.currentScale = 1.17;
+    PdfViewer._userHasAdjustedZoom = true;
+    windowState.innerWidth = 1280;
+    windowState.innerHeight = 800;
+    viewerElement.clientWidth = 1120;
+    previewPaneElement.clientWidth = 1120;
+    await PdfViewer._setScaleForDevice({ force: false });
+    assert(PdfViewer.currentScale === 1.17, 'manual zoom must not be reset by auto-fit without force');
 
     let renderCount = 0;
     PdfViewer.renderStack = () => { renderCount++; };
@@ -94,5 +126,5 @@ async function wait(ms) {
     assert(PdfViewer.currentScale === PdfViewer.MIN_SCALE, 'zoom out should clamp at MIN_SCALE');
 
     PdfViewer.teardownViewerInteractions();
-    console.log('✅ PdfViewer scale/zoom tests passed');
+    console.log('✅ PdfViewer geometry-fit/zoom tests passed');
 })();
