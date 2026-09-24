@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.70 ---
-const APP_VERSION = "v2.5.70";
+// --- SCHEMATICA ai v2.5.71 ---
+const APP_VERSION = "v2.5.71";
 const VERSION_HISTORY = {
+    "v2.5.71": "PDF viewer responsiveness hardening: deterministic 60/80/100/120 start-scale tiers, bounded/coalesced zoom rendering, viewer-scoped ctrl/cmd+wheel zoom handling, and stale-render cleanup during rapid zoom/document replacement",
     "v2.5.70": "Startup/update follow-up: instrument sync phase timings, replace the static 99% plateau with fetch/encrypt/save/apply progress, batch snapshot shard persistence into one IndexedDB write, and polish reset/result-card styling without changing behavior",
     "v2.5.69": "Regression fix: restore light/dark search action-row divider seam and make SHOW/HIDE reliably toggle the shared Search parameter collapse target after search completion/reset flows",
     "v2.5.68": "Restore full-height large-screen collapse rails and keep Search parameter collapse reachable after searches by collapsing only the main fields while preserving the action row/toggle across mobile and desktop flows",
@@ -3852,6 +3853,14 @@ class PdfViewer {
     static currentFetchId = 0;
     static currentRenderToken = 0;
     static loadingTask = null;
+    static MIN_SCALE = 0.4;
+    static MAX_SCALE = 2.4;
+    static ZOOM_STEP = 0.2;
+    static ZOOM_DEBOUNCE_MS = 100;
+    static _zoomTimer = null;
+    static _zoomInteractionElement = null;
+    static _wheelZoomHandler = null;
+    static _userHasAdjustedZoom = false;
     static isPrinting = false;
     static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
     static PRINT_MAX_TIMEOUT_MS = 120000; // 2 minute hard maximum
@@ -3860,9 +3869,64 @@ class PdfViewer {
         return this.doc && !this.doc.destroyed;
     }
 
+    static _clearZoomTimer() {
+        if (this._zoomTimer) {
+            clearTimeout(this._zoomTimer);
+            this._zoomTimer = null;
+        }
+    }
+
+    static _beginDocumentLoad() {
+        this._clearZoomTimer();
+        this.currentRenderToken++;
+        this._userHasAdjustedZoom = false;
+    }
+
+    static _clampScale(scale) {
+        return Math.min(this.MAX_SCALE, Math.max(this.MIN_SCALE, scale));
+    }
+
+    static _updateZoomLabel() {
+        const zoomLabel = document.getElementById('pdf-zoom-level');
+        if (zoomLabel) zoomLabel.innerText = Math.round(this.currentScale * 100) + "%";
+    }
+
+    static _removeRenderArtifactsForToken(container, renderToken) {
+        if (!container) return;
+        container.querySelectorAll(`.pdf-page-wrapper[data-render-token="${renderToken}"]`).forEach((wrapper) => wrapper.remove());
+    }
+
+    static initViewerInteractions() {
+        const viewer = document.getElementById('pdf-main-view');
+        if (!viewer || this._zoomInteractionElement === viewer) return;
+        this.teardownViewerInteractions();
+
+        this._zoomInteractionElement = viewer;
+        this._wheelZoomHandler = (event) => {
+            if (!this.isDocumentValid()) return;
+            if (!(event.ctrlKey || event.metaKey)) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const delta = event.deltaY < 0 ? this.ZOOM_STEP : -this.ZOOM_STEP;
+            this.zoom(delta, { source: 'wheel' });
+        };
+
+        viewer.addEventListener('wheel', this._wheelZoomHandler, { passive: false });
+    }
+
+    static teardownViewerInteractions() {
+        if (this._zoomInteractionElement && this._wheelZoomHandler) {
+            this._zoomInteractionElement.removeEventListener('wheel', this._wheelZoomHandler);
+        }
+        this._zoomInteractionElement = null;
+        this._wheelZoomHandler = null;
+        this._clearZoomTimer();
+    }
+
     static async loadById(panelId, fallbackUrl) {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
+        this._beginDocumentLoad();
         
         // === INITIALIZATION ===
         this.url = fallbackUrl || "";
@@ -3996,19 +4060,35 @@ class PdfViewer {
      * Helper: Set appropriate scale based on device width
      * @private
      */
-    static _setScaleForDevice() {
-        if (window.innerWidth < 768) {
+    static _setScaleForDevice({ force = true } = {}) {
+        if (!force && this._userHasAdjustedZoom) return;
+        const viewportWidth = Math.max(0, window.innerWidth || 0);
+        const viewportHeight = Math.max(0, window.innerHeight || 0);
+        const shortSide = Math.min(viewportWidth, viewportHeight);
+        const isPortrait = viewportHeight >= viewportWidth;
+        const isSmallMobile = shortSide <= 430 && viewportWidth <= 600;
+        const isPortraitLargeTabletOrMonitor = isPortrait && viewportWidth >= 820 && viewportHeight >= 1100;
+        const isSmallMonitorOrLargeTablet = viewportWidth >= 1024 || isPortraitLargeTabletOrMonitor;
+        const isLargeMonitor = viewportWidth >= 1600 && viewportHeight >= 900;
+
+        if (isSmallMobile) {
+            this.currentScale = 0.6;
+        } else if (!isSmallMonitorOrLargeTablet) {
             this.currentScale = 0.8;
-        } else if (window.innerWidth < 1200) {
-            this.currentScale = 0.8;
+        } else if (isLargeMonitor) {
+            this.currentScale = 1.2;
         } else {
-            this.currentScale = 1.1;
+            this.currentScale = 1.0;
         }
+
+        this.currentScale = this._clampScale(this.currentScale);
+        this._userHasAdjustedZoom = false;
     }
 
     static async loadFromCache(cached, panelId, fallbackUrl) {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
+        this._beginDocumentLoad();
         
         // === VALIDATE CACHED DATA ===
         if (!cached || !cached.arrayBuffer || !cached.blob) {
@@ -4079,6 +4159,7 @@ class PdfViewer {
     static async load(url) {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
+        this._beginDocumentLoad();
         
         // === INITIALIZATION ===
         this.url = url;
@@ -4209,8 +4290,10 @@ class PdfViewer {
             console.error('PDF container not found');
             return;
         }
+        const priorScrollTop = container.scrollTop;
+        const priorScrollHeight = container.scrollHeight || 1;
         container.innerHTML = ''; 
-        document.getElementById('pdf-zoom-level').innerText = Math.round(this.currentScale * 100) + "%";
+        this._updateZoomLabel();
         
         if (!this.doc) {
             console.error('No PDF document loaded');
@@ -4230,6 +4313,7 @@ class PdfViewer {
             // Check if render has been superseded
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
+                this._removeRenderArtifactsForToken(container, renderToken);
                 return;
             }
             
@@ -4277,6 +4361,7 @@ class PdfViewer {
                     transform: null
                 };
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
+            wrapper.dataset.renderToken = String(renderToken);
             wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
             wrapper.style.animationDelay = `${Math.min((i - 1) * 0.05, 0.5)}s`; // Staggered animation, max 0.5s delay
@@ -4327,6 +4412,13 @@ class PdfViewer {
             
             contentContainer.appendChild(canvas); 
             contentContainer.appendChild(rLayer); 
+
+            if (this.currentRenderToken !== renderToken) {
+                console.log(`[renderStack] Render cancelled before attaching page ${i} (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
+                this._removeRenderArtifactsForToken(container, renderToken);
+                return;
+            }
+
             wrapper.appendChild(contentContainer); 
             container.appendChild(wrapper); 
             
@@ -4337,6 +4429,7 @@ class PdfViewer {
             // Check again if render has been superseded before rendering canvas
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled before canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
+                this._removeRenderArtifactsForToken(container, renderToken);
                 return;
             }
 
@@ -4354,11 +4447,21 @@ class PdfViewer {
                     }
                 }
             }
+            if (this.currentRenderToken !== renderToken) {
+                console.log(`[renderStack] Render cancelled after canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
+                this._removeRenderArtifactsForToken(container, renderToken);
+                return;
+            }
             // Re-scale any existing overlay zones to match new page dimensions
             await PdfViewer.waitForLayoutStable(contentContainer);
             RedactionManager.rescaleZones(wrapper);
             // Second pass after fade-in animation may alter layout
             requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
+        }
+        const nextScrollHeight = container.scrollHeight || 1;
+        const scrollRatio = priorScrollTop / priorScrollHeight;
+        if (Number.isFinite(scrollRatio) && scrollRatio > 0) {
+            container.scrollTop = scrollRatio * nextScrollHeight;
         }
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
@@ -4392,7 +4495,20 @@ class PdfViewer {
             document.body.classList.remove('generator-transition');
         }
     }
-    static zoom(delta) { this.currentScale+=delta; if(this.currentScale<0.2) this.currentScale=0.2; clearTimeout(this._zoomTimer); this._zoomTimer = setTimeout(() => this.renderStack(), 100); }
+    static zoom(delta) {
+        if (!Number.isFinite(delta)) return;
+        const nextScale = this._clampScale(this.currentScale + delta);
+        if (nextScale === this.currentScale) return;
+        this.currentScale = nextScale;
+        this._userHasAdjustedZoom = true;
+        this._updateZoomLabel();
+        this._clearZoomTimer();
+        this._zoomTimer = setTimeout(() => {
+            this._zoomTimer = null;
+            if (!this.isDocumentValid()) return;
+            this.renderStack();
+        }, this.ZOOM_DEBOUNCE_MS);
+    }
 
     /** Wait two animation frames so the browser has had a chance to perform layout. */
     static waitForLayoutStable(element, { minWidth = 1, minHeight = 1, retries = 10, delay = 50 } = {}) {
@@ -5105,6 +5221,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.warn('⚠️ Cover sheet template not loaded (app continues without it):', err));
         
         UI.init(); 
+        PdfViewer.initViewerInteractions();
+        window.addEventListener('beforeunload', () => PdfViewer.teardownViewerInteractions(), { once: true });
         if(AuthService.init()) { 
             DataLoader.preload(); 
         }
