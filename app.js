@@ -815,13 +815,13 @@ class DataLoader {
             if ((now - this._lastBackgroundRefreshAt) < this.BACKGROUND_REFRESH_DEBOUNCE_MS) {
                 return { success: false, skipped: true };
             }
-            this._lastBackgroundRefreshAt = now;
         }
 
         this._backgroundRefreshPromise = (async () => {
         let hasLock = false;
         try {
             if (!this.shouldRefreshStaleCache()) return { success: false, skipped: true };
+            if (shouldDebounce) this._lastBackgroundRefreshAt = Date.now();
             hasLock = await this.acquireSyncLock();
             if (!hasLock) return { success: false, skipped: true };
             if (!this.shouldRefreshStaleCache()) return { success: false, skipped: true };

@@ -932,8 +932,7 @@ export default {
                                     `&sort%5B0%5D%5Bdirection%5D=${direction}`;
 
                         if (offset) mainUrl += `&offset=${encodeURIComponent(offset)}`;
-
-                        const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `****** || env.AIRTABLE_KEY}` } });
+                        const mainResp = await fetch(mainUrl, { headers: { 'Authorization': `Bearer ${env.AIRTABLE_READ_KEY}` } });
                         if (!mainResp.ok) throw new Error(`Airtable Main Data HTTP ${mainResp.status}`);
                         const mainJson = await mainResp.json();
                         const upstreamMs = Date.now() - upstreamStart;
@@ -1024,7 +1023,9 @@ export default {
                 try {
                     mainResult = await mainPromise;
                 } finally {
-                    if (!hasInflight) MAIN_PAGE_INFLIGHT.delete(inflightKey);
+                    if (!hasInflight && MAIN_PAGE_INFLIGHT.get(inflightKey) === mainPromise) {
+                        MAIN_PAGE_INFLIGHT.delete(inflightKey);
+                    }
                 }
 
                 const totalMs = Date.now() - mainStart;
@@ -1041,17 +1042,9 @@ export default {
                 });
                 const response = new Response(mainResult.body, { headers: responseHeaders });
 
-                if (workerCache && !hasInflight) {
+                if (workerCache) {
                     const cacheHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
                     cacheHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
-                    setMainTimingHeaders(cacheHeaders, {
-                        cacheStatus: 'MISS',
-                        authMs: 0,
-                        upstreamMs: mainResult.upstreamMs,
-                        processMs: mainResult.processMs,
-                        serializeMs: mainResult.serializeMs,
-                        totalMs: mainResult.upstreamMs + mainResult.processMs + mainResult.serializeMs
-                    });
                     const cacheResponse = new Response(mainResult.body, { headers: cacheHeaders });
                     if (ctx && ctx.waitUntil) ctx.waitUntil(workerCache.put(cacheKeyRequest, cacheResponse));
                     else await workerCache.put(cacheKeyRequest, cacheResponse);
