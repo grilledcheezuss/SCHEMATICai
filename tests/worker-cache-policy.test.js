@@ -24,6 +24,12 @@ function assert(condition, message) {
         offset: 'abc'
     });
     assert(cacheKey === 'https://worker.example/?target=MAIN&pageSize=50&sortDirection=asc&offset=abc', `stable cache key mismatch: ${cacheKey}`);
+    const firstPageCacheKey = buildMainCacheKey('https://worker.example/?target=MAIN&pageSize=50&sort[0][direction]=desc&offset=%20%20', {
+        pageSize: 50,
+        direction: 'desc',
+        offset: ''
+    });
+    assert(firstPageCacheKey === 'https://worker.example/?target=MAIN&pageSize=50&sortDirection=desc&offset=', `first-page cache key mismatch: ${firstPageCacheKey}`);
 
     const now = Date.now();
     const freshHeaders = new Headers({

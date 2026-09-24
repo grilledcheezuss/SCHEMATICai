@@ -1078,6 +1078,7 @@ export default {
                     const pdfResponse = await fetchPdfWithGuards(pdfUrl);
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
+                    newHeaders.set('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Type');
                     newHeaders.set('Content-Type', 'application/pdf');
                     if (downloadRequested) {
                         newHeaders.set('Content-Disposition', buildAttachmentContentDisposition(url.searchParams.get('filename') || 'schematic'));
@@ -1119,6 +1120,7 @@ export default {
                     const pdfResponse = await fetchPdfWithGuards(pdfUrl);
                     const newHeaders = new Headers(pdfResponse.headers);
                     newHeaders.set('Access-Control-Allow-Origin', '*');
+                    newHeaders.set('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Type');
                     newHeaders.set('Content-Type', 'application/pdf');
                     if (downloadRequested) {
                         newHeaders.set('Content-Disposition', buildAttachmentContentDisposition(url.searchParams.get('filename') || cleanId || panelId));

@@ -262,6 +262,16 @@ function wait(ms) {
     anchorsClicked = [];
     PdfViewer.currentBlobUrl = '';
     PdfViewer.currentPanelId = '';
+    PdfViewer.url = 'https://dl.airtable.com/mobile-example.pdf';
+    PdfViewer.download();
+    assert(anchorsClicked.length === 1, 'Safari/iOS non-panel download should still trigger one attachment link click');
+    assert(/target=PDF/.test(anchorsClicked[0].href), 'Safari/iOS non-panel download should use the worker PDF route');
+    assert(/download=1/.test(anchorsClicked[0].href), 'Safari/iOS non-panel download should request attachment mode');
+    assert(anchorsClicked[0].target === '_blank', 'Safari/iOS non-panel download should avoid navigating the current tab away');
+
+    anchorsClicked = [];
+    PdfViewer.currentBlobUrl = '';
+    PdfViewer.currentPanelId = '';
     PdfViewer.url = 'https://dl.airtable.com/example.pdf';
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
     navigatorState.vendor = 'Google Inc.';
