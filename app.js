@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.72 ---
-const APP_VERSION = "v2.5.72";
+// --- SCHEMATICA ai v2.5.73 ---
+const APP_VERSION = "v2.5.73";
 const VERSION_HISTORY = {
+    "v2.5.73": "PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action",
     "v2.5.72": "PDF interaction/performance follow-up on current main: live viewer-scoped pinch feedback with constrained pan and gesture-end crisp rerender, bounded first-page preload concurrency with in-flight reuse, and duration-only PDF timing diagnostics for preload/cache/network/render stages",
     "v2.5.71": "PDF viewer responsiveness hardening: deterministic 60/80/100/120 start-scale tiers, bounded/coalesced zoom rendering, viewer-scoped ctrl/cmd+wheel zoom handling, and stale-render cleanup during rapid zoom/document replacement",
     "v2.5.70": "Startup/update follow-up: instrument sync phase timings, replace the static 99% plateau with fetch/encrypt/save/apply progress, batch snapshot shard persistence into one IndexedDB write, and polish reset/result-card styling without changing behavior",
@@ -1045,9 +1046,12 @@ class DemoManager {
 
     static minimizePanel() {
         const panel = document.getElementById('generator-panel');
+        if (!panel) return;
+        panel.classList.remove('minimized', 'gen-collapsed');
         if (UI.isTablet()) {
             // On tablet: collapse the docked sidebar
             panel.classList.add('gen-collapsed');
+            panel.style.display = '';
             const rail = document.getElementById('toggle-right');
             if (rail) rail.innerText = '⚙';
         } else {
@@ -1060,18 +1064,65 @@ class DemoManager {
 
     static restorePanel() {
         const panel = document.getElementById('generator-panel');
+        if (!panel) return;
+        panel.classList.remove('minimized', 'gen-collapsed');
         if (UI.isTablet()) {
             panel.style.display = '';
-            panel.classList.remove('gen-collapsed');
             const rail = document.getElementById('toggle-right');
             if (rail) rail.innerText = '›';
         } else {
             panel.style.display = 'flex';
-            panel.classList.remove('minimized');
             document.getElementById('generator-restore-btn').style.display = 'none';
         }
         document.body.classList.add('editor-active');
         document.body.classList.remove('gen-minimized'); 
+    }
+
+    static syncLayoutForViewport() {
+        const panel = document.getElementById('generator-panel');
+        const rail = document.getElementById('toggle-right');
+        const restoreBtn = document.getElementById('generator-restore-btn');
+        const leftCtx = document.getElementById('left-generator-context');
+        if (!panel) return;
+
+        if (!this.isGeneratorActive) {
+            panel.style.display = 'none';
+            panel.classList.remove('gen-collapsed', 'minimized');
+            if (rail) rail.style.display = 'none';
+            if (restoreBtn) restoreBtn.style.display = 'none';
+            if (leftCtx) leftCtx.style.display = 'none';
+            document.body.classList.remove('demo-mode', 'editor-active', 'gen-minimized');
+            return;
+        }
+
+        document.body.classList.add('demo-mode');
+
+        if (UI.isSmallMobile()) {
+            panel.style.display = 'none';
+            panel.classList.remove('minimized');
+            if (rail) rail.style.display = 'none';
+            if (restoreBtn) restoreBtn.style.display = 'none';
+            if (leftCtx) leftCtx.style.display = 'none';
+            document.body.classList.remove('editor-active', 'gen-minimized');
+            return;
+        }
+
+        if (leftCtx) leftCtx.style.display = 'block';
+        panel.classList.remove('minimized');
+        panel.style.display = '';
+        if (restoreBtn) restoreBtn.style.display = 'none';
+        if (rail) rail.style.display = 'flex';
+
+        if (panel.classList.contains('gen-collapsed')) {
+            if (rail) rail.innerText = '⚙';
+            document.body.classList.remove('editor-active');
+            document.body.classList.add('gen-minimized');
+        } else {
+            if (rail) rail.innerText = '›';
+            document.body.classList.add('editor-active');
+            document.body.classList.remove('gen-minimized');
+        }
+
     }
 
     static toggleGeneratorSidebar() {
@@ -3444,9 +3495,18 @@ class PdfExporter {
         
         const modal = document.getElementById('pdf-preview-modal');
         const container = document.getElementById('pdf-preview-container');
-        const btn = document.querySelector('button[onclick="PdfExporter.preview()"]');
-        const origText = btn ? btn.innerText : '';
-        if (btn) { btn.innerText = "⏳ GENERATING..."; btn.disabled = true; }
+        const btn = (window.event && window.event.currentTarget && window.event.currentTarget.tagName === 'BUTTON')
+            ? window.event.currentTarget
+            : document.querySelector('#generator-panel button[onclick="PdfExporter.preview()"], #context-preview-btn');
+        const previewButtons = Array.from(document.querySelectorAll('button[onclick="PdfExporter.preview()"]'));
+        const previewButtonState = new Map(previewButtons.map((previewBtn) => [previewBtn, {
+            text: previewBtn.innerText,
+            disabled: previewBtn.disabled
+        }]));
+        previewButtons.forEach((previewBtn) => {
+            previewBtn.disabled = true;
+        });
+        if (btn) btn.innerText = "⏳ GENERATING...";
         
         try {
             const pdfBytes = await this.generateRedactedPdf();
@@ -3461,7 +3521,10 @@ class PdfExporter {
             console.error(e);
             alert("Preview Failed: " + e.message);
         } finally {
-            if (btn) { btn.innerText = origText; btn.disabled = false; }
+            previewButtonState.forEach((state, previewBtn) => {
+                previewBtn.innerText = state.text;
+                previewBtn.disabled = state.disabled;
+            });
         }
     }
     
@@ -3787,7 +3850,9 @@ function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbac
         viewer: DOM_CACHE.get('custom-pdf-viewer'),
         fallback: DOM_CACHE.get('pdf-fallback'),
         fallbackLink: DOM_CACHE.get('pdf-fallback-link'),
-        frame: DOM_CACHE.get('pdf-viewer-frame')
+        frame: DOM_CACHE.get('pdf-viewer-frame'),
+        printBtn: DOM_CACHE.get('pdf-print-btn'),
+        downloadBtn: DOM_CACHE.get('pdf-download-btn')
     };
     
     // Reset all states
@@ -3822,6 +3887,10 @@ function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbac
             // All elements already hidden
             break;
     }
+
+    const hasLoadedPdf = !!PdfViewer.currentBlobUrl && state === PDF_UI_STATE.READY;
+    if (elements.printBtn) elements.printBtn.disabled = !hasLoadedPdf;
+    if (elements.downloadBtn) elements.downloadBtn.disabled = !hasLoadedPdf;
 }
 
 /**
@@ -3889,6 +3958,7 @@ class PdfViewer {
     static _liveScale = 1;
     static _activeGesture = null;
     static _iosGestureNoticeLogged = false;
+    static _documentLoadToken = 0;
     static isPrinting = false;
     static PRINT_CLEANUP_TIMEOUT_MS = 90000; // 90 second fallback (afterprint event preferred)
     static PRINT_MAX_TIMEOUT_MS = 120000; // 2 minute hard maximum
@@ -3906,6 +3976,7 @@ class PdfViewer {
 
     static _beginDocumentLoad() {
         this._clearZoomTimer();
+        this._documentLoadToken++;
         this.currentRenderToken++;
         this._userHasAdjustedZoom = false;
         this._liveScale = 1;
@@ -3988,14 +4059,44 @@ class PdfViewer {
         this._activeGesture = null;
     }
 
+    static _captureAnchorContext(anchorPoint, scaleRatio = 1) {
+        const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
+        const stage = this._getGestureStage();
+        if (!viewer || !stage) return null;
+
+        const viewerRect = viewer.getBoundingClientRect();
+        const anchorOffsetYRaw = Number.isFinite(anchorPoint?.y)
+            ? (anchorPoint.y - viewerRect.top)
+            : (viewer.clientHeight / 2);
+        const anchorOffsetY = Math.max(0, Math.min(viewer.clientHeight || 0, anchorOffsetYRaw));
+        const liveScale = this._liveScale > 0 ? this._liveScale : 1;
+        const contentY = (viewer.scrollTop + anchorOffsetY - stage.offsetTop - this._committedPanY) / liveScale;
+
+        return {
+            anchorOffsetY,
+            contentY,
+            scaleRatio: Number.isFinite(scaleRatio) ? scaleRatio : 1
+        };
+    }
+
     static _finalizeGesture() {
-        if (!this._activeGesture) return;
+        const gesture = this._activeGesture;
+        if (!gesture) return;
+        if (gesture.documentLoadToken !== this._documentLoadToken) {
+            this._clearActiveGesture();
+            this._liveScale = 1;
+            this._applyViewerTransform(1, this._committedPanX, this._committedPanY);
+            return;
+        }
+
+        const priorScale = this.currentScale;
         const finalScale = this._clampScale(this.currentScale * (this._liveScale || 1));
         const scaleChanged = Math.abs(finalScale - this.currentScale) > 0.001;
         const clampScaleMultiplier = this.currentScale > 0 ? (finalScale / this.currentScale) : 1;
         const finalPan = this._clampPan(this._committedPanX, this._committedPanY, clampScaleMultiplier);
         this._committedPanX = finalPan.x;
         this._committedPanY = finalPan.y;
+        const anchorContext = this._captureAnchorContext(gesture.lastMidpoint || gesture.startMidpoint || null, clampScaleMultiplier);
         this._clearActiveGesture();
 
         if (scaleChanged) {
@@ -4005,7 +4106,11 @@ class PdfViewer {
             this._liveScale = 1;
             this._clearZoomTimer();
             if (this.isDocumentValid()) {
-                this.renderStack({ timingSource: 'gesture-commit' });
+                this.renderStack({
+                    timingSource: 'gesture-commit',
+                    expectedDocumentLoadToken: gesture.documentLoadToken,
+                    anchorContext: anchorContext || this._captureAnchorContext(null, finalScale / Math.max(priorScale, 0.0001))
+                });
             }
             return;
         }
@@ -4059,9 +4164,11 @@ class PdfViewer {
                 const visualScale = this._clampScale(this.currentScale * (this._liveScale || 1));
                 this._activeGesture = {
                     mode: 'pinch',
+                    documentLoadToken: this._documentLoadToken,
                     startDistance: this._distanceBetweenTouches(t0, t1),
                     startScale: visualScale,
                     startMidpoint: this._midpointBetweenTouches(t0, t1),
+                    lastMidpoint: this._midpointBetweenTouches(t0, t1),
                     startPanX: this._committedPanX,
                     startPanY: this._committedPanY
                 };
@@ -4074,6 +4181,7 @@ class PdfViewer {
                 const touch = touches[0];
                 this._activeGesture = {
                     mode: 'pan',
+                    documentLoadToken: this._documentLoadToken,
                     startX: touch.clientX,
                     startY: touch.clientY,
                     startPanX: this._committedPanX,
@@ -4088,6 +4196,10 @@ class PdfViewer {
             if (!this.isDocumentValid()) return;
             if (!this._activeGesture) return;
             if (document.body.classList.contains('editor-active')) return;
+            if (this._activeGesture.documentLoadToken !== this._documentLoadToken) {
+                this._clearActiveGesture();
+                return;
+            }
 
             if (this._activeGesture.mode === 'pinch') {
                 const touches = event.touches;
@@ -4096,6 +4208,7 @@ class PdfViewer {
                 const t1 = touches[1];
                 const distance = this._distanceBetweenTouches(t0, t1);
                 const midpoint = this._midpointBetweenTouches(t0, t1);
+                this._activeGesture.lastMidpoint = midpoint;
                 if (!(this._activeGesture.startDistance > 0)) return;
 
                 const nextScale = this._clampScale(this._activeGesture.startScale * (distance / this._activeGesture.startDistance));
@@ -4120,6 +4233,10 @@ class PdfViewer {
 
         this._touchEndHandler = (event) => {
             if (!this._activeGesture) return;
+            if (this._activeGesture.documentLoadToken !== this._documentLoadToken) {
+                this._clearActiveGesture();
+                return;
+            }
 
             if (this._activeGesture.mode === 'pinch') {
                 if ((event.touches?.length || 0) < 2) {
@@ -4500,66 +4617,123 @@ class PdfViewer {
             }
         }
     }
+    static _buildDownloadFilename() {
+        const rawPanelId = (DOM_CACHE.get('demo-panel-id')?.value || '').trim();
+        const safePanelId = rawPanelId
+            .replace(/[\\/:*?"<>|]+/g, '_')
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 80);
+        const baseName = safePanelId || `schematic_${new Date().toISOString().slice(0, 10)}`;
+        return baseName.toLowerCase().endsWith('.pdf') ? baseName : `${baseName}.pdf`;
+    }
+
+    static download() {
+        if (!this.currentBlobUrl) return;
+        const link = document.createElement('a');
+        link.href = this.currentBlobUrl;
+        link.download = this._buildDownloadFilename();
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        if (link.parentNode === document.body) {
+            document.body.removeChild(link);
+        }
+    }
+
     static print() {
         if (!this.currentBlobUrl) return alert("No PDF loaded to print.");
-        
-        // Immediately set flag to prevent concurrent prints (before any async operations)
         if (this.isPrinting) {
             console.warn('Print already in progress, ignoring duplicate print request');
             return;
         }
         this.isPrinting = true;
-        
+
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
         iframe.src = this.currentBlobUrl;
-        document.body.appendChild(iframe);
-        
+
         let fallbackTimeoutId = null;
-        
+        let maxTimeoutId = null;
+        let cleaned = false;
+        let afterPrintHandler = null;
+        let iframeWindow = null;
+
         const cleanup = () => {
+            if (cleaned) return;
+            cleaned = true;
             if (fallbackTimeoutId) {
                 clearTimeout(fallbackTimeoutId);
                 fallbackTimeoutId = null;
             }
-            // More precise cleanup validation - check parent is document.body
+            if (maxTimeoutId) {
+                clearTimeout(maxTimeoutId);
+                maxTimeoutId = null;
+            }
+            if (iframeWindow && afterPrintHandler) {
+                try {
+                    iframeWindow.removeEventListener('afterprint', afterPrintHandler);
+                } catch (_err) {}
+            }
+            iframe.onload = null;
+            iframe.onerror = null;
             if (iframe.parentNode === document.body) {
                 document.body.removeChild(iframe);
             }
             this.isPrinting = false;
         };
-        
+
         iframe.onload = () => {
             try {
-                iframe.contentWindow.focus();
-                
-                // Prefer afterprint event for clean cleanup (does not close browser print UI prematurely)
-                iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
-                
-                iframe.contentWindow.print();
-                
-                // Fallback: cleanup after long timeout in case afterprint never fires
-                if (fallbackTimeoutId) clearTimeout(fallbackTimeoutId);
+                iframeWindow = iframe.contentWindow;
+                if (!iframeWindow) {
+                    cleanup();
+                    return;
+                }
+                afterPrintHandler = () => cleanup();
+                iframeWindow.addEventListener('afterprint', afterPrintHandler, { once: true });
+                iframeWindow.focus();
+                iframeWindow.print();
                 fallbackTimeoutId = setTimeout(cleanup, this.PRINT_CLEANUP_TIMEOUT_MS);
             } catch (e) {
                 console.error('Print error:', e);
                 cleanup();
             }
         };
-        
-        // Fallback cleanup in case onload never fires
-        fallbackTimeoutId = setTimeout(cleanup, this.PRINT_MAX_TIMEOUT_MS);
+
+        iframe.onerror = () => {
+            console.error('Print iframe failed to load');
+            cleanup();
+        };
+
+        maxTimeoutId = setTimeout(cleanup, this.PRINT_MAX_TIMEOUT_MS);
+
+        try {
+            document.body.appendChild(iframe);
+        } catch (e) {
+            console.error('Print iframe append failed:', e);
+            cleanup();
+        }
     }
-    static async renderStack({ timingSource = 'unspecified' } = {}) {
+    static async renderStack({ timingSource = 'unspecified', expectedDocumentLoadToken = null, anchorContext = null } = {}) {
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
             return;
         }
+        if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
+            return;
+        }
         const renderStartMs = getNowMs();
         let firstPageReadyMs = null;
-        const priorScrollTop = container.scrollTop;
-        const priorScrollHeight = container.scrollHeight || 1;
+        const priorStage = this._getGestureStage();
+        const priorStageHeight = priorStage ? Math.max(1, priorStage.offsetHeight || 1) : 0;
+        const priorStageOffsetTop = priorStage ? priorStage.offsetTop : 0;
+        const priorAnchorOffsetY = Math.max(0, Math.min(container.clientHeight || 0, (container.clientHeight || 0) / 2));
+        const priorScrollRatio = priorStageHeight > 0
+            ? (container.scrollTop + priorAnchorOffsetY - priorStageOffsetTop) / priorStageHeight
+            : 0;
         container.innerHTML = ''; 
         const stage = this._ensureGestureStage(container);
         this._updateZoomLabel();
@@ -4729,10 +4903,19 @@ class PdfViewer {
             // Second pass after fade-in animation may alter layout
             requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
         }
-        const nextScrollHeight = container.scrollHeight || 1;
-        const scrollRatio = priorScrollTop / priorScrollHeight;
-        if (Number.isFinite(scrollRatio) && scrollRatio > 0) {
-            container.scrollTop = scrollRatio * nextScrollHeight;
+        if (anchorContext && Number.isFinite(anchorContext.contentY) && Number.isFinite(anchorContext.anchorOffsetY)) {
+            const scaledContentY = anchorContext.contentY * (Number.isFinite(anchorContext.scaleRatio) ? anchorContext.scaleRatio : 1);
+            const committedPan = this._clampPan(this._committedPanX, this._committedPanY, 1);
+            this._committedPanX = committedPan.x;
+            this._committedPanY = committedPan.y;
+            const targetScrollTop = stage.offsetTop + scaledContentY + committedPan.y - anchorContext.anchorOffsetY;
+            const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+            container.scrollTop = Math.max(0, Math.min(maxScrollTop, targetScrollTop));
+        } else if (Number.isFinite(priorScrollRatio)) {
+            const nextStageHeight = Math.max(1, stage.offsetHeight || 1);
+            const targetScrollTop = (priorScrollRatio * nextStageHeight) + stage.offsetTop - priorAnchorOffsetY;
+            const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+            container.scrollTop = Math.max(0, Math.min(maxScrollTop, targetScrollTop));
         }
         const liveScaleToApply = this._activeGesture ? (this._liveScale || 1) : 1;
         this._applyViewerTransform(liveScaleToApply, this._committedPanX, this._committedPanY);
@@ -5362,10 +5545,12 @@ class UI {
             }
 
             this.syncMobileLayout();
+            DemoManager.syncLayoutForViewport();
             return;
         }
 
         this.syncMobileLayout();
+        DemoManager.syncLayoutForViewport();
     }
     
     static toggleMenu() { 
