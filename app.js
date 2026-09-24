@@ -4063,6 +4063,9 @@ class PdfViewer {
 
         this._pointerDownHandler = (event) => {
             if (!this.isDocumentValid() || event.pointerType !== 'touch') return;
+            if (typeof this._zoomInteractionElement?.setPointerCapture === 'function') {
+                try { this._zoomInteractionElement.setPointerCapture(event.pointerId); } catch (_) {}
+            }
             this._pointerCache.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
             if (this._pointerCache.size === 2) {
                 const [pointA, pointB] = Array.from(this._pointerCache.values());
@@ -4080,6 +4083,9 @@ class PdfViewer {
 
         this._pointerUpHandler = (event) => {
             this._pointerCache.delete(event.pointerId);
+            if (typeof this._zoomInteractionElement?.releasePointerCapture === 'function') {
+                try { this._zoomInteractionElement.releasePointerCapture(event.pointerId); } catch (_) {}
+            }
             if (this._pointerCache.size < 2) this._pointerPinchState = null;
         };
 
@@ -4124,6 +4130,7 @@ class PdfViewer {
         viewer.addEventListener('pointermove', this._pointerMoveHandler, { passive: false });
         viewer.addEventListener('pointerup', this._pointerUpHandler, { passive: true });
         viewer.addEventListener('pointercancel', this._pointerUpHandler, { passive: true });
+        viewer.addEventListener('lostpointercapture', this._pointerUpHandler, { passive: true });
         viewer.addEventListener('touchstart', this._touchStartHandler, { passive: true });
         viewer.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
         viewer.addEventListener('touchend', this._touchEndHandler, { passive: true });
@@ -4146,6 +4153,7 @@ class PdfViewer {
             this._zoomInteractionElement.removeEventListener('pointermove', this._pointerMoveHandler);
             this._zoomInteractionElement.removeEventListener('pointerup', this._pointerUpHandler);
             this._zoomInteractionElement.removeEventListener('pointercancel', this._pointerUpHandler);
+            this._zoomInteractionElement.removeEventListener('lostpointercapture', this._pointerUpHandler);
             this._zoomInteractionElement.removeEventListener('touchstart', this._touchStartHandler);
             this._zoomInteractionElement.removeEventListener('touchmove', this._touchMoveHandler);
             this._zoomInteractionElement.removeEventListener('touchend', this._touchEndHandler);
