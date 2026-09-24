@@ -6,6 +6,9 @@ const appJsContent = fs.readFileSync(appJsPath, 'utf8');
 const appVersionMatch = appJsContent.match(/const APP_VERSION = "(v[^"]+)"/);
 if (!appVersionMatch) throw new Error('Could not determine APP_VERSION from app.js');
 const APP_VERSION = appVersionMatch[1];
+const schemaVersionMatch = appJsContent.match(/const SNAPSHOT_SCHEMA_VERSION = '([^']+)'/);
+if (!schemaVersionMatch) throw new Error('Could not determine SNAPSHOT_SCHEMA_VERSION from app.js');
+const SNAPSHOT_SCHEMA_VERSION = schemaVersionMatch[1];
 
 function assert(condition, message) {
     if (!condition) {
@@ -70,6 +73,8 @@ const networkState = { fetch: async () => ({ status: 200, json: async () => ({ r
 const dbState = {
     claimLock: async () => false,
     releaseLock: async () => {},
+    getChunk: async () => null,
+    putChunk: async () => {},
     deleteChunk: async () => {},
     deleteLegacy: async () => {},
     deleteDatabase: async () => {}
@@ -108,6 +113,7 @@ const DataLoader = new Function(
     'CONFIG',
     'AuthService',
     'location',
+    'SNAPSHOT_SCHEMA_VERSION',
     `${DataLoaderClassCode}; return DataLoader;`
 )(
     APP_VERSION,
@@ -121,7 +127,8 @@ const DataLoader = new Function(
     cacheState,
     configState,
     {},
-    locationState
+    locationState,
+    SNAPSHOT_SCHEMA_VERSION
 );
 const originalMethods = {
     acquireSyncLock: DataLoader.acquireSyncLock,
@@ -129,10 +136,12 @@ const originalMethods = {
     fetchPartition: DataLoader.fetchPartition,
     installLifecycleRefreshHooks: DataLoader.installLifecycleRefreshHooks,
     maybeRefreshStaleCache: DataLoader.maybeRefreshStaleCache
+    ,
+    waitForPeerSyncAndRestore: DataLoader.waitForPeerSyncAndRestore
 };
 
 function resetHarness() {
-    ['cox_db_complete', 'cox_db_synced_at', 'cox_db_sync_lock_at', 'cox_sync_attempts', 'cox_user', 'cox_pass', 'cox_version'].forEach(key => localStorage.removeItem(key));
+    ['cox_db_complete', 'cox_db_synced_at', 'cox_db_sync_lock_at', 'cox_sync_attempts', 'cox_user', 'cox_pass', 'cox_version', 'cox_cache_schema_version'].forEach(key => localStorage.removeItem(key));
     windowState.LOCAL_DB.length = 0;
     windowState.ID_MAP = new Map();
     windowState.FOUND_MFGS = new Set();
@@ -149,6 +158,8 @@ function resetHarness() {
     Object.assign(dbState, {
         claimLock: async () => false,
         releaseLock: async () => {},
+        getChunk: async () => null,
+        putChunk: async () => {},
         deleteChunk: async () => {},
         deleteLegacy: async () => {},
         deleteDatabase: async () => {}
@@ -156,7 +167,9 @@ function resetHarness() {
     Object.assign(cacheState, {
         prepareKey: async () => {},
         loadAllWithProgress: async () => null,
-        saveSnapshot: async () => {}
+        saveSnapshot: async () => {},
+        cleanupInactiveGenerations: async () => {},
+        ACTIVE_GENERATION_KEY: '__meta_active_generation'
     });
     Object.assign(networkState, {
         fetch: async () => ({ status: 200, json: async () => ({ records: [] }) })
@@ -170,6 +183,12 @@ function resetHarness() {
     DataLoader.fetchPartition = originalMethods.fetchPartition;
     DataLoader.installLifecycleRefreshHooks = originalMethods.installLifecycleRefreshHooks;
     DataLoader.maybeRefreshStaleCache = originalMethods.maybeRefreshStaleCache;
+    DataLoader.waitForPeerSyncAndRestore = originalMethods.waitForPeerSyncAndRestore;
+    DataLoader.STARTUP_REFRESH_JITTER_MAX_MS = 0;
+    DataLoader.SYNC_LOCK_WAIT_BASE_DELAY_MS = 1;
+    DataLoader._backgroundRefreshCooldownUntil = 0;
+    DataLoader._backgroundRefreshPromise = null;
+    DataLoader._lastBackgroundRefreshAt = 0;
 }
 
 function assertEqual(actual, expected, message) {
@@ -247,6 +266,34 @@ async function flushAsync() {
     assert(releaseCalls === 2, 'failed stale refresh should still release lock');
 
     resetHarness();
+    console.log('🧪 Testing app-version/schema compatibility migration');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_version', 'v0.0.1');
+    localStorage.setItem('cox_cache_schema_version', SNAPSHOT_SCHEMA_VERSION);
+    localStorage.setItem('cox_db_complete', 'true');
+    let deleteDbCalls = 0;
+    dbState.deleteDatabase = async () => { deleteDbCalls++; };
+    cacheState.loadAllWithProgress = async () => true;
+    DataLoader.installLifecycleRefreshHooks = () => {};
+    DataLoader.maybeRefreshStaleCache = async () => ({ success: false, skipped: true });
+    await DataLoader.preload();
+    await flushAsync();
+    assertEqual(deleteDbCalls, 0, 'app patch version bump should not purge compatible cache');
+    assertEqual(localStorage.getItem('cox_version'), APP_VERSION, 'app version should still update after preload');
+    assertEqual(localStorage.getItem('cox_cache_schema_version'), SNAPSHOT_SCHEMA_VERSION, 'schema version should be retained');
+
+    resetHarness();
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_cache_schema_version', 'legacy-schema');
+    dbState.deleteDatabase = async () => { deleteDbCalls++; };
+    cacheState.loadAllWithProgress = async () => null;
+    DataLoader.fetchPartition = async () => ({ success: false });
+    await DataLoader.preload();
+    assert(localStorage.getItem('cox_cache_schema_version') === SNAPSHOT_SCHEMA_VERSION, 'schema mismatch should migrate by resetting to explicit schema version');
+
+    resetHarness();
     console.log('🧪 Testing preload cached-startup recovery');
     localStorage.setItem('cox_user', 'user');
     localStorage.setItem('cox_pass', 'pass');
@@ -303,6 +350,21 @@ async function flushAsync() {
     assertEqual(localStorage.getItem('cox_sync_attempts'), '0', 'handled blocking sync failure should clear the blocking sync attempts');
 
     resetHarness();
+    console.log('🧪 Testing lock contention wait path');
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem('cox_cache_schema_version', SNAPSHOT_SCHEMA_VERSION);
+    cacheState.loadAllWithProgress = async () => null;
+    DataLoader.fetchPartition = async () => ({ success: false, skipped: true });
+    DataLoader.waitForPeerSyncAndRestore = async () => ({ success: true, restoredFromPeer: true });
+    let lockWaitPopCalls = 0;
+    uiState.pop = () => { lockWaitPopCalls++; };
+    DataLoader.installLifecycleRefreshHooks = () => {};
+    await DataLoader.preload();
+    assertEqual(lockWaitPopCalls, 1, 'lock wait restore should recover without interrupted state');
+    assertEqual(searchBtn.innerText, 'SEARCH', 'lock wait restore should leave button ready');
+
+    resetHarness();
     console.log('🧪 Testing preload handled auth/service/API-style failure recovery');
     localStorage.setItem('cox_user', 'user');
     localStorage.setItem('cox_pass', 'pass');
@@ -326,6 +388,12 @@ async function flushAsync() {
     DataLoader.acquireSyncLock = async () => { throw new Error('lock failure'); };
     const guardedRefreshResult = await DataLoader.maybeRefreshStaleCache({ reason: 'test-lock-failure' });
     assert(guardedRefreshResult && guardedRefreshResult.success === false, 'background refresh lock failure should be returned as a handled failure');
+
+    DataLoader.acquireSyncLock = async () => false;
+    cacheState.loadAllWithProgress = async () => null;
+    DataLoader.SYNC_LOCK_WAIT_BASE_DELAY_MS = 1;
+    const staleWaitResult = await originalMethods.waitForPeerSyncAndRestore.call(DataLoader, searchBtn, 10);
+    assert(staleWaitResult && staleWaitResult.success === false, 'wait helper should fail fast when no cache and timeout expires');
 
     resetHarness();
     console.log('🧪 Testing fetchPartition progress phases');

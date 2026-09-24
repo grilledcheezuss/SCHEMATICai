@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.75 ---
-const APP_VERSION = "v2.5.75";
+// --- SCHEMATICA ai v2.5.76 ---
+const APP_VERSION = "v2.5.76";
 const VERSION_HISTORY = {
+    "v2.5.76": "Trade-show reliability emergency: decouple app version from cache schema to prevent patch-release purges, treat sync-lock contention as WAITING FOR UPDATE with stale-lock heartbeat recovery, reject partial/corrupt snapshot generations, and harden Worker/PDF update stability paths",
     "v2.5.75": "Urgent reliability/performance hardening: Worker MAIN page responses now use short-lived shared cache + isolate single-flight processing to reduce duplicate CPU under concurrency, while client sync adds per-page timeout, Retry-After-aware jittered backoff, and stronger recoverable startup refresh behavior",
     "v2.5.74": "PDF viewer geometry/print follow-up: commit zoom and pan back into real scroll extents so all pages stay reachable without phantom space, and harden original-PDF printing with isolated targets plus reusable cleanup across Safari/iOS and repeated attempts",
     "v2.5.73": "PDF viewer stability fix: isolate live pinch/pan transforms from scroll rerender flow to remove jump/flicker, resync generator preview availability across viewport/orientation changes, harden print cleanup for repeated use, and add toolbar Download PDF action",
@@ -91,6 +92,7 @@ function buildWorkerUrl(target, params = {}) {
 }
 
 const CONFIG = { mainTable: 'MAIN', feedbackTable: 'FEEDBACK', voteThreshold: 3, estTotal: 7500 };
+const SNAPSHOT_SCHEMA_VERSION = '1';
 
 // Feature flags
 const FEATURES = {
@@ -328,9 +330,17 @@ class DB {
                 const existing = q.result;
                 const now = Date.now();
                 const lockAt = Number(existing?.at);
-                const isLocked = Number.isFinite(lockAt) && lockAt > 0 && (now - lockAt) < ttlMs;
-                if (isLocked) return;
-                store.put({ token, at: now }, k);
+                const heartbeatAt = Number(existing?.heartbeatAt);
+                const ttl = Number(existing?.ttlMs) || ttlMs;
+                const lockTimestamp = Number.isFinite(heartbeatAt) && heartbeatAt > 0 ? heartbeatAt : lockAt;
+                const isLocked = Number.isFinite(lockTimestamp) && lockTimestamp > 0 && (now - lockTimestamp) < ttl;
+                if (isLocked && existing?.token !== token) return;
+                store.put({
+                    token,
+                    at: (existing?.token === token && Number.isFinite(lockAt) && lockAt > 0) ? lockAt : now,
+                    heartbeatAt: now,
+                    ttlMs: ttlMs
+                }, k);
                 granted = true;
             };
             q.onerror = () => reject(q.error);
@@ -362,6 +372,7 @@ class DB {
 
 class CacheService {
     static ACTIVE_GENERATION_KEY = '__meta_active_generation';
+    static PREVIOUS_GENERATION_KEY = '__meta_previous_generation';
     static GENERATION_PREFIX = 'gen_';
     static LEGACY_SHARD_PREFIX = 'shard_';
     static activeKey = null;
@@ -401,7 +412,8 @@ class CacheService {
         const writeEntries = [
             ...shardEntries,
             [`${generation}:manifest`, { shardCount, createdAt: Date.now() }],
-            [this.ACTIVE_GENERATION_KEY, generation]
+            [this.ACTIVE_GENERATION_KEY, generation],
+            [this.PREVIOUS_GENERATION_KEY, (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== generation) ? previousGeneration : '']
         ];
         if (progressCallback) {
             progressCallback({ phase: 'saving', completed: 0, total: writeEntries.length, pct: 0 });
@@ -418,9 +430,6 @@ class CacheService {
         });
         const writeMs = Math.round(this.now() - writeStart);
 
-        if (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== generation) {
-            this.cleanupGeneration(previousGeneration).catch(err => console.warn('Cache cleanup warning:', err));
-        }
         this.cleanupLegacyShards().catch(err => console.warn('Legacy shard cleanup warning:', err));
         return {
             encryptMs,
@@ -462,40 +471,141 @@ class CacheService {
             }
         }
     }
+    static async cleanupInactiveGenerations({ keepGeneration = null, maxDeletes = 40 } = {}) {
+        const keys = await DB.getChunkKeys();
+        const prefixes = new Set();
+        for (const key of keys) {
+            if (typeof key !== 'string') continue;
+            if (!key.startsWith(this.GENERATION_PREFIX)) continue;
+            const marker = key.indexOf(':');
+            if (marker <= 0) continue;
+            prefixes.add(key.slice(0, marker));
+        }
+        const staleGenerations = Array.from(prefixes)
+            .filter(gen => gen && gen !== keepGeneration)
+            .sort();
+        let deleted = 0;
+        for (const generation of staleGenerations) {
+            const pref = `${generation}:`;
+            for (const key of keys) {
+                if (typeof key === 'string' && key.startsWith(pref)) {
+                    await DB.deleteChunk(key);
+                    deleted++;
+                    if (deleted >= maxDeletes) return;
+                }
+            }
+        }
+    }
+    static async loadGeneration(generation, keys, progressCallback) {
+        const stageMap = new Map();
+        const stageMfgs = new Set();
+        const stageEncs = new Set();
+        const manifest = await DB.getChunk(`${generation}:manifest`).catch(() => null);
+        const expectedShards = Number(manifest?.shardCount);
+        if (!Number.isInteger(expectedShards) || expectedShards < 1) {
+            return { success: false, reason: 'missing-manifest' };
+        }
+        const shardKeys = Array.from({ length: expectedShards }, (_, i) => `${generation}:shard:${i}`);
+        for (let i = 0; i < shardKeys.length; i++) {
+            if (i % 50 === 0) await new Promise(r => setTimeout(r, 1));
+            if (!keys.includes(shardKeys[i])) {
+                return { success: false, reason: `missing-shard-${i}` };
+            }
+            const chunk = await DB.getChunk(shardKeys[i]);
+            if (!chunk) return { success: false, reason: `empty-shard-${i}` };
+            let dec = null;
+            try {
+                dec = await this.dec(chunk);
+            } catch (_e) {}
+            if (!dec) return { success: false, reason: `decrypt-failed-${i}` };
+            let data = null;
+            try {
+                data = JSON.parse(dec);
+            } catch (_e) {
+                return { success: false, reason: `json-failed-${i}` };
+            }
+            if (!Array.isArray(data)) return { success: false, reason: `invalid-array-${i}` };
+            data.forEach(r => {
+                if (!r || !r.id) return;
+                stageMap.set(r.id, r);
+                if(r.mfg) stageMfgs.add(r.mfg);
+                if(r.enc) stageEncs.add(r.enc);
+            });
+            if(progressCallback) progressCallback(Math.round(((i + 1) / shardKeys.length) * 100));
+        }
+        if (stageMap.size === 0) return { success: false, reason: 'empty-generation' };
+        return { success: true, stageMap, stageMfgs, stageEncs };
+    }
     static async loadAllWithProgress(progressCallback) { 
         if(!this.activeKey) return null; 
         const keys = await DB.getChunkKeys(); 
         if(!keys || keys.length === 0) return null; 
         const activeGeneration = await DB.getChunk(this.ACTIVE_GENERATION_KEY).catch(() => null);
-        const activeKeys = this.getActiveGenerationShardKeys(keys, activeGeneration);
-        const shardKeys = activeKeys.length > 0 ? activeKeys : this.getLegacyShardKeys(keys);
-        if (shardKeys.length === 0) return null;
+        let stageMap = null;
+        let stageMfgs = null;
+        let stageEncs = null;
 
-        const stageMap = new Map();
-        const stageMfgs = new Set();
-        const stageEncs = new Set();
+        if (typeof activeGeneration === 'string' && activeGeneration) {
+            const activeResult = await this.loadGeneration(activeGeneration, keys, progressCallback);
+            if (activeResult?.success) {
+                stageMap = activeResult.stageMap;
+                stageMfgs = activeResult.stageMfgs;
+                stageEncs = activeResult.stageEncs;
+            } else {
+                const previousGeneration = await DB.getChunk(this.PREVIOUS_GENERATION_KEY).catch(() => null);
+                if (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== activeGeneration) {
+                    const previousResult = await this.loadGeneration(previousGeneration, keys, progressCallback);
+                    if (previousResult?.success) {
+                        await DB.putChunk(this.ACTIVE_GENERATION_KEY, previousGeneration);
+                        stageMap = previousResult.stageMap;
+                        stageMfgs = previousResult.stageMfgs;
+                        stageEncs = previousResult.stageEncs;
+                        console.warn(`[CacheService] Active generation invalid (${activeResult?.reason || 'unknown'}); restored previous generation`);
+                    } else {
+                        console.warn(`[CacheService] Active and previous generations invalid (${activeResult?.reason || 'unknown'}, ${previousResult?.reason || 'unknown'})`);
+                    }
+                } else {
+                    console.warn(`[CacheService] Active generation invalid (${activeResult?.reason || 'unknown'})`);
+                }
+            }
+        } else {
+            const shardKeys = this.getLegacyShardKeys(keys);
+            if (shardKeys.length === 0) return null;
+            const legacyMap = new Map();
+            const legacyMfgs = new Set();
+            const legacyEncs = new Set();
+            for(let i = 0; i < shardKeys.length; i++) { 
+                if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); 
+                const chunk = await DB.getChunk(shardKeys[i]); 
+                if(!chunk) return null;
+                let dec = null;
+                try {
+                    dec = await this.dec(chunk);
+                } catch (_e) {}
+                if (!dec) return null;
+                let data = null;
+                try {
+                    data = JSON.parse(dec);
+                } catch (_e) {
+                    return null;
+                }
+                if (!Array.isArray(data)) return null;
+                data.forEach(r => {
+                    if (!r || !r.id) return;
+                    legacyMap.set(r.id, r);
+                    if(r.mfg) legacyMfgs.add(r.mfg);
+                    if(r.enc) legacyEncs.add(r.enc);
+                });
+                if(progressCallback) progressCallback(Math.round(((i + 1) / shardKeys.length) * 100)); 
+            }
+            if (legacyMap.size > 0) {
+                stageMap = legacyMap;
+                stageMfgs = legacyMfgs;
+                stageEncs = legacyEncs;
+            }
+        }
 
-        for(let i = 0; i < shardKeys.length; i++) { 
-            if(i % 50 === 0) await new Promise(r => setTimeout(r, 1)); 
-            const chunk = await DB.getChunk(shardKeys[i]); 
-            if(chunk) { 
-                try { 
-                    const dec = await this.dec(chunk); 
-                    if(dec) { 
-                        const data = JSON.parse(dec); 
-                        data.forEach(r => {
-                            if (!r || !r.id) return;
-                            stageMap.set(r.id, r);
-                            if(r.mfg) stageMfgs.add(r.mfg); 
-                            if(r.enc) stageEncs.add(r.enc);
-                        }); 
-                    } 
-                } catch(e) {} 
-            } 
-            if(progressCallback) progressCallback(Math.round(((i + 1) / shardKeys.length) * 100)); 
-        } 
-
-        if (stageMap.size === 0) return null;
+        if (!stageMap || stageMap.size === 0) return null;
         window.LOCAL_DB.length = 0;
         stageMap.forEach(rec => window.LOCAL_DB.push(rec));
         if (!(window.ID_MAP instanceof Map)) window.ID_MAP = new Map();
@@ -546,14 +656,24 @@ class DataLoader {
     static MAX_INITIAL_SYNC_ATTEMPTS = 5;
     static SYNC_TIMESTAMP_KEY = 'cox_db_synced_at';
     static SYNC_LOCK_KEY = 'cox_db_sync_lock_at';
+    static APP_VERSION_KEY = 'cox_version';
+    static SNAPSHOT_SCHEMA_VERSION_KEY = 'cox_cache_schema_version';
     static SYNC_DB_LOCK_KEY = '__cox_db_sync_lock';
     static SYNC_LOCK_TTL_MS = 10 * 60 * 1000;
+    static SYNC_LOCK_HEARTBEAT_MS = 15000;
+    static SYNC_LOCK_WAIT_TIMEOUT_MS = 120000;
+    static SYNC_LOCK_WAIT_BASE_DELAY_MS = 1200;
+    static STARTUP_WATCHDOG_MS = 180000;
     static _inFlightSync = false;
     static _lockToken = null;
+    static _lockHeartbeatTimer = null;
     static _lifecycleRefreshHookInstalled = false;
     static _backgroundRefreshPromise = null;
     static _lastBackgroundRefreshAt = 0;
     static BACKGROUND_REFRESH_DEBOUNCE_MS = 30000;
+    static BACKGROUND_REFRESH_COOLDOWN_MS = 120000;
+    static STARTUP_REFRESH_JITTER_MAX_MS = 15000;
+    static _backgroundRefreshCooldownUntil = 0;
     static PAGE_REQUEST_TIMEOUT_MS = 25000;
     static MAX_PAGE_RETRIES = 5;
     static RETRY_BASE_DELAY_MS = 600;
@@ -645,10 +765,37 @@ class DataLoader {
                 .finally(() => location.reload());
         };
     }
+    static showWaitingForUpdate(btn, message = "⏳ WAITING FOR UPDATE...") {
+        if (!btn) return;
+        btn.classList.remove('warning', 'error');
+        btn.disabled = true;
+        btn.onclick = null;
+        btn.innerText = message;
+    }
+    static startSyncLockHeartbeat() {
+        this.stopSyncLockHeartbeat();
+        if (!this._lockToken) return;
+        this._lockHeartbeatTimer = setInterval(() => {
+            if (!this._lockToken) return;
+            DB.claimLock(this.SYNC_DB_LOCK_KEY, this._lockToken, this.SYNC_LOCK_TTL_MS)
+                .catch(() => {});
+        }, this.SYNC_LOCK_HEARTBEAT_MS);
+    }
+    static stopSyncLockHeartbeat() {
+        if (this._lockHeartbeatTimer) {
+            clearInterval(this._lockHeartbeatTimer);
+            this._lockHeartbeatTimer = null;
+        }
+    }
     static queueBackgroundRefresh(options = {}) {
-        Promise.resolve()
-            .then(() => this.maybeRefreshStaleCache(options))
-            .catch(err => console.warn('Background refresh bootstrap failed; keeping existing cache intact', err));
+        const now = Date.now();
+        const jitterMs = Math.round(Math.random() * this.STARTUP_REFRESH_JITTER_MAX_MS);
+        if (now < this._backgroundRefreshCooldownUntil) return;
+        setTimeout(() => {
+            Promise.resolve()
+                .then(() => this.maybeRefreshStaleCache(options))
+                .catch(err => console.warn('Background refresh bootstrap failed; keeping existing cache intact', err));
+        }, jitterMs);
     }
     static async acquireSyncLock(now = Date.now()) {
         if (this._inFlightSync) return false;
@@ -657,17 +804,61 @@ class DataLoader {
         if (won) {
             this._inFlightSync = true;
             this._lockToken = token;
-            localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: now, token }));
+            localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: now, heartbeatAt: now, token, ttlMs: this.SYNC_LOCK_TTL_MS }));
+            this.startSyncLockHeartbeat();
         }
         return won;
     }
     static async releaseSyncLock() {
+        this.stopSyncLockHeartbeat();
         if (this._lockToken) {
             await DB.releaseLock(this.SYNC_DB_LOCK_KEY, this._lockToken).catch(() => {});
         }
         this._inFlightSync = false;
         this._lockToken = null;
         localStorage.removeItem(this.SYNC_LOCK_KEY);
+    }
+    static async waitForPeerSyncAndRestore(btn, timeoutMs = this.SYNC_LOCK_WAIT_TIMEOUT_MS) {
+        const start = Date.now();
+        let poll = 0;
+        while ((Date.now() - start) < timeoutMs) {
+            poll++;
+            this.showWaitingForUpdate(btn, "⏳ WAITING FOR UPDATE...");
+            const restored = await CacheService.loadAllWithProgress((pct) => {
+                if (btn) btn.innerText = `⏳ WAITING FOR UPDATE... ${pct}%`;
+            }).catch(() => null);
+            if (restored && this.isCacheComplete()) {
+                return { success: true, restoredFromPeer: true };
+            }
+            const lockMeta = await DB.getChunk(this.SYNC_DB_LOCK_KEY).catch(() => null);
+            const heartbeatAt = Number(lockMeta?.heartbeatAt || lockMeta?.at);
+            const lockIsAlive = Number.isFinite(heartbeatAt) && heartbeatAt > 0 && (Date.now() - heartbeatAt) < this.SYNC_LOCK_TTL_MS;
+            if (!lockIsAlive) {
+                const won = await this.acquireSyncLock();
+                if (won) return { success: false, shouldSync: true };
+            }
+            const delayMs = Math.min(5000, this.SYNC_LOCK_WAIT_BASE_DELAY_MS + (poll * 250) + Math.round(Math.random() * 500));
+            await this.sleep(delayMs);
+        }
+        return { success: false, timedOut: true };
+    }
+    static async ensureCacheCompatibility() {
+        const currentSchema = localStorage.getItem(this.SNAPSHOT_SCHEMA_VERSION_KEY);
+        const hasCompleteCache = this.isCacheComplete();
+        if (!currentSchema && hasCompleteCache) {
+            localStorage.setItem(this.SNAPSHOT_SCHEMA_VERSION_KEY, SNAPSHOT_SCHEMA_VERSION);
+        } else if (!currentSchema) {
+            localStorage.setItem(this.SNAPSHOT_SCHEMA_VERSION_KEY, SNAPSHOT_SCHEMA_VERSION);
+        } else if (currentSchema !== SNAPSHOT_SCHEMA_VERSION) {
+            console.warn(`⚡ Cache schema changed (${currentSchema || 'none'} -> ${SNAPSHOT_SCHEMA_VERSION}). Resetting persisted snapshot.`);
+            await DB.deleteDatabase();
+            localStorage.removeItem('cox_db_complete');
+            localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
+            localStorage.removeItem(this.SYNC_LOCK_KEY);
+            localStorage.removeItem(this.INITIAL_SYNC_ATTEMPTS_KEY);
+            localStorage.setItem(this.SNAPSHOT_SCHEMA_VERSION_KEY, SNAPSHOT_SCHEMA_VERSION);
+        }
+        localStorage.setItem(this.APP_VERSION_KEY, APP_VERSION);
     }
     static applySnapshot(snapshot) {
         const records = Array.isArray(snapshot?.records) ? snapshot.records : [];
@@ -710,16 +901,7 @@ class DataLoader {
             return;
         }
 
-        const lastVer = localStorage.getItem('cox_version');
-        if (lastVer !== APP_VERSION) {
-            console.warn(`⚡ ${APP_VERSION} Update: Purging Cache...`);
-            await DB.deleteDatabase();
-            localStorage.removeItem('cox_db_complete');
-            localStorage.removeItem('cox_sync_attempts');
-            localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
-            localStorage.removeItem(this.SYNC_LOCK_KEY);
-            localStorage.setItem('cox_version', APP_VERSION);
-        }
+        await this.ensureCacheCompatibility();
 
         console.log("🚀 Starting Preload...");
         const btn = document.getElementById('searchBtn');
@@ -731,6 +913,12 @@ class DataLoader {
         btn.disabled = true;
         btn.classList.remove('warning', 'error');
         btn.innerText = "⏳ INITIALIZING...";
+        const startupWatchdog = setTimeout(() => {
+            if (!btn.classList.contains('error') && !btn.classList.contains('warning') && btn.disabled) {
+                console.warn('[SyncWatchdog] Startup sync exceeded watchdog window; surfacing recoverable retry state');
+                this.showSyncInterrupted(btn);
+            }
+        }, this.STARTUP_WATCHDOG_MS);
 
         try {
             btn.innerText = "🔒 PREPARING...";
@@ -767,7 +955,26 @@ class DataLoader {
                 btn.innerText = "⬇️ SYNCING...";
             }
 
-            const syncResult = await this.fetchPartition('desc', btn, { background: false });
+            let syncResult = await this.fetchPartition('desc', btn, { background: false });
+            if (syncResult?.skipped) {
+                const waitResult = await this.waitForPeerSyncAndRestore(btn);
+                if (waitResult?.success) {
+                    restoredFromCache = true;
+                    UI.pop();
+                    this.installLifecycleRefreshHooks();
+                    queueStartupRefresh = true;
+                    return;
+                }
+                if (waitResult?.shouldSync) {
+                    btn.classList.remove('warning', 'error');
+                    btn.disabled = true;
+                    btn.innerText = "⬇️ RESUMING...";
+                    syncResult = await this.fetchPartition('desc', btn, { background: false });
+                } else {
+                    this.showSyncInterrupted(btn);
+                    return;
+                }
+            }
             if(syncResult?.success) {
                 blockingSyncSucceeded = true;
                 btn.innerText = "✅ FINALIZING...";
@@ -785,6 +992,7 @@ class DataLoader {
                 this.showSyncInterrupted(btn);
             }
         } finally {
+            clearTimeout(startupWatchdog);
             if (restoredFromCache || blockingSyncSucceeded) {
                 this.clearBlockingSyncAttempts();
                 this.restoreSearchReadyState(btn);
@@ -810,8 +1018,11 @@ class DataLoader {
     static async maybeRefreshStaleCache({ reason = 'startup' } = {}) {
         if (this._backgroundRefreshPromise) return this._backgroundRefreshPromise;
         const shouldDebounce = reason === 'startup' || reason === 'foreground' || reason === 'reconnect';
+        const now = Date.now();
+        if (shouldDebounce && now < this._backgroundRefreshCooldownUntil) {
+            return { success: false, skipped: true, reason: 'cooldown' };
+        }
         if (shouldDebounce) {
-            const now = Date.now();
             if ((now - this._lastBackgroundRefreshAt) < this.BACKGROUND_REFRESH_DEBOUNCE_MS) {
                 return { success: false, skipped: true };
             }
@@ -828,10 +1039,13 @@ class DataLoader {
             const result = await this.fetchPartition('desc', null, { background: true, reason });
             if (result?.success) {
                 UI.pop();
+            } else {
+                this._backgroundRefreshCooldownUntil = Date.now() + this.BACKGROUND_REFRESH_COOLDOWN_MS;
             }
             return result;
         } catch (e) {
             console.warn('Background refresh failed before completion; keeping existing cache intact', e);
+            this._backgroundRefreshCooldownUntil = Date.now() + this.BACKGROUND_REFRESH_COOLDOWN_MS;
             return { success: false, error: e };
         } finally {
             if (hasLock) await this.releaseSyncLock();
@@ -1019,12 +1233,21 @@ class DataLoader {
             const applyMs = Math.round(this.now() - applyStart);
             localStorage.setItem('cox_db_complete', 'true');
             localStorage.setItem(this.SYNC_TIMESTAMP_KEY, String(Date.now()));
+            const activeGeneration = await DB.getChunk(CacheService.ACTIVE_GENERATION_KEY).catch(() => null);
+            CacheService.cleanupInactiveGenerations({ keepGeneration: typeof activeGeneration === 'string' ? activeGeneration : null }).catch(() => {});
             console.info(`[SyncTiming] fetch=${fetchMs}ms snapshot=${snapshotMs}ms encrypt=${persistStats?.encryptMs ?? 0}ms write=${persistStats?.writeMs ?? 0}ms persist=${persistStats?.totalMs ?? 0}ms apply=${applyMs}ms`);
             console.info(`✅ Data sync complete (${snapshot.records.length} records) [${reason}]`);
             return { success: true, count: snapshot.records.length };
         } catch(e) {
             console.error("Sync Critical Error", e);
             if (background) console.warn('Background refresh failed; keeping existing cache intact');
+            if (!background && btn && !btn.classList.contains('error')) {
+                const offline = (typeof navigator !== 'undefined' ? navigator.onLine === false : false) || this.isRetryableNetworkError(e);
+                btn.classList.add('error');
+                btn.disabled = false;
+                btn.innerText = offline ? "OFFLINE - RETRY" : "SYNC INTERRUPTED";
+                btn.onclick = () => location.reload();
+            }
             return { success: false, error: e };
         } finally {
             if (!background) await this.releaseSyncLock();
@@ -4070,6 +4293,7 @@ class PdfViewer {
     static PRINT_MAX_TIMEOUT_MS = 30000;
     static PRINT_IFRAME_LOAD_TIMEOUT_MS = 8000;
     static PRINT_DIALOG_RELEASE_DELAY_MS = 1500;
+    static _activePanelId = '';
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -4462,6 +4686,7 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
+        this._activePanelId = (panelId || '').trim();
         const loadStartMs = getNowMs();
         
         // === INITIALIZATION ===
@@ -4791,7 +5016,7 @@ class PdfViewer {
         }
     }
     static _buildDownloadFilename() {
-        const rawPanelId = (DOM_CACHE.get('demo-panel-id')?.value || '').trim();
+        const rawPanelId = (this._activePanelId || DOM_CACHE.get('demo-panel-id')?.value || '').trim();
         const safePanelId = rawPanelId
             .replace(/[\\/:*?"<>|]+/g, '_')
             .replace(/\s+/g, '_')
@@ -4801,9 +5026,36 @@ class PdfViewer {
         const baseName = safePanelId || `schematic_${new Date().toISOString().slice(0, 10)}`;
         return baseName.toLowerCase().endsWith('.pdf') ? baseName : `${baseName}.pdf`;
     }
+    static _buildAttachmentDownloadUrl() {
+        const panelId = (this._activePanelId || '').trim();
+        if (!panelId) return '';
+        return buildWorkerUrl('PDF_BY_ID', {
+            id: panelId,
+            mode: 'attachment',
+            filename: this._buildDownloadFilename()
+        });
+    }
+    static _supportsBlobDownload() {
+        return !this._isIsolatedPdfPrintBrowser();
+    }
 
     static download() {
         if (!this.currentBlobUrl) return;
+        if (!this._supportsBlobDownload()) {
+            const attachmentUrl = this._buildAttachmentDownloadUrl();
+            if (attachmentUrl) {
+                const link = document.createElement('a');
+                link.href = attachmentUrl;
+                link.target = '_blank';
+                link.rel = 'noopener';
+                document.body.appendChild(link);
+                link.click();
+                if (link.parentNode === document.body) {
+                    document.body.removeChild(link);
+                }
+                return;
+            }
+        }
         const link = document.createElement('a');
         link.href = this.currentBlobUrl;
         link.download = this._buildDownloadFilename();
@@ -5040,8 +5292,11 @@ class PdfViewer {
                 ? (container.scrollTop + priorAnchorOffsetY - priorStageOffsetTop) / priorStageHeight
                 : Number.NaN
         };
-        container.innerHTML = ''; 
-        const stage = this._ensureGestureStage(container);
+        const stage = document.createElement('div');
+        stage.className = 'pdf-gesture-stage pdf-gesture-stage--staging';
+        stage.setAttribute('aria-hidden', 'true');
+        container.appendChild(stage);
+        this._gestureStageElement = stage;
         this._updateZoomLabel();
         
         if (!this.doc) {
@@ -5063,6 +5318,7 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
+                if (stage.parentNode === container) stage.remove();
                 return;
             }
             
@@ -5163,6 +5419,7 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled before attaching page ${i} (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
+                if (stage.parentNode === container) stage.remove();
                 return;
             }
 
@@ -5177,6 +5434,7 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled before canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
+                if (stage.parentNode === container) stage.remove();
                 return;
             }
 
@@ -5201,6 +5459,7 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled after canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
+                if (stage.parentNode === container) stage.remove();
                 return;
             }
             // Re-scale any existing overlay zones to match new page dimensions
@@ -5221,6 +5480,13 @@ class PdfViewer {
             this._committedPanY = 0;
             this._applyViewerTransform(1, 0, 0);
         }
+        const existingStages = Array.from(container.querySelectorAll('.pdf-gesture-stage'));
+        existingStages.forEach(existingStage => {
+            if (existingStage !== stage) existingStage.remove();
+        });
+        stage.classList.remove('pdf-gesture-stage--staging');
+        stage.removeAttribute('aria-hidden');
+        this._gestureStageElement = stage;
         logPdfTiming('full_render_complete', getNowMs() - renderStartMs, { source: timingSource, pages: this.doc?.numPages || 0 });
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
@@ -5391,6 +5657,9 @@ class PdfController {
         if(rec && rec.displayId) {
             const panelIdEl = DOM_CACHE.get('demo-panel-id');
             if (panelIdEl) panelIdEl.value = rec.displayId;
+            PdfViewer._activePanelId = rec.displayId;
+        } else {
+            PdfViewer._activePanelId = id ? `CP-${String(id).replace(/^CP-/i, '')}` : '';
         }
         
         // === VALIDATE ID ===
