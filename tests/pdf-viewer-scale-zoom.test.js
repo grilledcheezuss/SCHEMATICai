@@ -50,6 +50,12 @@ async function wait(ms) {
         offsetLeft: 60,
         style: {}
     };
+    const staleStage = {
+        removed: false,
+        remove() {
+            this.removed = true;
+        }
+    };
     const viewerEl = {
         clientWidth: 900,
         clientHeight: 700,
@@ -58,6 +64,7 @@ async function wait(ms) {
         scrollWidth: 2200,
         scrollHeight: 3400,
         querySelector: () => stageEl,
+        querySelectorAll: (selector) => selector === '.pdf-gesture-stage' ? [staleStage] : [],
         getBoundingClientRect: () => ({ left: 0, top: 0 }),
         addEventListener: (name, fn) => {
             viewerListeners.set(name, fn);
@@ -149,6 +156,28 @@ async function wait(ms) {
     assert(viewerEl.scrollTop === 250, `committed pan should become vertical scroll, got ${viewerEl.scrollTop}`);
     assert(PdfViewer._committedPanX === 0 && PdfViewer._committedPanY === 0, 'pan commit should reset committed pan offsets');
     assert(stageEl.style.transform === 'translate3d(0px, 0px, 0) scale(1)', `pan commit should reset transform, got ${stageEl.style.transform}`);
+
+    PdfViewer._beginDocumentLoad();
+    assert(staleStage.removed === true, 'beginDocumentLoad should clear stale rendered stages immediately');
+
+    let finalizeRenderOptions = null;
+    PdfViewer.renderStack = (options) => { finalizeRenderOptions = options; };
+    PdfViewer.doc = { destroyed: false };
+    PdfViewer.currentScale = 1;
+    PdfViewer._liveScale = 1.35;
+    PdfViewer._committedPanX = 12;
+    PdfViewer._committedPanY = -8;
+    PdfViewer._documentLoadToken = 7;
+    PdfViewer._activeGesture = {
+        mode: 'pinch',
+        documentLoadToken: 7,
+        startMidpoint: { x: 320, y: 280 },
+        lastMidpoint: { x: 330, y: 290 }
+    };
+    PdfViewer._finalizeGesture();
+    assert(Math.abs(PdfViewer.currentScale - 1.35) < 1e-9, `pinch finalize should commit final scale, got ${PdfViewer.currentScale}`);
+    assert(PdfViewer._liveScale > 1, `pinch finalize should keep live transform until crisp render commit, got ${PdfViewer._liveScale}`);
+    assert(finalizeRenderOptions && finalizeRenderOptions.timingSource === 'gesture-commit', 'pinch finalize should trigger gesture-commit render');
 
     console.log('✅ PdfViewer scale/zoom tests passed');
 })();

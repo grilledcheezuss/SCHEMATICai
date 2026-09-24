@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.76 ---
-const APP_VERSION = "v2.5.76";
+// --- SCHEMATICA ai v2.5.77 ---
+const APP_VERSION = "v2.5.77";
 const VERSION_HISTORY = {
+    "v2.5.77": "Mobile sync + PDF transition stability: classify suspension/network-transition interruptions as resumable with bounded restart flow and explicit quota messaging, clear stale PDF stage on document switch, and keep pinch-release scale continuous until crisp commit",
     "v2.5.76": "Trade-show reliability emergency: decouple app version from cache schema to prevent patch-release purges, treat sync-lock contention as WAITING FOR UPDATE with stale-lock heartbeat recovery, reject partial/corrupt snapshot generations, and harden Worker/PDF update stability paths",
     "v2.5.75": "Urgent reliability/performance hardening: Worker MAIN page responses now use short-lived shared cache + isolate single-flight processing to reduce duplicate CPU under concurrency, while client sync adds per-page timeout, Retry-After-aware jittered backoff, and stronger recoverable startup refresh behavior",
     "v2.5.74": "PDF viewer geometry/print follow-up: commit zoom and pan back into real scroll extents so all pages stay reachable without phantom space, and harden original-PDF printing with isolated targets plus reusable cleanup across Safari/iOS and repeated attempts",
@@ -677,10 +678,17 @@ class DataLoader {
     static _backgroundRefreshCooldownUntil = 0;
     static PAGE_REQUEST_TIMEOUT_MS = 25000;
     static MAX_PAGE_RETRIES = 5;
+    static MAX_RECOVERABLE_SYNC_RESTARTS = 2;
     static RETRY_BASE_DELAY_MS = 600;
     static RETRY_MAX_DELAY_MS = 10000;
     static JITTER_MIN = 0.85;
     static JITTER_MAX = 1.25;
+    static RESUME_WAIT_TIMEOUT_MS = 20000;
+    static _syncInterruptionHooksInstalled = false;
+    static _suspensionGeneration = 0;
+    static _networkTransitionGeneration = 0;
+    static _lastKnownOnline = null;
+    static _lockHeartbeatLost = false;
 
     static sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, Math.max(0, ms)));
@@ -713,6 +721,80 @@ class DataLoader {
         if (err.name === 'AbortError') return true;
         const msg = String(err.message || '').toLowerCase();
         return msg.includes('network') || msg.includes('fetch') || msg.includes('timeout') || msg.includes('abort');
+    }
+    static isQuotaExceededError(err) {
+        if (!err) return false;
+        if (err.name === 'QuotaExceededError') return true;
+        const msg = String(err.message || '').toLowerCase();
+        return msg.includes('quota') || msg.includes('storage full') || msg.includes('maximum size');
+    }
+    static isDocumentSuspended() {
+        return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    }
+    static markSuspension(reason = 'suspend') {
+        this._suspensionGeneration++;
+        console.info(`[SyncState] status=suspension event=${reason} generation=${this._suspensionGeneration}`);
+    }
+    static markNetworkTransition(reason = 'network-change') {
+        this._networkTransitionGeneration++;
+        const online = (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') ? navigator.onLine : null;
+        this._lastKnownOnline = online;
+        console.info(`[SyncState] status=network-transition event=${reason} online=${online === null ? 'unknown' : (online ? 'true' : 'false')} generation=${this._networkTransitionGeneration}`);
+    }
+    static installSyncInterruptionHooks() {
+        if (this._syncInterruptionHooksInstalled) return;
+        if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'hidden') this.markSuspension('visibility-hidden');
+            });
+            document.addEventListener('freeze', () => this.markSuspension('freeze'));
+        }
+        if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            window.addEventListener('pagehide', () => this.markSuspension('pagehide'));
+            window.addEventListener('offline', () => this.markNetworkTransition('offline'));
+            window.addEventListener('online', () => this.markNetworkTransition('online'));
+        }
+        this._syncInterruptionHooksInstalled = true;
+    }
+    static classifySyncFailure(err, { background = false, syncStartSuspensionGeneration = this._suspensionGeneration, syncStartNetworkGeneration = this._networkTransitionGeneration } = {}) {
+        if (this.isQuotaExceededError(err)) {
+            return { kind: 'quota', recoverable: false, message: '💾 STORAGE FULL - FREE SPACE' };
+        }
+        if (!background && err?.code === 'SYNC_LOCK_LOST') {
+            return { kind: 'lock-lost', recoverable: true, message: '⏳ REVALIDATING SYNC LOCK...' };
+        }
+        if (!background && (this._suspensionGeneration !== syncStartSuspensionGeneration || this.isDocumentSuspended())) {
+            return { kind: 'suspension', recoverable: true, message: '⏳ APP RESUMING...' };
+        }
+        if (!background && this._networkTransitionGeneration !== syncStartNetworkGeneration && this.isRetryableNetworkError(err)) {
+            return { kind: 'network-transition', recoverable: true, message: '⏳ NETWORK CHANGED - RETRYING...' };
+        }
+        if (!background && ((typeof navigator !== 'undefined' && navigator.onLine === false) || this.isRetryableNetworkError(err))) {
+            return { kind: 'network', recoverable: true, message: '⏳ RETRYING NETWORK...' };
+        }
+        return { kind: 'terminal', recoverable: false, message: '⚠️ SYNC INTERRUPTED' };
+    }
+    static async ensureActiveLockOwnership() {
+        if (!this._lockToken) return false;
+        const lockMeta = await DB.getChunk(this.SYNC_DB_LOCK_KEY).catch(() => null);
+        const heartbeatAt = Number(lockMeta?.heartbeatAt || lockMeta?.at);
+        const ttlMs = Number(lockMeta?.ttlMs) || this.SYNC_LOCK_TTL_MS;
+        const lockAlive = Number.isFinite(heartbeatAt) && heartbeatAt > 0 && (Date.now() - heartbeatAt) < ttlMs;
+        const owned = lockAlive && lockMeta?.token === this._lockToken;
+        if (!owned) return false;
+        localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: Number(lockMeta?.at) || heartbeatAt, heartbeatAt, token: this._lockToken, ttlMs }));
+        return true;
+    }
+    static async waitForResumeReady(btn, message = '⏳ WAITING TO RESUME SYNC...', timeoutMs = this.RESUME_WAIT_TIMEOUT_MS) {
+        const startedAt = Date.now();
+        while ((Date.now() - startedAt) < timeoutMs) {
+            const visible = !this.isDocumentSuspended();
+            const online = (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') ? navigator.onLine !== false : true;
+            if (visible && online) return true;
+            this.showWaitingForUpdate(btn, message);
+            await this.sleep(500);
+        }
+        return false;
     }
 
     static getSyncTimestamp() {
@@ -754,6 +836,7 @@ class DataLoader {
     }
     static showSyncInterrupted(btn) {
         if (!btn) return;
+        console.warn('[SyncState] status=terminal-failure');
         btn.classList.remove('error');
         btn.classList.add('warning');
         btn.innerText = "⚠️ SYNC INTERRUPTED";
@@ -779,6 +862,16 @@ class DataLoader {
         this._lockHeartbeatTimer = setInterval(() => {
             if (!this._lockToken) return;
             DB.claimLock(this.SYNC_DB_LOCK_KEY, this._lockToken, this.SYNC_LOCK_TTL_MS)
+                .then((retained) => {
+                    if (!retained) {
+                        this._lockHeartbeatLost = true;
+                        console.warn('[SyncLock] heartbeat status=lost');
+                        return;
+                    }
+                    this._lockHeartbeatLost = false;
+                    const now = Date.now();
+                    localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: now, heartbeatAt: now, token: this._lockToken, ttlMs: this.SYNC_LOCK_TTL_MS }));
+                })
                 .catch(() => {});
         }, this.SYNC_LOCK_HEARTBEAT_MS);
     }
@@ -807,6 +900,7 @@ class DataLoader {
         if (won) {
             this._inFlightSync = true;
             this._lockToken = token;
+            this._lockHeartbeatLost = false;
             localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: now, heartbeatAt: now, token, ttlMs: this.SYNC_LOCK_TTL_MS }));
             this.startSyncLockHeartbeat();
         }
@@ -819,6 +913,7 @@ class DataLoader {
         }
         this._inFlightSync = false;
         this._lockToken = null;
+        this._lockHeartbeatLost = false;
         localStorage.removeItem(this.SYNC_LOCK_KEY);
     }
     static async waitForPeerSyncAndRestore(btn, timeoutMs = this.SYNC_LOCK_WAIT_TIMEOUT_MS) {
@@ -826,6 +921,11 @@ class DataLoader {
         let poll = 0;
         while ((Date.now() - start) < timeoutMs) {
             poll++;
+            if (this.isDocumentSuspended()) {
+                this.showWaitingForUpdate(btn, "⏳ APP RESUMING...");
+                await this.sleep(400);
+                continue;
+            }
             this.showWaitingForUpdate(btn, "⏳ WAITING FOR UPDATE...");
             const restored = await CacheService.loadAllWithProgress((pct) => {
                 if (btn) btn.innerText = `⏳ WAITING FOR UPDATE... ${pct}%`;
@@ -843,7 +943,8 @@ class DataLoader {
             const delayMs = Math.min(5000, this.SYNC_LOCK_WAIT_BASE_DELAY_MS + (poll * 250) + Math.round(Math.random() * 500));
             await this.sleep(delayMs);
         }
-        return { success: false, timedOut: true };
+        const recoverable = this.isDocumentSuspended() || (typeof navigator !== 'undefined' && navigator.onLine === false);
+        return { success: false, timedOut: true, recoverable, reason: recoverable ? 'lock-wait-interrupted' : 'lock-wait-timeout' };
     }
     static async ensureCacheCompatibility() {
         const currentSchema = localStorage.getItem(this.SNAPSHOT_SCHEMA_VERSION_KEY);
@@ -916,14 +1017,20 @@ class DataLoader {
         let queueStartupRefresh = false;
         let blockingSyncStarted = false;
         let blockingSyncSucceeded = false;
+        this.installSyncInterruptionHooks();
 
         btn.disabled = true;
         btn.classList.remove('warning', 'error');
         btn.innerText = "⏳ INITIALIZING...";
         const startupWatchdog = setTimeout(() => {
             if (!btn.classList.contains('error') && !btn.classList.contains('warning') && btn.disabled) {
+                if (this.isDocumentSuspended()) {
+                    console.warn('[SyncWatchdog] status=suspended; preserving resumable startup state');
+                    this.showWaitingForUpdate(btn, "⏳ APP RESUMING...");
+                    return;
+                }
                 console.warn('[SyncWatchdog] Startup sync exceeded watchdog window; surfacing recoverable retry state');
-                this.showSyncInterrupted(btn);
+                this.showWaitingForUpdate(btn, "⏳ RETRYING SYNC...");
             }
         }, this.STARTUP_WATCHDOG_MS);
 
@@ -962,25 +1069,45 @@ class DataLoader {
                 btn.innerText = "⬇️ SYNCING...";
             }
 
-            let syncResult = await this.fetchPartition('desc', btn, { background: false });
-            if (syncResult?.skipped) {
-                const waitResult = await this.waitForPeerSyncAndRestore(btn);
-                if (waitResult?.success) {
-                    restoredFromCache = true;
-                    UI.pop();
-                    this.installLifecycleRefreshHooks();
-                    queueStartupRefresh = true;
-                    return;
-                }
-                if (waitResult?.shouldSync) {
-                    btn.classList.remove('warning', 'error');
-                    btn.disabled = true;
-                    btn.innerText = "⬇️ RESUMING...";
-                    syncResult = await this.fetchPartition('desc', btn, { background: false });
-                } else {
+            let syncResult = null;
+            let recoverableRestarts = 0;
+            while (true) {
+                syncResult = await this.fetchPartition('desc', btn, { background: false, allowWaitingState: true });
+                if (syncResult?.skipped) {
+                    const waitResult = await this.waitForPeerSyncAndRestore(btn);
+                    if (waitResult?.success) {
+                        restoredFromCache = true;
+                        UI.pop();
+                        this.installLifecycleRefreshHooks();
+                        queueStartupRefresh = true;
+                        return;
+                    }
+                    if (waitResult?.shouldSync) {
+                        btn.classList.remove('warning', 'error');
+                        btn.disabled = true;
+                        btn.innerText = "⬇️ RESUMING...";
+                        continue;
+                    }
+                    if (waitResult?.recoverable && recoverableRestarts < this.MAX_RECOVERABLE_SYNC_RESTARTS) {
+                        recoverableRestarts++;
+                        const resumedFromWait = await this.waitForResumeReady(btn, "⏳ WAITING TO RESUME SYNC...");
+                        if (resumedFromWait) continue;
+                    }
                     this.showSyncInterrupted(btn);
                     return;
                 }
+                if (syncResult?.success) break;
+                if (syncResult?.recoverable && recoverableRestarts < this.MAX_RECOVERABLE_SYNC_RESTARTS) {
+                    recoverableRestarts++;
+                    const resumed = await this.waitForResumeReady(btn, syncResult?.message || "⏳ WAITING TO RESUME SYNC...");
+                    if (resumed) {
+                        btn.classList.remove('warning', 'error');
+                        btn.disabled = true;
+                        btn.innerText = "⬇️ RESUMING...";
+                        continue;
+                    }
+                }
+                break;
             }
             if(syncResult?.success) {
                 blockingSyncSucceeded = true;
@@ -1092,7 +1219,7 @@ class DataLoader {
         btn.innerText = `${label} ${Math.max(0, Math.min(99, Math.round(pct)))}%`;
     }
 
-    static async fetchPartition(dir, btn, { background = false, reason = 'sync' } = {}) {
+    static async fetchPartition(dir, btn, { background = false, reason = 'sync', allowWaitingState = false } = {}) {
         if (!background) {
             if (!await this.acquireSyncLock()) return { success: false, skipped: true };
         }
@@ -1103,11 +1230,26 @@ class DataLoader {
         const foundEncs = new Set();
         const hadExistingData = window.LOCAL_DB.length > 0;
         const fetchStart = this.now();
+        const syncStartSuspensionGeneration = this._suspensionGeneration;
+        const syncStartNetworkGeneration = this._networkTransitionGeneration;
         try {
             do {
                 loop++;
                 if (loop > 300) throw new Error('Sync aborted: pagination loop limit exceeded');
                 console.group(`📥 Sync Batch ${loop}`); 
+                if (!background && this._lockHeartbeatLost) {
+                    const lockErr = new Error('Sync lock heartbeat lost');
+                    lockErr.code = 'SYNC_LOCK_LOST';
+                    throw lockErr;
+                }
+                if (!background && this._lockToken) {
+                    const hasLock = await this.ensureActiveLockOwnership();
+                    if (!hasLock) {
+                        const lockErr = new Error('Sync lock ownership lost');
+                        lockErr.code = 'SYNC_LOCK_LOST';
+                        throw lockErr;
+                    }
+                }
                 
                 if(btn && !background && !btn.classList.contains('warning') && !btn.classList.contains('error')) { 
                     if(loop === 1 && fetchedCount === 0) {
@@ -1246,16 +1388,37 @@ class DataLoader {
             console.info(`✅ Data sync complete (${snapshot.records.length} records) [${reason}]`);
             return { success: true, count: snapshot.records.length };
         } catch(e) {
+            const interruption = this.classifySyncFailure(e, { background, syncStartSuspensionGeneration, syncStartNetworkGeneration });
+            const syncDurationMs = Math.round(this.now() - fetchStart);
+            console.warn(`[SyncFailure] status=${interruption.kind} durationMs=${syncDurationMs} background=${background ? 'true' : 'false'} recoverable=${interruption.recoverable ? 'true' : 'false'}`);
             console.error("Sync Critical Error", e);
             if (background) console.warn('Background refresh failed; keeping existing cache intact');
             if (!background && btn && !btn.classList.contains('error')) {
-                const offline = (typeof navigator !== 'undefined' ? navigator.onLine === false : false) || this.isRetryableNetworkError(e);
-                btn.classList.add('error');
-                btn.disabled = false;
-                btn.innerText = offline ? "OFFLINE - RETRY" : "SYNC INTERRUPTED";
-                btn.onclick = () => location.reload();
+                if (interruption.kind === 'quota') {
+                    btn.classList.remove('warning');
+                    btn.classList.add('error');
+                    btn.disabled = false;
+                    btn.innerText = interruption.message;
+                    btn.onclick = () => location.reload();
+                } else if (interruption.recoverable && allowWaitingState) {
+                    this.showWaitingForUpdate(btn, interruption.message);
+                } else if (interruption.recoverable) {
+                    btn.classList.remove('error');
+                    btn.classList.add('warning');
+                    btn.disabled = false;
+                    btn.innerText = interruption.kind === 'network' || interruption.kind === 'network-transition'
+                        ? "OFFLINE - RETRY"
+                        : "RETRY SYNC";
+                    btn.onclick = () => location.reload();
+                } else {
+                    btn.classList.remove('warning');
+                    btn.classList.add('error');
+                    btn.disabled = false;
+                    btn.innerText = interruption.message;
+                    btn.onclick = () => location.reload();
+                }
             }
-            return { success: false, error: e };
+            return { success: false, error: e, recoverable: interruption.recoverable, reason: interruption.kind, message: interruption.message };
         } finally {
             if (!background) await this.releaseSyncLock();
         } 
@@ -4323,6 +4486,13 @@ class PdfViewer {
         this._committedPanX = 0;
         this._committedPanY = 0;
         this._clearActiveGesture();
+        this._clearStagedPdfSurface();
+    }
+    static _clearStagedPdfSurface() {
+        const viewer = document.getElementById('pdf-main-view');
+        if (!viewer) return;
+        viewer.querySelectorAll('.pdf-gesture-stage').forEach((stage) => stage.remove());
+        this._gestureStageElement = null;
     }
 
     static _clampScale(scale) {
@@ -4501,10 +4671,10 @@ class PdfViewer {
             this.currentScale = finalScale;
             this._userHasAdjustedZoom = true;
             this._updateZoomLabel();
-            this._liveScale = 1;
-            this._committedPanX = 0;
-            this._committedPanY = 0;
-            this._applyViewerTransform(1, 0, 0);
+            this._liveScale = clampScaleMultiplier;
+            this._committedPanX = finalPan.x;
+            this._committedPanY = finalPan.y;
+            this._applyViewerTransform(this._liveScale, this._committedPanX, this._committedPanY);
             this._clearZoomTimer();
             if (this.isDocumentValid()) {
                 this.renderStack({
