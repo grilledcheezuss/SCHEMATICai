@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.69 ---
-const APP_VERSION = "v2.5.69";
+// --- SCHEMATICA ai v2.5.70 ---
+const APP_VERSION = "v2.5.70";
 const VERSION_HISTORY = {
+    "v2.5.70": "Startup/update follow-up: instrument sync phase timings, replace the static 99% plateau with fetch/encrypt/save/apply progress, batch snapshot shard persistence into one IndexedDB write, and polish reset/result-card styling without changing behavior",
     "v2.5.69": "Regression fix: restore light/dark search action-row divider seam and make SHOW/HIDE reliably toggle the shared Search parameter collapse target after search completion/reset flows",
     "v2.5.68": "Restore full-height large-screen collapse rails and keep Search parameter collapse reachable after searches by collapsing only the main fields while preserving the action row/toggle across mobile and desktop flows",
     "v2.5.67": "Visual shell follow-up: removed the badge-row bubble treatment and strengthened light-mode seams between cards, results chrome, collapse rails, and the PDF toolbar without changing behavior",
@@ -288,6 +289,19 @@ const AI_TRAINING_DATA = {
 class DB {
     static open() { return new Promise((r, j) => { const q = indexedDB.open("CoxSchematicDB", 8); q.onupgradeneeded = e => { const d = e.target.result; if(d.objectStoreNames.contains("cache")) d.deleteObjectStore("cache"); if(d.objectStoreNames.contains("chunks")) d.deleteObjectStore("chunks"); d.createObjectStore("chunks"); }; q.onsuccess = e => r(e.target.result); q.onerror = e => j(e); }); }
     static async putChunk(k, v) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").put(v, k); t.oncomplete = r; t.onerror = j; }); }
+    static async putChunks(entries) {
+        const safeEntries = Array.isArray(entries) ? entries : [];
+        if (safeEntries.length === 0) return;
+        const d = await this.open();
+        return new Promise((resolve, reject) => {
+            const t = d.transaction("chunks", "readwrite");
+            const store = t.objectStore("chunks");
+            safeEntries.forEach(([k, v]) => store.put(v, k));
+            t.oncomplete = resolve;
+            t.onerror = () => reject(t.error);
+            t.onabort = () => reject(t.error);
+        });
+    }
     static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async deleteChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").delete(k); t.oncomplete = r; t.onerror = j; }); }
@@ -339,28 +353,62 @@ class CacheService {
     static GENERATION_PREFIX = 'gen_';
     static LEGACY_SHARD_PREFIX = 'shard_';
     static activeKey = null;
+    static now() {
+        return (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
+    }
     static async prepareKey(p) { if(!p) return null; const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); this.activeKey = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); return this.activeKey; }
     static async saveShard(id, data) { if(!this.activeKey) return; const j = JSON.stringify(data); const e = await this.enc(j); await DB.putChunk(id, e); }
-    static async saveSnapshot(records, { chunkSize = 50 } = {}) {
+    static async saveSnapshot(records, { chunkSize = 50, progressCallback } = {}) {
         if (!this.activeKey) throw new Error('Cache encryption key missing');
         const safeRecords = Array.isArray(records) ? records : [];
         const previousGeneration = await DB.getChunk(this.ACTIVE_GENERATION_KEY).catch(() => null);
         const generation = `${this.GENERATION_PREFIX}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         let shardCount = 0;
+        const totalStart = this.now();
+        const encryptStart = totalStart;
+        const totalShards = Math.max(1, Math.ceil(safeRecords.length / chunkSize));
+        const shardEntries = [];
 
         for (let i = 0; i < safeRecords.length; i += chunkSize) {
             const chunk = safeRecords.slice(i, i + chunkSize);
-            await this.saveShard(`${generation}:shard:${shardCount++}`, chunk);
+            const enc = await this.enc(JSON.stringify(chunk));
+            shardEntries.push([`${generation}:shard:${shardCount++}`, enc]);
+            if (progressCallback) {
+                progressCallback({
+                    phase: 'encrypting',
+                    completed: shardCount,
+                    total: totalShards,
+                    pct: Math.round((shardCount / totalShards) * 100)
+                });
+            }
             if (shardCount % 4 === 0) await new Promise(r => setTimeout(r, 0));
         }
+        const encryptMs = Math.round(this.now() - encryptStart);
 
-        await DB.putChunk(`${generation}:manifest`, { shardCount, createdAt: Date.now() });
-        await DB.putChunk(this.ACTIVE_GENERATION_KEY, generation);
+        const writeStart = this.now();
+        const writeEntries = [
+            ...shardEntries,
+            [`${generation}:manifest`, { shardCount, createdAt: Date.now() }],
+            [this.ACTIVE_GENERATION_KEY, generation]
+        ];
+        if (progressCallback) {
+            progressCallback({ phase: 'saving', completed: 0, total: writeEntries.length, pct: 0 });
+        }
+        await DB.putChunks(writeEntries);
+        const writeMs = Math.round(this.now() - writeStart);
+        if (progressCallback) {
+            progressCallback({ phase: 'saving', completed: writeEntries.length, total: writeEntries.length, pct: 100 });
+        }
 
         if (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== generation) {
             this.cleanupGeneration(previousGeneration).catch(err => console.warn('Cache cleanup warning:', err));
         }
         this.cleanupLegacyShards().catch(err => console.warn('Legacy shard cleanup warning:', err));
+        return {
+            encryptMs,
+            writeMs,
+            totalMs: Math.round(this.now() - totalStart)
+        };
     }
     static getActiveGenerationShardKeys(keys, generation) {
         if (!generation || !Array.isArray(keys)) return [];
@@ -709,6 +757,24 @@ class DataLoader {
             foundEncs
         };
     }
+    static now() {
+        return (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
+    }
+    static scalePhaseProgress(current, total, startPct, endPct) {
+        const safeStart = Number.isFinite(startPct) ? startPct : 0;
+        const safeEnd = Number.isFinite(endPct) ? endPct : safeStart;
+        if (!Number.isFinite(total) || total <= 0) return Math.round(safeStart);
+        const ratio = Math.max(0, Math.min(1, current / total));
+        return Math.round(safeStart + ((safeEnd - safeStart) * ratio));
+    }
+    static setSyncProgress(btn, label, pct) {
+        if (!btn || btn.classList.contains('warning') || btn.classList.contains('error')) return;
+        if (!Number.isFinite(pct)) {
+            btn.innerText = label;
+            return;
+        }
+        btn.innerText = `${label} ${Math.max(0, Math.min(99, Math.round(pct)))}%`;
+    }
 
     static async fetchPartition(dir, btn, { background = false, reason = 'sync' } = {}) {
         if (!background) {
@@ -720,6 +786,7 @@ class DataLoader {
         const foundMfgs = new Set();
         const foundEncs = new Set();
         const hadExistingData = window.LOCAL_DB.length > 0;
+        const fetchStart = this.now();
         try {
             do {
                 loop++;
@@ -730,8 +797,8 @@ class DataLoader {
                     if(loop === 1 && fetchedCount === 0) {
                         btn.innerText = `⏳ Initializing...`;
                     } else {
-                        const pct = Math.min(99, Math.round((fetchedCount/CONFIG.estTotal)*100)); 
-                        btn.innerText = `⬇️ UPDATING ${pct}%`; 
+                        const fetchPct = this.scalePhaseProgress(fetchedCount, CONFIG.estTotal, 0, 78);
+                        this.setSyncProgress(btn, '⬇️ UPDATING', fetchPct);
                     }
                 }
                 
@@ -810,11 +877,28 @@ class DataLoader {
                 
             } while(offset);
 
+            const fetchMs = Math.round(this.now() - fetchStart);
+            const snapshotStart = this.now();
+            this.setSyncProgress(btn, '⚙️ FINALIZING', 82);
             const snapshot = this.buildSnapshot(recordsById, foundMfgs, foundEncs);
-            await CacheService.saveSnapshot(snapshot.records);
+            const snapshotMs = Math.round(this.now() - snapshotStart);
+            const persistStats = await CacheService.saveSnapshot(snapshot.records, {
+                progressCallback: ({ phase, pct = 0 }) => {
+                    if (!btn || background) return;
+                    if (phase === 'encrypting') {
+                        this.setSyncProgress(btn, '🔒 ENCRYPTING', this.scalePhaseProgress(pct, 100, 83, 92));
+                    } else if (phase === 'saving') {
+                        this.setSyncProgress(btn, '💾 SAVING', this.scalePhaseProgress(pct, 100, 93, 98));
+                    }
+                }
+            });
+            const applyStart = this.now();
+            this.setSyncProgress(btn, '✅ APPLYING', 99);
             this.applySnapshot(snapshot);
+            const applyMs = Math.round(this.now() - applyStart);
             localStorage.setItem('cox_db_complete', 'true');
             localStorage.setItem(this.SYNC_TIMESTAMP_KEY, String(Date.now()));
+            console.info(`[SyncTiming] fetch=${fetchMs}ms snapshot=${snapshotMs}ms encrypt=${persistStats?.encryptMs ?? 0}ms write=${persistStats?.writeMs ?? 0}ms persist=${persistStats?.totalMs ?? 0}ms apply=${applyMs}ms`);
             console.info(`✅ Data sync complete (${snapshot.records.length} records) [${reason}]`);
             return { success: true, count: snapshot.records.length };
         } catch(e) {

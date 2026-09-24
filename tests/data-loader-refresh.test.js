@@ -66,6 +66,7 @@ function createSearchButton() {
 
 const localStorage = createLocalStorage();
 const uiState = { pop: () => {} };
+const networkState = { fetch: async () => ({ status: 200, json: async () => ({ records: [] }) }) };
 const dbState = {
     claimLock: async () => false,
     releaseLock: async () => {},
@@ -74,6 +75,7 @@ const dbState = {
     deleteDatabase: async () => {}
 };
 const cacheState = {};
+const configState = { estTotal: 1, mainTable: 'test-table' };
 const searchBtn = createSearchButton();
 const authOverlay = { classList: createClassList() };
 const documentState = {
@@ -115,9 +117,9 @@ const DataLoader = new Function(
     windowState,
     documentState,
     uiState,
-    {},
+    networkState,
     cacheState,
-    {},
+    configState,
     {},
     locationState
 );
@@ -155,6 +157,13 @@ function resetHarness() {
         prepareKey: async () => {},
         loadAllWithProgress: async () => null,
         saveSnapshot: async () => {}
+    });
+    Object.assign(networkState, {
+        fetch: async () => ({ status: 200, json: async () => ({ records: [] }) })
+    });
+    Object.assign(configState, {
+        estTotal: 1,
+        mainTable: 'test-table'
     });
     DataLoader.acquireSyncLock = originalMethods.acquireSyncLock;
     DataLoader.releaseSyncLock = originalMethods.releaseSyncLock;
@@ -298,6 +307,49 @@ async function flushAsync() {
     DataLoader.acquireSyncLock = async () => { throw new Error('lock failure'); };
     const guardedRefreshResult = await DataLoader.maybeRefreshStaleCache({ reason: 'test-lock-failure' });
     assert(guardedRefreshResult && guardedRefreshResult.success === false, 'background refresh lock failure should be returned as a handled failure');
+
+    resetHarness();
+    console.log('🧪 Testing fetchPartition progress phases');
+    configState.estTotal = 2;
+    const syncProgressUpdates = [];
+    const progressBtn = {
+        disabled: false,
+        onclick: null,
+        classList: createClassList()
+    };
+    let progressLabel = 'SEARCH';
+    Object.defineProperty(progressBtn, 'innerText', {
+        get: () => progressLabel,
+        set: value => {
+            progressLabel = value;
+            syncProgressUpdates.push(value);
+        }
+    });
+    const pages = [
+        { records: [{ id: '1', mfg: 'M1', enc: 'E1' }], offset: 'page-2' },
+        { records: [{ id: '2', mfg: 'M2', enc: 'E2' }] }
+    ];
+    networkState.fetch = async () => ({
+        status: 200,
+        json: async () => pages.shift() || { records: [] }
+    });
+    cacheState.saveSnapshot = async (_records, { progressCallback } = {}) => {
+        progressCallback?.({ phase: 'encrypting', pct: 50 });
+        progressCallback?.({ phase: 'saving', pct: 0 });
+        progressCallback?.({ phase: 'saving', pct: 100 });
+        return { encryptMs: 5, writeMs: 3, totalMs: 8 };
+    };
+    DataLoader.acquireSyncLock = async () => true;
+    DataLoader.releaseSyncLock = async () => {};
+    const syncResult = await DataLoader.fetchPartition('desc', progressBtn, { background: false, reason: 'test-progress' });
+    assert(syncResult && syncResult.success === true, 'fetchPartition should succeed for the mocked sync flow');
+    assert(syncProgressUpdates.includes('⬇️ UPDATING 39%'), 'fetch progress should reserve headroom before finalization');
+    assert(syncProgressUpdates.includes('⚙️ FINALIZING 82%'), 'finalizing phase should be reported after fetch completes');
+    assert(syncProgressUpdates.includes('🔒 ENCRYPTING 88%'), 'encrypting phase should report reserved progress');
+    assert(syncProgressUpdates.includes('💾 SAVING 93%'), 'saving phase should report start of persistence');
+    assert(syncProgressUpdates.includes('💾 SAVING 98%'), 'saving phase should report completion without claiming 100%');
+    assert(syncProgressUpdates.includes('✅ APPLYING 99%'), 'apply phase should remain below 100% until sync fully completes');
+    assertEqual(localStorage.getItem('cox_db_complete'), 'true', 'successful sync should still mark cache complete');
 
     console.log('✅ DataLoader stale-refresh tests passed');
 })().catch((err) => {
