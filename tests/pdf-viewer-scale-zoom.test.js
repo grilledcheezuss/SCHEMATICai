@@ -42,9 +42,30 @@ async function wait(ms) {
     const pdfViewerClassCode = extractClass('PdfViewer', appJsContent);
 
     const zoomLabel = { innerText: '' };
+    const viewerListeners = new Map();
+    const viewerEl = {
+        clientWidth: 900,
+        clientHeight: 700,
+        querySelector: () => null,
+        addEventListener: (name, fn) => {
+            viewerListeners.set(name, fn);
+        },
+        removeEventListener: (name) => {
+            viewerListeners.delete(name);
+        }
+    };
     const documentState = {
-        getElementById: (id) => (id === 'pdf-zoom-level' ? zoomLabel : null),
-        querySelectorAll: () => []
+        getElementById: (id) => {
+            if (id === 'pdf-zoom-level') return zoomLabel;
+            if (id === 'pdf-main-view') return viewerEl;
+            return null;
+        },
+        querySelectorAll: () => [],
+        body: {
+            classList: {
+                contains: () => false
+            }
+        }
     };
     const windowState = {
         innerWidth: 0,
@@ -93,6 +114,13 @@ async function wait(ms) {
     PdfViewer.zoom(-0.2);
     assert(PdfViewer.currentScale === PdfViewer.MIN_SCALE, 'zoom out should clamp at MIN_SCALE');
 
+    PdfViewer.initViewerInteractions();
+    assert(viewerListeners.has('wheel'), 'initViewerInteractions should attach wheel listener');
+    assert(viewerListeners.has('touchstart'), 'initViewerInteractions should attach touchstart listener');
+    assert(viewerListeners.has('touchmove'), 'initViewerInteractions should attach touchmove listener');
+    assert(viewerListeners.has('touchend'), 'initViewerInteractions should attach touchend listener');
+    assert(viewerListeners.has('touchcancel'), 'initViewerInteractions should attach touchcancel listener');
     PdfViewer.teardownViewerInteractions();
+    assert(viewerListeners.size === 0, 'teardownViewerInteractions should remove attached listeners');
     console.log('✅ PdfViewer scale/zoom tests passed');
 })();
