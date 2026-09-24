@@ -143,7 +143,8 @@ async function wait(ms) {
     const windowState = {
         innerWidth: 0,
         innerHeight: 0,
-        addEventListener: () => {}
+        addEventListener: () => {},
+        removeEventListener: () => {}
     };
     const DOM_CACHE = {
         get(id) {

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.80 ---
-const APP_VERSION = "v2.5.80";
+// --- SCHEMATICA ai v2.5.81 ---
+const APP_VERSION = "v2.5.81";
 const VERSION_HISTORY = {
+    "v2.5.81": "PDF viewer stability patch: stage replacement renders outside the scroll container until layout settles, new-document loads reset to page-start instead of reusing stale offsets, same-document anchor restores are generation-guarded, and post-swap scroll clamping prevents scrollbar churn across replacement and viewport changes",
     "v2.5.80": "PDF result-swap transition fix: keep the active viewer surface/toolbar stable while replacement documents stage in, clear only stale staging surfaces at load start, and swap rendered stages atomically so rapid document changes do not flicker or expose placeholder gaps",
     "v2.5.79": "PDF/mobile interaction hardening: gesture-release commits now preserve release anchor through crisp rerender swaps without snap-back, and mobile touch ownership locks Results vs PDF scrolling to gesture origin until lift/cancel",
     "v2.5.78": "Follow-up to PR #169: restore explicit Airtable token routing (Users/Feedback reads + FEEDBACK POST use write key; MAIN/PDF_BY_ID reads use read key) and classify 401/403 credential access failures distinctly from transient 503 outages",
@@ -4607,6 +4608,8 @@ class PdfViewer {
     static _documentLoadToken = 0;
     static _gestureCommitGeneration = 0;
     static _pendingGestureCommitGeneration = 0;
+    static _currentDocumentIdentity = '';
+    static _viewportClampHandler = null;
     static isPrinting = false;
     static _activePrintSession = null;
     static PRINT_CLEANUP_TIMEOUT_MS = 15000;
@@ -4650,9 +4653,29 @@ class PdfViewer {
             if (preserveActiveSurface && !stage.classList.contains('pdf-gesture-stage--staging')) return;
             stage.remove();
         });
+        document.getElementById('pdf-staging-host')?.querySelectorAll('.pdf-gesture-stage').forEach((stage) => stage.remove());
         if (!preserveActiveSurface || (this._gestureStageElement && !this._gestureStageElement.isConnected)) {
             this._gestureStageElement = viewer.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)') || null;
         }
+    }
+
+    static _buildDocumentIdentity({ panelId = this._activePanelId, url = this.url } = {}) {
+        const normalizedPanelId = String(panelId || '').trim();
+        if (normalizedPanelId) return `panel:${normalizedPanelId}`;
+        const normalizedUrl = String(url || '').trim();
+        if (normalizedUrl) return `url:${normalizedUrl}`;
+        return `load-token:${this._documentLoadToken}`;
+    }
+
+    static _setCurrentDocumentIdentity(identityOrContext = {}) {
+        this._currentDocumentIdentity = typeof identityOrContext === 'string'
+            ? identityOrContext
+            : this._buildDocumentIdentity(identityOrContext);
+        return this._currentDocumentIdentity;
+    }
+
+    static _getCurrentDocumentIdentity() {
+        return this._currentDocumentIdentity || this._buildDocumentIdentity();
     }
 
     static _clampScale(scale) {
@@ -4674,6 +4697,23 @@ class PdfViewer {
         }
         this._gestureStageElement = stage;
         return stage;
+    }
+
+    static _getStagingHost(container = document.getElementById('pdf-main-view')) {
+        const hostParent = document.getElementById('custom-pdf-viewer') || container?.parentElement || container;
+        if (!hostParent) return container;
+        let host = document.getElementById('pdf-staging-host');
+        if (!host) {
+            host = document.createElement('div');
+            host.id = 'pdf-staging-host';
+            host.setAttribute('aria-hidden', 'true');
+            host.className = 'pdf-staging-host';
+            hostParent.appendChild(host);
+        } else if (host.parentNode !== hostParent) {
+            host.parentNode?.removeChild(host);
+            hostParent.appendChild(host);
+        }
+        return host;
     }
 
     static _getGestureStage() {
@@ -4756,6 +4796,108 @@ class PdfViewer {
         };
     }
 
+    static _findAnchorPageNumber(viewer, stage, anchorOffsetY = null) {
+        if (!viewer || !stage || typeof stage.querySelectorAll !== 'function') return null;
+        const wrappers = Array.from(stage.querySelectorAll('.pdf-page-wrapper'));
+        if (!wrappers.length) return null;
+        const effectiveAnchorOffsetY = Number.isFinite(anchorOffsetY)
+            ? anchorOffsetY
+            : Math.max(0, Math.min(viewer.clientHeight || 0, (viewer.clientHeight || 0) / 2));
+        const anchorY = (viewer.scrollTop || 0) + effectiveAnchorOffsetY - (stage.offsetTop || 0);
+        let fallbackPage = null;
+        for (const wrapper of wrappers) {
+            const pageNumber = Number(wrapper.dataset?.pageNumber || wrapper.getAttribute?.('data-page-number'));
+            if (!Number.isFinite(pageNumber)) continue;
+            fallbackPage = pageNumber;
+            const top = wrapper.offsetTop || 0;
+            const height = Math.max(1, wrapper.offsetHeight || 0);
+            if (anchorY >= top && anchorY < (top + height)) {
+                return pageNumber;
+            }
+        }
+        return fallbackPage;
+    }
+
+    static _captureStageScrollState(viewer, stage) {
+        if (!viewer || !stage) return null;
+        const stageWidth = Math.max(1, stage.offsetWidth || 1);
+        const stageHeight = Math.max(1, stage.offsetHeight || 1);
+        const anchorOffsetX = Math.max(0, Math.min(viewer.clientWidth || 0, (viewer.clientWidth || 0) / 2));
+        const anchorOffsetY = Math.max(0, Math.min(viewer.clientHeight || 0, (viewer.clientHeight || 0) / 2));
+        return {
+            anchorOffsetX,
+            anchorOffsetY,
+            scrollRatioX: stageWidth > 0
+                ? (viewer.scrollLeft + anchorOffsetX - (stage.offsetLeft || 0)) / stageWidth
+                : Number.NaN,
+            scrollRatioY: stageHeight > 0
+                ? (viewer.scrollTop + anchorOffsetY - (stage.offsetTop || 0)) / stageHeight
+                : Number.NaN,
+            documentLoadToken: Number(stage.dataset?.documentLoadToken),
+            documentIdentity: stage.dataset?.documentIdentity || '',
+            pageCount: Number(stage.dataset?.pageCount) || 0,
+            anchorPageNumber: this._findAnchorPageNumber(viewer, stage, anchorOffsetY)
+        };
+    }
+
+    static _stageMatchesCurrentDocument(priorState = null) {
+        if (!priorState) return false;
+        if (priorState.documentLoadToken !== this._documentLoadToken) return false;
+        if ((priorState.documentIdentity || '') !== this._getCurrentDocumentIdentity()) return false;
+        const pageCount = Number(this.doc?.numPages || 0);
+        return !pageCount || !priorState.pageCount || priorState.pageCount === pageCount;
+    }
+
+    static _resolveRenderScrollPlan({ renderMode = 'preserve-ratios', priorState = null, anchorContext = null, expectedDocumentLoadToken = null, expectedGestureCommitGeneration = null } = {}) {
+        const sameDocument = this._stageMatchesCurrentDocument(priorState);
+        const anchorPageValid = Number.isFinite(priorState?.anchorPageNumber)
+            && priorState.anchorPageNumber >= 1
+            && priorState.anchorPageNumber <= Math.max(1, this.doc?.numPages || 1);
+        const anchorContextValid = !!anchorContext
+            && Number.isFinite(anchorContext.contentX)
+            && Number.isFinite(anchorContext.contentY)
+            && (expectedDocumentLoadToken === null || expectedDocumentLoadToken === this._documentLoadToken)
+            && (expectedGestureCommitGeneration === null || expectedGestureCommitGeneration === this._pendingGestureCommitGeneration);
+        if (renderMode === 'gesture-anchor') {
+            if (sameDocument && anchorPageValid && anchorContextValid) {
+                return { mode: 'anchor', fallbackMode: 'ratios' };
+            }
+            if (sameDocument && anchorPageValid) {
+                return { mode: 'ratios', fallbackMode: 'document-start' };
+            }
+            return { mode: 'document-start', fallbackMode: 'document-start' };
+        }
+        if (renderMode === 'preserve-ratios' && sameDocument && anchorPageValid) {
+            return { mode: 'ratios', fallbackMode: 'document-start' };
+        }
+        return { mode: 'document-start', fallbackMode: 'document-start' };
+    }
+
+    static _annotateStage(stage) {
+        if (!stage) return;
+        stage.dataset.documentLoadToken = String(this._documentLoadToken);
+        stage.dataset.documentIdentity = this._getCurrentDocumentIdentity();
+        stage.dataset.pageCount = String(this.doc?.numPages || 0);
+    }
+
+    static _clampViewerScroll(viewer) {
+        if (!viewer) return;
+        this._applyScrollPosition(viewer, viewer.scrollLeft || 0, viewer.scrollTop || 0);
+    }
+
+    static _resetScrollToDocumentStart(viewer, stage) {
+        if (!viewer || !stage) return false;
+        const firstPage = typeof stage.querySelector === 'function'
+            ? stage.querySelector('.pdf-page-wrapper')
+            : null;
+        this._applyScrollPosition(
+            viewer,
+            stage.offsetLeft || 0,
+            (stage.offsetTop || 0) + (firstPage?.offsetTop || 0)
+        );
+        return true;
+    }
+
     static _applyScrollPosition(viewer, nextScrollLeft, nextScrollTop) {
         if (!viewer) return;
         const maxScrollLeft = Math.max(0, (viewer.scrollWidth || 0) - (viewer.clientWidth || 0));
@@ -4797,6 +4939,12 @@ class PdfViewer {
         const hasX = Number.isFinite(priorState.scrollRatioX);
         const hasY = Number.isFinite(priorState.scrollRatioY);
         if (!hasX && !hasY) return false;
+        if (Number.isFinite(priorState.anchorPageNumber)) {
+            const pageSelector = `.pdf-page-wrapper[data-page-number="${priorState.anchorPageNumber}"]`;
+            if (typeof stage.querySelector === 'function' && !stage.querySelector(pageSelector)) {
+                return false;
+            }
+        }
         const nextStageWidth = Math.max(1, stage.offsetWidth || 1);
         const nextStageHeight = Math.max(1, stage.offsetHeight || 1);
         const nextScrollLeft = hasX
@@ -4845,7 +4993,8 @@ class PdfViewer {
                     timingSource: 'gesture-commit',
                     expectedDocumentLoadToken: gesture.documentLoadToken,
                     expectedGestureCommitGeneration: commitGeneration,
-                    anchorContext: anchorContext || this._captureAnchorContext(null, finalScale / Math.max(priorScale, 0.0001))
+                    anchorContext: anchorContext || this._captureAnchorContext(null, finalScale / Math.max(priorScale, 0.0001)),
+                    renderMode: 'gesture-anchor'
                 });
             }
             return;
@@ -4878,6 +5027,9 @@ class PdfViewer {
         this.teardownViewerInteractions();
 
         this._zoomInteractionElement = viewer;
+        this._viewportClampHandler = () => {
+            requestAnimationFrame(() => this._clampViewerScroll(this._zoomInteractionElement || document.getElementById('pdf-main-view')));
+        };
         this._wheelZoomHandler = (event) => {
             if (!this.isDocumentValid()) return;
             if (!(event.ctrlKey || event.metaKey)) return;
@@ -5001,6 +5153,8 @@ class PdfViewer {
         viewer.addEventListener('touchmove', this._touchMoveHandler, { passive: false });
         viewer.addEventListener('touchend', this._touchEndHandler, { passive: false });
         viewer.addEventListener('touchcancel', this._touchEndHandler, { passive: false });
+        window.addEventListener('resize', this._viewportClampHandler, { passive: true });
+        window.addEventListener('orientationchange', this._viewportClampHandler, { passive: true });
 
         const userAgent = (typeof navigator !== 'undefined' && navigator?.userAgent) ? navigator.userAgent : '';
         const isIPadDesktopUA = typeof navigator !== 'undefined'
@@ -5022,11 +5176,16 @@ class PdfViewer {
             this._zoomInteractionElement.removeEventListener('touchend', this._touchEndHandler);
             this._zoomInteractionElement.removeEventListener('touchcancel', this._touchEndHandler);
         }
+        if (this._viewportClampHandler) {
+            window.removeEventListener('resize', this._viewportClampHandler, { passive: true });
+            window.removeEventListener('orientationchange', this._viewportClampHandler, { passive: true });
+        }
         this._zoomInteractionElement = null;
         this._wheelZoomHandler = null;
         this._touchStartHandler = null;
         this._touchMoveHandler = null;
         this._touchEndHandler = null;
+        this._viewportClampHandler = null;
         this._gestureStageElement = null;
         this._liveScale = 1;
         this._committedPanX = 0;
@@ -5048,6 +5207,7 @@ class PdfViewer {
         
         // === INITIALIZATION ===
         this.url = fallbackUrl || "";
+        this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
         setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
 
         const fetchId = Date.now();
@@ -5107,7 +5267,7 @@ class PdfViewer {
                         
                         this._setScaleForDevice();
                         setPdfUiState(PDF_UI_STATE.READY);
-                        await this.renderStack({ timingSource: 'network-fallback' });
+                        await this.renderStack({ timingSource: 'network-fallback', renderMode: 'document-load' });
                         logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-fallback' });
                         return; // Success - exit early
                     }
@@ -5171,7 +5331,7 @@ class PdfViewer {
 
             this._setScaleForDevice();
             setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack({ timingSource: 'network-by-id' });
+            await this.renderStack({ timingSource: 'network-by-id', renderMode: 'document-load' });
             logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-by-id' });
         } catch(e) {
             // === ERROR HANDLING ===
@@ -5234,6 +5394,7 @@ class PdfViewer {
         
         // === INITIALIZATION ===
         this.url = fallbackUrl || "";
+        this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
         setPdfUiState(PDF_UI_STATE.LOADING, '⚡ LOADING FROM CACHE...');
 
         const fetchId = Date.now();
@@ -5279,7 +5440,7 @@ class PdfViewer {
 
             this._setScaleForDevice();
             setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack({ timingSource: 'cache-hit' });
+            await this.renderStack({ timingSource: 'cache-hit', renderMode: 'document-load' });
             logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'cache-hit' });
             console.log('✓ Loaded from cache'); 
         } catch(e) {
@@ -5297,6 +5458,7 @@ class PdfViewer {
         
         // === INITIALIZATION ===
         this.url = url;
+        this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
         setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
 
         const fetchId = Date.now();
@@ -5360,7 +5522,7 @@ class PdfViewer {
 
             this._setScaleForDevice();
             setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack({ timingSource: 'network-url' });
+            await this.renderStack({ timingSource: 'network-url', renderMode: 'document-load' });
             logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-url' });
         } catch(e) {
             // === ERROR HANDLING ===
@@ -5621,7 +5783,7 @@ class PdfViewer {
         }
         this._printViaIframe(printTarget);
     }
-    static async renderStack({ timingSource = 'unspecified', expectedDocumentLoadToken = null, expectedGestureCommitGeneration = null, anchorContext = null } = {}) {
+    static async renderStack({ timingSource = 'unspecified', expectedDocumentLoadToken = null, expectedGestureCommitGeneration = null, anchorContext = null, renderMode = 'preserve-ratios' } = {}) {
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
@@ -5636,31 +5798,23 @@ class PdfViewer {
         const renderStartMs = getNowMs();
         let firstPageReadyMs = null;
         const priorStage = this._getGestureStage();
-        const priorStageWidth = priorStage ? Math.max(1, priorStage.offsetWidth || 1) : 0;
-        const priorStageHeight = priorStage ? Math.max(1, priorStage.offsetHeight || 1) : 0;
-        const priorStageOffsetLeft = priorStage ? priorStage.offsetLeft : 0;
-        const priorStageOffsetTop = priorStage ? priorStage.offsetTop : 0;
-        const priorAnchorOffsetX = Math.max(0, Math.min(container.clientWidth || 0, (container.clientWidth || 0) / 2));
-        const priorAnchorOffsetY = Math.max(0, Math.min(container.clientHeight || 0, (container.clientHeight || 0) / 2));
-        const priorState = {
-            anchorOffsetX: priorAnchorOffsetX,
-            anchorOffsetY: priorAnchorOffsetY,
-            scrollRatioX: priorStageWidth > 0
-                ? (container.scrollLeft + priorAnchorOffsetX - priorStageOffsetLeft) / priorStageWidth
-                : Number.NaN,
-            scrollRatioY: priorStageHeight > 0
-                ? (container.scrollTop + priorAnchorOffsetY - priorStageOffsetTop) / priorStageHeight
-                : Number.NaN
-        };
+        const priorState = this._captureStageScrollState(container, priorStage);
+        const scrollPlan = this._resolveRenderScrollPlan({
+            renderMode,
+            priorState,
+            anchorContext,
+            expectedDocumentLoadToken,
+            expectedGestureCommitGeneration
+        });
         const stage = document.createElement('div');
         stage.className = 'pdf-gesture-stage pdf-gesture-stage--staging';
         stage.setAttribute('aria-hidden', 'true');
-        container.appendChild(stage);
+        this._getStagingHost(container)?.appendChild(stage);
         this._updateZoomLabel();
         
         if (!this.doc) {
             console.error('No PDF document loaded');
-            if (stage.parentNode === container) stage.remove();
+            if (stage.parentNode) stage.remove();
             return;
         }
         
@@ -5678,13 +5832,14 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
-                if (stage.parentNode === container) stage.remove();
+                if (stage.parentNode) stage.remove();
                 return;
             }
             
             // Check if document is still valid
             if (!this.isDocumentValid()) {
                 console.warn('[renderStack] Document became invalid during rendering');
+                if (stage.parentNode) stage.remove();
                 return;
             }
             
@@ -5703,6 +5858,7 @@ class PdfViewer {
                 // Check for destroyed transport or InvalidPDFException
                 if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
                     console.error('[renderStack] Transport destroyed - stopping render');
+                    if (stage.parentNode) stage.remove();
                     return;
                 }
                 // Fall back to original doc's page 1 if template fails
@@ -5779,7 +5935,7 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled before attaching page ${i} (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
-                if (stage.parentNode === container) stage.remove();
+                if (stage.parentNode) stage.remove();
                 return;
             }
 
@@ -5794,7 +5950,7 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled before canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
-                if (stage.parentNode === container) stage.remove();
+                if (stage.parentNode) stage.remove();
                 return;
             }
 
@@ -5812,6 +5968,7 @@ class PdfViewer {
                     // Check for destroyed transport
                     if (renderError.message?.includes('destroyed') || renderError.message?.includes('Transport destroyed')) {
                         console.error('[renderStack] Transport destroyed during render - stopping');
+                        if (stage.parentNode) stage.remove();
                         return;
                     }
                 }
@@ -5819,7 +5976,7 @@ class PdfViewer {
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled after canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
-                if (stage.parentNode === container) stage.remove();
+                if (stage.parentNode) stage.remove();
                 return;
             }
             // Re-scale any existing overlay zones to match new page dimensions
@@ -5830,22 +5987,33 @@ class PdfViewer {
         }
         await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
-            if (stage.parentNode === container) stage.remove();
+            if (stage.parentNode) stage.remove();
             return;
         }
         if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration !== this._pendingGestureCommitGeneration) {
-            if (stage.parentNode === container) stage.remove();
+            if (stage.parentNode) stage.remove();
             return;
         }
-        if (!this._restoreScrollFromAnchorContext(container, stage, anchorContext)) {
-            this._restoreScrollFromPriorRatios(container, stage, priorState);
-        }
         const existingStages = Array.from(container.querySelectorAll('.pdf-gesture-stage'));
+        if (stage.parentNode !== container) {
+            container.appendChild(stage);
+        }
         existingStages.forEach(existingStage => {
             if (existingStage !== stage) existingStage.remove();
         });
         stage.classList.remove('pdf-gesture-stage--staging');
         stage.removeAttribute('aria-hidden');
+        let restored = false;
+        if (scrollPlan.mode === 'anchor') {
+            restored = this._restoreScrollFromAnchorContext(container, stage, anchorContext);
+        }
+        if (!restored && (scrollPlan.mode === 'ratios' || scrollPlan.fallbackMode === 'ratios')) {
+            restored = this._restoreScrollFromPriorRatios(container, stage, priorState);
+        }
+        if (!restored) {
+            this._resetScrollToDocumentStart(container, stage);
+        }
+        this._annotateStage(stage);
         this._gestureStageElement = stage;
         if (this._activeGesture) {
             this._applyViewerTransform(this._liveScale || 1, this._committedPanX, this._committedPanY);
@@ -5858,6 +6026,8 @@ class PdfViewer {
                 this._pendingGestureCommitGeneration = 0;
             }
         }
+        this._clampViewerScroll(container);
+        requestAnimationFrame(() => this._clampViewerScroll(container));
         logPdfTiming('full_render_complete', getNowMs() - renderStartMs, { source: timingSource, pages: this.doc?.numPages || 0 });
         // Populate ALL profile dropdowns ONCE after all pages are rendered
         // This ensures all <select> elements exist in the DOM before population
