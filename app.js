@@ -4691,7 +4691,15 @@ class PdfViewer {
             return false;
         }
         const priorBlobUrl = this.currentBlobUrl;
-        this.currentBlobUrl = this._pendingBlobUrl || '';
+        let nextBlobUrl = this._pendingBlobUrl || '';
+        if (!nextBlobUrl && this._pendingPdfBlob && typeof URL?.createObjectURL === 'function') {
+            try {
+                nextBlobUrl = URL.createObjectURL(this._pendingPdfBlob);
+            } catch (error) {
+                console.warn('Failed to create committed PDF blob URL:', error);
+            }
+        }
+        this.currentBlobUrl = nextBlobUrl || priorBlobUrl || '';
         this.currentPdfBlob = this._pendingPdfBlob || null;
         this._committedPanelId = this._pendingPanelId || this._committedPanelId;
         this._committedUrl = this._pendingUrl || this._committedUrl;
