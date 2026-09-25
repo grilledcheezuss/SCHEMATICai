@@ -4936,7 +4936,7 @@ class PdfViewer {
         this._pendingLoadUiState = '';
         this._clearPendingDocumentResources();
         this._clearPendingReplacementViewportAnchor();
-        this._clearCommittedDocumentResources();
+        this._documentActionsInvalidated = true;
         this._clearStagedPdfSurface();
         this._gestureStageElement = null;
         setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);

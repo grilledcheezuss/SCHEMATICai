@@ -206,11 +206,12 @@ function wait(ms) {
         'alert',
         'buildWorkerUrl',
         'PDF_UI_STATE',
+        'setPdfUiState',
         `${pdfViewerClassCode}; return PdfViewer;`
     )(windowState, documentState, DOM_CACHE, localStorage, navigatorState, URLState, (message) => alerts.push(message), (target, params = {}) => {
         const query = new URLSearchParams({ target, ...params }).toString();
         return `https://worker.example/?${query}`;
-    }, PDF_UI_STATE);
+    }, PDF_UI_STATE, () => {});
 
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
     PdfViewer.currentPdfBlob = { tag: 'pdf-blob' };
@@ -336,6 +337,14 @@ function wait(ms) {
     PdfViewer._beginDocumentLoad();
     PdfViewer.download();
     assert(anchorsClicked.length === 0, 'Safari download should also stay inactive until the replacement commits');
+
+    PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
+    PdfViewer.currentPdfBlob = { tag: 'fallback-source' };
+    PdfViewer._committedPanelId = 'CP-NEW';
+    PdfViewer._committedUrl = 'https://example.com/panel.pdf';
+    PdfViewer._transitionToFallback('https://example.com/panel.pdf');
+    assert(PdfViewer.hasCommittedDocumentTarget() === true, 'fallback after a successful load should preserve the last committed document identity');
+    assert(PdfViewer._documentActionsInvalidated === true, 'fallback after a successful load should keep document actions invalidated');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
