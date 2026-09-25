@@ -124,6 +124,7 @@ runTest('6) Blocklist state resets via resetSearch lifecycle', () => {
     assert(keywordInput.value === '', 'Expected keyword input cleared by resetSearch');
     assert(keywordInput.placeholder === 'Allowed Terms - Use Comma To Separate', 'Expected allowed placeholder after reset');
     assert(toggleBtn['aria-pressed'] === 'false', 'Expected toggle aria-pressed false after reset');
+    assert(toggleBtn['aria-label'] === 'Blocklist mode off. Toggle blocklist mode', 'Expected stateful aria-label after reset');
 });
 
 runTest('7) Pagination/counts operate on post-blocklist filtered set', () => {

@@ -7107,6 +7107,15 @@ class UI {
 
         if (blocklistToggle) {
             blocklistToggle.setAttribute('aria-pressed', isBlocklist ? 'true' : 'false');
+            blocklistToggle.setAttribute(
+                'aria-label',
+                isBlocklist
+                    ? 'Blocklist mode on. Toggle blocklist mode'
+                    : 'Blocklist mode off. Toggle blocklist mode'
+            );
+            blocklistToggle.title = isBlocklist
+                ? 'Blocklist mode is ON (click to switch to allowed terms mode)'
+                : 'Blocklist mode is OFF (click to switch to blocked terms mode)';
         }
     }
 
