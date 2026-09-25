@@ -4904,8 +4904,18 @@ class PdfViewer {
         if (button) {
             if (typeof button.setAttribute === 'function') {
                 button.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
+                if (isVisible) {
+                    button.setAttribute('aria-describedby', 'pdf-download-hint');
+                } else if (typeof button.removeAttribute === 'function') {
+                    button.removeAttribute('aria-describedby');
+                }
             } else {
                 button['aria-expanded'] = isVisible ? 'true' : 'false';
+                if (isVisible) {
+                    button['aria-describedby'] = 'pdf-download-hint';
+                } else {
+                    delete button['aria-describedby'];
+                }
             }
         }
         if (hint) {

@@ -78,6 +78,9 @@ function wait(ms) {
         setAttribute(name, value) {
             this.attributes[name] = value;
         },
+        removeAttribute(name) {
+            delete this.attributes[name];
+        },
         contains(target) {
             return target === toolbarDownloadButton;
         }
@@ -321,6 +324,7 @@ function wait(ms) {
     assert(toolbarHint.style.display === 'block', 'first iOS Save PDF tap should show the nested tooltip');
     assert(toolbarDownloadControl.classes.has('tooltip-visible') === true, 'first iOS Save PDF tap should mark the control as tooltip-visible');
     assert(toolbarDownloadButton.attributes['aria-expanded'] === 'true', 'first iOS Save PDF tap should expand the button tooltip state');
+    assert(toolbarDownloadButton.attributes['aria-describedby'] === 'pdf-download-hint', 'visible tooltip should be associated with the button for assistive tech');
     assert(/Tap Share, then Save to Files\./i.test(toolbarHint.innerText), 'first iOS Save PDF tap should explain the native save path');
     PdfViewer.download();
     assert(anchorsClicked.length === 1, 'second iOS Save PDF tap should proceed immediately to the existing share/download flow');
@@ -329,6 +333,7 @@ function wait(ms) {
     assert(anchorsClicked[0].target === '_blank', 'Safari attachment download should open isolated target');
     assert(toolbarHint.style.display === 'none', 'second iOS Save PDF tap should dismiss the tooltip');
     assert(toolbarDownloadButton.attributes['aria-expanded'] === 'false', 'second iOS Save PDF tap should collapse the button tooltip state');
+    assert(!('aria-describedby' in toolbarDownloadButton.attributes), 'hidden tooltip should not stay associated with the button');
     PdfViewer.download();
     assert(anchorsClicked.length === 2, 'acknowledged iOS Save PDF interactions should proceed directly for the same committed PDF');
 
