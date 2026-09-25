@@ -5013,7 +5013,7 @@ class PdfViewer {
         if (!documentIdentity) return;
         this._iosSaveTooltipAcknowledgedDocumentIdentity = documentIdentity;
         this._hideIosSavePdfHint();
-        this._performDownloadAction();
+        this.download();
     }
 
     static _clearPendingDocumentResources({ revoke = true } = {}) {
