@@ -4672,7 +4672,7 @@ class PdfViewer {
     static _committedPanelId = '';
     static _committedUrl = '';
     static _uiState = 'empty';
-    static _pendingLoadUiState = PDF_UI_STATE.FIRST_LOAD_LOADING;
+    static _pendingLoadUiState = '';
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -4768,7 +4768,7 @@ class PdfViewer {
     }
 
     static _transitionToFallback(fallbackUrl = '') {
-        this._pendingLoadUiState = PDF_UI_STATE.FIRST_LOAD_LOADING;
+        this._pendingLoadUiState = '';
         this._clearPendingDocumentResources();
         this._clearCommittedDocumentResources();
         this._clearStagedPdfSurface();
@@ -6209,7 +6209,7 @@ class PdfViewer {
             if (stage.parentNode) stage.remove();
             return false;
         }
-        this._pendingLoadUiState = PDF_UI_STATE.FIRST_LOAD_LOADING;
+        this._pendingLoadUiState = '';
         const existingStages = Array.from(container.querySelectorAll('.pdf-gesture-stage'));
         if (stage.parentNode !== container) {
             container.appendChild(stage);
