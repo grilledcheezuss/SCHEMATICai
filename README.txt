@@ -1,10 +1,18 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.88)
+CLOUDFLARE WORKER SCRIPT (v2.5.89)
 
-Release-alignment note: this patch is frontend-only; the Worker-facing version strings are mirrored to v2.5.88 for release tracking, but Worker/API behavior is unchanged from v2.5.87.
+Release-alignment note: this patch is frontend-only; the Worker-facing version strings are mirrored to v2.5.89 for release tracking, but Worker/API behavior is unchanged from v2.5.88.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.88):
+RECENT UPDATES (v2.5.89):
+
+- Added a blocklist-mode toggle flush to the keyword input with an accessible circle-slash icon, `aria-pressed` semantics, purple inactive icon treatment, and red active treatment
+- Keyword input guidance now switches exactly between "Allowed Terms - Use Comma To Separate" and "Blocked Terms - Use Comma To Separate", and active blocklist mode applies a red input border for immediate visual clarity
+- Search keeps existing inclusive keyword behavior unchanged in normal mode, while blocklist mode reuses the same parsed/matched comma-separated keyword semantics and excludes any record matching any blocked term
+- Blocklist mode is treated as transient search criteria (no localStorage persistence), resets with existing search reset/session boundaries, and does not change Worker/backend feedback/healer behavior
+- Version strings aligned to v2.5.89 across the viewer/client and Worker-facing version surfaces for release bookkeeping only; Worker/API behavior is unchanged
+
+PREVIOUS UPDATES (v2.5.88):
 
 - Desktop/tablet header branding now keeps RESEARCH fixed to the Cox logo while SCHEMATICA ai continues immediately to its right on the same lower lockup row at matching scale
 - The existing lock-icon PDF toolbar pill now reads "Lock Position", stays ahead of the zoom controls, and keeps the same persistence, purple active state, icon treatment, and underlying maintain-position behavior

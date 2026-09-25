@@ -334,6 +334,79 @@ body.dark-mode .panel-toggle-btn {
 }
 .cox-input:focus { border-color: var(--app-primary); box-shadow: 0 0 0 1px var(--app-primary); } .cox-input:disabled { background: #e5e7eb; cursor: not-allowed; opacity: 0.7; }
 
+.keyword-input-row {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+}
+
+#keywordInput {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+#keywordInput.keyword-input-blocklist-active {
+    border-color: var(--match-red-bg);
+}
+
+#keywordInput.keyword-input-blocklist-active:focus {
+    border-color: var(--match-red-bg);
+    box-shadow: 0 0 0 1px var(--match-red-bg);
+}
+
+.keyword-blocklist-toggle {
+    height: var(--input-height);
+    width: var(--input-height);
+    min-width: var(--input-height);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-left: none;
+    border-radius: 0 4px 4px 0;
+    background: var(--bg-input);
+    color: var(--app-primary);
+    transition: 0.2s;
+}
+
+.keyword-blocklist-toggle:hover {
+    filter: brightness(1.06);
+}
+
+.keyword-blocklist-toggle:focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 2px;
+}
+
+.keyword-blocklist-toggle[aria-pressed="true"] {
+    background: var(--match-red-bg);
+    border-color: var(--match-red-bg);
+    color: var(--match-red-text);
+}
+
+.keyword-blocklist-toggle[aria-pressed="true"]:focus-visible {
+    outline-color: var(--match-red-bg);
+}
+
+.keyword-blocklist-icon {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.keyword-blocklist-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 input[type=range] { accent-color: var(--lsu-purple); }
 
 .search-btn { flex: 1; min-width: 0; height: 34px; background-color: var(--app-primary) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; transition: 0.2s; font-size: 11px; letter-spacing: 0.5px; white-space: nowrap; } 
@@ -1030,6 +1103,11 @@ input[type="date"].demo-input { text-align: left; }
         height: 32px;
         font-size: 11px;
         padding: 0 7px;
+    }
+    #search-controls .keyword-blocklist-toggle {
+        height: 32px;
+        width: 32px;
+        min-width: 32px;
     }
     #search-action-row {
         display: grid !important;

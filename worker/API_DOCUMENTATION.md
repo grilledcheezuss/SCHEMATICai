@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.88
+## Version: v2.5.89
 
-_Release-alignment note: this patch version is mirrored here for app/Worker bookkeeping, but the Worker API surface and backend behavior are unchanged from v2.5.87._
+_Release-alignment note: this patch version is mirrored here for app/Worker bookkeeping, but the Worker API surface and backend behavior are unchanged from v2.5.88._
 
 ## Overview
 
@@ -12,6 +12,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.89**: Frontend-only keyword search refinement: adds a blocklist-mode toggle at the keyword input with red active treatment and explicit allowed/blocked placeholder guidance, applies an isolated top-level keyword branch so inclusive matching remains unchanged while blocked-term matches are excluded from visible results, and Worker API/backend behavior is unchanged
 - **v2.5.88**: Frontend-only refinement follow-up: version surfaces are aligned for the release, desktop/tablet branding keeps RESEARCH anchored to COX while SCHEMATICA ai continues from the same lower row, the existing lock pill now reads Lock Position before the zoom controls, mobile toolbar sizing is tightened to keep one-row controls, and the Worker API/backend behavior is unchanged
 - **v2.5.87**: Desktop header branding and PDF-toolbar control refinement: desktop/tablet lockup now positions SCHEMATICA ai as a complementary lower-right title beside the Cox logo, and maintain-position is now a lock-icon pill toggle beside zoom controls with active-purple pressed state while preserving existing persistence/restore behavior and Worker parity
 - **v2.5.86**: iOS Save PDF refinement: the first Save PDF tap now opens a button-anchored Share → Save to Files tooltip, a fast second tap proceeds immediately, and the contextual guidance resets per committed document without changing desktop or Worker behavior

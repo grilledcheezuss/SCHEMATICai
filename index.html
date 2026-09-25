@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.88)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.89)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -139,7 +139,25 @@
             <div id="search-main-fields">
                 <div class="input-group">
                     <span class="input-label">Keywords</span>
-                    <input type="text" id="keywordInput" class="cox-input" placeholder="e.g. Pump, Fan..." onkeypress="UI.handleEnter(event)">
+                    <div class="keyword-input-row">
+                        <input type="text" id="keywordInput" class="cox-input" placeholder="Allowed Terms - Use Comma To Separate" onkeypress="UI.handleEnter(event)">
+                        <button
+                            id="keyword-blocklist-toggle"
+                            class="keyword-blocklist-toggle"
+                            type="button"
+                            onclick="UI.toggleKeywordBlocklistMode()"
+                            aria-pressed="false"
+                            aria-label="Toggle blocklist mode"
+                            title="Toggle blocklist mode for keyword filtering"
+                        >
+                            <span class="keyword-blocklist-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <circle cx="12" cy="12" r="8"></circle>
+                                    <path d="M8.5 15.5L15.5 8.5"></path>
+                                </svg>
+                            </span>
+                        </button>
+                    </div>
                 </div>
                 <div class="filter-grid" style="margin-top:5px;">
                     <div class="input-group"><span class="input-label">Manufacturer</span><select id="mfgInput" class="cox-input"><option value="Any">Any</option></select></div>
