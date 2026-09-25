@@ -4409,7 +4409,9 @@ function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl
         downloadBtn: DOM_CACHE.get('pdf-download-btn')
     };
     const presentation = resolvePdfUiStatePresentation(state, {
-        hasCommittedPdf: !!PdfViewer.currentBlobUrl || !!PdfViewer.currentPdfBlob,
+        hasCommittedPdf: typeof PdfViewer?.hasCommittedDocumentTarget === 'function'
+            ? PdfViewer.hasCommittedDocumentTarget()
+            : (!!PdfViewer.currentBlobUrl || !!PdfViewer.currentPdfBlob),
         loadingMessage
     });
 
@@ -4657,6 +4659,10 @@ class PdfViewer {
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
+    }
+
+    static hasCommittedDocumentTarget() {
+        return !!(this.currentBlobUrl || this.currentPdfBlob || this._committedPanelId || this._committedUrl);
     }
 
     static _clearPendingDocumentResources({ revoke = true } = {}) {
@@ -5700,7 +5706,7 @@ class PdfViewer {
         return baseName.toLowerCase().endsWith('.pdf') ? baseName : `${baseName}.pdf`;
     }
     static _buildAttachmentDownloadUrl() {
-        const panelId = (this._committedPanelId || this._activePanelId || '').trim();
+        const panelId = (this._committedPanelId || '').trim();
         if (!panelId) return '';
         return buildWorkerUrl('PDF_BY_ID', {
             id: panelId,
@@ -5713,9 +5719,22 @@ class PdfViewer {
     }
 
     static download() {
-        if (!this.currentBlobUrl) return;
+        const attachmentUrl = this._buildAttachmentDownloadUrl();
+        if (!this.currentBlobUrl) {
+            const fallbackUrl = attachmentUrl || (this._committedUrl ? buildWorkerUrl('PDF', { url: this._committedUrl }) : '');
+            if (!fallbackUrl) return;
+            const link = document.createElement('a');
+            link.href = fallbackUrl;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            document.body.appendChild(link);
+            link.click();
+            if (link.parentNode === document.body) {
+                document.body.removeChild(link);
+            }
+            return;
+        }
         if (!this._supportsBlobDownload()) {
-            const attachmentUrl = this._buildAttachmentDownloadUrl();
             if (attachmentUrl) {
                 const link = document.createElement('a');
                 link.href = attachmentUrl;
@@ -5751,7 +5770,18 @@ class PdfViewer {
         if (this.currentPdfBlob && typeof URL?.createObjectURL === 'function') {
             return { url: URL.createObjectURL(this.currentPdfBlob), revokeOnCleanup: true };
         }
-        return { url: this.currentBlobUrl || '', revokeOnCleanup: false };
+        if (this.currentBlobUrl) {
+            return { url: this.currentBlobUrl, revokeOnCleanup: false };
+        }
+        const committedPanelId = (this._committedPanelId || '').trim();
+        if (committedPanelId) {
+            return { url: buildWorkerUrl('PDF_BY_ID', { id: committedPanelId }), revokeOnCleanup: false };
+        }
+        const committedUrl = (this._committedUrl || '').trim();
+        if (committedUrl) {
+            return { url: buildWorkerUrl('PDF', { url: committedUrl }), revokeOnCleanup: false };
+        }
+        return { url: '', revokeOnCleanup: false };
     }
 
     static _releasePrintSession(reason = 'cleanup') {

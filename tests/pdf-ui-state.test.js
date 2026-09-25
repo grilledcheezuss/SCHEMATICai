@@ -114,7 +114,16 @@ function makeElement(initialDisplay = 'none') {
     ]);
 
     const DOM_CACHE = { get: (id) => elements.get(id) || null };
-    const PdfViewer = { currentBlobUrl: '', currentPdfBlob: null, _uiState: null };
+    const PdfViewer = {
+        currentBlobUrl: '',
+        currentPdfBlob: null,
+        _committedPanelId: '',
+        _committedUrl: '',
+        _uiState: null,
+        hasCommittedDocumentTarget() {
+            return !!(this.currentBlobUrl || this.currentPdfBlob || this._committedPanelId || this._committedUrl);
+        }
+    };
     const documentState = {};
 
     const { PDF_UI_STATE, setPdfUiState } = new Function(
@@ -143,6 +152,7 @@ function makeElement(initialDisplay = 'none') {
     assert(downloadBtn.disabled === true, 'first-load state should keep download disabled');
 
     PdfViewer.currentBlobUrl = 'blob:active-doc';
+    PdfViewer._committedPanelId = 'CP-1234';
     toolbar.style._history.length = 0;
     viewer.style._history.length = 0;
     toolbar.style.display = 'flex';
@@ -156,6 +166,13 @@ function makeElement(initialDisplay = 'none') {
     assert(viewer.style._history.length === 0, 'replacement loading should not toggle viewer display when already visible');
     assert(printBtn.disabled === false, 'replacement loading should keep print enabled for the committed document');
     assert(downloadBtn.disabled === false, 'replacement loading should keep download enabled for the committed document');
+
+    PdfViewer.currentBlobUrl = '';
+    PdfViewer.currentPdfBlob = null;
+    PdfViewer._committedPanelId = 'CP-attachment-only';
+    setPdfUiState(PDF_UI_STATE.READY);
+    assert(printBtn.disabled === false, 'ready state should remain actionable when only committed fallback targets are available');
+    assert(downloadBtn.disabled === false, 'ready state should remain actionable when only committed fallback targets are available');
 
     setPdfUiState(PDF_UI_STATE.READY);
     assert(toolbar.style.display === 'flex', 'ready state should show toolbar');
