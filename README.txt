@@ -1,10 +1,25 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.90)
+CLOUDFLARE WORKER SCRIPT (v2.5.91)
 
-Release-alignment note: this patch is frontend-only; the Worker-facing version strings are mirrored to v2.5.90 for release tracking, but Worker/API behavior is unchanged from v2.5.89.
+Release-alignment note: this patch is frontend-only; the Worker-facing version strings are mirrored to v2.5.91 for release tracking, but Worker/API behavior is unchanged from v2.5.90.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.90):
+RECENT UPDATES (v2.5.91):
+
+- Mixed Allowed + Blocked keyword searches now use a single explicit dominance branch: eligible records stay visible only when total allowed-term occurrences exceed total blocked-term occurrences; ties and blocked-majority records stay hidden
+- Allowed-only and blocked-only keyword searches retain their existing behaviors, contradiction validation remains unchanged, and empty/duplicate comma-separated entries are still normalized away before search
+- Result counts and pagination now reflect the dominantly filtered set while maintaining the same responsive search/reset lifecycle on desktop, tablet, and mobile
+- Version strings aligned to v2.5.91 across the viewer/client and Worker-facing version surfaces for release bookkeeping only; Worker/API behavior is unchanged
+
+MANUAL ACCEPTANCE CHECKS:
+
+- Desktop/tablet/mobile: Allowed Terms only still return the same inclusive matches as before
+- Desktop/tablet/mobile: Blocked Terms only still hide any matching record
+- Desktop/tablet/mobile: with Allowed=`duplex` and Blocked=`simplex`, `duplex duplex simplex` stays visible, while `duplex simplex` and `duplex simplex simplex` stay hidden
+- Desktop/tablet/mobile: contradiction warning beside Keywords still blocks search when the same normalized term appears in both sets, and clears immediately after correction/reset
+- Desktop/tablet/mobile: results count and pagination reflect only the records that survive the dominance branch
+
+PREVIOUS UPDATES (v2.5.90):
 
 - Keyword term editing now maintains two independent sets: Allowed Terms and Blocked Terms, with the existing toggle acting as the editor selector while preserving each set when switching modes
 - Added explicit contradiction validation between allowed and blocked terms (case-insensitive) with immediate red warning text beside Keywords that names all duplicate terms and blocks search execution until resolved
