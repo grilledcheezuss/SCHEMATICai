@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.88 ---
-const APP_VERSION = "v2.5.88";
+// --- SCHEMATICA ai v2.5.89 ---
+const APP_VERSION = "v2.5.89";
 const VERSION_HISTORY = {
+    "v2.5.89": "Keyword blocklist mode (frontend-only): add a flush keyword-end prohibited toggle with red active treatment and placeholder guidance, branch keyword filtering to exclude any matched blocked term while preserving inclusive mode and matcher internals, and keep Worker/backend behavior unchanged",
     "v2.5.88": "Frontend-only header/toolbar refinement: keep RESEARCH fixed to the Cox lockup while SCHEMATICA ai continues from the same lower row, relabel the existing lock pill to Lock Position, and tighten mobile toolbar sizing without changing viewer or backend behavior",
     "v2.5.87": "Desktop branding + toolbar refinement: tuned the Cox/SCHEMATICA ai desktop lockup, converted maintain-position into a lock-style pill toggle beside zoom controls with active purple state and aria-pressed semantics, and kept maintain-position persistence/behavior unchanged",
     "v2.5.86": "iOS Save PDF refinement: the first Save PDF tap now opens a button-anchored Share → Save to Files tooltip, a fast second tap proceeds immediately, and the contextual guidance resets safely per committed document without changing desktop or backend behavior",
@@ -3785,6 +3786,19 @@ class SearchEngine {
     static currentPage = 1;
     static pageSize = 25;
     static lastCriteria = null;
+    
+    static shouldIncludeRecordForKeywordMode(record, rawKeywords, expandedKeywords, blocklistMode) {
+        if (!expandedKeywords || expandedKeywords.length === 0) return true;
+        if (!blocklistMode) {
+            return KeywordMatcher.matches(record, rawKeywords, expandedKeywords);
+        }
+
+        const blockedMatchExists = expandedKeywords.some((group, idx) => {
+            const rawKeyword = rawKeywords[idx];
+            return KeywordMatcher.matches(record, rawKeyword ? [rawKeyword] : [], [group]);
+        });
+        return !blockedMatchExists;
+    }
 
     static perform() {
         // === STOP PREVIOUS PRELOADING ===
@@ -3800,6 +3814,7 @@ class SearchEngine {
             }
             return [k]; 
         });
+        const blocklistMode = UI.isKeywordBlocklistMode();
 
         const catInputEl = DOM_CACHE.get('catInput');
         const cat = catInputEl?.value || 'Any';
@@ -3810,7 +3825,8 @@ class SearchEngine {
             hp: DOM_CACHE.get('hpInput')?.value || 'Any', 
             volt: DOM_CACHE.get('voltInput')?.value || 'Any', 
             phase: DOM_CACHE.get('phaseInput')?.value || 'Any', 
-            enc: DOM_CACHE.get('encInput')?.value || 'Any'
+            enc: DOM_CACHE.get('encInput')?.value || 'Any',
+            blocklistMode
         };
         
         // === FILTER AND SCORE RESULTS ===
@@ -3937,8 +3953,8 @@ class SearchEngine {
             }
             
             // Keyword filter using helper
-            if(!KeywordMatcher.matches(r, rawKeywords, expandedKeywords)) return;
-            if(expandedKeywords.length) w += 10;
+            if(!SearchEngine.shouldIncludeRecordForKeywordMode(r, rawKeywords, expandedKeywords, blocklistMode)) return;
+            if(expandedKeywords.length && !blocklistMode) w += 10;
 
             r.w=w; r.p=p; r.mfgV=mfgV; r.hpV=hpV; r.voltV=voltV; r.phaseV=phaseV; r.encV=encV; res.push(r);
         });
@@ -7008,6 +7024,9 @@ class UI {
     static mobileManualPanelState = { search: false, results: false };
     static refineToggleHome = null;
     static paginationFooterHome = null;
+    static keywordBlocklistMode = false;
+    static keywordAllowedPlaceholder = 'Allowed Terms - Use Comma To Separate';
+    static keywordBlockedPlaceholder = 'Blocked Terms - Use Comma To Separate';
 
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { 
@@ -7034,6 +7053,7 @@ class UI {
         }); 
 
         this.handleViewportChange();
+        this.setKeywordBlocklistMode(false);
     }
     
     static isSmallMobile() { return window.innerWidth < 768; }
@@ -7060,7 +7080,32 @@ class UI {
         document.querySelectorAll('select').forEach(s=>s.value="Any"); 
         const keywordInput = DOM_CACHE.get('keywordInput');
         if (keywordInput) keywordInput.value=''; 
+        this.setKeywordBlocklistMode(false);
         this.toggleSearch(true); 
+    }
+
+    static isKeywordBlocklistMode() {
+        return this.keywordBlocklistMode === true;
+    }
+
+    static setKeywordBlocklistMode(isActive) {
+        this.keywordBlocklistMode = isActive === true;
+        const keywordInput = DOM_CACHE.get('keywordInput');
+        const blocklistToggle = DOM_CACHE.get('keyword-blocklist-toggle');
+        const isBlocklist = this.isKeywordBlocklistMode();
+
+        if (keywordInput) {
+            keywordInput.placeholder = isBlocklist ? this.keywordBlockedPlaceholder : this.keywordAllowedPlaceholder;
+            keywordInput.classList.toggle('keyword-input-blocklist-active', isBlocklist);
+        }
+
+        if (blocklistToggle) {
+            blocklistToggle.setAttribute('aria-pressed', isBlocklist ? 'true' : 'false');
+        }
+    }
+
+    static toggleKeywordBlocklistMode() {
+        this.setKeywordBlocklistMode(!this.isKeywordBlocklistMode());
     }
     
     static closeMobilePreview() { 
@@ -7383,6 +7428,7 @@ static pop() {
         const keywordInput = DOM_CACHE.get('keywordInput');
         if (keywordInput) keywordInput.value = savedValues.keyword;
     }
+    UI.setKeywordBlocklistMode(UI.isKeywordBlocklistMode());
 }
 
 /**
@@ -7433,7 +7479,7 @@ static _generateBadges(record, criteria) {
     }
 
     // Keyword badges (avoid duplicating mfg badge)
-    if (criteria.kw && criteria.kw.length > 0) {
+    if (criteria.kw && criteria.kw.length > 0 && !criteria.blocklistMode) {
         criteria.kw.forEach(k => {
             if (!(criteria.mfg !== "Any" && record.mfg === k.toUpperCase())) {
                 badges.push(`<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`);
