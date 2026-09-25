@@ -344,6 +344,8 @@ function wait(ms) {
     PdfViewer._committedUrl = 'https://example.com/panel.pdf';
     PdfViewer._transitionToFallback('https://example.com/panel.pdf');
     assert(PdfViewer.hasCommittedDocumentTarget() === true, 'fallback after a successful load should preserve the last committed document identity');
+    assert(PdfViewer.currentBlobUrl === '', 'fallback after a successful load should clear the stale committed blob URL');
+    assert(PdfViewer.currentPdfBlob === null, 'fallback after a successful load should clear the stale committed blob object');
     assert(PdfViewer._documentActionsInvalidated === true, 'fallback after a successful load should keep document actions invalidated');
     anchorsClicked = [];
     PdfViewer.download();

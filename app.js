@@ -4937,6 +4937,18 @@ class PdfViewer {
         this._documentActionsInvalidated = false;
     }
 
+    static _clearCommittedBlobResources({ revoke = true } = {}) {
+        if (revoke && this.currentBlobUrl && typeof URL?.revokeObjectURL === 'function') {
+            try {
+                URL.revokeObjectURL(this.currentBlobUrl);
+            } catch (error) {
+                console.warn('Failed to revoke active PDF blob URL:', error);
+            }
+        }
+        this.currentBlobUrl = '';
+        this.currentPdfBlob = null;
+    }
+
     static _hasActiveRenderedSurface() {
         const viewerSurface = document.getElementById('pdf-main-view');
         return !!viewerSurface?.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)');
@@ -4962,6 +4974,7 @@ class PdfViewer {
         this._clearPendingReplacementViewportAnchor();
         this._documentActionsInvalidated = true;
         this._uiState = PDF_UI_STATE.FALLBACK;
+        this._clearCommittedBlobResources();
         this._clearStagedPdfSurface();
         this._gestureStageElement = null;
         setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
