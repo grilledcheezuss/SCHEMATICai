@@ -3781,6 +3781,8 @@ class KeywordMatcher {
     }
 
     static matchesSingleGroup(record, rawKeyword, expandedGroup) {
+        if (!rawKeyword || !String(rawKeyword).trim()) return false;
+        if (!Array.isArray(expandedGroup) || expandedGroup.length === 0) return false;
         return this.matches(record, rawKeyword ? [rawKeyword] : [], [expandedGroup]);
     }
 }
