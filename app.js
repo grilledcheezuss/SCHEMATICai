@@ -150,14 +150,67 @@ const PDF_STATUS = {
 };
 
 // PDF UI display states
-const PDF_UI_STATE = {
-    EMPTY: 'empty',
-    FIRST_LOAD_LOADING: 'first-load-loading',
-    REPLACEMENT_LOADING: 'replacement-loading',
-    READY: 'ready',
-    FALLBACK: 'fallback',
-    HIDDEN: 'hidden'
-};
+const PDF_UI_STATE_HELPERS = typeof PdfUiStateHelper !== 'undefined'
+    ? PdfUiStateHelper
+    : (() => {
+        const PDF_UI_STATE = {
+            EMPTY: 'empty',
+            FIRST_LOAD_LOADING: 'first-load-loading',
+            REPLACEMENT_LOADING: 'replacement-loading',
+            READY: 'ready',
+            FALLBACK: 'fallback',
+            HIDDEN: 'hidden'
+        };
+        const setElementDisplay = (element, displayValue) => {
+            if (!element) return;
+            if ((element.style.display || '') !== displayValue) {
+                element.style.display = displayValue;
+            }
+        };
+        const resolvePdfUiStatePresentation = (state, { hasCommittedPdf = false, loadingMessage = '⏳ Loading PDF...' } = {}) => {
+            const presentation = {
+                placeholderDisplay: 'none',
+                placeholderText: '📄 Select a schematic',
+                toolbarDisplay: 'none',
+                viewerDisplay: 'none',
+                fallbackDisplay: 'none',
+                frameDisplay: 'none',
+                printDisabled: true,
+                downloadDisabled: true
+            };
+            switch (state) {
+                case PDF_UI_STATE.FIRST_LOAD_LOADING:
+                    presentation.placeholderDisplay = 'flex';
+                    presentation.placeholderText = loadingMessage || '⏳ Loading PDF...';
+                    break;
+                case PDF_UI_STATE.REPLACEMENT_LOADING:
+                    presentation.toolbarDisplay = 'flex';
+                    presentation.viewerDisplay = 'flex';
+                    presentation.printDisabled = !hasCommittedPdf;
+                    presentation.downloadDisabled = !hasCommittedPdf;
+                    break;
+                case PDF_UI_STATE.READY:
+                    presentation.toolbarDisplay = 'flex';
+                    presentation.viewerDisplay = 'flex';
+                    presentation.printDisabled = !hasCommittedPdf;
+                    presentation.downloadDisabled = !hasCommittedPdf;
+                    break;
+                case PDF_UI_STATE.FALLBACK:
+                    presentation.fallbackDisplay = 'block';
+                    break;
+                case PDF_UI_STATE.EMPTY:
+                case PDF_UI_STATE.HIDDEN:
+                default:
+                    presentation.placeholderDisplay = 'flex';
+                    break;
+            }
+            return presentation;
+        };
+        return { PDF_UI_STATE, setElementDisplay, resolvePdfUiStatePresentation };
+    })();
+const PDF_UI_STATE = PDF_UI_STATE_HELPERS.PDF_UI_STATE;
+const setElementDisplay = PDF_UI_STATE_HELPERS.setElementDisplay;
+const resolvePdfUiStatePresentation = PDF_UI_STATE_HELPERS.resolvePdfUiStatePresentation;
 
 // DOM cache for frequently accessed elements
 // Note: Cache can become stale if elements are removed/replaced
@@ -4348,55 +4401,6 @@ function logPdfTiming(metric, durationMs, fields = {}) {
  * @param {string} loadingMessage - Optional custom loading message
  * @param {string} fallbackUrl - Optional fallback URL for direct PDF link
  */
-function setElementDisplay(element, displayValue) {
-    if (!element) return;
-    if ((element.style.display || '') !== displayValue) {
-        element.style.display = displayValue;
-    }
-}
-
-function resolvePdfUiStatePresentation(state, { hasCommittedPdf = false, loadingMessage = '⏳ Loading PDF...' } = {}) {
-    const presentation = {
-        placeholderDisplay: 'none',
-        placeholderText: '📄 Select a schematic',
-        toolbarDisplay: 'none',
-        viewerDisplay: 'none',
-        fallbackDisplay: 'none',
-        frameDisplay: 'none',
-        printDisabled: true,
-        downloadDisabled: true
-    };
-
-    switch (state) {
-        case PDF_UI_STATE.FIRST_LOAD_LOADING:
-            presentation.placeholderDisplay = 'flex';
-            presentation.placeholderText = loadingMessage || '⏳ Loading PDF...';
-            break;
-        case PDF_UI_STATE.REPLACEMENT_LOADING:
-            presentation.toolbarDisplay = 'flex';
-            presentation.viewerDisplay = 'flex';
-            presentation.printDisabled = !hasCommittedPdf;
-            presentation.downloadDisabled = !hasCommittedPdf;
-            break;
-        case PDF_UI_STATE.READY:
-            presentation.toolbarDisplay = 'flex';
-            presentation.viewerDisplay = 'flex';
-            presentation.printDisabled = !hasCommittedPdf;
-            presentation.downloadDisabled = !hasCommittedPdf;
-            break;
-        case PDF_UI_STATE.FALLBACK:
-            presentation.fallbackDisplay = 'block';
-            break;
-        case PDF_UI_STATE.EMPTY:
-        case PDF_UI_STATE.HIDDEN:
-        default:
-            presentation.placeholderDisplay = 'flex';
-            break;
-    }
-
-    return presentation;
-}
-
 function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl = '') {
     const elements = {
         placeholder: DOM_CACHE.get('pdf-placeholder-text'),
@@ -4705,7 +4709,11 @@ class PdfViewer {
                 console.warn('Failed to create committed PDF blob URL:', error);
             }
         }
-        this.currentBlobUrl = nextBlobUrl || priorBlobUrl || '';
+        if (!nextBlobUrl) {
+            this._clearPendingDocumentResources();
+            return false;
+        }
+        this.currentBlobUrl = nextBlobUrl;
         this.currentPdfBlob = this._pendingPdfBlob || null;
         this._committedPanelId = this._pendingPanelId || this._committedPanelId;
         this._committedUrl = this._pendingUrl || this._committedUrl;
