@@ -76,6 +76,7 @@ function wait(ms) {
 
     const loadCalls = [];
     const PdfViewer = {
+        _showPendingLoadUi: (url) => { loadCalls.push({ type: 'pending-ui', url }); },
         loadFromCache: async (_cached, id) => { loadCalls.push({ type: 'cache', id }); },
         loadById: async (id) => { loadCalls.push({ type: 'network', id }); }
     };
@@ -123,6 +124,7 @@ function wait(ms) {
     await PdfController.load('ID-1', 'https://example.com/panel-1.pdf');
     await preloadPromise;
 
+    assert(loadCalls.some((entry) => entry.type === 'pending-ui' && entry.url === 'https://example.com/panel-1.pdf'), 'clicking in-flight preload should show loading UI immediately');
     assert(loadCalls.some((entry) => entry.type === 'cache' && entry.id === 'ID-1'), 'clicking in-flight preload should reuse cache path');
     assert(!loadCalls.some((entry) => entry.type === 'network' && entry.id === 'ID-1'), 'clicking in-flight preload should avoid duplicate network load');
     assert((seenFetchById.get('ID-1') || 0) === 1, 'preload + click should fetch a PDF_BY_ID once per ID');

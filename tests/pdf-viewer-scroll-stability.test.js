@@ -124,6 +124,7 @@ function matchesSelector(node, selector) {
     viewer.scrollTop = 1100;
     viewer.scrollWidth = 2400;
     viewer.scrollHeight = 3600;
+    viewer.getBoundingClientRect = () => ({ left: 0, top: 0 });
     customPdfViewer.appendChild(viewer);
 
     const documentRoots = [customPdfViewer];
@@ -298,6 +299,24 @@ function matchesSelector(node, selector) {
     assert(replacementRestored === true, 'replacement anchor should restore on a differently sized document');
     assert(viewer.scrollLeft >= 0 && viewer.scrollLeft <= (viewer.scrollWidth - viewer.clientWidth), 'replacement anchor restore should clamp horizontal scroll within bounds');
     assert(viewer.scrollTop >= 0 && viewer.scrollTop <= (viewer.scrollHeight - viewer.clientHeight), 'replacement anchor restore should clamp vertical scroll within bounds');
+
+    viewer.scrollLeft = 260;
+    viewer.scrollTop = 1180;
+    PdfViewer._zoomInteractionElement = viewer;
+    PdfViewer._gestureStageElement = stage;
+    PdfViewer._uiState = PDF_UI_STATE.READY;
+    let rafCount = 0;
+    const realRequestAnimationFrame = global.requestAnimationFrame;
+    global.requestAnimationFrame = (fn) => {
+        rafCount++;
+        fn();
+        return rafCount;
+    };
+    PdfViewer._scheduleViewportAnchorRestore({ retries: 1 });
+    global.requestAnimationFrame = realRequestAnimationFrame;
+    assert(viewer.scrollLeft >= 0 && viewer.scrollLeft <= (viewer.scrollWidth - viewer.clientWidth), 'viewport anchor restore should keep horizontal scroll clamped');
+    assert(viewer.scrollTop >= 0 && viewer.scrollTop <= (viewer.scrollHeight - viewer.clientHeight), 'viewport anchor restore should keep vertical scroll clamped');
+    assert(viewer.scrollTop > 0, 'viewport anchor restore should preserve a meaningful vertical position');
 
     const resetApplied = PdfViewer._resetScrollToDocumentStart(viewer, stage);
     assert(resetApplied === true, 'new document scroll helper should reset to the first page');

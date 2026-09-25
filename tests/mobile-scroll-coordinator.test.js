@@ -125,6 +125,7 @@ touchStart({
 assert(MobileScrollCoordinator.shouldAllowPdfTouchStart() === true, 'viewer-origin gesture should keep PDF ownership');
 
 prevented = false;
+const priorViewerScroll = viewer.scrollTop;
 touchMove({
     target: resultsChildTarget,
     touches: [{ clientY: 260 }],
@@ -132,8 +133,8 @@ touchMove({
     preventDefault() { prevented = true; },
     stopPropagation() {}
 });
-assert(prevented, 'crossing into results while viewer-owned should prevent default on non-owner region');
-assert(viewer.scrollTop > 0, 'viewer-owned crossing should continue scrolling viewer');
+assert(prevented === false, 'viewer-owned crossing should preserve native scrolling instead of forcing manual handoff');
+assert(viewer.scrollTop === priorViewerScroll, 'viewer-owned crossing should not inject manual scroll deltas');
 
 touchEnd({ touches: [] });
 touchStart({
@@ -148,6 +149,24 @@ touchMove({
     stopPropagation() {}
 });
 assert(MobileScrollCoordinator.shouldAllowPdfTouchStart() === false, 'results-origin multi-touch should not allow PDF pinch start');
+
+touchEnd({ touches: [] });
+touchStart({
+    target: viewerTarget,
+    touches: [{ clientY: 180 }, { clientY: 176 }]
+});
+prevented = false;
+PdfViewer._activeGesture = { mode: 'pinch' };
+touchMove({
+    target: resultsChildTarget,
+    touches: [{ clientY: 150 }, { clientY: 146 }],
+    cancelable: true,
+    preventDefault() { prevented = true; },
+    stopPropagation() {}
+});
+assert(prevented === true, 'viewer-origin active pinch should still suppress cross-panel drift');
+assert(results.scrollTop > 0, 'viewer-origin active pinch should not reroute movement into results scrolling');
+PdfViewer._activeGesture = null;
 
 MobileScrollCoordinator.resetGestureOwnership('test-reset');
 assert(MobileScrollCoordinator.shouldAllowPdfTouchStart() === true, 'manual ownership reset should clear lock');
