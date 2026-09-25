@@ -528,8 +528,7 @@ body:not(.dark-mode) #pdf-toolbar .pdf-tool-btn {
 }
 
 #preview-pane { flex: 1; background: var(--bg-viewer); display: flex; flex-direction: column; position:relative; overflow: hidden; min-width: 0; z-index: 1; }
-#custom-pdf-viewer { flex: 1; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; opacity: 0; transition: opacity 0.3s ease-in; }
-#custom-pdf-viewer[style*="display: flex"] { opacity: 1; }
+#custom-pdf-viewer { flex: 1; width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 #pdf-main-view { flex: 1; overflow-y: auto; overflow-x: auto; display: flex; flex-direction: column; align-items: center; padding: 20px; background: var(--bg-viewer); width:100%; height:100%; -webkit-overflow-scrolling: touch; transition: opacity 0.2s ease; touch-action: pan-y; position: relative; overflow-anchor: none; }
 body.generator-transition #pdf-main-view { opacity: 0.6; }
 
