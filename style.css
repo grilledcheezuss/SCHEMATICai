@@ -323,6 +323,21 @@ body.dark-mode .panel-toggle-btn {
 .refine-btn { width: auto; }
 
 .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .input-group.full-width { grid-column: span 2; } .input-group { display: flex; flex-direction: column; gap: 1px; } .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--app-primary); margin-left: 2px; letter-spacing: 0.5px; } body.dark-mode .input-label { color: var(--text-secondary); }
+.input-label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.keyword-contradiction-warning {
+    color: var(--match-red-bg);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    display: none;
+}
 
 .cox-input { 
     width: 100%; height: var(--input-height); padding: 0 8px; 

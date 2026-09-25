@@ -1,10 +1,18 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.89)
+CLOUDFLARE WORKER SCRIPT (v2.5.90)
 
-Release-alignment note: this patch is frontend-only; the Worker-facing version strings are mirrored to v2.5.89 for release tracking, but Worker/API behavior is unchanged from v2.5.88.
+Release-alignment note: this patch is frontend-only; the Worker-facing version strings are mirrored to v2.5.90 for release tracking, but Worker/API behavior is unchanged from v2.5.89.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.89):
+RECENT UPDATES (v2.5.90):
+
+- Keyword term editing now maintains two independent sets: Allowed Terms and Blocked Terms, with the existing toggle acting as the editor selector while preserving each set when switching modes
+- Added explicit contradiction validation between allowed and blocked terms (case-insensitive) with immediate red warning text beside Keywords that names all duplicate terms and blocks search execution until resolved
+- Search keyword pipeline now stays explicit and branch-isolated: allowed-term inclusion runs first, then blocked-term exclusion, while feedback/reject_keywords Worker payload behavior remains unchanged
+- Empty/whitespace tokens and duplicates inside the same term set are normalized away, and keyword badges no longer present misleading inclusive chips when blocked terms are active in criteria
+- Version strings aligned to v2.5.90 across the viewer/client and Worker-facing version surfaces for release bookkeeping only; Worker/API behavior is unchanged
+
+PREVIOUS UPDATES (v2.5.89):
 
 - Added a blocklist-mode toggle flush to the keyword input with an accessible circle-slash icon, `aria-pressed` semantics, purple inactive icon treatment, and red active treatment
 - Keyword input guidance now switches exactly between "Allowed Terms - Use Comma To Separate" and "Blocked Terms - Use Comma To Separate", and active blocklist mode applies a red input border for immediate visual clarity
