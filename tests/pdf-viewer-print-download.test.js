@@ -348,6 +348,9 @@ function wait(ms) {
     anchorsClicked = [];
     PdfViewer.download();
     assert(anchorsClicked.length === 0, 'fallback after a successful load should keep stale download actions blocked');
+    const priorPrintCalls = popupPrintCalls.length;
+    PdfViewer.print();
+    assert(popupPrintCalls.length === priorPrintCalls, 'fallback after a successful load should keep stale print actions blocked');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';

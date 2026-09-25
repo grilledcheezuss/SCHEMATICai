@@ -4459,7 +4459,11 @@ function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl
 
     if (elements.printBtn) elements.printBtn.disabled = presentation.printDisabled;
     if (elements.downloadBtn) elements.downloadBtn.disabled = presentation.downloadDisabled;
-    if (typeof PdfViewer !== 'undefined') PdfViewer._uiState = state;
+    if (typeof PdfViewer !== 'undefined') {
+        PdfViewer._uiState = state;
+        PdfViewer._syncMaintainPositionToggle?.();
+        PdfViewer._syncDownloadActionPresentation?.();
+    }
 }
 
 /**
@@ -4723,16 +4727,24 @@ class PdfViewer {
     }
 
     static _syncMaintainPositionToggle() {
-        const toggle = DOM_CACHE.get('pdf-maintain-position-toggle');
+        const toggle = typeof DOM_CACHE !== 'undefined'
+            ? DOM_CACHE.get('pdf-maintain-position-toggle')
+            : document.getElementById('pdf-maintain-position-toggle');
         if (toggle) {
             toggle.checked = !!this._maintainPositionBetweenResults;
         }
     }
 
     static _syncDownloadActionPresentation() {
-        const downloadButton = DOM_CACHE.get('pdf-download-btn');
-        const downloadLabel = DOM_CACHE.get('pdf-download-btn-label');
-        const downloadHint = DOM_CACHE.get('pdf-download-hint');
+        const downloadButton = typeof DOM_CACHE !== 'undefined'
+            ? DOM_CACHE.get('pdf-download-btn')
+            : document.getElementById('pdf-download-btn');
+        const downloadLabel = typeof DOM_CACHE !== 'undefined'
+            ? DOM_CACHE.get('pdf-download-btn-label')
+            : document.getElementById('pdf-download-btn-label');
+        const downloadHint = typeof DOM_CACHE !== 'undefined'
+            ? DOM_CACHE.get('pdf-download-hint')
+            : document.getElementById('pdf-download-hint');
         const isIosSafari = this._isIosSafariBrowser();
         const actionLabel = isIosSafari ? 'Save PDF' : 'Download';
         if (downloadLabel && downloadLabel.textContent !== actionLabel) {
@@ -4745,7 +4757,11 @@ class PdfViewer {
             if (downloadButton.title !== actionTitle) {
                 downloadButton.title = actionTitle;
             }
-            downloadButton.setAttribute('aria-label', actionLabel);
+            if (typeof downloadButton.setAttribute === 'function') {
+                downloadButton.setAttribute('aria-label', actionLabel);
+            } else {
+                downloadButton['aria-label'] = actionLabel;
+            }
         }
         if (downloadHint && !isIosSafari) {
             downloadHint.innerText = '';
@@ -4832,7 +4848,9 @@ class PdfViewer {
     }
 
     static _showIosSavePdfHint() {
-        const downloadHint = DOM_CACHE.get('pdf-download-hint');
+        const downloadHint = typeof DOM_CACHE !== 'undefined'
+            ? DOM_CACHE.get('pdf-download-hint')
+            : document.getElementById('pdf-download-hint');
         if (!downloadHint || !this._isIosSafariBrowser()) return;
         const hintText = 'To save this PDF, tap Share, then Save to Files.';
         if (downloadHint.innerText !== hintText) {
@@ -5977,6 +5995,7 @@ class PdfViewer {
     }
 
     static download() {
+        if (this._documentActionsInvalidated || this._uiState === PDF_UI_STATE.FALLBACK) return;
         if (!this._areDocumentActionsAvailable()) return;
         const attachmentUrl = this._buildAttachmentDownloadUrl();
         if (!this.currentBlobUrl) {
@@ -6217,6 +6236,7 @@ class PdfViewer {
     }
 
     static print() {
+        if (this._documentActionsInvalidated || this._uiState === PDF_UI_STATE.FALLBACK) return;
         if (!this._areDocumentActionsAvailable()) return;
         if (!this.currentBlobUrl && !this.currentPdfBlob) return alert("No PDF loaded to print.");
         if (this.isPrinting) {
