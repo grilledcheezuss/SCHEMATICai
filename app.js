@@ -7443,7 +7443,7 @@ static pop() {
         const keywordInput = DOM_CACHE.get('keywordInput');
         if (keywordInput) keywordInput.value = savedValues.keyword;
     }
-    UI.setKeywordBlocklistMode(UI.isKeywordBlocklistMode());
+    this.setKeywordBlocklistMode(this.isKeywordBlocklistMode());
 }
 
 /**
