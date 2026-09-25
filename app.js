@@ -4702,6 +4702,12 @@ class PdfViewer {
         return !!this._hasEverCommittedDocument;
     }
 
+    static _areDocumentActionsAvailable() {
+        return !this._documentActionsInvalidated
+            && this._uiState !== PDF_UI_STATE.FALLBACK
+            && this.hasCommittedDocumentTarget();
+    }
+
     static _readMaintainPositionPreference() {
         try {
             return localStorage.getItem(this.MAINTAIN_POSITION_STORAGE_KEY) === 'true';
@@ -5970,7 +5976,7 @@ class PdfViewer {
     }
 
     static download() {
-        if (this._documentActionsInvalidated) return;
+        if (!this._areDocumentActionsAvailable()) return;
         const attachmentUrl = this._buildAttachmentDownloadUrl();
         if (!this.currentBlobUrl) {
             const fallbackUrl = attachmentUrl || (this._committedUrl ? buildWorkerUrl('PDF', { url: this._committedUrl }) : '');
@@ -6210,7 +6216,7 @@ class PdfViewer {
     }
 
     static print() {
-        if (this._documentActionsInvalidated) return;
+        if (!this._areDocumentActionsAvailable()) return;
         if (!this.currentBlobUrl && !this.currentPdfBlob) return alert("No PDF loaded to print.");
         if (this.isPrinting) {
             console.warn('Print already in progress, ignoring duplicate print request');

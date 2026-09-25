@@ -345,6 +345,9 @@ function wait(ms) {
     PdfViewer._transitionToFallback('https://example.com/panel.pdf');
     assert(PdfViewer.hasCommittedDocumentTarget() === true, 'fallback after a successful load should preserve the last committed document identity');
     assert(PdfViewer._documentActionsInvalidated === true, 'fallback after a successful load should keep document actions invalidated');
+    anchorsClicked = [];
+    PdfViewer.download();
+    assert(anchorsClicked.length === 0, 'fallback after a successful load should keep stale download actions blocked');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
