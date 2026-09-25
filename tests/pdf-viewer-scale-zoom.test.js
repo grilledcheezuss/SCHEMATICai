@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { PDF_UI_STATE, resolvePdfUiStatePresentation, setElementDisplay } = require('../pdf-ui-state.js');
 
 function assert(condition, message) {
     if (!condition) {
@@ -99,6 +100,7 @@ async function wait(ms) {
     const printBtn = { disabled: false };
     const downloadBtn = { disabled: false };
     const viewerEl = {
+        style: { visibility: 'visible', pointerEvents: 'auto' },
         clientWidth: 900,
         clientHeight: 700,
         scrollLeft: 200,
@@ -151,25 +153,21 @@ async function wait(ms) {
             return documentState.getElementById(id);
         }
     };
-    const PDF_UI_STATE = {
-        LOADING: 'loading',
-        READY: 'ready',
-        FALLBACK: 'fallback',
-        HIDDEN: 'hidden'
-    };
-
     const PdfViewer = new Function(
         'window',
         'document',
+        'PDF_UI_STATE',
         `${pdfViewerClassCode}; return PdfViewer;`
-    )(windowState, documentState);
+    )(windowState, documentState, PDF_UI_STATE);
     const setPdfUiState = new Function(
         'DOM_CACHE',
         'document',
         'PdfViewer',
         'PDF_UI_STATE',
+        'resolvePdfUiStatePresentation',
+        'setElementDisplay',
         `${setPdfUiStateCode}; return setPdfUiState;`
-    )(DOM_CACHE, documentState, PdfViewer, PDF_UI_STATE);
+    )(DOM_CACHE, documentState, PdfViewer, PDF_UI_STATE, resolvePdfUiStatePresentation, setElementDisplay);
 
     const checkStartScale = (width, height, expected, label) => {
         windowState.innerWidth = width;
@@ -239,15 +237,20 @@ async function wait(ms) {
     assert(Math.abs(viewerEl.scrollLeft - 522.5) < 1e-9, `anchor restore should preserve horizontal release position, got ${viewerEl.scrollLeft}`);
     assert(Math.abs(viewerEl.scrollTop - 345) < 1e-9, `anchor restore should preserve vertical release position, got ${viewerEl.scrollTop}`);
 
-    setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
-    assert(toolbar.style.display === 'flex', 'loading with an active rendered surface should keep toolbar visible');
+    setPdfUiState(PDF_UI_STATE.REPLACEMENT_LOADING, '⏳ DOWNLOADING PDF...');
+    assert(toolbar.style.display === 'none', 'replacement loading should hide toolbar until the new document commits');
     assert(viewerShell.style.display === 'flex', 'loading with an active rendered surface should keep viewer visible');
-    assert(placeholder.style.display === 'none', 'loading with an active rendered surface should suppress placeholder copy');
+    assert(viewerEl.style.visibility === 'hidden', 'replacement loading should hide the stale PDF surface immediately');
+    assert(placeholder.style.display === 'flex', 'replacement loading should show the shared loading placeholder');
     assert(printBtn.disabled === true && downloadBtn.disabled === true, 'loading state should keep PDF actions disabled during replacement');
 
     activeStage.dataset = {};
     PdfViewer.doc = { destroyed: false, numPages: 2 };
     PdfViewer._activePanelId = 'CP-4242';
+    PdfViewer._committedPanelId = 'CP-4242';
+    PdfViewer._committedUrl = 'https://example.test/current.pdf';
+    PdfViewer.currentBlobUrl = 'blob:committed';
+    PdfViewer.currentPdfBlob = { tag: 'committed' };
     PdfViewer.url = 'https://example.test/current.pdf';
     PdfViewer._setCurrentDocumentIdentity({ panelId: PdfViewer._activePanelId, url: PdfViewer.url });
     PdfViewer._beginDocumentLoad();
@@ -256,6 +259,10 @@ async function wait(ms) {
     assert(PdfViewer._gestureStageElement === activeStage, 'beginDocumentLoad should keep the active stage wired for continuity');
     assert(activeStage.dataset.documentLoadToken === '0', `beginDocumentLoad should annotate the preserved active stage with its original load token, got ${activeStage.dataset.documentLoadToken}`);
     assert(activeStage.dataset.documentIdentity === 'panel:CP-4242', `beginDocumentLoad should annotate the preserved active stage identity, got ${activeStage.dataset.documentIdentity}`);
+    assert(PdfViewer.currentBlobUrl === 'blob:committed', 'beginDocumentLoad should preserve the committed blob URL until commit or fallback');
+    assert(PdfViewer.currentPdfBlob && PdfViewer.currentPdfBlob.tag === 'committed', 'beginDocumentLoad should preserve the committed PDF blob until commit or fallback');
+    assert(PdfViewer._committedPanelId === 'CP-4242', 'beginDocumentLoad should preserve the committed panel target until commit or fallback');
+    assert(PdfViewer._documentActionsInvalidated === true, 'beginDocumentLoad should invalidate toolbar actions during replacement');
 
     let finalizeRenderOptions = null;
     PdfViewer.renderStack = (options) => { finalizeRenderOptions = options; };

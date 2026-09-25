@@ -27,6 +27,8 @@
             placeholderText: '📄 Select a schematic',
             toolbarDisplay: 'none',
             viewerDisplay: 'none',
+            mainViewVisibility: 'visible',
+            mainViewPointerEvents: 'auto',
             fallbackDisplay: 'none',
             frameDisplay: 'none',
             printDisabled: true,
@@ -37,12 +39,16 @@
             case PDF_UI_STATE.FIRST_LOAD_LOADING:
                 presentation.placeholderDisplay = 'flex';
                 presentation.placeholderText = loadingMessage || '⏳ Loading PDF...';
+                presentation.viewerDisplay = 'flex';
+                presentation.mainViewVisibility = 'hidden';
+                presentation.mainViewPointerEvents = 'none';
                 break;
             case PDF_UI_STATE.REPLACEMENT_LOADING:
-                presentation.toolbarDisplay = 'flex';
+                presentation.placeholderDisplay = 'flex';
+                presentation.placeholderText = loadingMessage || '⏳ Loading PDF...';
                 presentation.viewerDisplay = 'flex';
-                presentation.printDisabled = !hasCommittedPdf;
-                presentation.downloadDisabled = !hasCommittedPdf;
+                presentation.mainViewVisibility = 'hidden';
+                presentation.mainViewPointerEvents = 'none';
                 break;
             case PDF_UI_STATE.READY:
                 presentation.toolbarDisplay = 'flex';

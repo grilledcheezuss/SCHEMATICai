@@ -865,8 +865,12 @@ input[type="date"].demo-input { text-align: left; }
     display: flex; 
     align-items: center; 
     justify-content: center; 
+    position: absolute;
+    inset: 0;
     height: 100%; 
     width: 100%; 
+    z-index: 2;
+    pointer-events: none;
     color: rgba(255,255,255,0.5); 
     font-weight: 700; 
     text-transform: uppercase; 

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { PDF_UI_STATE } = require('../pdf-ui-state.js');
 
 function assert(condition, message) {
     if (!condition) throw new Error(`Assertion failed: ${message}`);
@@ -159,8 +160,9 @@ function matchesSelector(node, selector) {
     const PdfViewer = new Function(
         'window',
         'document',
+        'PDF_UI_STATE',
         `${pdfViewerClassCode}; return PdfViewer;`
-    )(windowState, documentState);
+    )(windowState, documentState, PDF_UI_STATE);
 
     PdfViewer.doc = { numPages: 3, destroyed: false };
     PdfViewer._documentLoadToken = 9;
@@ -230,6 +232,10 @@ function matchesSelector(node, selector) {
         }
     });
     assert(newDocumentPlan.mode === 'document-start', `expected new document load to start at page-top, got ${newDocumentPlan.mode}`);
+    const resetApplied = PdfViewer._resetScrollToDocumentStart(viewer, stage);
+    assert(resetApplied === true, 'new document scroll helper should reset to the first page');
+    assert(viewer.scrollLeft === 40, `expected new document reset to align the stage left edge, got ${viewer.scrollLeft}`);
+    assert(viewer.scrollTop === 20, `expected new document reset to align to the first page top, got ${viewer.scrollTop}`);
 
     const stagingHost = PdfViewer._getStagingHost(viewer);
     assert(stagingHost !== viewer, 'staging host should not reuse the scroll container');

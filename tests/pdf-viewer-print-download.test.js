@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { PDF_UI_STATE } = require('../pdf-ui-state.js');
 
 function assert(condition, message) {
     if (!condition) throw new Error(`Assertion failed: ${message}`);
@@ -179,11 +180,12 @@ function wait(ms) {
         'URL',
         'alert',
         'buildWorkerUrl',
+        'PDF_UI_STATE',
         `${pdfViewerClassCode}; return PdfViewer;`
     )(windowState, documentState, DOM_CACHE, navigatorState, URLState, (message) => alerts.push(message), (target, params = {}) => {
         const query = new URLSearchParams({ target, ...params }).toString();
         return `https://worker.example/?${query}`;
-    });
+    }, PDF_UI_STATE);
 
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
     PdfViewer.currentPdfBlob = { tag: 'pdf-blob' };
@@ -255,20 +257,23 @@ function wait(ms) {
     PdfViewer._committedPanelId = 'CP-OLD';
     PdfViewer._activePanelId = 'CP-NEW';
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
+    PdfViewer.currentPdfBlob = { tag: 'replacement-source' };
+    PdfViewer._beginDocumentLoad();
+    assert(PdfViewer._pendingLoadUiState === PDF_UI_STATE.REPLACEMENT_LOADING, 'beginDocumentLoad should keep replacement-loading UI when a committed document existed even without an attached stage');
+    assert(PdfViewer._documentActionsInvalidated === true, 'beginDocumentLoad should invalidate stale print/download actions during replacement');
     PdfViewer.download();
-    assert(anchorsClicked.length === 1, 'download should still fire for the committed PDF during a replacement load');
-    assert(anchorsClicked[0].download === 'CP-OLD.pdf', 'download filename should stay tied to the committed panel until the new stage commits');
+    assert(anchorsClicked.length === 0, 'download should stay inactive while a replacement document is still pending');
 
     anchorsClicked = [];
-    PdfViewer.currentBlobUrl = '';
+    PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
+    PdfViewer.currentPdfBlob = { tag: 'replacement-source' };
     PdfViewer._committedPanelId = 'CP-OLD';
     PdfViewer._activePanelId = 'CP-NEW';
+    PdfViewer._beginDocumentLoad();
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
     navigatorState.vendor = 'Google Inc.';
     PdfViewer.download();
-    assert(anchorsClicked.length === 1, 'download should still provide a committed-target fallback when the blob URL is temporarily unavailable');
-    assert(anchorsClicked[0].download === 'CP-OLD.pdf', 'fallback download should preserve the committed filename on download-capable browsers');
-    assert(anchorsClicked[0].target === '', 'fallback download should avoid forcing a new tab on download-capable browsers');
+    assert(anchorsClicked.length === 0, 'download should not fall back to stale committed targets during a replacement transition');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
@@ -276,8 +281,10 @@ function wait(ms) {
     PdfViewer._committedPanelId = 'CP-OLD';
     PdfViewer._activePanelId = 'CP-NEW';
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
+    PdfViewer.currentPdfBlob = { tag: 'replacement-source' };
+    PdfViewer._beginDocumentLoad();
     PdfViewer.download();
-    assert(/id=CP-OLD/.test(anchorsClicked[0].href), 'Safari attachment URL should stay tied to the committed panel until swap commit');
+    assert(anchorsClicked.length === 0, 'Safari download should also stay inactive until the replacement commits');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
