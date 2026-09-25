@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.84
+## Version: v2.5.85
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.85**: Viewer/header polish follow-up: keep the PDF toolbar session-mounted through mobile replacement transitions, harden iOS Safari Save PDF detection so Share-to-Files guidance appears reliably, and move the desktop SCHEMATICA ai title beside the Cox logo with simplified chrome while preserving mobile behavior and Worker parity
 - **v2.5.84**: PDF viewer polish follow-up: once a PDF succeeds the toolbar stays mounted through replacement/error states, an optional maintain-position-between-results restore path preserves equivalent viewport/zoom on document swaps, stale PDFs stay hidden until committed replacements are ready, iOS Safari uses a Save PDF + Share-to-Files hint flow, and Worker behavior is unchanged
 - **v2.5.83**: PDF transition UX pass: result swaps now hide the stale PDF immediately behind the existing loading header, toolbar Print/Download targets invalidate until the replacement commits, new-document start positioning stays calmer across desktop/mobile, and Worker behavior is unchanged
 - **v2.5.82**: PDF viewer polish pass: centralized first-load vs replacement-load UI states, kept toolbar Print/Download targets pinned to the committed document until swap commit, suppressed replacement-load flicker/throwaway status churn, and delayed the first toolbar reveal until the first rendered stage was actually committed
@@ -342,6 +343,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.85**: Viewer/header polish follow-up: mobile replacement transitions keep the PDF toolbar session-mounted, iOS Safari Save PDF detection/guidance is more reliable, and desktop branding chrome is simplified without Worker changes
 - **v2.5.81**: PDF viewer stability patch: hidden replacement staging now lives outside the scroll container, first/new-document loads initialize at page-start, same-document anchor restores are generation-guarded, and swap/viewport scroll positions clamp safely without scrollbar churn
 - **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform to crisp-render swap, and mobile Results/PDF scrolling stays origin-locked for each touch gesture
 - **v2.5.78**: Follow-up to PR #169: explicit Airtable token routing by base-purpose and clearer 401/403 credential/access diagnostics (no transient retry classification)

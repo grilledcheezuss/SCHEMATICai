@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.84 ---
-const APP_VERSION = "v2.5.84";
+// --- SCHEMATICA ai v2.5.85 ---
+const APP_VERSION = "v2.5.85";
 const VERSION_HISTORY = {
+    "v2.5.85": "Viewer/header polish follow-up: keep the PDF toolbar session-mounted across mobile replacement transitions, improve iOS Safari Save PDF detection for Share-to-Files guidance, and move the desktop SCHEMATICA ai title beside the Cox logo with simpler chrome while preserving mobile behavior",
     "v2.5.84": "PDF viewer polish follow-up: keep the toolbar mounted after the first successful PDF load, add an optional maintain-position-between-results restore path, hide stale documents through replacements while preserving stage isolation, and tailor iOS Safari download UX without changing Worker behavior",
     "v2.5.83": "PDF transition UX pass: hide stale PDFs immediately behind the existing loading header, invalidate toolbar print/download targets until the replacement commit, and keep new-document start positioning calmer across desktop/mobile without changing Worker behavior",
     "v2.5.82": "PDF viewer polish pass: centralize first-load vs replacement-load UI states, keep toolbar actions pinned to the committed document until swap commit, suppress throwaway replacement loading flicker, and only reveal the first toolbar once the first rendered stage is actually ready",
@@ -4437,6 +4438,10 @@ function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl
         hasEverCommittedPdf,
         loadingMessage
     });
+    const bodyEl = document?.body || null;
+    if (bodyEl?.classList) {
+        bodyEl.classList.toggle('pdf-toolbar-session-ready', !!hasEverCommittedPdf);
+    }
 
     if (elements.placeholder) {
         setElementDisplay(elements.placeholder, presentation.placeholderDisplay);
@@ -4444,7 +4449,11 @@ function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl
             elements.placeholder.innerText = presentation.placeholderText;
         }
     }
-    setElementDisplay(elements.toolbar, presentation.toolbarDisplay);
+    if (!hasEverCommittedPdf) {
+        setElementDisplay(elements.toolbar, presentation.toolbarDisplay);
+    } else if (elements.toolbar && (elements.toolbar.style.display || '') !== '') {
+        elements.toolbar.style.display = '';
+    }
     setElementDisplay(elements.viewer, presentation.viewerDisplay);
     if (elements.mainView) {
         elements.mainView.style.visibility = presentation.mainViewVisibility;
@@ -5992,7 +6001,8 @@ class PdfViewer {
         const ua = navigator?.userAgent || '';
         const isTouchMac = navigator?.platform === 'MacIntel' && Number(navigator?.maxTouchPoints || 0) > 1;
         const isIosFamily = /iPad|iPhone|iPod/i.test(ua) || isTouchMac;
-        return isIosFamily && this._isSafariBrowser();
+        const isSafariEngine = /Safari/i.test(ua) && !/Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|OPiOS|Firefox|FxiOS/i.test(ua);
+        return isIosFamily && isSafariEngine;
     }
 
     static download() {

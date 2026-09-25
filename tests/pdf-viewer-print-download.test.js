@@ -293,6 +293,11 @@ function wait(ms) {
     assert(toolbarHint.style.display === 'block', 'iOS Safari save flow should surface the Share → Save to Files hint');
     assert(/Save to Files/i.test(toolbarHint.innerText), 'iOS Safari save flow hint should explain the native save path');
 
+    navigatorState.vendor = '';
+    PdfViewer.initToolbarState();
+    assert(PdfViewer._isIosSafariBrowser() === true, 'iOS Safari detection should not require navigator.vendor');
+    assert(toolbarDownloadLabel.textContent === 'Save PDF', 'vendor-less iOS Safari should keep the Save PDF label');
+
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
     navigatorState.vendor = 'Apple Computer, Inc.';

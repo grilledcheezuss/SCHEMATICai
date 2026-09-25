@@ -121,6 +121,7 @@ async function wait(ms) {
             viewerListeners.delete(name);
         }
     };
+    const bodyClasses = new Set();
     const documentState = {
         getElementById: (id) => {
             if (id === 'pdf-zoom-level') return zoomLabel;
@@ -138,7 +139,14 @@ async function wait(ms) {
         querySelectorAll: () => [],
         body: {
             classList: {
-                contains: () => false
+                toggle: (className, shouldHave) => {
+                    if (shouldHave) {
+                        bodyClasses.add(className);
+                    } else {
+                        bodyClasses.delete(className);
+                    }
+                },
+                contains: (className) => bodyClasses.has(className)
             }
         }
     };
@@ -243,6 +251,12 @@ async function wait(ms) {
     assert(viewerEl.style.visibility === 'hidden', 'replacement loading should hide the stale PDF surface immediately');
     assert(placeholder.style.display === 'flex', 'replacement loading should show the shared loading placeholder');
     assert(printBtn.disabled === true && downloadBtn.disabled === true, 'loading state should keep PDF actions disabled during replacement');
+
+    PdfViewer._hasEverCommittedDocument = true;
+    toolbar.style.display = 'none';
+    setPdfUiState(PDF_UI_STATE.REPLACEMENT_LOADING, '⏳ DOWNLOADING PDF...');
+    assert(documentState.body.classList.contains('pdf-toolbar-session-ready') === true, 'session-ready toolbar class should be set after first successful commit');
+    assert(toolbar.style.display === '', 'session-ready toolbar should clear inline display hiding during replacement states');
 
     activeStage.dataset = {};
     PdfViewer.doc = { destroyed: false, numPages: 2 };
