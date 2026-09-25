@@ -4825,7 +4825,7 @@ class PdfViewer {
     }
 
     static _applyPendingReplacementScale(anchor = this._getPendingReplacementViewportAnchor()) {
-        if (!anchor || !Number.isFinite(anchor.zoomScale)) return false;
+        if (!this.shouldMaintainPositionBetweenResults() || !anchor || !Number.isFinite(anchor.zoomScale)) return false;
         this.currentScale = this._clampScale(anchor.zoomScale);
         this._userHasAdjustedZoom = !!anchor.hasUserAdjustedZoom;
         return true;
@@ -4943,6 +4943,7 @@ class PdfViewer {
         this._clearPendingDocumentResources();
         this._clearPendingReplacementViewportAnchor();
         this._documentActionsInvalidated = true;
+        this._uiState = PDF_UI_STATE.FALLBACK;
         this._clearStagedPdfSurface();
         this._gestureStageElement = null;
         setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);

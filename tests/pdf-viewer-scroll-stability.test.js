@@ -248,8 +248,14 @@ function matchesSelector(node, selector) {
         replacementAnchor: PdfViewer._getPendingReplacementViewportAnchor()
     });
     assert(replacementPlan.mode === 'replacement-anchor', `expected matching replacement anchor plan, got ${replacementPlan.mode}`);
+    PdfViewer._maintainPositionBetweenResults = true;
     assert(PdfViewer._applyPendingReplacementScale() === true, 'matching replacement anchor should restore its captured zoom level');
     assert(PdfViewer.currentScale === 1.6, `expected replacement scale restore to preserve 1.6 zoom, got ${PdfViewer.currentScale}`);
+    PdfViewer._maintainPositionBetweenResults = false;
+    PdfViewer.currentScale = 1.0;
+    assert(PdfViewer._applyPendingReplacementScale() === false, 'replacement scale restore should stay off when maintain-position is disabled');
+    assert(PdfViewer.currentScale === 1.0, `expected disabled maintain-position to leave zoom unchanged, got ${PdfViewer.currentScale}`);
+    PdfViewer._maintainPositionBetweenResults = true;
 
     const staleReplacementPlan = PdfViewer._resolveRenderScrollPlan({
         renderMode: 'document-load',
