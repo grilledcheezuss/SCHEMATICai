@@ -259,6 +259,7 @@ function wait(ms) {
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
     PdfViewer.currentPdfBlob = { tag: 'replacement-source' };
     PdfViewer._beginDocumentLoad();
+    assert(PdfViewer._pendingLoadUiState === PDF_UI_STATE.REPLACEMENT_LOADING, 'beginDocumentLoad should keep replacement-loading UI when a committed document existed even without an attached stage');
     PdfViewer.download();
     assert(anchorsClicked.length === 0, 'download should stay inactive while a replacement document is still pending');
 

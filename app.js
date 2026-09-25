@@ -4785,7 +4785,10 @@ class PdfViewer {
 
     static _beginDocumentLoad() {
         const activeStage = this._getGestureStage();
-        this._pendingLoadUiState = activeStage?.isConnected
+        const hasCommittedViewerState = !!activeStage?.isConnected
+            || this.hasCommittedDocumentTarget()
+            || this._uiState === PDF_UI_STATE.READY;
+        this._pendingLoadUiState = hasCommittedViewerState
             ? PDF_UI_STATE.REPLACEMENT_LOADING
             : PDF_UI_STATE.FIRST_LOAD_LOADING;
         if (activeStage?.isConnected) {
