@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.81 ---
-const APP_VERSION = "v2.5.81";
+// --- SCHEMATICA ai v2.5.82 ---
+const APP_VERSION = "v2.5.82";
 const VERSION_HISTORY = {
+    "v2.5.82": "PDF viewer polish pass: centralize first-load vs replacement-load UI states, keep toolbar actions pinned to the committed document until swap commit, suppress throwaway replacement loading flicker, and only reveal the first toolbar once the first rendered stage is actually ready",
     "v2.5.81": "PDF viewer stability patch: stage replacement renders outside the scroll container until layout settles, new-document loads reset to page-start instead of reusing stale offsets, same-document anchor restores are generation-guarded, and post-swap scroll clamping prevents scrollbar churn across replacement and viewport changes",
     "v2.5.80": "PDF result-swap transition fix: keep the active viewer surface/toolbar stable while replacement documents stage in, clear only stale staging surfaces at load start, and swap rendered stages atomically so rapid document changes do not flicker or expose placeholder gaps",
     "v2.5.79": "PDF/mobile interaction hardening: gesture-release commits now preserve release anchor through crisp rerender swaps without snap-back, and mobile touch ownership locks Results vs PDF scrolling to gesture origin until lift/cancel",
@@ -149,12 +150,67 @@ const PDF_STATUS = {
 };
 
 // PDF UI display states
-const PDF_UI_STATE = {
-    LOADING: 'loading',
-    READY: 'ready',
-    FALLBACK: 'fallback',
-    HIDDEN: 'hidden'
-};
+const PDF_UI_STATE_HELPERS = typeof PdfUiStateHelper !== 'undefined'
+    ? PdfUiStateHelper
+    : (() => {
+        const PDF_UI_STATE = {
+            EMPTY: 'empty',
+            FIRST_LOAD_LOADING: 'first-load-loading',
+            REPLACEMENT_LOADING: 'replacement-loading',
+            READY: 'ready',
+            FALLBACK: 'fallback',
+            HIDDEN: 'hidden'
+        };
+        const setElementDisplay = (element, displayValue) => {
+            if (!element) return;
+            if ((element.style.display || '') !== displayValue) {
+                element.style.display = displayValue;
+            }
+        };
+        const resolvePdfUiStatePresentation = (state, { hasCommittedPdf = false, loadingMessage = '⏳ Loading PDF...' } = {}) => {
+            const presentation = {
+                placeholderDisplay: 'none',
+                placeholderText: '📄 Select a schematic',
+                toolbarDisplay: 'none',
+                viewerDisplay: 'none',
+                fallbackDisplay: 'none',
+                frameDisplay: 'none',
+                printDisabled: true,
+                downloadDisabled: true
+            };
+            switch (state) {
+                case PDF_UI_STATE.FIRST_LOAD_LOADING:
+                    presentation.placeholderDisplay = 'flex';
+                    presentation.placeholderText = loadingMessage || '⏳ Loading PDF...';
+                    break;
+                case PDF_UI_STATE.REPLACEMENT_LOADING:
+                    presentation.toolbarDisplay = 'flex';
+                    presentation.viewerDisplay = 'flex';
+                    presentation.printDisabled = !hasCommittedPdf;
+                    presentation.downloadDisabled = !hasCommittedPdf;
+                    break;
+                case PDF_UI_STATE.READY:
+                    presentation.toolbarDisplay = 'flex';
+                    presentation.viewerDisplay = 'flex';
+                    presentation.printDisabled = !hasCommittedPdf;
+                    presentation.downloadDisabled = !hasCommittedPdf;
+                    break;
+                case PDF_UI_STATE.FALLBACK:
+                    presentation.fallbackDisplay = 'block';
+                    break;
+                case PDF_UI_STATE.EMPTY:
+                case PDF_UI_STATE.HIDDEN:
+                default:
+                    presentation.placeholderDisplay = 'flex';
+                    break;
+            }
+            return presentation;
+        };
+        return { PDF_UI_STATE, setElementDisplay, resolvePdfUiStatePresentation };
+    })();
+const PDF_UI_STATE = PDF_UI_STATE_HELPERS.PDF_UI_STATE;
+const setElementDisplay = PDF_UI_STATE_HELPERS.setElementDisplay;
+const resolvePdfUiStatePresentation = PDF_UI_STATE_HELPERS.resolvePdfUiStatePresentation;
 
 // DOM cache for frequently accessed elements
 // Note: Cache can become stale if elements are removed/replaced
@@ -4345,7 +4401,7 @@ function logPdfTiming(metric, durationMs, fields = {}) {
  * @param {string} loadingMessage - Optional custom loading message
  * @param {string} fallbackUrl - Optional fallback URL for direct PDF link
  */
-function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbackUrl = '') {
+function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl = '') {
     const elements = {
         placeholder: DOM_CACHE.get('pdf-placeholder-text'),
         toolbar: DOM_CACHE.get('pdf-toolbar'),
@@ -4356,49 +4412,31 @@ function setPdfUiState(state, loadingMessage = '⏳ DOWNLOADING PDF...', fallbac
         printBtn: DOM_CACHE.get('pdf-print-btn'),
         downloadBtn: DOM_CACHE.get('pdf-download-btn')
     };
-    const viewerSurface = document.getElementById('pdf-main-view');
-    const hasActiveRenderedSurface = !!viewerSurface?.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)');
-    const preserveActiveSurfaceDuringLoad = state === PDF_UI_STATE.LOADING && hasActiveRenderedSurface;
-    
-    // Reset all states
-    if (elements.placeholder) elements.placeholder.style.display = 'none';
-    if (elements.toolbar) elements.toolbar.style.display = 'none';
-    if (elements.viewer) elements.viewer.style.display = 'none';
-    if (elements.fallback) elements.fallback.style.display = 'none';
-    if (elements.frame) elements.frame.style.display = 'none';
-    
-    // Apply specific state
-    switch (state) {
-        case PDF_UI_STATE.LOADING:
-            if (preserveActiveSurfaceDuringLoad) {
-                if (elements.toolbar) elements.toolbar.style.display = 'flex';
-                if (elements.viewer) elements.viewer.style.display = 'flex';
-            } else if (elements.placeholder) {
-                elements.placeholder.style.display = 'flex';
-                elements.placeholder.innerText = loadingMessage;
-            }
-            break;
-        case PDF_UI_STATE.READY:
-            if (elements.placeholder) elements.placeholder.style.display = 'none';
-            if (elements.toolbar) elements.toolbar.style.display = 'flex';
-            if (elements.viewer) elements.viewer.style.display = 'flex';
-            break;
-        case PDF_UI_STATE.FALLBACK:
-            if (elements.placeholder) elements.placeholder.style.display = 'none';
-            if (elements.fallback) elements.fallback.style.display = 'block';
-            if (fallbackUrl && elements.fallbackLink) {
-                elements.fallbackLink.href = fallbackUrl;
-            }
-            break;
-        case PDF_UI_STATE.HIDDEN:
-        default:
-            // All elements already hidden
-            break;
+    const presentation = resolvePdfUiStatePresentation(state, {
+        hasCommittedPdf: typeof PdfViewer?.hasCommittedDocumentTarget === 'function'
+            ? PdfViewer.hasCommittedDocumentTarget()
+            : (!!PdfViewer.currentBlobUrl || !!PdfViewer.currentPdfBlob),
+        loadingMessage
+    });
+
+    if (elements.placeholder) {
+        setElementDisplay(elements.placeholder, presentation.placeholderDisplay);
+        if (elements.placeholder.innerText !== presentation.placeholderText) {
+            elements.placeholder.innerText = presentation.placeholderText;
+        }
+    }
+    setElementDisplay(elements.toolbar, presentation.toolbarDisplay);
+    setElementDisplay(elements.viewer, presentation.viewerDisplay);
+    setElementDisplay(elements.fallback, presentation.fallbackDisplay);
+    setElementDisplay(elements.frame, presentation.frameDisplay);
+
+    if (state === PDF_UI_STATE.FALLBACK && fallbackUrl && elements.fallbackLink) {
+        elements.fallbackLink.href = fallbackUrl;
     }
 
-    const hasLoadedPdf = !!PdfViewer.currentBlobUrl && state === PDF_UI_STATE.READY;
-    if (elements.printBtn) elements.printBtn.disabled = !hasLoadedPdf;
-    if (elements.downloadBtn) elements.downloadBtn.disabled = !hasLoadedPdf;
+    if (elements.printBtn) elements.printBtn.disabled = presentation.printDisabled;
+    if (elements.downloadBtn) elements.downloadBtn.disabled = presentation.downloadDisabled;
+    if (typeof PdfViewer !== 'undefined') PdfViewer._uiState = state;
 }
 
 /**
@@ -4585,6 +4623,7 @@ class MobileScrollCoordinator {
 
 class PdfViewer {
     static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = ""; static currentPdfBlob = null;
+    static _pendingBlobUrl = ""; static _pendingPdfBlob = null; static _pendingPanelId = ''; static _pendingUrl = ''; static _pendingDocumentIdentity = '';
     static currentFetchId = 0;
     static currentRenderToken = 0;
     static loadingTask = null;
@@ -4618,9 +4657,108 @@ class PdfViewer {
     static PRINT_IFRAME_LOAD_TIMEOUT_MS = 8000;
     static PRINT_DIALOG_RELEASE_DELAY_MS = 1500;
     static _activePanelId = '';
+    static _committedPanelId = '';
+    static _committedUrl = '';
+    static _uiState = 'empty';
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
+    }
+
+    static hasCommittedDocumentTarget() {
+        return !!(this.currentBlobUrl || this.currentPdfBlob || this._committedPanelId || this._committedUrl);
+    }
+
+    static _clearPendingDocumentResources({ revoke = true } = {}) {
+        if (revoke && this._pendingBlobUrl && this._pendingBlobUrl !== this.currentBlobUrl && typeof URL?.revokeObjectURL === 'function') {
+            try {
+                URL.revokeObjectURL(this._pendingBlobUrl);
+            } catch (error) {
+                console.warn('Failed to revoke pending PDF blob URL:', error);
+            }
+        }
+        this._pendingBlobUrl = "";
+        this._pendingPdfBlob = null;
+        this._pendingPanelId = '';
+        this._pendingUrl = '';
+        this._pendingDocumentIdentity = '';
+    }
+
+    static _stagePendingDocumentResources({ blob = null, blobUrl = '', panelId = this._activePanelId, url = this.url, documentIdentity = this._getCurrentDocumentIdentity() } = {}) {
+        this._clearPendingDocumentResources();
+        this._pendingPdfBlob = blob || null;
+        this._pendingBlobUrl = blobUrl || '';
+        this._pendingPanelId = String(panelId || '').trim();
+        this._pendingUrl = String(url || '').trim();
+        this._pendingDocumentIdentity = String(documentIdentity || '').trim();
+    }
+
+    static _commitPendingDocumentResources({ documentIdentity = this._getCurrentDocumentIdentity() } = {}) {
+        if (!this._pendingBlobUrl && !this._pendingPdfBlob) return false;
+        const normalizedDocumentIdentity = String(documentIdentity || '').trim();
+        if (this._pendingDocumentIdentity && normalizedDocumentIdentity && this._pendingDocumentIdentity !== normalizedDocumentIdentity) {
+            this._clearPendingDocumentResources();
+            return false;
+        }
+        const priorBlobUrl = this.currentBlobUrl;
+        let nextBlobUrl = this._pendingBlobUrl || '';
+        if (!nextBlobUrl && this._pendingPdfBlob && typeof URL?.createObjectURL === 'function') {
+            try {
+                nextBlobUrl = URL.createObjectURL(this._pendingPdfBlob);
+            } catch (error) {
+                console.warn('Failed to create committed PDF blob URL:', error);
+            }
+        }
+        if (!nextBlobUrl) {
+            this._clearPendingDocumentResources();
+            return false;
+        }
+        this.currentBlobUrl = nextBlobUrl;
+        this.currentPdfBlob = this._pendingPdfBlob || null;
+        this._committedPanelId = this._pendingPanelId || this._committedPanelId;
+        this._committedUrl = this._pendingUrl || this._committedUrl;
+        this._clearPendingDocumentResources({ revoke: false });
+        if (priorBlobUrl && priorBlobUrl !== this.currentBlobUrl && typeof URL?.revokeObjectURL === 'function') {
+            try {
+                URL.revokeObjectURL(priorBlobUrl);
+            } catch (error) {
+                console.warn('Failed to revoke prior PDF blob URL:', error);
+            }
+        }
+        return true;
+    }
+
+    static _clearCommittedDocumentResources({ revoke = true } = {}) {
+        if (revoke && this.currentBlobUrl && typeof URL?.revokeObjectURL === 'function') {
+            try {
+                URL.revokeObjectURL(this.currentBlobUrl);
+            } catch (error) {
+                console.warn('Failed to revoke active PDF blob URL:', error);
+            }
+        }
+        this.currentBlobUrl = '';
+        this.currentPdfBlob = null;
+        this._committedPanelId = '';
+        this._committedUrl = '';
+    }
+
+    static _hasActiveRenderedSurface() {
+        const viewerSurface = document.getElementById('pdf-main-view');
+        return !!viewerSurface?.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)');
+    }
+
+    static _getLoadingUiState() {
+        return this._hasActiveRenderedSurface() && this.hasCommittedDocumentTarget()
+            ? PDF_UI_STATE.REPLACEMENT_LOADING
+            : PDF_UI_STATE.FIRST_LOAD_LOADING;
+    }
+
+    static _transitionToFallback(fallbackUrl = '') {
+        this._clearPendingDocumentResources();
+        this._clearCommittedDocumentResources();
+        this._clearStagedPdfSurface();
+        this._gestureStageElement = null;
+        setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
     }
 
     static _clearZoomTimer() {
@@ -4640,6 +4778,7 @@ class PdfViewer {
         }
         this._clearZoomTimer();
         this._releasePrintSession('document-load');
+        this._clearPendingDocumentResources();
         this._documentLoadToken++;
         this.currentRenderToken++;
         this._gestureCommitGeneration++;
@@ -5217,7 +5356,7 @@ class PdfViewer {
         // === INITIALIZATION ===
         this.url = fallbackUrl || "";
         this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
-        setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
+        setPdfUiState(this._getLoadingUiState());
 
         const fetchId = Date.now();
         this.currentFetchId = fetchId;
@@ -5241,9 +5380,12 @@ class PdfViewer {
                     const fallbackResult = await attemptPdfFallbackFetch(fallbackUrl, panelId, AuthService.headers);
                     if (fallbackResult) {
                         // === FALLBACK SUCCESS: LOAD AND RENDER ===
-                        if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-                        this.currentPdfBlob = fallbackResult.blob;
-                        this.currentBlobUrl = URL.createObjectURL(fallbackResult.blob);
+                        this._stagePendingDocumentResources({
+                            blob: fallbackResult.blob,
+                            blobUrl: URL.createObjectURL(fallbackResult.blob),
+                            panelId: this._activePanelId,
+                            url: this.url
+                        });
                         
                         try {
                             const docInitStartMs = getNowMs();
@@ -5275,9 +5417,11 @@ class PdfViewer {
                         }
                         
                         this._setScaleForDevice();
-                        setPdfUiState(PDF_UI_STATE.READY);
-                        await this.renderStack({ timingSource: 'network-fallback', renderMode: 'document-load' });
-                        logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-fallback' });
+                        const committed = await this.renderStack({ timingSource: 'network-fallback', renderMode: 'document-load' });
+                        if (committed && this._commitPendingDocumentResources()) {
+                            setPdfUiState(PDF_UI_STATE.READY);
+                            logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-fallback' });
+                        }
                         return; // Success - exit early
                     }
                     
@@ -5289,7 +5433,7 @@ class PdfViewer {
                         console.log(`[loadById] Marked panel ${panelId} as missing PDF`);
                     }
                     
-                    setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
+                    this._transitionToFallback(fallbackUrl);
                     return; // Exit gracefully
                 }
                 throw new Error(`Failed to fetch PDF by ID: ${resp.status}`);
@@ -5306,14 +5450,17 @@ class PdfViewer {
             const validation = validatePdfWithContext(resp, arrayBuffer, 'loadById', panelId);
             if (!validation.valid) {
                 console.error(`[loadById] Invalid PDF for panel ${panelId}: ${validation.reason}`);
-                setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
+                this._transitionToFallback(fallbackUrl);
                 return;
             }
 
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentPdfBlob = blob;
-            this.currentBlobUrl = URL.createObjectURL(blob);
+            this._stagePendingDocumentResources({
+                blob,
+                blobUrl: URL.createObjectURL(blob),
+                panelId: this._activePanelId,
+                url: this.url
+            });
             
             try {
                 const docInitStartMs = getNowMs();
@@ -5339,16 +5486,18 @@ class PdfViewer {
             }
 
             this._setScaleForDevice();
-            setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack({ timingSource: 'network-by-id', renderMode: 'document-load' });
-            logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-by-id' });
+            const committed = await this.renderStack({ timingSource: 'network-by-id', renderMode: 'document-load' });
+            if (committed && this._commitPendingDocumentResources()) {
+                setPdfUiState(PDF_UI_STATE.READY);
+                logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-by-id' });
+            }
         } catch(e) {
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
-                setPdfUiState(PDF_UI_STATE.FALLBACK, '', fallbackUrl);
+                this._transitionToFallback(fallbackUrl);
             }
         }
     }
@@ -5404,7 +5553,7 @@ class PdfViewer {
         // === INITIALIZATION ===
         this.url = fallbackUrl || "";
         this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
-        setPdfUiState(PDF_UI_STATE.LOADING, '⚡ LOADING FROM CACHE...');
+        setPdfUiState(this._getLoadingUiState());
 
         const fetchId = Date.now();
         this.currentFetchId = fetchId;
@@ -5417,9 +5566,12 @@ class PdfViewer {
             }
 
             // === LOAD FROM CACHE ===
-            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentPdfBlob = cached.blob;
-            this.currentBlobUrl = URL.createObjectURL(cached.blob);
+            this._stagePendingDocumentResources({
+                blob: cached.blob,
+                blobUrl: URL.createObjectURL(cached.blob),
+                panelId: this._activePanelId,
+                url: this.url
+            });
             
             try {
                 const docInitStartMs = getNowMs();
@@ -5448,10 +5600,12 @@ class PdfViewer {
             }
 
             this._setScaleForDevice();
-            setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack({ timingSource: 'cache-hit', renderMode: 'document-load' });
-            logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'cache-hit' });
-            console.log('✓ Loaded from cache'); 
+            const committed = await this.renderStack({ timingSource: 'cache-hit', renderMode: 'document-load' });
+            if (committed && this._commitPendingDocumentResources()) {
+                setPdfUiState(PDF_UI_STATE.READY);
+                logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'cache-hit' });
+                console.log('✓ Loaded from cache');
+            }
         } catch(e) {
             console.error("[loadFromCache] Cache Load Error:", e);
             PdfController.evictFromCache(panelId);
@@ -5468,7 +5622,7 @@ class PdfViewer {
         // === INITIALIZATION ===
         this.url = url;
         this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
-        setPdfUiState(PDF_UI_STATE.LOADING, '⏳ DOWNLOADING PDF...');
+        setPdfUiState(this._getLoadingUiState());
 
         const fetchId = Date.now();
         this.currentFetchId = fetchId;
@@ -5496,15 +5650,18 @@ class PdfViewer {
             const validation = validatePdfWithContext(resp, arrayBuffer, 'load', url);
             if (!validation.valid) {
                 console.error(`[load] Invalid PDF from URL ${url}: ${validation.reason}`);
-                setPdfUiState(PDF_UI_STATE.FALLBACK, '', url);
+                this._transitionToFallback(url);
                 return;
             }
 
             // === LOAD PDF ===
             const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-            if(this.currentBlobUrl) URL.revokeObjectURL(this.currentBlobUrl);
-            this.currentPdfBlob = blob;
-            this.currentBlobUrl = URL.createObjectURL(blob);
+            this._stagePendingDocumentResources({
+                blob,
+                blobUrl: URL.createObjectURL(blob),
+                panelId: this._activePanelId,
+                url: this.url
+            });
             
             try {
                 const docInitStartMs = getNowMs();
@@ -5530,21 +5687,23 @@ class PdfViewer {
             }
 
             this._setScaleForDevice();
-            setPdfUiState(PDF_UI_STATE.READY);
-            await this.renderStack({ timingSource: 'network-url', renderMode: 'document-load' });
-            logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-url' });
+            const committed = await this.renderStack({ timingSource: 'network-url', renderMode: 'document-load' });
+            if (committed && this._commitPendingDocumentResources()) {
+                setPdfUiState(PDF_UI_STATE.READY);
+                logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-url' });
+            }
         } catch(e) {
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
             } else {
                 console.error("PDF Load Error:", e);
-                setPdfUiState(PDF_UI_STATE.FALLBACK, '', url);
+                this._transitionToFallback(url);
             }
         }
     }
     static _buildDownloadFilename() {
-        const rawPanelId = (this._activePanelId || DOM_CACHE.get('demo-panel-id')?.value || '').trim();
+        const rawPanelId = (this._committedPanelId || this._activePanelId || DOM_CACHE.get('demo-panel-id')?.value || '').trim();
         const safePanelId = rawPanelId
             .replace(/[\\/:*?"<>|]+/g, '_')
             .replace(/\s+/g, '_')
@@ -5555,7 +5714,7 @@ class PdfViewer {
         return baseName.toLowerCase().endsWith('.pdf') ? baseName : `${baseName}.pdf`;
     }
     static _buildAttachmentDownloadUrl() {
-        const panelId = (this._activePanelId || '').trim();
+        const panelId = (this._committedPanelId || '').trim();
         if (!panelId) return '';
         return buildWorkerUrl('PDF_BY_ID', {
             id: panelId,
@@ -5568,9 +5727,26 @@ class PdfViewer {
     }
 
     static download() {
-        if (!this.currentBlobUrl) return;
+        const attachmentUrl = this._buildAttachmentDownloadUrl();
+        if (!this.currentBlobUrl) {
+            const fallbackUrl = attachmentUrl || (this._committedUrl ? buildWorkerUrl('PDF', { url: this._committedUrl }) : '');
+            if (!fallbackUrl) return;
+            const link = document.createElement('a');
+            link.href = fallbackUrl;
+            link.rel = 'noopener';
+            if (this._supportsBlobDownload()) {
+                link.download = this._buildDownloadFilename();
+            } else {
+                link.target = '_blank';
+            }
+            document.body.appendChild(link);
+            link.click();
+            if (link.parentNode === document.body) {
+                document.body.removeChild(link);
+            }
+            return;
+        }
         if (!this._supportsBlobDownload()) {
-            const attachmentUrl = this._buildAttachmentDownloadUrl();
             if (attachmentUrl) {
                 const link = document.createElement('a');
                 link.href = attachmentUrl;
@@ -5606,7 +5782,18 @@ class PdfViewer {
         if (this.currentPdfBlob && typeof URL?.createObjectURL === 'function') {
             return { url: URL.createObjectURL(this.currentPdfBlob), revokeOnCleanup: true };
         }
-        return { url: this.currentBlobUrl || '', revokeOnCleanup: false };
+        if (this.currentBlobUrl) {
+            return { url: this.currentBlobUrl, revokeOnCleanup: false };
+        }
+        const committedPanelId = (this._committedPanelId || '').trim();
+        if (committedPanelId) {
+            return { url: buildWorkerUrl('PDF_BY_ID', { id: committedPanelId }), revokeOnCleanup: false };
+        }
+        const committedUrl = (this._committedUrl || '').trim();
+        if (committedUrl) {
+            return { url: buildWorkerUrl('PDF', { url: committedUrl }), revokeOnCleanup: false };
+        }
+        return { url: '', revokeOnCleanup: false };
     }
 
     static _releasePrintSession(reason = 'cleanup') {
@@ -5796,13 +5983,13 @@ class PdfViewer {
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
-            return;
+            return false;
         }
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
-            return;
+            return false;
         }
         if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration !== this._pendingGestureCommitGeneration) {
-            return;
+            return false;
         }
         const renderStartMs = getNowMs();
         let firstPageReadyMs = null;
@@ -5824,7 +6011,7 @@ class PdfViewer {
         if (!this.doc) {
             console.error('No PDF document loaded');
             if (stage.parentNode) stage.remove();
-            return;
+            return false;
         }
         
         // Capture render token to detect if rendering is superseded
@@ -5842,14 +6029,14 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
             
             // Check if document is still valid
             if (!this.isDocumentValid()) {
                 console.warn('[renderStack] Document became invalid during rendering');
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
             
             let page; let isTemplate = false;
@@ -5868,7 +6055,7 @@ class PdfViewer {
                 if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
                     console.error('[renderStack] Transport destroyed - stopping render');
                     if (stage.parentNode) stage.remove();
-                    return;
+                    return false;
                 }
                 // Fall back to original doc's page 1 if template fails
                 try { page = await this.doc.getPage(i); } catch(e) { continue; }
@@ -5945,7 +6132,7 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled before attaching page ${i} (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
 
             wrapper.appendChild(contentContainer); 
@@ -5960,7 +6147,7 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled before canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
 
             // Add null check for canvas context and wrap render in try/catch
@@ -5978,7 +6165,7 @@ class PdfViewer {
                     if (renderError.message?.includes('destroyed') || renderError.message?.includes('Transport destroyed')) {
                         console.error('[renderStack] Transport destroyed during render - stopping');
                         if (stage.parentNode) stage.remove();
-                        return;
+                        return false;
                     }
                 }
             }
@@ -5986,7 +6173,7 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled after canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
             // Re-scale any existing overlay zones to match new page dimensions
             await PdfViewer.waitForLayoutStable(contentContainer);
@@ -5997,11 +6184,11 @@ class PdfViewer {
         await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
             if (stage.parentNode) stage.remove();
-            return;
+            return false;
         }
         if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration !== this._pendingGestureCommitGeneration) {
             if (stage.parentNode) stage.remove();
-            return;
+            return false;
         }
         const existingStages = Array.from(container.querySelectorAll('.pdf-gesture-stage'));
         if (stage.parentNode !== container) {
@@ -6069,6 +6256,7 @@ class PdfViewer {
         } else {
             document.body.classList.remove('generator-transition');
         }
+        return true;
     }
     static zoom(delta) {
         if (!Number.isFinite(delta)) return;
@@ -6211,7 +6399,7 @@ class PdfController {
         
         // === VALIDATE ID ===
         if (!id) {
-            setPdfUiState(PDF_UI_STATE.FALLBACK, '', url);
+            PdfViewer._transitionToFallback(url);
             return; 
         }
         

@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.81
+## Version: v2.5.82
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.82**: PDF viewer polish pass: centralized first-load vs replacement-load UI states, kept toolbar Print/Download targets pinned to the committed document until swap commit, suppressed replacement-load flicker/throwaway status churn, and delayed the first toolbar reveal until the first rendered stage was actually committed
 - **v2.5.81**: PDF viewer stability patch: replacement stages now render in a hidden sibling host so they cannot perturb viewer scroll extents, first/new-document loads reset to page-start after layout settles, same-document anchor restores are generation-guarded, and post-swap scroll clamping prevents scrollbar churn across document changes and viewport resets
 - **v2.5.80**: PDF result-swap transition follow-up: document replacements now keep the active viewer surface/toolbar visible while the next PDF stages, remove only stale staging surfaces at load start, and swap the new rendered stage in atomically to avoid flicker/placeholder gaps during rapid result changes
 - **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform → crisp-render handoff without snap-back, and mobile touch ownership is origin-locked between Results and PDF scrolling until touch end/cancel
