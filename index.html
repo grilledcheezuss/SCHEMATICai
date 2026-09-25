@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.87)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.88)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -104,11 +104,11 @@
     <div class="brand-lockup" role="group" aria-label="Cox Research product branding">
         <a href="#" class="logo-group">
             <span class="logo-main">COX</span>
-            <span class="logo-sub">RESEARCH</span>
+            <span class="logo-sub-row">
+                <span class="logo-sub">RESEARCH</span>
+                <span class="app-title-main" id="app-program-name">SCHEMATICA ai</span>
+            </span>
         </a>
-        <div class="app-title-group">
-            <span class="app-title-main" id="app-program-name">SCHEMATICA ai</span>
-        </div>
     </div>
 
     <div class="header-controls">
@@ -231,9 +231,6 @@
                     <button id="pdf-download-hint-continue" class="pdf-toolbar-hint-action" type="button" onclick="PdfViewer.confirmIosSavePdfHint()">Open PDF</button>
                 </div>
             </div>
-            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)" title="Zoom Out">-</button>
-            <span id="pdf-zoom-level">100%</span>
-            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)" title="Zoom In">+</button>
             <button
                 id="pdf-maintain-position-toggle"
                 class="pdf-tool-btn pdf-maintain-position-btn"
@@ -252,8 +249,11 @@
                         <path d="M9 10V7a3 3 0 0 1 6 0v3"></path>
                     </svg>
                 </span>
-                <span class="pdf-tool-btn-label">Maintain position between results</span>
+                <span class="pdf-tool-btn-label">Lock Position</span>
             </button>
+            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)" title="Zoom Out">-</button>
+            <span id="pdf-zoom-level">100%</span>
+            <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)" title="Zoom In">+</button>
         </div>
         <div id="custom-pdf-viewer" style="display:none;"><div id="pdf-main-view"></div></div>
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>
