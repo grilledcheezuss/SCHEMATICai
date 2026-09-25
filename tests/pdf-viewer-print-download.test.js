@@ -48,6 +48,16 @@ function wait(ms) {
     const windowListeners = new Map();
     const documentListeners = new Map();
     const popupPrintCalls = [];
+    const toolbarHint = { style: { display: 'none' }, innerText: '' };
+    const toolbarDownloadLabel = { textContent: 'Download' };
+    const toolbarDownloadButton = {
+        title: 'Download original (unredacted) PDF currently shown in the viewer',
+        attributes: {},
+        setAttribute(name, value) {
+            this.attributes[name] = value;
+        }
+    };
+    const maintainPositionToggle = { checked: false };
     let objectUrlCounter = 0;
     let popupBlocked = false;
     let popupPrintMissing = false;
@@ -138,7 +148,21 @@ function wait(ms) {
     const DOM_CACHE = {
         get(id) {
             if (id === 'demo-panel-id') return { value: panelIdValue };
+            if (id === 'pdf-download-hint') return toolbarHint;
+            if (id === 'pdf-download-btn-label') return toolbarDownloadLabel;
+            if (id === 'pdf-download-btn') return toolbarDownloadButton;
+            if (id === 'pdf-maintain-position-toggle') return maintainPositionToggle;
             return null;
+        }
+    };
+
+    const localStorageState = new Map();
+    const localStorage = {
+        getItem(key) {
+            return localStorageState.has(key) ? localStorageState.get(key) : null;
+        },
+        setItem(key, value) {
+            localStorageState.set(key, String(value));
         }
     };
 
@@ -176,13 +200,14 @@ function wait(ms) {
         'window',
         'document',
         'DOM_CACHE',
+        'localStorage',
         'navigator',
         'URL',
         'alert',
         'buildWorkerUrl',
         'PDF_UI_STATE',
         `${pdfViewerClassCode}; return PdfViewer;`
-    )(windowState, documentState, DOM_CACHE, navigatorState, URLState, (message) => alerts.push(message), (target, params = {}) => {
+    )(windowState, documentState, DOM_CACHE, localStorage, navigatorState, URLState, (message) => alerts.push(message), (target, params = {}) => {
         const query = new URLSearchParams({ target, ...params }).toString();
         return `https://worker.example/?${query}`;
     }, PDF_UI_STATE);
@@ -233,27 +258,53 @@ function wait(ms) {
     assert(PdfViewer.isPrinting === false, 'popup-open failure should release the print guard');
     popupBlocked = false;
 
+    navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
+    navigatorState.vendor = 'Google Inc.';
+    navigatorState.platform = 'Linux x86_64';
+    navigatorState.maxTouchPoints = 0;
     PdfViewer.download();
     assert(anchorsClicked.length === 1, 'download should trigger one anchor click when PDF is loaded');
     assert(anchorsClicked[0].href === 'blob:viewer-pdf', 'download should use current viewer blob URL');
     assert(anchorsClicked[0].download.endsWith('.pdf'), 'download filename should end with .pdf');
     assert(!/[\\/:*?"<>|]/.test(anchorsClicked[0].download), 'download filename should be sanitized');
+    PdfViewer.initToolbarState();
+    assert(toolbarDownloadLabel.textContent === 'Download', 'non-iOS browsers should keep the Download label');
+    PdfViewer.setMaintainPositionBetweenResults(true);
+    assert(maintainPositionToggle.checked === true, 'maintain-position toggle should sync checked state');
+    assert(localStorageState.get(PdfViewer.MAINTAIN_POSITION_STORAGE_KEY) === 'true', 'maintain-position preference should persist to localStorage');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
     navigatorState.vendor = 'Apple Computer, Inc.';
+    navigatorState.platform = 'iPhone';
+    navigatorState.maxTouchPoints = 5;
     PdfViewer._activePanelId = 'CP-1234';
     PdfViewer._committedPanelId = 'CP-1234';
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';
+    PdfViewer.initToolbarState();
+    assert(PdfViewer._isIosSafariBrowser() === true, 'iPhone Safari should be detected as iOS Safari');
+    assert(toolbarDownloadLabel.textContent === 'Save PDF', 'iOS Safari should relabel the action to Save PDF');
     PdfViewer.download();
     assert(anchorsClicked.length === 1, 'Safari download should use attachment URL path');
     assert(/target=PDF_BY_ID/.test(anchorsClicked[0].href), 'Safari attachment URL should target PDF_BY_ID');
     assert(/mode=attachment/.test(anchorsClicked[0].href), 'Safari attachment URL should request attachment mode');
     assert(anchorsClicked[0].target === '_blank', 'Safari attachment download should open isolated target');
+    assert(toolbarHint.style.display === 'block', 'iOS Safari save flow should surface the Share → Save to Files hint');
+    assert(/Save to Files/i.test(toolbarHint.innerText), 'iOS Safari save flow hint should explain the native save path');
 
     anchorsClicked = [];
+    navigatorState.userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15';
+    navigatorState.vendor = 'Apple Computer, Inc.';
+    navigatorState.platform = 'MacIntel';
+    navigatorState.maxTouchPoints = 0;
+    PdfViewer.initToolbarState();
+    assert(PdfViewer._isIosSafariBrowser() === false, 'desktop Safari should not be classified as iOS Safari');
+    assert(toolbarDownloadLabel.textContent === 'Download', 'desktop Safari should keep the Download label');
+    assert(toolbarHint.style.display === 'none', 'desktop Safari should not keep the iOS-specific save hint visible');
     navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
     navigatorState.vendor = 'Google Inc.';
+    navigatorState.platform = 'Linux x86_64';
+    navigatorState.maxTouchPoints = 0;
     PdfViewer._committedPanelId = 'CP-OLD';
     PdfViewer._activePanelId = 'CP-NEW';
     PdfViewer.currentBlobUrl = 'blob:viewer-pdf';

@@ -67,6 +67,7 @@ function applyPresentation(elements, presentation, { fallbackUrl = '', state = P
         elements,
         resolvePdfUiStatePresentation(PDF_UI_STATE.FIRST_LOAD_LOADING, {
             hasCommittedPdf: false,
+            hasEverCommittedPdf: false,
             loadingMessage: '⏳ Loading PDF...'
         })
     );
@@ -87,11 +88,14 @@ function applyPresentation(elements, presentation, { fallbackUrl = '', state = P
     elements.viewer.style._history.length = 0;
     applyPresentation(
         elements,
-        resolvePdfUiStatePresentation(PDF_UI_STATE.REPLACEMENT_LOADING, { hasCommittedPdf: true })
+        resolvePdfUiStatePresentation(PDF_UI_STATE.REPLACEMENT_LOADING, {
+            hasCommittedPdf: true,
+            hasEverCommittedPdf: true
+        })
     );
     assert(elements.placeholder.style.display === 'flex', 'replacement loading should show the shared loading placeholder');
     assert(elements.placeholder.innerText === '⏳ Loading PDF...', 'replacement loading should reuse the calm loading text');
-    assert(elements.toolbar.style.display === 'none', 'replacement loading should hide toolbar until the next document commits');
+    assert(elements.toolbar.style.display === 'flex', 'replacement loading should keep toolbar mounted after a successful commit');
     assert(elements.viewer.style.display === 'flex', 'replacement loading should keep viewer visible');
     assert(elements.mainView.style.visibility === 'hidden', 'replacement loading should hide the stale PDF surface immediately');
     assert(elements.mainView.style.pointerEvents === 'none', 'replacement loading should disable interaction with stale PDF content');
@@ -102,7 +106,7 @@ function applyPresentation(elements, presentation, { fallbackUrl = '', state = P
 
     applyPresentation(
         elements,
-        resolvePdfUiStatePresentation(PDF_UI_STATE.READY, { hasCommittedPdf: true })
+        resolvePdfUiStatePresentation(PDF_UI_STATE.READY, { hasCommittedPdf: true, hasEverCommittedPdf: true })
     );
     assert(elements.toolbar.style.display === 'flex', 'ready state should show toolbar');
     assert(elements.viewer.style.display === 'flex', 'ready state should show viewer');
@@ -113,15 +117,24 @@ function applyPresentation(elements, presentation, { fallbackUrl = '', state = P
 
     applyPresentation(
         elements,
-        resolvePdfUiStatePresentation(PDF_UI_STATE.FALLBACK),
+        resolvePdfUiStatePresentation(PDF_UI_STATE.FALLBACK, { hasCommittedPdf: false, hasEverCommittedPdf: false }),
         { fallbackUrl: 'https://example.com/fallback.pdf', state: PDF_UI_STATE.FALLBACK }
     );
     assert(elements.fallback.style.display === 'block', 'fallback state should show fallback container');
     assert(elements.fallbackLink.href === 'https://example.com/fallback.pdf', 'fallback state should wire the fallback link');
-    assert(elements.toolbar.style.display === 'none', 'fallback state should hide toolbar');
+    assert(elements.toolbar.style.display === 'none', 'fallback before any successful load should hide toolbar');
     assert(elements.viewer.style.display === 'none', 'fallback state should hide viewer');
     assert(elements.printBtn.disabled === true, 'fallback state should disable print');
     assert(elements.downloadBtn.disabled === true, 'fallback state should disable download');
+
+    applyPresentation(
+        elements,
+        resolvePdfUiStatePresentation(PDF_UI_STATE.FALLBACK, { hasCommittedPdf: false, hasEverCommittedPdf: true }),
+        { fallbackUrl: 'https://example.com/fallback.pdf', state: PDF_UI_STATE.FALLBACK }
+    );
+    assert(elements.toolbar.style.display === 'flex', 'fallback after a successful load should keep toolbar mounted');
+    assert(elements.printBtn.disabled === true, 'fallback after a successful load should keep print disabled');
+    assert(elements.downloadBtn.disabled === true, 'fallback after a successful load should keep download disabled');
 
     console.log('✅ PDF UI state tests passed');
 })();
