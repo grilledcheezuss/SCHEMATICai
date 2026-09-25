@@ -3878,7 +3878,7 @@ class SearchEngine {
                 const regex = KeywordMatcher.buildAliasCountRegex(alias);
                 let aliasCount = 0;
                 while (regex.exec(text)) aliasCount++;
-                return count + aliasCount;
+                return Math.max(count, aliasCount);
             }, 0);
             return total + groupCount;
         }, 0);

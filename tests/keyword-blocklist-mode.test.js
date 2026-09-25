@@ -319,7 +319,31 @@ runTest('11) Blank and duplicate entries do not inflate mixed dominance counts',
     );
 });
 
-runTest('12) Dominance-filtered result counts and pagination stay consistent', () => {
+runTest('12) Mixed dominance counts treat alias-expanded groups as a single term', () => {
+    AI_TRAINING_DATA.ALIASES = {
+        ALERT: ['ALERT', 'PANEL ALERT']
+    };
+
+    const allowedRaw = SearchEngine.parseAllowedKeywordTerms('alert');
+    const blockedRaw = SearchEngine.parseBlockedKeywordTerms('simplex');
+    const allowedExpanded = SearchEngine.expandKeywordGroups(allowedRaw);
+    const blockedExpanded = SearchEngine.expandKeywordGroups(blockedRaw);
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-10', desc: 'PANEL ALERT SIMPLEX' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === false,
+        'Alias-expanded matches should count once per allowed term, so a single overlapping alias match should tie and hide the record'
+    );
+
+    AI_TRAINING_DATA.ALIASES = {};
+});
+
+runTest('13) Dominance-filtered result counts and pagination stay consistent', () => {
     const records = Array.from({ length: 40 }, (_, i) => ({
         id: `CP-${i + 1}`,
         desc: i % 4 === 0 ? 'DUPLEX SIMPLEX' : 'DUPLEX DUPLEX SIMPLEX',
