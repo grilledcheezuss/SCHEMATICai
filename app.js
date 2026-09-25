@@ -3883,7 +3883,9 @@ class SearchEngine {
         if (!text || !Array.isArray(group) || group.length === 0) return 0;
         const matches = [];
         group.forEach(alias => {
-            const regex = KeywordMatcher.buildAliasCountRegex(alias);
+            const normalizedAlias = typeof alias === 'string' ? alias.trim() : '';
+            if (!normalizedAlias) return;
+            const regex = KeywordMatcher.buildAliasCountRegex(normalizedAlias);
             let match;
             while ((match = regex.exec(text)) !== null) {
                 const matchedAlias = match[1];
