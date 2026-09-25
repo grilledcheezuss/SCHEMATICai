@@ -168,6 +168,8 @@ function matchesSelector(node, selector) {
     PdfViewer._documentLoadToken = 9;
     PdfViewer._pendingGestureCommitGeneration = 12;
     PdfViewer._setCurrentDocumentIdentity('panel:CP-123');
+    PdfViewer.currentScale = 1.6;
+    PdfViewer._userHasAdjustedZoom = true;
 
     const stage = makeNode({
         className: 'pdf-gesture-stage',
@@ -180,11 +182,11 @@ function matchesSelector(node, selector) {
     stage.dataset.documentIdentity = 'panel:CP-123';
     stage.dataset.pageCount = '3';
 
-    const page1 = makeNode({ className: 'pdf-page-wrapper', offsetTop: 0, offsetHeight: 880 });
+    const page1 = makeNode({ className: 'pdf-page-wrapper', offsetTop: 0, offsetWidth: 1200, offsetHeight: 880 });
     page1.dataset.pageNumber = '1';
-    const page2 = makeNode({ className: 'pdf-page-wrapper', offsetTop: 900, offsetHeight: 880 });
+    const page2 = makeNode({ className: 'pdf-page-wrapper', offsetTop: 900, offsetWidth: 1200, offsetHeight: 880 });
     page2.dataset.pageNumber = '2';
-    const page3 = makeNode({ className: 'pdf-page-wrapper', offsetTop: 1800, offsetHeight: 880 });
+    const page3 = makeNode({ className: 'pdf-page-wrapper', offsetTop: 1800, offsetWidth: 1200, offsetHeight: 880 });
     page3.dataset.pageNumber = '3';
     stage.appendChild(page1);
     stage.appendChild(page2);
@@ -232,6 +234,71 @@ function matchesSelector(node, selector) {
         }
     });
     assert(newDocumentPlan.mode === 'document-start', `expected new document load to start at page-top, got ${newDocumentPlan.mode}`);
+
+    const replacementAnchor = PdfViewer._captureReplacementViewportAnchor(viewer, stage, 10);
+    assert(replacementAnchor && replacementAnchor.pageIndex === 1, `expected replacement anchor to capture the second page, got ${replacementAnchor?.pageIndex}`);
+    assert(replacementAnchor && replacementAnchor.zoomScale === 1.6, `expected replacement anchor to capture current zoom, got ${replacementAnchor?.zoomScale}`);
+    PdfViewer._pendingReplacementViewportAnchor = { ...replacementAnchor, targetDocumentIdentity: 'panel:CP-NEW' };
+    PdfViewer._documentLoadToken = 10;
+    PdfViewer._setCurrentDocumentIdentity('panel:CP-NEW');
+
+    const replacementPlan = PdfViewer._resolveRenderScrollPlan({
+        renderMode: 'document-load',
+        priorState,
+        replacementAnchor: PdfViewer._getPendingReplacementViewportAnchor()
+    });
+    assert(replacementPlan.mode === 'replacement-anchor', `expected matching replacement anchor plan, got ${replacementPlan.mode}`);
+    PdfViewer._maintainPositionBetweenResults = true;
+    assert(PdfViewer._applyPendingReplacementScale() === true, 'matching replacement anchor should restore its captured zoom level');
+    assert(PdfViewer.currentScale === 1.6, `expected replacement scale restore to preserve 1.6 zoom, got ${PdfViewer.currentScale}`);
+    PdfViewer._maintainPositionBetweenResults = false;
+    PdfViewer.currentScale = 1.0;
+    assert(PdfViewer._applyPendingReplacementScale() === false, 'replacement scale restore should stay off when maintain-position is disabled');
+    assert(PdfViewer.currentScale === 1.0, `expected disabled maintain-position to leave zoom unchanged, got ${PdfViewer.currentScale}`);
+    PdfViewer._maintainPositionBetweenResults = true;
+
+    const staleReplacementPlan = PdfViewer._resolveRenderScrollPlan({
+        renderMode: 'document-load',
+        priorState,
+        expectedDocumentLoadToken: 11,
+        replacementAnchor
+    });
+    assert(staleReplacementPlan.mode === 'document-start', `expected stale replacement anchor token to fall back to document-start, got ${staleReplacementPlan.mode}`);
+
+    const invalidReplacementPlan = PdfViewer._resolveRenderScrollPlan({
+        renderMode: 'document-load',
+        priorState,
+        replacementAnchor: {
+            ...replacementAnchor,
+            targetDocumentLoadToken: 10,
+            targetDocumentIdentity: 'panel:CP-NEW',
+            normalizedY: Number.NaN
+        }
+    });
+    assert(invalidReplacementPlan.mode === 'document-start', `expected invalid replacement anchor geometry to fall back to document-start, got ${invalidReplacementPlan.mode}`);
+
+    const replacementStage = makeNode({
+        className: 'pdf-gesture-stage',
+        offsetTop: 20,
+        offsetLeft: 40,
+        offsetWidth: 1000,
+        offsetHeight: 1200
+    });
+    replacementStage.dataset.documentLoadToken = '10';
+    replacementStage.dataset.documentIdentity = 'panel:CP-NEW';
+    replacementStage.dataset.pageCount = '1';
+    const replacementPage = makeNode({ className: 'pdf-page-wrapper', offsetTop: 0, offsetWidth: 1000, offsetHeight: 1200 });
+    replacementPage.dataset.pageNumber = '1';
+    replacementStage.appendChild(replacementPage);
+    viewer.scrollLeft = 0;
+    viewer.scrollTop = 0;
+    viewer.scrollWidth = 2400;
+    viewer.scrollHeight = 2600;
+    const replacementRestored = PdfViewer._restoreScrollFromReplacementAnchor(viewer, replacementStage, replacementAnchor);
+    assert(replacementRestored === true, 'replacement anchor should restore on a differently sized document');
+    assert(viewer.scrollLeft >= 0 && viewer.scrollLeft <= (viewer.scrollWidth - viewer.clientWidth), 'replacement anchor restore should clamp horizontal scroll within bounds');
+    assert(viewer.scrollTop >= 0 && viewer.scrollTop <= (viewer.scrollHeight - viewer.clientHeight), 'replacement anchor restore should clamp vertical scroll within bounds');
+
     const resetApplied = PdfViewer._resetScrollToDocumentStart(viewer, stage);
     assert(resetApplied === true, 'new document scroll helper should reset to the first page');
     assert(viewer.scrollLeft === 40, `expected new document reset to align the stage left edge, got ${viewer.scrollLeft}`);
