@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.80
+## Version: v2.5.81
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.81**: PDF viewer stability patch: replacement stages now render in a hidden sibling host so they cannot perturb viewer scroll extents, first/new-document loads reset to page-start after layout settles, same-document anchor restores are generation-guarded, and post-swap scroll clamping prevents scrollbar churn across document changes and viewport resets
 - **v2.5.80**: PDF result-swap transition follow-up: document replacements now keep the active viewer surface/toolbar visible while the next PDF stages, remove only stale staging surfaces at load start, and swap the new rendered stage in atomically to avoid flicker/placeholder gaps during rapid result changes
 - **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform → crisp-render handoff without snap-back, and mobile touch ownership is origin-locked between Results and PDF scrolling until touch end/cancel
 - **v2.5.78**: Follow-up to PR #169: Airtable token routing is explicit by base purpose (Users/Feedback reads + FEEDBACK POST use write key; MAIN and PDF_BY_ID reads use read key), and Airtable 401/403 credential/access failures now surface as configuration diagnostics instead of retry-looping 503 outages
@@ -338,6 +339,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.81**: PDF viewer stability patch: hidden replacement staging now lives outside the scroll container, first/new-document loads initialize at page-start, same-document anchor restores are generation-guarded, and swap/viewport scroll positions clamp safely without scrollbar churn
 - **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform to crisp-render swap, and mobile Results/PDF scrolling stays origin-locked for each touch gesture
 - **v2.5.78**: Follow-up to PR #169: explicit Airtable token routing by base-purpose and clearer 401/403 credential/access diagnostics (no transient retry classification)
 - **v2.5.65**: Reliability hardening (`cox_sync_attempts` limited to blocking cache-miss/resume sync, cached startup restores Search before optional stale-cache refresh, and background refresh failures stay non-blocking)
