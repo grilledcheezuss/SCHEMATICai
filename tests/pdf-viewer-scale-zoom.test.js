@@ -74,6 +74,7 @@ async function wait(ms) {
         offsetTop: 20,
         offsetLeft: 60,
         style: {},
+        dataset: { renderedScale: '1' },
         isConnected: true,
         classList: {
             contains: (name) => name === 'pdf-gesture-stage'
@@ -193,7 +194,8 @@ async function wait(ms) {
     checkStartScale(1920, 1080, 1.2, 'large monitor');
 
     let renderCount = 0;
-    PdfViewer.renderStack = () => { renderCount++; };
+    let lastRenderOptions = null;
+    PdfViewer.renderStack = (options) => { renderCount++; lastRenderOptions = options; };
     PdfViewer.doc = { destroyed: false };
 
     PdfViewer.currentScale = 1.0;
@@ -203,6 +205,8 @@ async function wait(ms) {
     await wait(PdfViewer.ZOOM_DEBOUNCE_MS + 40);
     assert(renderCount === 1, `rapid zoom should coalesce to one render, got ${renderCount}`);
     assert(Math.abs(PdfViewer.currentScale - 1.6) < 1e-9, `rapid zoom should keep latest scale, got ${PdfViewer.currentScale}`);
+    assert(lastRenderOptions && lastRenderOptions.renderMode === 'gesture-anchor', 'toolbar zoom should preserve an anchor-based rerender mode');
+    assert(lastRenderOptions && lastRenderOptions.anchorContext && Number.isFinite(lastRenderOptions.anchorContext.contentX), 'toolbar zoom should pass an anchor context into rerender');
 
     PdfViewer.currentScale = PdfViewer.MAX_SCALE;
     PdfViewer.zoom(0.2);

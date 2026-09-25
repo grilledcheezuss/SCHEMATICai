@@ -4749,9 +4749,16 @@ class MobileScrollCoordinator {
             const target = event.target;
             const inOwnerRegion = this._isWithinOwnerRegion(target, this._owner);
             if (inOwnerRegion) return;
+            const viewerPinchActive = this._owner === 'viewer' && PdfViewer?._activeGesture?.mode === 'pinch';
+            if (this._owner === 'viewer') {
+                if (viewerPinchActive) {
+                    if (event.cancelable) event.preventDefault();
+                    event.stopPropagation();
+                }
+                return;
+            }
             if (event.cancelable) event.preventDefault();
             event.stopPropagation();
-            const viewerPinchActive = this._owner === 'viewer' && PdfViewer?._activeGesture?.mode === 'pinch';
             if (viewerPinchActive) return;
             this._applyOwnedScrollDelta(this._owner, deltaY);
         };
@@ -4822,6 +4829,7 @@ class PdfViewer {
     static _currentDocumentIdentity = '';
     static _viewportClampHandler = null;
     static _viewportClampListenerOptions = { passive: true };
+    static _viewportRestoreSequence = 0;
     static isPrinting = false;
     static _activePrintSession = null;
     static PRINT_CLEANUP_TIMEOUT_MS = 15000;
@@ -5285,6 +5293,18 @@ class PdfViewer {
         }
     }
 
+    static _showPendingLoadUi(url = this.url) {
+        this.url = url || "";
+        this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
+        this._pendingLoadUiState = this._hasCommittedViewerState()
+            ? PDF_UI_STATE.REPLACEMENT_LOADING
+            : PDF_UI_STATE.FIRST_LOAD_LOADING;
+        this._hideIosSavePdfHint();
+        this._documentActionsInvalidated = true;
+        this._releasePrintSession('pending-load-ui');
+        setPdfUiState(this._getLoadingUiState());
+    }
+
     static _beginDocumentLoad() {
         const activeStage = this._getGestureStage();
         const viewer = document.getElementById('pdf-main-view');
@@ -5308,6 +5328,7 @@ class PdfViewer {
         this._clearPendingDocumentResources();
         this._documentActionsInvalidated = true;
         this._documentLoadToken++;
+        this._viewportRestoreSequence++;
         this.currentRenderToken++;
         this._gestureCommitGeneration++;
         this._pendingGestureCommitGeneration = 0;
@@ -5567,6 +5588,7 @@ class PdfViewer {
         stage.dataset.documentLoadToken = String(this._documentLoadToken);
         stage.dataset.documentIdentity = this._getCurrentDocumentIdentity();
         stage.dataset.pageCount = String(this.doc?.numPages || 0);
+        stage.dataset.renderedScale = String(this.currentScale);
     }
 
     static _clampViewerScroll(viewer) {
@@ -5609,6 +5631,53 @@ class PdfViewer {
             this._committedPanY = 0;
             this._applyViewerTransform(1, 0, 0);
         }
+    }
+
+    static _scheduleViewportAnchorRestore({ reason = 'viewport-change', retries = 2 } = {}) {
+        const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
+        const stage = this._getGestureStage();
+        if (!viewer || !stage || !this.isDocumentValid() || this._uiState !== PDF_UI_STATE.READY || this._activeGesture) {
+            this._clampViewerScroll(viewer);
+            return;
+        }
+        const restoreSequence = ++this._viewportRestoreSequence;
+        const expectedDocumentLoadToken = this._documentLoadToken;
+        const priorState = this._captureStageScrollState(viewer, stage);
+        const anchorContext = this._captureAnchorContext(null, 1);
+        const attemptRestore = (remainingRetries) => {
+            requestAnimationFrame(() => {
+                if (restoreSequence !== this._viewportRestoreSequence) return;
+                if (this._activeGesture) {
+                    attemptRestore(remainingRetries);
+                    return;
+                }
+                const activeViewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
+                const activeStage = this._getGestureStage();
+                if (!activeViewer) return;
+                if (!activeStage || expectedDocumentLoadToken !== this._documentLoadToken || !this.isDocumentValid()) {
+                    this._clampViewerScroll(activeViewer);
+                    return;
+                }
+                let restored = false;
+                if (this._stageMatchesCurrentDocument(priorState) && anchorContext) {
+                    restored = this._restoreScrollFromAnchorContext(activeViewer, activeStage, anchorContext);
+                }
+                if (!restored && this._stageMatchesCurrentDocument(priorState)) {
+                    restored = this._restoreScrollFromPriorRatios(activeViewer, activeStage, priorState);
+                }
+                this._clampViewerScroll(activeViewer);
+                if (!restored && remainingRetries > 0) {
+                    attemptRestore(remainingRetries - 1);
+                    return;
+                }
+                requestAnimationFrame(() => {
+                    if (restoreSequence !== this._viewportRestoreSequence) return;
+                    if (this._activeGesture) return;
+                    this._clampViewerScroll(activeViewer);
+                });
+            });
+        };
+        attemptRestore(Math.max(0, retries));
     }
 
     static _restoreScrollFromAnchorContext(viewer, stage, anchorContext) {
@@ -5736,7 +5805,7 @@ class PdfViewer {
 
         this._zoomInteractionElement = viewer;
         this._viewportClampHandler = () => {
-            requestAnimationFrame(() => this._clampViewerScroll(this._zoomInteractionElement || document.getElementById('pdf-main-view')));
+            this._scheduleViewportAnchorRestore();
         };
         this._wheelZoomHandler = (event) => {
             if (!this.isDocumentValid()) return;
@@ -5898,6 +5967,7 @@ class PdfViewer {
         this._liveScale = 1;
         this._committedPanX = 0;
         this._committedPanY = 0;
+        this._viewportRestoreSequence++;
         this._clearActiveGesture();
         this._clearZoomTimer();
         this._pendingGestureCommitGeneration = 0;
@@ -6860,6 +6930,7 @@ class PdfViewer {
     }
     static zoom(delta) {
         if (!Number.isFinite(delta)) return;
+        const priorScale = this.currentScale;
         const nextScale = this._clampScale(this.currentScale + delta);
         if (nextScale === this.currentScale) return;
         this.currentScale = nextScale;
@@ -6869,7 +6940,18 @@ class PdfViewer {
         this._zoomTimer = setTimeout(() => {
             this._zoomTimer = null;
             if (!this.isDocumentValid()) return;
-            this.renderStack({ timingSource: 'toolbar-zoom' });
+            const expectedDocumentLoadToken = this._documentLoadToken;
+            const renderedScaleValue = Number(this._getGestureStage()?.dataset?.renderedScale);
+            const renderedScale = Number.isFinite(renderedScaleValue) && renderedScaleValue > 0
+                ? renderedScaleValue
+                : priorScale;
+            const anchorContext = this._captureAnchorContext(null, this.currentScale / Math.max(renderedScale, 0.0001));
+            this.renderStack({
+                timingSource: 'toolbar-zoom',
+                expectedDocumentLoadToken,
+                anchorContext,
+                renderMode: 'gesture-anchor'
+            });
         }, this.ZOOM_DEBOUNCE_MS);
     }
 
@@ -7012,6 +7094,7 @@ class PdfController {
 
         const inflight = this.preloadInFlight.get(id);
         if (inflight) {
+            PdfViewer._showPendingLoadUi?.(url);
             const waitStartMs = getNowMs();
             try {
                 await inflight;
