@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.92 ---
-const APP_VERSION = "v2.5.92";
+// --- SCHEMATICA ai v2.5.93 ---
+const APP_VERSION = "v2.5.93";
 const VERSION_HISTORY = {
+    "v2.5.93": "Mobile PDF viewer geometry fix: stop flex-centered negative left overflow from recentering zoomed documents on mobile by giving wide stages a true scrollable left origin while preserving centered narrow layouts and existing gesture/render guards",
     "v2.5.92": "PDF zoom/pan stability refinement: replaced symmetric pan clamping with scroll-aware directional bounds, cancel stale viewport-restoration sequences during active gestures, and block delayed restore callbacks from overriding newer touch/wheel zoom interactions",
     "v2.5.91": "Keyword dominance refinement (frontend-only): mixed Allowed/Blocked keyword searches now compare occurrence counts in a single explicit branch while preserving contradiction validation, pagination/results consistency, and unchanged Worker/backend behavior",
     "v2.5.90": "Keyword refinement (frontend-only): split keywords into independent Allowed/Blocked term sets with mode-switched editing, contradiction validation + inline warning, and explicit allowed-then-blocked filtering while keeping Worker/backend behavior unchanged",

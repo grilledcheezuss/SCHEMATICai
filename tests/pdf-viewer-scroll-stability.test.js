@@ -6,6 +6,12 @@ function assert(condition, message) {
     if (!condition) throw new Error(`Assertion failed: ${message}`);
 }
 
+function assertNear(actual, expected, message, epsilon = 1e-9) {
+    if (Math.abs(actual - expected) > epsilon) {
+        throw new Error(`Assertion failed: ${message} (expected ${expected}, got ${actual})`);
+    }
+}
+
 function extractClass(className, content) {
     const startIdx = content.indexOf(`class ${className} {`);
     if (startIdx === -1) throw new Error(`Could not find ${className} class in app.js`);
@@ -299,6 +305,46 @@ function matchesSelector(node, selector) {
     assert(replacementRestored === true, 'replacement anchor should restore on a differently sized document');
     assert(viewer.scrollLeft >= 0 && viewer.scrollLeft <= (viewer.scrollWidth - viewer.clientWidth), 'replacement anchor restore should clamp horizontal scroll within bounds');
     assert(viewer.scrollTop >= 0 && viewer.scrollTop <= (viewer.scrollHeight - viewer.clientHeight), 'replacement anchor restore should clamp vertical scroll within bounds');
+
+    const originalStageOffsetLeft = stage.offsetLeft;
+    stage.offsetLeft = 20;
+
+    const assertAnchorRoundTrip = ({ label, scrollLeft, scrollTop, anchorX, anchorY }) => {
+        viewer.scrollLeft = scrollLeft;
+        viewer.scrollTop = scrollTop;
+        PdfViewer._committedPanX = 0;
+        PdfViewer._committedPanY = 0;
+        PdfViewer._liveScale = 1;
+        const anchorContext = PdfViewer._captureAnchorContext({ x: anchorX, y: anchorY }, 1);
+        assert(anchorContext, `${label}: expected anchor context`);
+        viewer.scrollLeft = Math.min(viewer.scrollWidth - viewer.clientWidth, scrollLeft + 137);
+        viewer.scrollTop = Math.min(viewer.scrollHeight - viewer.clientHeight, scrollTop + 211);
+        const restored = PdfViewer._restoreScrollFromAnchorContext(viewer, stage, anchorContext);
+        assert(restored === true, `${label}: expected anchor restore to succeed`);
+        assertNear(viewer.scrollLeft, scrollLeft, `${label}: horizontal position should restore exactly`);
+        assertNear(viewer.scrollTop, scrollTop, `${label}: vertical position should restore exactly`);
+    };
+
+    viewer.scrollLeft = 140;
+    viewer.scrollTop = 930;
+    PdfViewer._commitPanToScroll(140, 0);
+    assertNear(viewer.scrollLeft, 0, 'pan release at the left edge should commit to the true left scroll extent');
+    assertNear(viewer.scrollTop, 930, 'pan release at the left edge should not disturb vertical scroll');
+
+    assertAnchorRoundTrip({ label: 'left edge', scrollLeft: 0, scrollTop: 840, anchorX: 60, anchorY: 220 });
+    assertAnchorRoundTrip({ label: 'center', scrollLeft: 260, scrollTop: 1020, anchorX: 195, anchorY: 260 });
+    assertAnchorRoundTrip({ label: 'right edge', scrollLeft: viewer.scrollWidth - viewer.clientWidth, scrollTop: 1240, anchorX: 330, anchorY: 280 });
+    for (let cycle = 0; cycle < 3; cycle++) {
+        assertAnchorRoundTrip({
+            label: `left edge repeat ${cycle + 1}`,
+            scrollLeft: 0,
+            scrollTop: 900 + (cycle * 30),
+            anchorX: 48,
+            anchorY: 240
+        });
+    }
+
+    stage.offsetLeft = originalStageOffsetLeft;
 
     viewer.scrollLeft = 260;
     viewer.scrollTop = 1180;
