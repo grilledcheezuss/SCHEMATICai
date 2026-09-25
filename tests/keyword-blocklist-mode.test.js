@@ -343,7 +343,31 @@ runTest('12) Mixed dominance counts treat alias-expanded groups as a single term
     AI_TRAINING_DATA.ALIASES = {};
 });
 
-runTest('13) Dominance-filtered result counts and pagination stay consistent', () => {
+runTest('13) Mixed dominance counts deduplicate repeated overlapping alias matches', () => {
+    AI_TRAINING_DATA.ALIASES = {
+        ALERT: ['ALERT', 'PANEL ALERT']
+    };
+
+    const allowedRaw = SearchEngine.parseAllowedKeywordTerms('alert');
+    const blockedRaw = SearchEngine.parseBlockedKeywordTerms('simplex');
+    const allowedExpanded = SearchEngine.expandKeywordGroups(allowedRaw);
+    const blockedExpanded = SearchEngine.expandKeywordGroups(blockedRaw);
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-11', desc: 'PANEL ALERT PANEL ALERT SIMPLEX' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === true,
+        'Repeated overlapping aliases should count as two allowed occurrences, not four'
+    );
+
+    AI_TRAINING_DATA.ALIASES = {};
+});
+
+runTest('14) Dominance-filtered result counts and pagination stay consistent', () => {
     const records = Array.from({ length: 40 }, (_, i) => ({
         id: `CP-${i + 1}`,
         desc: i % 4 === 0 ? 'DUPLEX SIMPLEX' : 'DUPLEX DUPLEX SIMPLEX',

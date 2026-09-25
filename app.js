@@ -3874,14 +3874,34 @@ class SearchEngine {
         return expandedKeywords.reduce((total, group, idx) => {
             const rawKeyword = rawKeywords[idx];
             if (!KeywordMatcher.matchesSingleGroup(record, rawKeyword, group)) return total;
-            const groupCount = group.reduce((count, alias) => {
-                const regex = KeywordMatcher.buildAliasCountRegex(alias);
-                let aliasCount = 0;
-                while (regex.exec(text)) aliasCount++;
-                return Math.max(count, aliasCount);
-            }, 0);
+            const groupCount = this.countKeywordGroupOccurrences(text, group);
             return total + groupCount;
         }, 0);
+    }
+
+    static countKeywordGroupOccurrences(text, group) {
+        if (!text || !Array.isArray(group) || group.length === 0) return 0;
+        const matches = [];
+        group.forEach(alias => {
+            const regex = KeywordMatcher.buildAliasCountRegex(alias);
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                const matchedAlias = match[1];
+                const start = match.index + match[0].indexOf(matchedAlias);
+                matches.push({ start, end: start + matchedAlias.length });
+            }
+        });
+
+        matches.sort((a, b) => (a.end - b.end) || (a.start - b.start));
+        let count = 0;
+        let currentEnd = -1;
+        matches.forEach(match => {
+            if (match.start >= currentEnd) {
+                count++;
+                currentEnd = match.end;
+            }
+        });
+        return count;
     }
 
     static perform() {
