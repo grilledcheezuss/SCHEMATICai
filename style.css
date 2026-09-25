@@ -522,6 +522,14 @@ body.pdf-toolbar-session-ready #pdf-toolbar { display: flex; }
 #pdf-toolbar .pdf-maintain-position-btn[aria-pressed="true"] .maintain-lock-icon--locked {
     display: inline-flex;
 }
+#pdf-toolbar .pdf-maintain-position-btn:focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 2px;
+}
+#pdf-toolbar .pdf-maintain-position-btn[aria-pressed="true"]:focus-visible {
+    outline-color: #ffffff;
+    box-shadow: 0 0 0 2px var(--app-primary), var(--surface-soft-shadow);
+}
 #pdf-toolbar .pdf-toolbar-hint {
     display: none;
     position: absolute;
