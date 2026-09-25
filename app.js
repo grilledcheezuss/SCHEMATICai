@@ -4748,7 +4748,7 @@ class PdfViewer {
     }
 
     static _getLoadingUiState() {
-        return this._hasActiveRenderedSurface() && (this.currentBlobUrl || this.currentPdfBlob)
+        return this._hasActiveRenderedSurface() && this.hasCommittedDocumentTarget()
             ? PDF_UI_STATE.REPLACEMENT_LOADING
             : PDF_UI_STATE.FIRST_LOAD_LOADING;
     }
