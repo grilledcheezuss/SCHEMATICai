@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.90
+## Version: v2.5.91
 
-_Release-alignment note: this patch version is mirrored here for app/Worker bookkeeping, but the Worker API surface and backend behavior are unchanged from v2.5.89._
+_Release-alignment note: this patch version is mirrored here for app/Worker bookkeeping, but the Worker API surface and backend behavior are unchanged from v2.5.90._
 
 ## Overview
 
@@ -12,6 +12,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.91**: Frontend-only keyword dominance follow-up: mixed Allowed and Blocked term searches now use an explicit dominance branch that compares occurrence counts per eligible record (allowed must exceed blocked or the record stays hidden), while contradiction validation, pagination/count behavior, and Worker API/backend behavior remain unchanged
 - **v2.5.90**: Frontend-only keyword follow-up: keyword editing now manages independent Allowed and Blocked term sets, adds case-insensitive contradiction validation with inline warning + blocked search execution on overlap, and applies explicit allowed-then-blocked client-side filtering while Worker API/backend behavior remains unchanged
 - **v2.5.89**: Frontend-only keyword search refinement: adds a blocklist-mode toggle at the keyword input with red active treatment and explicit allowed/blocked placeholder guidance, applies an isolated top-level keyword branch so inclusive matching remains unchanged while blocked-term matches are excluded from visible results, and Worker API/backend behavior is unchanged
 - **v2.5.88**: Frontend-only refinement follow-up: version surfaces are aligned for the release, desktop/tablet branding keeps RESEARCH anchored to COX while SCHEMATICA ai continues from the same lower row, the existing lock pill now reads Lock Position before the zoom controls, mobile toolbar sizing is tightened to keep one-row controls, and the Worker API/backend behavior is unchanged

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.90 ---
-const APP_VERSION = "v2.5.90";
+// --- SCHEMATICA ai v2.5.91 ---
+const APP_VERSION = "v2.5.91";
 const VERSION_HISTORY = {
+    "v2.5.91": "Keyword dominance refinement (frontend-only): mixed Allowed/Blocked keyword searches now compare occurrence counts in a single explicit branch while preserving contradiction validation, pagination/results consistency, and unchanged Worker/backend behavior",
     "v2.5.90": "Keyword refinement (frontend-only): split keywords into independent Allowed/Blocked term sets with mode-switched editing, contradiction validation + inline warning, and explicit allowed-then-blocked filtering while keeping Worker/backend behavior unchanged",
     "v2.5.89": "Keyword blocklist mode (frontend-only): add a flush keyword-end prohibited toggle with red active treatment and placeholder guidance, branch keyword filtering to exclude any matched blocked term while preserving inclusive mode and matcher internals, and keep Worker/backend behavior unchanged",
     "v2.5.88": "Frontend-only header/toolbar refinement: keep RESEARCH fixed to the Cox lockup while SCHEMATICA ai continues from the same lower row, relabel the existing lock pill to Lock Position, and tighten mobile toolbar sizing without changing viewer or backend behavior",
@@ -3743,6 +3744,26 @@ class HorsepowerMatcher {
  * // => true
  */
 class KeywordMatcher {
+    static getRecordText(record) {
+        return (record.id + " " + (record.desc || "")).toUpperCase();
+    }
+
+    static buildAliasRegex(alias, global = false) {
+        const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const flexAlias = cleanAlias
+            .replace(/([A-Za-z])([\d])/g, '$1[-\\s]?$2')
+            .replace(/([\d])([A-Za-z])/g, '$1[-\\s]?$2');
+        return new RegExp(`(?:^|[^a-zA-Z0-9_.])` + flexAlias + `([^a-zA-Z0-9_.]|$)`, global ? 'gi' : 'i');
+    }
+
+    static buildAliasCountRegex(alias) {
+        const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const flexAlias = cleanAlias
+            .replace(/([A-Za-z])([\d])/g, '$1[-\\s]?$2')
+            .replace(/([\d])([A-Za-z])/g, '$1[-\\s]?$2');
+        return new RegExp(`(?:^|[^a-zA-Z0-9_.])(` + flexAlias + `)(?=[^a-zA-Z0-9_.]|$)`, 'gi');
+    }
+
     /**
      * Match keywords in record with alias expansion and reject logic
      * @param {Object} record - Database record with id, desc, and reject_keywords fields
@@ -3755,7 +3776,7 @@ class KeywordMatcher {
             return true; // No keyword filter
         }
         
-        const text = (record.id + " " + (record.desc || "")).toUpperCase();
+        const text = this.getRecordText(record);
         
         // === CHECK REJECT KEYWORDS ===
         if (record.reject_keywords && record.reject_keywords.length > 0) {
@@ -3768,13 +3789,7 @@ class KeywordMatcher {
         // === CHECK ALL KEYWORD GROUPS MATCH ===
         const allGroupsMatch = expandedKeywords.every(group => {
             return group.some(alias => {
-                const cleanAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                // Also allow optional hyphen/space at letter-digit boundaries for model numbers
-                // e.g. "PD6000" matches "PD-6000" and "PD 6000"
-                const flexAlias = cleanAlias
-                    .replace(/([A-Za-z])([\d])/g, '$1[-\\s]?$2')
-                    .replace(/([\d])([A-Za-z])/g, '$1[-\\s]?$2');
-                const regex = new RegExp(`(?:^|[^a-zA-Z0-9_.])` + flexAlias + `([^a-zA-Z0-9_.]|$)`, 'i');
+                const regex = this.buildAliasRegex(alias);
                 return regex.test(text); 
             });
         });
@@ -3845,7 +3860,50 @@ class SearchEngine {
             const rawKeyword = blockedRawKeywords[idx];
             return KeywordMatcher.matchesSingleGroup(record, rawKeyword, group);
         });
-        return !blockedMatchExists;
+        if (!allowedExpandedKeywords.length) return !blockedMatchExists;
+        if (!blockedMatchExists) return true;
+
+        const allowedMatchCount = this.countKeywordMatchOccurrences(record, allowedRawKeywords, allowedExpandedKeywords);
+        const blockedMatchCount = this.countKeywordMatchOccurrences(record, blockedRawKeywords, blockedExpandedKeywords);
+        return allowedMatchCount > blockedMatchCount;
+    }
+
+    static countKeywordMatchOccurrences(record, rawKeywords, expandedKeywords) {
+        if (!Array.isArray(expandedKeywords) || expandedKeywords.length === 0) return 0;
+        const text = KeywordMatcher.getRecordText(record);
+        return expandedKeywords.reduce((total, group, idx) => {
+            const rawKeyword = rawKeywords[idx];
+            if (!KeywordMatcher.matchesSingleGroup(record, rawKeyword, group)) return total;
+            const groupCount = this.countKeywordGroupOccurrences(text, group);
+            return total + groupCount;
+        }, 0);
+    }
+
+    static countKeywordGroupOccurrences(text, group) {
+        if (!text || !Array.isArray(group) || group.length === 0) return 0;
+        const matches = [];
+        group.forEach(alias => {
+            const normalizedAlias = typeof alias === 'string' ? alias.trim() : '';
+            if (!normalizedAlias) return;
+            const regex = KeywordMatcher.buildAliasCountRegex(normalizedAlias);
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                const matchedAlias = match[1];
+                const start = match.index + match[0].indexOf(matchedAlias);
+                matches.push({ start, end: start + matchedAlias.length });
+            }
+        });
+
+        matches.sort((a, b) => (a.start - b.start) || (b.end - a.end));
+        let count = 0;
+        let currentEnd = -1;
+        matches.forEach(match => {
+            if (match.start >= currentEnd) {
+                count++;
+                currentEnd = match.end;
+            }
+        });
+        return count;
     }
 
     static perform() {

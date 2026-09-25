@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🧪 Testing v2.5.90 Allowed/Blocked Keyword Sets\n');
+console.log('🧪 Testing v2.5.91 Allowed/Blocked Keyword Dominance\n');
 
 const appJsPath = path.join(__dirname, '..', 'app.js');
 const appJsContent = fs.readFileSync(appJsPath, 'utf8');
@@ -231,17 +231,153 @@ runTest('6) Allowed-term matching branch remains unchanged without blocked terms
     assert(SearchEngine.shouldIncludeRecordForKeywordSets({ id: 'CP-3', desc: 'PUMP PANEL' }, allowedRaw, allowedExpanded, [], []) === false, 'Allowed mismatch should exclude record');
 });
 
-runTest('7) Blocked exclusion runs after allowed inclusion and preserves pagination/count semantics', () => {
+runTest('7) Blocked-only terms still exclude any matching record', () => {
+    const blockedRaw = ['SIMPLEX'];
+    const blockedExpanded = [['SIMPLEX']];
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets({ id: 'CP-4', desc: 'DUPLEX SIMPLEX PANEL' }, [], [], blockedRaw, blockedExpanded) === false,
+        'Blocked-only match should exclude record'
+    );
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets({ id: 'CP-5', desc: 'DUPLEX PANEL' }, [], [], blockedRaw, blockedExpanded) === true,
+        'Blocked-only non-match should keep record'
+    );
+});
+
+runTest('8) Mixed terms show record when allowed count is greater than blocked count', () => {
+    const allowedRaw = ['DUPLEX'];
+    const allowedExpanded = [['DUPLEX']];
+    const blockedRaw = ['SIMPLEX'];
+    const blockedExpanded = [['SIMPLEX']];
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-6', desc: 'DUPLEX DUPLEX SIMPLEX PANEL' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === true,
+        'Expected record to remain visible when allowed count wins'
+    );
+});
+
+runTest('9) Mixed terms hide record when allowed count equals blocked count', () => {
+    const allowedRaw = ['DUPLEX'];
+    const allowedExpanded = [['DUPLEX']];
+    const blockedRaw = ['SIMPLEX'];
+    const blockedExpanded = [['SIMPLEX']];
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-7', desc: 'DUPLEX SIMPLEX PANEL' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === false,
+        'Expected record to hide when counts tie'
+    );
+});
+
+runTest('10) Mixed terms hide record when blocked count is greater than allowed count', () => {
+    const allowedRaw = ['DUPLEX'];
+    const allowedExpanded = [['DUPLEX']];
+    const blockedRaw = ['SIMPLEX'];
+    const blockedExpanded = [['SIMPLEX']];
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-8', desc: 'DUPLEX SIMPLEX SIMPLEX PANEL' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === false,
+        'Expected record to hide when blocked count wins'
+    );
+});
+
+runTest('11) Blank and duplicate entries do not inflate mixed dominance counts', () => {
+    const allowedRaw = SearchEngine.parseAllowedKeywordTerms(' DUPLEX, duplex, , ');
+    const blockedRaw = SearchEngine.parseBlockedKeywordTerms(' SIMPLEX, SIMPLEX ,, ');
+    const allowedExpanded = SearchEngine.expandKeywordGroups(allowedRaw);
+    const blockedExpanded = SearchEngine.expandKeywordGroups(blockedRaw);
+
+    assert(allowedRaw.length === 1 && allowedRaw[0] === 'DUPLEX', `Unexpected allowed parse result: ${allowedRaw.join('|')}`);
+    assert(blockedRaw.length === 1 && blockedRaw[0] === 'SIMPLEX', `Unexpected blocked parse result: ${blockedRaw.join('|')}`);
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-9', desc: 'DUPLEX DUPLEX SIMPLEX PANEL' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === true,
+        'Duplicate entries should not count as extra matches'
+    );
+});
+
+runTest('12) Mixed dominance counts treat alias-expanded groups as a single term', () => {
+    AI_TRAINING_DATA.ALIASES = {
+        ALERT: ['ALERT', 'PANEL ALERT']
+    };
+
+    const allowedRaw = SearchEngine.parseAllowedKeywordTerms('alert');
+    const blockedRaw = SearchEngine.parseBlockedKeywordTerms('simplex');
+    const allowedExpanded = SearchEngine.expandKeywordGroups(allowedRaw);
+    const blockedExpanded = SearchEngine.expandKeywordGroups(blockedRaw);
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-10', desc: 'PANEL ALERT SIMPLEX' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === false,
+        'Alias-expanded matches should count once per allowed term, so a single overlapping alias match should tie and hide the record'
+    );
+
+    AI_TRAINING_DATA.ALIASES = {};
+});
+
+runTest('13) Mixed dominance counts deduplicate repeated overlapping alias matches', () => {
+    AI_TRAINING_DATA.ALIASES = {
+        ALERT: ['ALERT', 'PANEL ALERT']
+    };
+
+    const allowedRaw = SearchEngine.parseAllowedKeywordTerms('alert');
+    const blockedRaw = SearchEngine.parseBlockedKeywordTerms('simplex');
+    const allowedExpanded = SearchEngine.expandKeywordGroups(allowedRaw);
+    const blockedExpanded = SearchEngine.expandKeywordGroups(blockedRaw);
+
+    assert(
+        SearchEngine.shouldIncludeRecordForKeywordSets(
+            { id: 'CP-11', desc: 'PANEL ALERT PANEL ALERT SIMPLEX' },
+            allowedRaw,
+            allowedExpanded,
+            blockedRaw,
+            blockedExpanded
+        ) === true,
+        'Repeated overlapping aliases should count as two allowed occurrences, not four'
+    );
+
+    AI_TRAINING_DATA.ALIASES = {};
+});
+
+runTest('14) Dominance-filtered result counts and pagination stay consistent', () => {
     const records = Array.from({ length: 40 }, (_, i) => ({
         id: `CP-${i + 1}`,
-        desc: i % 4 === 0 ? 'MOTOR BLOCKED' : 'MOTOR NORMAL',
+        desc: i % 4 === 0 ? 'DUPLEX SIMPLEX' : 'DUPLEX DUPLEX SIMPLEX',
         pdfStatus: 'ok'
     }));
 
-    const allowedRaw = ['MOTOR'];
-    const allowedExpanded = [['MOTOR']];
-    const blockedRaw = ['BLOCKED'];
-    const blockedExpanded = [['BLOCKED']];
+    const allowedRaw = ['DUPLEX'];
+    const allowedExpanded = [['DUPLEX']];
+    const blockedRaw = ['SIMPLEX'];
+    const blockedExpanded = [['SIMPLEX']];
 
     const filtered = records.filter(r =>
         SearchEngine.shouldIncludeRecordForKeywordSets(r, allowedRaw, allowedExpanded, blockedRaw, blockedExpanded)
@@ -279,14 +415,6 @@ runTest('7) Blocked exclusion runs after allowed inclusion and preserves paginat
     assert(renderedTotal === 30, `Expected total count 30, got ${renderedTotal}`);
     assert(pageInfoEl.textContent === 'Page 1 of 2', `Expected pagination to show Page 1 of 2, got ${pageInfoEl.textContent}`);
     assert(nextBtn.disabled === false, 'Expected next button enabled on first page with 2 pages');
-});
-
-runTest('8) Blank and duplicate entries in same set are ignored as noise', () => {
-    const parsedAllowed = SearchEngine.parseAllowedKeywordTerms(' MOTOR, motor, , MOTOR ,, fan ');
-    const parsedBlocked = SearchEngine.parseBlockedKeywordTerms(' PUMP, PUMP, ');
-
-    assert(parsedAllowed.length === 2 && parsedAllowed[0] === 'MOTOR' && parsedAllowed[1] === 'FAN', `Unexpected allowed parse result: ${parsedAllowed.join('|')}`);
-    assert(parsedBlocked.length === 1 && parsedBlocked[0] === 'PUMP', `Unexpected blocked parse result: ${parsedBlocked.join('|')}`);
 });
 
 console.log('\n═══════════════════════════════════════');
