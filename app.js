@@ -3892,7 +3892,7 @@ class SearchEngine {
             }
         });
 
-        matches.sort((a, b) => (a.end - b.end) || (a.start - b.start));
+        matches.sort((a, b) => (a.start - b.start) || (b.end - a.end));
         let count = 0;
         let currentEnd = -1;
         matches.forEach(match => {
