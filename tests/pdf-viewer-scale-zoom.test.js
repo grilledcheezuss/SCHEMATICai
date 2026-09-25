@@ -74,6 +74,7 @@ async function wait(ms) {
         offsetTop: 20,
         offsetLeft: 60,
         style: {},
+        dataset: { renderedScale: '1' },
         isConnected: true,
         classList: {
             contains: (name) => name === 'pdf-gesture-stage'

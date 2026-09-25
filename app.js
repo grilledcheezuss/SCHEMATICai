@@ -5588,6 +5588,7 @@ class PdfViewer {
         stage.dataset.documentLoadToken = String(this._documentLoadToken);
         stage.dataset.documentIdentity = this._getCurrentDocumentIdentity();
         stage.dataset.pageCount = String(this.doc?.numPages || 0);
+        stage.dataset.renderedScale = String(this.currentScale);
     }
 
     static _clampViewerScroll(viewer) {
@@ -5646,7 +5647,10 @@ class PdfViewer {
         const attemptRestore = (remainingRetries) => {
             requestAnimationFrame(() => {
                 if (restoreSequence !== this._viewportRestoreSequence) return;
-                if (this._activeGesture) return;
+                if (this._activeGesture) {
+                    attemptRestore(remainingRetries);
+                    return;
+                }
                 const activeViewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
                 const activeStage = this._getGestureStage();
                 if (!activeViewer) return;
@@ -6937,7 +6941,11 @@ class PdfViewer {
             this._zoomTimer = null;
             if (!this.isDocumentValid()) return;
             const expectedDocumentLoadToken = this._documentLoadToken;
-            const anchorContext = this._captureAnchorContext(null, nextScale / Math.max(priorScale, 0.0001));
+            const renderedScaleValue = Number(this._getGestureStage()?.dataset?.renderedScale);
+            const renderedScale = Number.isFinite(renderedScaleValue) && renderedScaleValue > 0
+                ? renderedScaleValue
+                : priorScale;
+            const anchorContext = this._captureAnchorContext(null, this.currentScale / Math.max(renderedScale, 0.0001));
             this.renderStack({
                 timingSource: 'toolbar-zoom',
                 expectedDocumentLoadToken,
