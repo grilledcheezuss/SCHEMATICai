@@ -4877,7 +4877,8 @@ class PdfViewer {
         return {
             control: getElement('pdf-download-control'),
             button: getElement('pdf-download-btn'),
-            hint: getElement('pdf-download-hint')
+            hint: getElement('pdf-download-hint'),
+            hintText: getElement('pdf-download-hint-text')
         };
     }
 
@@ -4960,13 +4961,11 @@ class PdfViewer {
     }
 
     static _showIosSavePdfHint({ documentIdentity = this._getCommittedDocumentIdentity() } = {}) {
-        const downloadHint = typeof DOM_CACHE !== 'undefined'
-            ? DOM_CACHE.get('pdf-download-hint')
-            : document.getElementById('pdf-download-hint');
-        if (!downloadHint || !this._isIosSafariBrowser() || !documentIdentity) return;
-        const hintText = 'Tap Share, then Save to Files.';
-        if (downloadHint.innerText !== hintText) {
-            downloadHint.innerText = hintText;
+        const { hint, hintText } = this._getIosSavePdfHintElements();
+        if (!hint || !this._isIosSafariBrowser() || !documentIdentity) return;
+        const hintMessage = 'Tap Share, then Save to Files.';
+        if (hintText && hintText.textContent !== hintMessage) {
+            hintText.textContent = hintMessage;
         }
         this._clearIosSavePdfHintAutoDismissTimer();
         this._detachIosSavePdfHintOutsideDismissHandler();

@@ -56,6 +56,16 @@ function wait(ms) {
             this.attributes[name] = value;
         }
     };
+    const toolbarHintText = {
+        _text: '',
+        get textContent() {
+            return this._text;
+        },
+        set textContent(value) {
+            this._text = value;
+            toolbarHint.innerText = value;
+        }
+    };
     const toolbarHintContinueButton = {
         attributes: {},
         setAttribute(name, value) {
@@ -170,6 +180,7 @@ function wait(ms) {
         },
         getElementById(id) {
             if (id === 'pdf-download-hint') return toolbarHint;
+            if (id === 'pdf-download-hint-text') return toolbarHintText;
             if (id === 'pdf-download-hint-continue') return toolbarHintContinueButton;
             if (id === 'pdf-download-btn-label') return toolbarDownloadLabel;
             if (id === 'pdf-download-btn') return toolbarDownloadButton;
@@ -189,6 +200,7 @@ function wait(ms) {
         get(id) {
             if (id === 'demo-panel-id') return { value: panelIdValue };
             if (id === 'pdf-download-hint') return toolbarHint;
+            if (id === 'pdf-download-hint-text') return toolbarHintText;
             if (id === 'pdf-download-hint-continue') return toolbarHintContinueButton;
             if (id === 'pdf-download-btn-label') return toolbarDownloadLabel;
             if (id === 'pdf-download-btn') return toolbarDownloadButton;
