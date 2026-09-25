@@ -156,6 +156,7 @@ touchStart({
     touches: [{ clientY: 180 }, { clientY: 176 }]
 });
 prevented = false;
+const priorResultsScroll = results.scrollTop;
 PdfViewer._activeGesture = { mode: 'pinch' };
 touchMove({
     target: resultsChildTarget,
@@ -165,7 +166,7 @@ touchMove({
     stopPropagation() {}
 });
 assert(prevented === true, 'viewer-origin active pinch should still suppress cross-panel drift');
-assert(results.scrollTop > 0, 'viewer-origin active pinch should not reroute movement into results scrolling');
+assert(results.scrollTop === priorResultsScroll, 'viewer-origin active pinch should not reroute movement into results scrolling');
 PdfViewer._activeGesture = null;
 
 MobileScrollCoordinator.resetGestureOwnership('test-reset');
