@@ -1075,14 +1075,14 @@ input[type="date"].demo-input { text-align: left; }
     }
     #pdf-toolbar .pdf-tool-btn {
         height: 30px;
-        padding: 0 5px;
+        padding: 0 4px;
         gap: 4px;
         font-size: 10px;
     }
     #pdf-toolbar .pdf-maintain-position-btn {
         width: auto;
         justify-content: center;
-        padding: 0 6px;
+        padding: 0 5px;
         gap: 3px;
     }
     #pdf-toolbar .pdf-tool-btn-icon {
@@ -1219,12 +1219,12 @@ input[type="date"].demo-input { text-align: left; }
         margin-top: 2px;
     }
     .app-title-main {
-        font-size: 0.63rem;
+        font-size: 0.75rem;
         font-weight: 700;
-        letter-spacing: 2px;
+        letter-spacing: 1.6px;
     }
     .logo-main { font-size: 1.58rem; } 
-    .logo-sub { font-size: 0.63rem; letter-spacing: 2px; }
+    .logo-sub { font-size: 0.7rem; letter-spacing: 2px; }
     .date-stage-row { flex-wrap: wrap; }
     #pdf-toolbar .pdf-maintain-position-btn .pdf-tool-btn-label {
         font-size: 10px;
@@ -1232,6 +1232,30 @@ input[type="date"].demo-input { text-align: left; }
     }
     #pdf-zoom-level {
         min-width: 34px;
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 360px) {
+    #pdf-toolbar {
+        gap: 3px;
+        padding: 4px;
+    }
+    #pdf-toolbar .pdf-tool-btn {
+        padding: 0 3px;
+        font-size: 9px;
+    }
+    #pdf-toolbar .pdf-tool-btn-icon {
+        font-size: 11px;
+    }
+    #pdf-toolbar .pdf-maintain-position-btn {
+        padding: 0 4px;
+    }
+    #pdf-toolbar .pdf-maintain-position-btn .pdf-tool-btn-label {
+        font-size: 9px;
+    }
+    #pdf-zoom-level {
+        min-width: 30px;
         font-size: 11px;
     }
 }
@@ -1270,7 +1294,6 @@ input[type="date"].demo-input { text-align: left; }
         font-size: clamp(0.66rem, 0.85vw, 0.76rem);
         font-weight: 800;
         letter-spacing: 3.4px;
-        text-transform: none;
     }
 }
 
