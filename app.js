@@ -5646,6 +5646,7 @@ class PdfViewer {
         const attemptRestore = (remainingRetries) => {
             requestAnimationFrame(() => {
                 if (restoreSequence !== this._viewportRestoreSequence) return;
+                if (this._activeGesture) return;
                 const activeViewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
                 const activeStage = this._getGestureStage();
                 if (!activeViewer) return;
@@ -5667,6 +5668,7 @@ class PdfViewer {
                 }
                 requestAnimationFrame(() => {
                     if (restoreSequence !== this._viewportRestoreSequence) return;
+                    if (this._activeGesture) return;
                     this._clampViewerScroll(activeViewer);
                 });
             });
