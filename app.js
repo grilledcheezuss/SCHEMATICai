@@ -4905,14 +4905,14 @@ class PdfViewer {
             if (typeof button.setAttribute === 'function') {
                 button.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
                 if (isVisible) {
-                    button.setAttribute('aria-describedby', 'pdf-download-hint');
+                    button.setAttribute('aria-describedby', 'pdf-download-hint-text');
                 } else if (typeof button.removeAttribute === 'function') {
                     button.removeAttribute('aria-describedby');
                 }
             } else {
                 button['aria-expanded'] = isVisible ? 'true' : 'false';
                 if (isVisible) {
-                    button['aria-describedby'] = 'pdf-download-hint';
+                    button['aria-describedby'] = 'pdf-download-hint-text';
                 } else {
                     delete button['aria-describedby'];
                 }
@@ -5005,6 +5005,15 @@ class PdfViewer {
         }
         this._showIosSavePdfHint({ documentIdentity });
         return true;
+    }
+
+    static confirmIosSavePdfHint() {
+        if (!this._areDocumentActionsAvailable()) return;
+        const documentIdentity = this._getCommittedDocumentIdentity();
+        if (!documentIdentity) return;
+        this._iosSaveTooltipAcknowledgedDocumentIdentity = documentIdentity;
+        this._hideIosSavePdfHint();
+        this._performDownloadAction();
     }
 
     static _clearPendingDocumentResources({ revoke = true } = {}) {
@@ -6155,6 +6164,10 @@ class PdfViewer {
         if (this._documentActionsInvalidated || this._uiState === PDF_UI_STATE.FALLBACK) return;
         if (!this._areDocumentActionsAvailable()) return;
         if (this._consumeIosSavePdfInteractionGate()) return;
+        this._performDownloadAction();
+    }
+
+    static _performDownloadAction() {
         const attachmentUrl = this._buildAttachmentDownloadUrl();
         if (!this.currentBlobUrl) {
             const fallbackUrl = attachmentUrl || (this._committedUrl ? buildWorkerUrl('PDF', { url: this._committedUrl }) : '');

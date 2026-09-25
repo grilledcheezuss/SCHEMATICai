@@ -56,6 +56,12 @@ function wait(ms) {
             this.attributes[name] = value;
         }
     };
+    const toolbarHintContinueButton = {
+        attributes: {},
+        setAttribute(name, value) {
+            this.attributes[name] = value;
+        }
+    };
     const toolbarDownloadControl = {
         classes: new Set(),
         classList: {
@@ -68,7 +74,7 @@ function wait(ms) {
             }
         },
         contains(target) {
-            return target === toolbarDownloadControl || target === toolbarDownloadButton || target === toolbarHint;
+            return target === toolbarDownloadControl || target === toolbarDownloadButton || target === toolbarHint || target === toolbarHintContinueButton;
         }
     };
     const toolbarDownloadLabel = { textContent: 'Download' };
@@ -164,6 +170,7 @@ function wait(ms) {
         },
         getElementById(id) {
             if (id === 'pdf-download-hint') return toolbarHint;
+            if (id === 'pdf-download-hint-continue') return toolbarHintContinueButton;
             if (id === 'pdf-download-btn-label') return toolbarDownloadLabel;
             if (id === 'pdf-download-btn') return toolbarDownloadButton;
             if (id === 'pdf-download-control') return toolbarDownloadControl;
@@ -182,6 +189,7 @@ function wait(ms) {
         get(id) {
             if (id === 'demo-panel-id') return { value: panelIdValue };
             if (id === 'pdf-download-hint') return toolbarHint;
+            if (id === 'pdf-download-hint-continue') return toolbarHintContinueButton;
             if (id === 'pdf-download-btn-label') return toolbarDownloadLabel;
             if (id === 'pdf-download-btn') return toolbarDownloadButton;
             if (id === 'pdf-download-control') return toolbarDownloadControl;
@@ -324,7 +332,7 @@ function wait(ms) {
     assert(toolbarHint.style.display === 'block', 'first iOS Save PDF tap should show the nested tooltip');
     assert(toolbarDownloadControl.classes.has('tooltip-visible') === true, 'first iOS Save PDF tap should mark the control as tooltip-visible');
     assert(toolbarDownloadButton.attributes['aria-expanded'] === 'true', 'first iOS Save PDF tap should expand the button tooltip state');
-    assert(toolbarDownloadButton.attributes['aria-describedby'] === 'pdf-download-hint', 'visible tooltip should be associated with the button for assistive tech');
+    assert(toolbarDownloadButton.attributes['aria-describedby'] === 'pdf-download-hint-text', 'visible tooltip should be associated with the button for assistive tech');
     assert(/Tap Share, then Save to Files\./i.test(toolbarHint.innerText), 'first iOS Save PDF tap should explain the native save path');
     PdfViewer.download();
     assert(anchorsClicked.length === 1, 'second iOS Save PDF tap should proceed immediately to the existing share/download flow');
@@ -362,6 +370,13 @@ function wait(ms) {
     assert(toolbarHint.style.display === 'block', 'after auto-dismiss, the tooltip should restart on the next tap');
     PdfViewer._hideIosSavePdfHint();
     PdfViewer.IOS_SAVE_TOOLTIP_AUTO_DISMISS_MS = 3200;
+
+    anchorsClicked = [];
+    PdfViewer._iosSaveTooltipAcknowledgedDocumentIdentity = '';
+    PdfViewer.download();
+    PdfViewer.confirmIosSavePdfHint();
+    assert(anchorsClicked.length === 1, 'tooltip continue action should open the PDF without requiring a second button tap');
+    assert(toolbarHint.style.display === 'none', 'tooltip continue action should dismiss the tooltip after opening the PDF');
 
     anchorsClicked = [];
     PdfViewer._iosSaveTooltipAcknowledgedDocumentIdentity = 'panel:CP-1234';
