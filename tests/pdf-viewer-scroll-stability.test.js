@@ -231,6 +231,7 @@ function matchesSelector(node, selector) {
     assert(stagingHost !== viewer, 'staging host should not reuse the scroll container');
     assert(stagingHost.parentNode === customPdfViewer, 'staging host should mount beside the scroll container');
     assert(!viewer.children.includes(stagingHost), 'staging host must remain outside the scroll container to avoid scroll extent perturbation');
+    assert(stagingHost.inert === '', 'staging host should be inert so hidden staged content cannot take focus');
 
     console.log('✅ PdfViewer scroll stability tests passed');
 })();

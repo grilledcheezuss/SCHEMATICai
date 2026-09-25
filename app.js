@@ -4715,6 +4715,7 @@ class PdfViewer {
             host = document.createElement('div');
             host.id = 'pdf-staging-host';
             host.setAttribute('aria-hidden', 'true');
+            host.setAttribute('inert', '');
             host.className = 'pdf-staging-host';
             hostParent.appendChild(host);
         } else if (host.parentNode !== hostParent) {
