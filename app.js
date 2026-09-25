@@ -4829,6 +4829,7 @@ class PdfViewer {
     static _currentDocumentIdentity = '';
     static _viewportClampHandler = null;
     static _viewportClampListenerOptions = { passive: true };
+    static _viewportRestoreSequence = 0;
     static isPrinting = false;
     static _activePrintSession = null;
     static PRINT_CLEANUP_TIMEOUT_MS = 15000;
@@ -5327,6 +5328,7 @@ class PdfViewer {
         this._clearPendingDocumentResources();
         this._documentActionsInvalidated = true;
         this._documentLoadToken++;
+        this._viewportRestoreSequence++;
         this.currentRenderToken++;
         this._gestureCommitGeneration++;
         this._pendingGestureCommitGeneration = 0;
@@ -5637,11 +5639,13 @@ class PdfViewer {
             this._clampViewerScroll(viewer);
             return;
         }
+        const restoreSequence = ++this._viewportRestoreSequence;
         const expectedDocumentLoadToken = this._documentLoadToken;
         const priorState = this._captureStageScrollState(viewer, stage);
         const anchorContext = this._captureAnchorContext(null, 1);
         const attemptRestore = (remainingRetries) => {
             requestAnimationFrame(() => {
+                if (restoreSequence !== this._viewportRestoreSequence) return;
                 const activeViewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
                 const activeStage = this._getGestureStage();
                 if (!activeViewer) return;
@@ -5661,7 +5665,10 @@ class PdfViewer {
                     attemptRestore(remainingRetries - 1);
                     return;
                 }
-                requestAnimationFrame(() => this._clampViewerScroll(activeViewer));
+                requestAnimationFrame(() => {
+                    if (restoreSequence !== this._viewportRestoreSequence) return;
+                    this._clampViewerScroll(activeViewer);
+                });
             });
         };
         attemptRestore(Math.max(0, retries));
@@ -5954,6 +5961,7 @@ class PdfViewer {
         this._liveScale = 1;
         this._committedPanX = 0;
         this._committedPanY = 0;
+        this._viewportRestoreSequence++;
         this._clearActiveGesture();
         this._clearZoomTimer();
         this._pendingGestureCommitGeneration = 0;
