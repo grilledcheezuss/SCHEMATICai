@@ -342,8 +342,10 @@ function wait(ms) {
     PdfViewer.currentPdfBlob = { tag: 'fallback-source' };
     PdfViewer._committedPanelId = 'CP-NEW';
     PdfViewer._committedUrl = 'https://example.com/panel.pdf';
+    PdfViewer._hasEverCommittedDocument = true;
     PdfViewer._transitionToFallback('https://example.com/panel.pdf');
-    assert(PdfViewer.hasCommittedDocumentTarget() === true, 'fallback after a successful load should preserve the last committed document identity');
+    assert(PdfViewer.hasEverCommittedDocumentTarget() === true, 'fallback after a successful load should preserve the session-level successful-load flag');
+    assert(PdfViewer.hasCommittedDocumentTarget() === false, 'fallback after a successful load should clear the stale committed document target');
     assert(PdfViewer.currentBlobUrl === '', 'fallback after a successful load should clear the stale committed blob URL');
     assert(PdfViewer.currentPdfBlob === null, 'fallback after a successful load should clear the stale committed blob object');
     assert(PdfViewer._documentActionsInvalidated === true, 'fallback after a successful load should keep document actions invalidated');
