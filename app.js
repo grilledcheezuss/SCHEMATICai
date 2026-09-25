@@ -5941,13 +5941,13 @@ class PdfViewer {
         const container = document.getElementById('pdf-main-view'); 
         if (!container) {
             console.error('PDF container not found');
-            return;
+            return false;
         }
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
-            return;
+            return false;
         }
         if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration !== this._pendingGestureCommitGeneration) {
-            return;
+            return false;
         }
         const renderStartMs = getNowMs();
         let firstPageReadyMs = null;
@@ -5969,7 +5969,7 @@ class PdfViewer {
         if (!this.doc) {
             console.error('No PDF document loaded');
             if (stage.parentNode) stage.remove();
-            return;
+            return false;
         }
         
         // Capture render token to detect if rendering is superseded
@@ -5987,14 +5987,14 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
             
             // Check if document is still valid
             if (!this.isDocumentValid()) {
                 console.warn('[renderStack] Document became invalid during rendering');
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
             
             let page; let isTemplate = false;
@@ -6013,7 +6013,7 @@ class PdfViewer {
                 if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
                     console.error('[renderStack] Transport destroyed - stopping render');
                     if (stage.parentNode) stage.remove();
-                    return;
+                    return false;
                 }
                 // Fall back to original doc's page 1 if template fails
                 try { page = await this.doc.getPage(i); } catch(e) { continue; }
@@ -6090,7 +6090,7 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled before attaching page ${i} (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
 
             wrapper.appendChild(contentContainer); 
@@ -6105,7 +6105,7 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled before canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
 
             // Add null check for canvas context and wrap render in try/catch
@@ -6123,7 +6123,7 @@ class PdfViewer {
                     if (renderError.message?.includes('destroyed') || renderError.message?.includes('Transport destroyed')) {
                         console.error('[renderStack] Transport destroyed during render - stopping');
                         if (stage.parentNode) stage.remove();
-                        return;
+                        return false;
                     }
                 }
             }
@@ -6131,7 +6131,7 @@ class PdfViewer {
                 console.log(`[renderStack] Render cancelled after canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
-                return;
+                return false;
             }
             // Re-scale any existing overlay zones to match new page dimensions
             await PdfViewer.waitForLayoutStable(contentContainer);
@@ -6142,11 +6142,11 @@ class PdfViewer {
         await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
             if (stage.parentNode) stage.remove();
-            return;
+            return false;
         }
         if (expectedGestureCommitGeneration !== null && expectedGestureCommitGeneration !== this._pendingGestureCommitGeneration) {
             if (stage.parentNode) stage.remove();
-            return;
+            return false;
         }
         const existingStages = Array.from(container.querySelectorAll('.pdf-gesture-stage'));
         if (stage.parentNode !== container) {
