@@ -101,7 +101,24 @@ function wait(ms) {
             return target === toolbarDownloadButton;
         }
     };
-    const maintainPositionToggle = { checked: false };
+    let maintainPositionToggle = {
+        tagName: 'BUTTON',
+        type: 'button',
+        attributes: {},
+        classes: new Set(),
+        setAttribute(name, value) {
+            this.attributes[name] = value;
+        },
+        classList: {
+            toggle(name, force) {
+                if (force) {
+                    maintainPositionToggle.classes.add(name);
+                } else {
+                    maintainPositionToggle.classes.delete(name);
+                }
+            }
+        }
+    };
     let objectUrlCounter = 0;
     let popupBlocked = false;
     let popupPrintMissing = false;
@@ -325,8 +342,32 @@ function wait(ms) {
     PdfViewer.initToolbarState();
     assert(toolbarDownloadLabel.textContent === 'Download', 'non-iOS browsers should keep the Download label');
     PdfViewer.setMaintainPositionBetweenResults(true);
-    assert(maintainPositionToggle.checked === true, 'maintain-position toggle should sync checked state');
+    assert(maintainPositionToggle.attributes['aria-pressed'] === 'true', 'maintain-position toggle should expose aria-pressed true when enabled');
+    assert(maintainPositionToggle.classes.has('is-active') === true, 'maintain-position toggle should expose active class when enabled');
     assert(localStorageState.get(PdfViewer.MAINTAIN_POSITION_STORAGE_KEY) === 'true', 'maintain-position preference should persist to localStorage');
+    PdfViewer.setMaintainPositionBetweenResults(false);
+    assert(maintainPositionToggle.attributes['aria-pressed'] === 'false', 'maintain-position toggle should expose aria-pressed false when disabled');
+    assert(maintainPositionToggle.classes.has('is-active') === false, 'maintain-position toggle active class should clear when disabled');
+
+    maintainPositionToggle = {
+        tagName: 'INPUT',
+        type: 'checkbox',
+        checked: false,
+        classes: new Set(),
+        classList: {
+            toggle(name, force) {
+                if (force) {
+                    maintainPositionToggle.classes.add(name);
+                } else {
+                    maintainPositionToggle.classes.delete(name);
+                }
+            }
+        }
+    };
+    PdfViewer.setMaintainPositionBetweenResults(true);
+    assert(maintainPositionToggle.checked === true, 'checkbox fallback toggle should sync checked state');
+    assert(maintainPositionToggle['aria-pressed'] === 'true', 'fallback toggle should sync aria-pressed without setAttribute');
+    assert(maintainPositionToggle.classes.has('is-active') === true, 'checkbox fallback toggle should still apply active class');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';

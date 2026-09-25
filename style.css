@@ -192,6 +192,13 @@ header {
     z-index: 100; flex-shrink: 0; position: relative; 
 }
 
+.brand-lockup {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    min-width: 0;
+}
+
 .logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; justify-content: center; } 
 .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.31rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; } 
 .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.79rem; color: #b39ddb; font-weight: 700; letter-spacing: 4.5px; text-transform: uppercase; margin-top: 3px; margin-left: 2px; }
@@ -203,6 +210,7 @@ header {
     align-items: center;
     justify-content: flex-start;
     pointer-events: none;
+    min-width: 0;
     background: transparent;
     border: none;
     box-shadow: none;
@@ -481,17 +489,46 @@ body.pdf-toolbar-session-ready #pdf-toolbar { display: flex; }
     display: inline-flex;
     align-items: center;
 }
-#pdf-toolbar .pdf-toolbar-toggle {
+#pdf-toolbar .pdf-maintain-position-btn {
+    transition: 0.2s;
+}
+#pdf-toolbar .maintain-lock-icon {
+    width: 14px;
+    height: 14px;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    color: var(--text-primary);
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
+    justify-content: center;
 }
-#pdf-toolbar .pdf-toolbar-toggle input {
-    margin: 0;
+#pdf-toolbar .maintain-lock-icon svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+#pdf-toolbar .maintain-lock-icon--locked {
+    display: none;
+}
+#pdf-toolbar .pdf-maintain-position-btn[aria-pressed="true"] {
+    background: var(--app-primary);
+    border-color: var(--app-primary);
+    color: #ffffff;
+}
+#pdf-toolbar .pdf-maintain-position-btn[aria-pressed="true"] .maintain-lock-icon--unlocked {
+    display: none;
+}
+#pdf-toolbar .pdf-maintain-position-btn[aria-pressed="true"] .maintain-lock-icon--locked {
+    display: inline-flex;
+}
+#pdf-toolbar .pdf-maintain-position-btn:focus-visible {
+    outline: 2px solid var(--app-primary);
+    outline-offset: 2px;
+}
+#pdf-toolbar .pdf-maintain-position-btn[aria-pressed="true"]:focus-visible {
+    outline-color: #ffffff;
+    box-shadow: 0 0 0 2px var(--app-primary), var(--surface-soft-shadow);
 }
 #pdf-toolbar .pdf-toolbar-hint {
     display: none;
@@ -1036,8 +1073,9 @@ input[type="date"].demo-input { text-align: left; }
         justify-content: flex-start;
         align-content: center;
     }
-    #pdf-toolbar .pdf-toolbar-toggle {
+    #pdf-toolbar .pdf-maintain-position-btn {
         width: 100%;
+        justify-content: center;
     }
     #pdf-toolbar .pdf-download-control {
         max-width: 100%;
@@ -1177,6 +1215,9 @@ input[type="date"].demo-input { text-align: left; }
     .logo-main { font-size: 1.58rem; } 
     .logo-sub { font-size: 0.63rem; letter-spacing: 2px; }
     .date-stage-row { flex-wrap: wrap; }
+    #pdf-toolbar .pdf-maintain-position-btn .pdf-tool-btn-label {
+        font-size: 11px;
+    }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) {
@@ -1188,6 +1229,39 @@ input[type="date"].demo-input { text-align: left; }
 
 @media (min-width: 768px) {
     #menu-demo { display: flex; }
+    .brand-lockup {
+        padding-bottom: 2px;
+        padding-right: clamp(114px, 15vw, 156px);
+        max-width: calc(100% - 58px);
+    }
+    .logo-group {
+        position: relative;
+    }
+    .logo-main {
+        font-size: clamp(2.2rem, 2.75vw, 2.55rem);
+        letter-spacing: -1.1px;
+    }
+    .logo-sub {
+        font-size: clamp(0.66rem, 0.85vw, 0.76rem);
+        letter-spacing: 3.4px;
+        font-weight: 800;
+        margin-top: 2px;
+    }
+    .app-title-group {
+        position: absolute;
+        left: calc(100% - 2px);
+        bottom: 3px;
+        margin-left: 0;
+        align-items: flex-end;
+    }
+    .app-title-main {
+        font-size: clamp(0.88rem, 1.2vw, 1.02rem);
+        font-weight: 800;
+        letter-spacing: 0.32px;
+        text-transform: none;
+        line-height: 1;
+        white-space: nowrap;
+    }
 }
 
 @media (min-width: 768px) {
