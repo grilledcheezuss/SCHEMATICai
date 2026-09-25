@@ -199,30 +199,27 @@ header {
     min-width: 0;
 }
 
-.logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; justify-content: center; } 
+.logo-group { text-decoration: none; display: flex; flex-direction: column; line-height: 1; z-index: 2; justify-content: center; min-width: 0; } 
 .logo-main { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 2.31rem; font-weight: 900; color: white; letter-spacing: -1px; text-transform: uppercase; } 
-.logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.79rem; color: #b39ddb; font-weight: 700; letter-spacing: 4.5px; text-transform: uppercase; margin-top: 3px; margin-left: 2px; }
-
-.app-title-group { 
-    margin-left: 12px;
-    text-align: left;
+.logo-sub-row {
     display: inline-flex;
-    align-items: center;
-    justify-content: flex-start;
-    pointer-events: none;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 3px;
     min-width: 0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    padding: 0;
 }
+.logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.79rem; color: #b39ddb; font-weight: 700; letter-spacing: 4.5px; text-transform: uppercase; margin-left: 2px; flex: 0 0 auto; }
 .app-title-main { 
-    font-family: 'Inter', sans-serif; 
-    font-size: 1.15rem;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.79rem;
     font-weight: 700;
     color: white; 
-    letter-spacing: 0.2px;
+    letter-spacing: 4.5px;
     text-shadow: none;
+    line-height: 1;
+    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 .app-title-version { 
     font-family: 'Inter', sans-serif;
@@ -1072,10 +1069,29 @@ input[type="date"].demo-input { text-align: left; }
     #pdf-toolbar {
         justify-content: flex-start;
         align-content: center;
+        gap: 4px;
+        padding: 5px 6px;
+        flex-wrap: nowrap;
+    }
+    #pdf-toolbar .pdf-tool-btn {
+        height: 30px;
+        padding: 0 5px;
+        gap: 4px;
+        font-size: 10px;
     }
     #pdf-toolbar .pdf-maintain-position-btn {
-        width: 100%;
+        width: auto;
         justify-content: center;
+        padding: 0 6px;
+        gap: 3px;
+    }
+    #pdf-toolbar .pdf-tool-btn-icon {
+        font-size: 12px;
+    }
+    #pdf-toolbar .maintain-lock-icon,
+    #pdf-toolbar .maintain-lock-icon svg {
+        width: 12px;
+        height: 12px;
     }
     #pdf-toolbar .pdf-download-control {
         max-width: 100%;
@@ -1198,24 +1214,24 @@ input[type="date"].demo-input { text-align: left; }
         gap: 6px;
         margin-top: 1px;
     }
-    
-    .app-title-group {
-        margin-left: 8px;
-        padding: 0;
+    .logo-sub-row {
+        gap: 4px;
+        margin-top: 2px;
     }
     .app-title-main {
-        color: rgba(255,255,255,0.9); 
-        background: rgba(255,255,255,0.2); 
-        padding: 2px 6px; 
-        border-radius: 6px; 
-        font-size: 11px;
-        letter-spacing: 0.25px;
-        line-height: 1.2;
+        font-size: 0.63rem;
+        font-weight: 700;
+        letter-spacing: 2px;
     }
     .logo-main { font-size: 1.58rem; } 
     .logo-sub { font-size: 0.63rem; letter-spacing: 2px; }
     .date-stage-row { flex-wrap: wrap; }
     #pdf-toolbar .pdf-maintain-position-btn .pdf-tool-btn-label {
+        font-size: 10px;
+        letter-spacing: 0.1px;
+    }
+    #pdf-zoom-level {
+        min-width: 34px;
         font-size: 11px;
     }
 }
@@ -1241,26 +1257,20 @@ input[type="date"].demo-input { text-align: left; }
         font-size: clamp(2.2rem, 2.75vw, 2.55rem);
         letter-spacing: -1.1px;
     }
+    .logo-sub-row {
+        gap: clamp(5px, 0.7vw, 8px);
+        margin-top: 2px;
+    }
     .logo-sub {
         font-size: clamp(0.66rem, 0.85vw, 0.76rem);
         letter-spacing: 3.4px;
         font-weight: 800;
-        margin-top: 2px;
-    }
-    .app-title-group {
-        position: absolute;
-        left: calc(100% - 2px);
-        bottom: 3px;
-        margin-left: 0;
-        align-items: flex-end;
     }
     .app-title-main {
-        font-size: clamp(0.88rem, 1.2vw, 1.02rem);
+        font-size: clamp(0.66rem, 0.85vw, 0.76rem);
         font-weight: 800;
-        letter-spacing: 0.32px;
+        letter-spacing: 3.4px;
         text-transform: none;
-        line-height: 1;
-        white-space: nowrap;
     }
 }
 

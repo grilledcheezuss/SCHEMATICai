@@ -20,7 +20,7 @@ function assert(condition, message) {
     assert(compactLegacyCount === 0, 'header should not include duplicated legacy SCHEMATICAai text');
     assert(/id="app-program-name"/.test(headerHtml), 'header should keep a single app-program-name element for branding hook consistency');
     assert(/class="brand-lockup"/.test(headerHtml), 'header should keep the logo + title in a shared lockup wrapper');
-    assert(/class="logo-group"[\s\S]*id="app-program-name"/.test(headerHtml), 'header branding should keep SCHEMATICA ai adjacent to the Cox logo treatment');
+    assert(/class="logo-sub-row"[\s\S]*RESEARCH[\s\S]*id="app-program-name"/.test(headerHtml), 'header branding should keep RESEARCH and SCHEMATICA ai on the shared lower lockup row');
 
     const toolbarStart = html.indexOf('<div id="pdf-toolbar">');
     const toolbarEnd = html.indexOf('<div id="custom-pdf-viewer"', toolbarStart);
@@ -28,7 +28,8 @@ function assert(condition, message) {
     const toolbarHtml = html.slice(toolbarStart, toolbarEnd);
     assert(/id="pdf-maintain-position-toggle"/.test(toolbarHtml), 'toolbar should include maintain-position toggle button');
     assert(/id="pdf-maintain-position-toggle"[\s\S]*aria-pressed="false"/.test(toolbarHtml), 'maintain-position toggle should use aria-pressed semantics');
-    assert(/Zoom In[\s\S]*id="pdf-maintain-position-toggle"/.test(toolbarHtml), 'maintain-position toggle should appear after the Zoom In button');
+    assert(/id="pdf-maintain-position-toggle"[\s\S]*Lock Position/.test(toolbarHtml), 'maintain-position toggle should use the Lock Position label');
+    assert(/id="pdf-download-control"[\s\S]*id="pdf-maintain-position-toggle"[\s\S]*Zoom Out[\s\S]*id="pdf-zoom-level"[\s\S]*Zoom In/.test(toolbarHtml), 'toolbar should keep Lock Position immediately before the zoom controls');
 
     console.log('✅ Header branding markup tests passed');
 })();

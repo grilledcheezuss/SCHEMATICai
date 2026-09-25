@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.87 ---
-const APP_VERSION = "v2.5.87";
+// --- SCHEMATICA ai v2.5.88 ---
+const APP_VERSION = "v2.5.88";
 const VERSION_HISTORY = {
+    "v2.5.88": "Frontend-only header/toolbar refinement: keep RESEARCH fixed to the Cox lockup while SCHEMATICA ai continues from the same lower row, relabel the existing lock pill to Lock Position, and tighten mobile toolbar sizing without changing viewer or backend behavior",
     "v2.5.87": "Desktop branding + toolbar refinement: tuned the Cox/SCHEMATICA ai desktop lockup, converted maintain-position into a lock-style pill toggle beside zoom controls with active purple state and aria-pressed semantics, and kept maintain-position persistence/behavior unchanged",
     "v2.5.86": "iOS Save PDF refinement: the first Save PDF tap now opens a button-anchored Share → Save to Files tooltip, a fast second tap proceeds immediately, and the contextual guidance resets safely per committed document without changing desktop or backend behavior",
     "v2.5.85": "Viewer/header polish follow-up: keep the PDF toolbar session-mounted across mobile replacement transitions, improve iOS Safari Save PDF detection for Share-to-Files guidance, and move the desktop SCHEMATICA ai title beside the Cox logo with simpler chrome while preserving mobile behavior",

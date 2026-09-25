@@ -1,6 +1,6 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.87
+## Version: v2.5.88
 
 ## Overview
 
@@ -10,6 +10,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.88**: Frontend-only refinement follow-up: desktop/tablet branding keeps RESEARCH anchored to COX while SCHEMATICA ai continues from the same lower row, the existing lock pill now reads Lock Position before the zoom controls, mobile toolbar sizing is tightened to keep one-row controls, and Worker/backend behavior is unchanged
 - **v2.5.87**: Desktop header branding and PDF-toolbar control refinement: desktop/tablet lockup now positions SCHEMATICA ai as a complementary lower-right title beside the Cox logo, and maintain-position is now a lock-icon pill toggle beside zoom controls with active-purple pressed state while preserving existing persistence/restore behavior and Worker parity
 - **v2.5.86**: iOS Save PDF refinement: the first Save PDF tap now opens a button-anchored Share → Save to Files tooltip, a fast second tap proceeds immediately, and the contextual guidance resets per committed document without changing desktop or Worker behavior
 - **v2.5.85**: Viewer/header polish follow-up: keep the PDF toolbar session-mounted through mobile replacement transitions, harden iOS Safari Save PDF detection so Share-to-Files guidance appears reliably, and move the desktop SCHEMATICA ai title beside the Cox logo with simplified chrome while preserving mobile behavior and Worker parity

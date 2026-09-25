@@ -1,8 +1,15 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.87)
+CLOUDFLARE WORKER SCRIPT (v2.5.88)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.87):
+RECENT UPDATES (v2.5.88):
+
+- Desktop/tablet header branding now keeps RESEARCH fixed to the Cox logo while SCHEMATICA ai continues immediately to its right on the same lower lockup row at matching scale
+- The existing lock-icon PDF toolbar pill now reads "Lock Position", stays ahead of the zoom controls, and keeps the same persistence, purple active state, icon treatment, and underlying maintain-position behavior
+- Mobile PDF toolbar sizing is tightened so Print/Save PDF, Lock Position, and zoom controls stay on one row without changing Worker/backend behavior
+- Version strings aligned to v2.5.88 across the viewer/client and Worker-facing version surfaces, and Worker/backend behavior is unchanged
+
+PREVIOUS UPDATES (v2.5.87):
 
 - Desktop/tablet header branding now uses a tighter Cox + SCHEMATICA ai lockup with the product name anchored at the lower-right of the logo treatment (single title only, no restored icy title chrome)
 - "Maintain position between results" is now a lock-icon pill toggle beside Zoom +, matching Print/Save toolbar styling with purple active-state inversion while keeping localStorage persistence and maintain-position behavior unchanged
