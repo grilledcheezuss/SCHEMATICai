@@ -215,6 +215,11 @@ async function wait(ms) {
     PdfViewer.currentScale = PdfViewer.MIN_SCALE;
     PdfViewer.zoom(-0.2);
     assert(PdfViewer.currentScale === PdfViewer.MIN_SCALE, 'zoom out should clamp at MIN_SCALE');
+    const priorRestoreSequence = PdfViewer._viewportRestoreSequence;
+    PdfViewer.currentScale = 1.0;
+    PdfViewer.zoom(0.2);
+    assert(PdfViewer._viewportRestoreSequence === (priorRestoreSequence + 1), 'zoom should invalidate stale viewport-restoration sequences');
+    await wait(PdfViewer.ZOOM_DEBOUNCE_MS + 40);
 
     PdfViewer.initViewerInteractions();
     assert(viewerListeners.has('wheel'), 'initViewerInteractions should attach wheel listener');
@@ -227,6 +232,13 @@ async function wait(ms) {
 
     PdfViewer._zoomInteractionElement = viewerEl;
     PdfViewer._gestureStageElement = activeStage;
+    const panBounds = PdfViewer._getPanBounds(1);
+    assert(panBounds.minX < 0 && panBounds.maxX > 0, 'pan bounds should allow movement in both horizontal directions when zoomed');
+    assert(panBounds.minY < 0 && panBounds.maxY > 0, 'pan bounds should allow movement in both vertical directions when zoomed');
+    const clampedPan = PdfViewer._clampPan(9999, -9999, 1);
+    assert(clampedPan.x === panBounds.maxX, `pan clamp should cap rightward motion at dynamic bound, got ${clampedPan.x}`);
+    assert(clampedPan.y === panBounds.minY, `pan clamp should cap upward motion at dynamic bound, got ${clampedPan.y}`);
+
     PdfViewer._committedPanX = -120;
     PdfViewer._committedPanY = 150;
     PdfViewer._liveScale = 1.25;

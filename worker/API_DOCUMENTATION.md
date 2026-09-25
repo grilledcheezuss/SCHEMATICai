@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.91
+## Version: v2.5.92
 
-_Release-alignment note: this patch version is mirrored here for app/Worker bookkeeping, but the Worker API surface and backend behavior are unchanged from v2.5.90._
+_Release-alignment note: this patch version is mirrored here for app/Worker bookkeeping, but the Worker API surface and backend behavior are unchanged from v2.5.91._
 
 ## Overview
 
@@ -12,6 +12,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.92**: Frontend-only PDF zoom/pan stability follow-up: pan clamping now derives directional movement bounds from live viewer scroll geometry (avoiding inconsistent lockouts near edges), viewport restore sequences are invalidated when touch gestures take ownership, and stale restore callbacks no longer overwrite newer touch/wheel zoom interactions; Worker API/backend behavior is unchanged
 - **v2.5.91**: Frontend-only keyword dominance follow-up: mixed Allowed and Blocked term searches now use an explicit dominance branch that compares occurrence counts per eligible record (allowed must exceed blocked or the record stays hidden), while contradiction validation, pagination/count behavior, and Worker API/backend behavior remain unchanged
 - **v2.5.90**: Frontend-only keyword follow-up: keyword editing now manages independent Allowed and Blocked term sets, adds case-insensitive contradiction validation with inline warning + blocked search execution on overlap, and applies explicit allowed-then-blocked client-side filtering while Worker API/backend behavior remains unchanged
 - **v2.5.89**: Frontend-only keyword search refinement: adds a blocklist-mode toggle at the keyword input with red active treatment and explicit allowed/blocked placeholder guidance, applies an isolated top-level keyword branch so inclusive matching remains unchanged while blocked-term matches are excluded from visible results, and Worker API/backend behavior is unchanged

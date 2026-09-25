@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.91 ---
-const APP_VERSION = "v2.5.91";
+// --- SCHEMATICA ai v2.5.92 ---
+const APP_VERSION = "v2.5.92";
 const VERSION_HISTORY = {
+    "v2.5.92": "PDF zoom/pan stability refinement: replaced symmetric pan clamping with scroll-aware directional bounds, cancel stale viewport-restoration sequences during active gestures, and block delayed restore callbacks from overriding newer touch/wheel zoom interactions",
     "v2.5.91": "Keyword dominance refinement (frontend-only): mixed Allowed/Blocked keyword searches now compare occurrence counts in a single explicit branch while preserving contradiction validation, pagination/results consistency, and unchanged Worker/backend behavior",
     "v2.5.90": "Keyword refinement (frontend-only): split keywords into independent Allowed/Blocked term sets with mode-switched editing, contradiction validation + inline warning, and explicit allowed-then-blocked filtering while keeping Worker/backend behavior unchanged",
     "v2.5.89": "Keyword blocklist mode (frontend-only): add a flush keyword-end prohibited toggle with red active treatment and placeholder guidance, branch keyword filtering to exclude any matched blocked term while preserving inclusive mode and matcher internals, and keep Worker/backend behavior unchanged",
@@ -5426,23 +5427,27 @@ class PdfViewer {
     static _getPanBounds(scaleMultiplier = 1) {
         const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
         const stage = this._getGestureStage();
-        if (!viewer || !stage) return { maxX: 0, maxY: 0 };
+        if (!viewer || !stage) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
         const viewerWidth = Math.max(1, viewer.clientWidth || 0);
         const viewerHeight = Math.max(1, viewer.clientHeight || 0);
         const contentWidth = Math.max(1, stage.offsetWidth || 0) * scaleMultiplier;
         const contentHeight = Math.max(1, stage.offsetHeight || 0) * scaleMultiplier;
-
-        const maxX = Math.max(0, ((contentWidth - viewerWidth) / 2) + 24);
-        const maxY = Math.max(0, ((contentHeight - viewerHeight) / 2) + 24);
-        return { maxX, maxY };
+        const edgeAllowance = 24;
+        const baseLeft = (stage.offsetLeft || 0) - (viewer.scrollLeft || 0);
+        const baseTop = (stage.offsetTop || 0) - (viewer.scrollTop || 0);
+        const minX = Math.min(0, (viewerWidth - edgeAllowance) - (baseLeft + contentWidth));
+        const maxX = Math.max(0, edgeAllowance - baseLeft);
+        const minY = Math.min(0, (viewerHeight - edgeAllowance) - (baseTop + contentHeight));
+        const maxY = Math.max(0, edgeAllowance - baseTop);
+        return { minX, maxX, minY, maxY };
     }
 
     static _clampPan(x, y, scaleMultiplier = 1) {
-        const { maxX, maxY } = this._getPanBounds(scaleMultiplier);
+        const { minX, maxX, minY, maxY } = this._getPanBounds(scaleMultiplier);
         return {
-            x: Math.min(maxX, Math.max(-maxX, Number.isFinite(x) ? x : 0)),
-            y: Math.min(maxY, Math.max(-maxY, Number.isFinite(y) ? y : 0))
+            x: Math.min(maxX, Math.max(minX, Number.isFinite(x) ? x : 0)),
+            y: Math.min(maxY, Math.max(minY, Number.isFinite(y) ? y : 0))
         };
     }
 
@@ -5459,7 +5464,7 @@ class PdfViewer {
     static _isZoomedForPan() {
         const scaleMultiplier = this._liveScale || 1;
         const bounds = this._getPanBounds(scaleMultiplier);
-        return bounds.maxX > 0 || bounds.maxY > 0 || this.currentScale > 1.01;
+        return (bounds.maxX - bounds.minX) > 0 || (bounds.maxY - bounds.minY) > 0 || this.currentScale > 1.01;
     }
 
     static _clearActiveGesture() {
@@ -5637,6 +5642,9 @@ class PdfViewer {
         const viewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
         const stage = this._getGestureStage();
         if (!viewer || !stage || !this.isDocumentValid() || this._uiState !== PDF_UI_STATE.READY || this._activeGesture) {
+            if (this._activeGesture) {
+                this._viewportRestoreSequence++;
+            }
             this._clampViewerScroll(viewer);
             return;
         }
@@ -5648,7 +5656,6 @@ class PdfViewer {
             requestAnimationFrame(() => {
                 if (restoreSequence !== this._viewportRestoreSequence) return;
                 if (this._activeGesture) {
-                    attemptRestore(remainingRetries);
                     return;
                 }
                 const activeViewer = this._zoomInteractionElement || document.getElementById('pdf-main-view');
@@ -5835,6 +5842,7 @@ class PdfViewer {
                 const t0 = touches[0];
                 const t1 = touches[1];
                 const visualScale = this._clampScale(this.currentScale * (this._liveScale || 1));
+                this._viewportRestoreSequence++;
                 this._activeGesture = {
                     mode: 'pinch',
                     documentLoadToken: this._documentLoadToken,
@@ -5852,6 +5860,7 @@ class PdfViewer {
 
             if (touches.length === 1 && this._isZoomedForPan()) {
                 const touch = touches[0];
+                this._viewportRestoreSequence++;
                 this._activeGesture = {
                     mode: 'pan',
                     documentLoadToken: this._documentLoadToken,
@@ -6933,6 +6942,7 @@ class PdfViewer {
         const priorScale = this.currentScale;
         const nextScale = this._clampScale(this.currentScale + delta);
         if (nextScale === this.currentScale) return;
+        this._viewportRestoreSequence++;
         this.currentScale = nextScale;
         this._userHasAdjustedZoom = true;
         this._updateZoomLabel();

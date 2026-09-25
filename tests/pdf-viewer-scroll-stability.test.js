@@ -312,6 +312,15 @@ function matchesSelector(node, selector) {
         fn();
         return rafCount;
     };
+    const restoreSequenceBeforeGesture = PdfViewer._viewportRestoreSequence;
+    const scrollLeftBeforeGestureRestore = viewer.scrollLeft;
+    const scrollTopBeforeGestureRestore = viewer.scrollTop;
+    PdfViewer._activeGesture = { mode: 'pan', documentLoadToken: PdfViewer._documentLoadToken };
+    PdfViewer._scheduleViewportAnchorRestore({ retries: 1 });
+    assert(PdfViewer._viewportRestoreSequence === (restoreSequenceBeforeGesture + 1), 'active gestures should invalidate stale viewport restore sequences');
+    assert(rafCount === 0, `active-gesture restore should not queue restoration frames, got ${rafCount}`);
+    assert(viewer.scrollLeft === scrollLeftBeforeGestureRestore && viewer.scrollTop === scrollTopBeforeGestureRestore, 'active-gesture restore should not jump scroll position');
+    PdfViewer._activeGesture = null;
     PdfViewer._scheduleViewportAnchorRestore({ retries: 1 });
     global.requestAnimationFrame = realRequestAnimationFrame;
     assert(viewer.scrollLeft >= 0 && viewer.scrollLeft <= (viewer.scrollWidth - viewer.clientWidth), 'viewport anchor restore should keep horizontal scroll clamped');

@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.91
+// 🧠 SCHEMATICA ai WORKER v2.5.92
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
