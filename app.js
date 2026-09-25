@@ -4760,9 +4760,16 @@ class PdfViewer {
         return !!viewerSurface?.querySelector('.pdf-gesture-stage:not(.pdf-gesture-stage--staging)');
     }
 
+    static _hasCommittedViewerState() {
+        const activeStage = this._getGestureStage();
+        return !!activeStage?.isConnected
+            || this.hasCommittedDocumentTarget()
+            || this._uiState === PDF_UI_STATE.READY;
+    }
+
     static _getLoadingUiState() {
         return this._pendingLoadUiState
-            || (this._hasActiveRenderedSurface()
+            || (this._hasCommittedViewerState()
             ? PDF_UI_STATE.REPLACEMENT_LOADING
             : PDF_UI_STATE.FIRST_LOAD_LOADING);
     }
@@ -4785,10 +4792,7 @@ class PdfViewer {
 
     static _beginDocumentLoad() {
         const activeStage = this._getGestureStage();
-        const hasCommittedViewerState = !!activeStage?.isConnected
-            || this.hasCommittedDocumentTarget()
-            || this._uiState === PDF_UI_STATE.READY;
-        this._pendingLoadUiState = hasCommittedViewerState
+        this._pendingLoadUiState = this._hasCommittedViewerState()
             ? PDF_UI_STATE.REPLACEMENT_LOADING
             : PDF_UI_STATE.FIRST_LOAD_LOADING;
         if (activeStage?.isConnected) {
