@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.89 ---
-const APP_VERSION = "v2.5.89";
+// --- SCHEMATICA ai v2.5.90 ---
+const APP_VERSION = "v2.5.90";
 const VERSION_HISTORY = {
+    "v2.5.90": "Keyword refinement (frontend-only): split keywords into independent Allowed/Blocked term sets with mode-switched editing, contradiction validation + inline warning, and explicit allowed-then-blocked filtering while keeping Worker/backend behavior unchanged",
     "v2.5.89": "Keyword blocklist mode (frontend-only): add a flush keyword-end prohibited toggle with red active treatment and placeholder guidance, branch keyword filtering to exclude any matched blocked term while preserving inclusive mode and matcher internals, and keep Worker/backend behavior unchanged",
     "v2.5.88": "Frontend-only header/toolbar refinement: keep RESEARCH fixed to the Cox lockup while SCHEMATICA ai continues from the same lower row, relabel the existing lock pill to Lock Position, and tighten mobile toolbar sizing without changing viewer or backend behavior",
     "v2.5.87": "Desktop branding + toolbar refinement: tuned the Cox/SCHEMATICA ai desktop lockup, converted maintain-position into a lock-style pill toggle beside zoom controls with active purple state and aria-pressed semantics, and kept maintain-position persistence/behavior unchanged",
@@ -3397,12 +3398,13 @@ class FeedbackService {
     }
 
     static generateKeywordButtons() { 
-        const input = document.getElementById('keywordInput').value; 
         const container = document.getElementById('keyword-cluster'); 
         const wrapper = document.getElementById('keyword-feedback-area'); 
         container.innerHTML = ''; 
         
-        const keywords = input.split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length > 0); 
+        const keywords = Array.isArray(SearchEngine.lastCriteria?.kw)
+            ? SearchEngine.lastCriteria.kw
+            : SearchEngine.parseAllowedKeywordTerms(UI.getAllowedKeywordTermsInput());
         
         if (keywords.length === 0) { 
             wrapper.style.display = 'none'; 
@@ -3793,46 +3795,87 @@ class SearchEngine {
     static pageSize = 25;
     static lastCriteria = null;
     
-    static shouldIncludeRecordForKeywordMode(record, rawKeywords, expandedKeywords, blocklistMode) {
-        if (!expandedKeywords || expandedKeywords.length === 0) return true;
-        if (!blocklistMode) {
-            return KeywordMatcher.matches(record, rawKeywords, expandedKeywords);
+    static parseKeywordTerms(rawValue) {
+        if (!rawValue || typeof rawValue !== 'string') return [];
+        const unique = new Set();
+        rawValue
+            .split(',')
+            .map(s => s.trim().toUpperCase())
+            .filter(Boolean)
+            .forEach(term => unique.add(term));
+        return Array.from(unique);
+    }
+
+    static parseAllowedKeywordTerms(rawValue) {
+        return this.parseKeywordTerms(rawValue);
+    }
+
+    static parseBlockedKeywordTerms(rawValue) {
+        return this.parseKeywordTerms(rawValue);
+    }
+
+    static expandKeywordGroups(rawKeywords) {
+        return rawKeywords.map(k => {
+            for (const group of Object.values(AI_TRAINING_DATA.ALIASES)) {
+                if (group.includes(k)) return group;
+            }
+            return [k];
+        });
+    }
+
+    static collectKeywordTermSetValidation(allowedKeywords, blockedKeywords) {
+        if (!allowedKeywords.length || !blockedKeywords.length) {
+            return { hasContradiction: false, duplicates: [] };
+        }
+        const blockedSet = new Set(blockedKeywords);
+        const duplicates = allowedKeywords.filter(k => blockedSet.has(k));
+        return {
+            hasContradiction: duplicates.length > 0,
+            duplicates
+        };
+    }
+
+    static shouldIncludeRecordForKeywordSets(record, allowedRawKeywords, allowedExpandedKeywords, blockedRawKeywords, blockedExpandedKeywords) {
+        if (allowedExpandedKeywords.length && !KeywordMatcher.matches(record, allowedRawKeywords, allowedExpandedKeywords)) {
+            return false;
         }
 
-        const blockedMatchExists = expandedKeywords.some((group, idx) => {
-            const rawKeyword = rawKeywords[idx];
+        if (!blockedExpandedKeywords.length) return true;
+        const blockedMatchExists = blockedExpandedKeywords.some((group, idx) => {
+            const rawKeyword = blockedRawKeywords[idx];
             return KeywordMatcher.matchesSingleGroup(record, rawKeyword, group);
         });
         return !blockedMatchExists;
     }
 
     static perform() {
+        // === GATHER / VALIDATE KEYWORD CRITERIA ===
+        const allowedRawKeywords = this.parseAllowedKeywordTerms(UI.getAllowedKeywordTermsInput());
+        const blockedRawKeywords = this.parseBlockedKeywordTerms(UI.getBlockedKeywordTermsInput());
+        const keywordValidation = this.collectKeywordTermSetValidation(allowedRawKeywords, blockedRawKeywords);
+        UI.setKeywordContradictionWarning(keywordValidation.duplicates);
+        if (keywordValidation.hasContradiction) return;
+
         // === STOP PREVIOUS PRELOADING ===
         PdfController.stopPreloading();
         FeedbackService.resetLockout();
 
         // === GATHER SEARCH CRITERIA ===
-        const keywordInputEl = DOM_CACHE.get('keywordInput');
-        const rawKeywords = (keywordInputEl?.value || '').split(',').map(s=>s.trim().toUpperCase()).filter(s=>s.length);
-        const expandedKeywords = rawKeywords.map(k => {
-            for (const [key, group] of Object.entries(AI_TRAINING_DATA.ALIASES)) {
-                if (group.includes(k)) return group; 
-            }
-            return [k]; 
-        });
-        const blocklistMode = UI.isKeywordBlocklistMode();
+        const allowedExpandedKeywords = this.expandKeywordGroups(allowedRawKeywords);
+        const blockedExpandedKeywords = this.expandKeywordGroups(blockedRawKeywords);
 
         const catInputEl = DOM_CACHE.get('catInput');
         const cat = catInputEl?.value || 'Any';
         
         const crit = { 
-            kw: rawKeywords, 
+            kw: allowedRawKeywords,
+            blockedKw: blockedRawKeywords,
             mfg: DOM_CACHE.get('mfgInput')?.value || 'Any', 
             hp: DOM_CACHE.get('hpInput')?.value || 'Any', 
             volt: DOM_CACHE.get('voltInput')?.value || 'Any', 
             phase: DOM_CACHE.get('phaseInput')?.value || 'Any', 
             enc: DOM_CACHE.get('encInput')?.value || 'Any',
-            blocklistMode
+            blocklistMode: UI.isKeywordBlocklistMode()
         };
         
         // === FILTER AND SCORE RESULTS ===
@@ -3959,8 +4002,14 @@ class SearchEngine {
             }
             
             // Keyword filter using helper
-            if(!SearchEngine.shouldIncludeRecordForKeywordMode(r, rawKeywords, expandedKeywords, blocklistMode)) return;
-            if(expandedKeywords.length && !blocklistMode) w += 10;
+            if(!SearchEngine.shouldIncludeRecordForKeywordSets(
+                r,
+                allowedRawKeywords,
+                allowedExpandedKeywords,
+                blockedRawKeywords,
+                blockedExpandedKeywords
+            )) return;
+            if(allowedExpandedKeywords.length) w += 10;
 
             r.w=w; r.p=p; r.mfgV=mfgV; r.hpV=hpV; r.voltV=voltV; r.phaseV=phaseV; r.encV=encV; res.push(r);
         });
@@ -7033,6 +7082,8 @@ class UI {
     static keywordBlocklistMode = false;
     static keywordAllowedPlaceholder = 'Allowed Terms - Use Comma To Separate';
     static keywordBlockedPlaceholder = 'Blocked Terms - Use Comma To Separate';
+    static keywordAllowedTermsInput = '';
+    static keywordBlockedTermsInput = '';
 
     static init() { 
         if(localStorage.getItem('cox_theme') === 'dark') { 
@@ -7084,10 +7135,50 @@ class UI {
     
     static resetSearch() { 
         document.querySelectorAll('select').forEach(s=>s.value="Any"); 
-        const keywordInput = DOM_CACHE.get('keywordInput');
-        if (keywordInput) keywordInput.value=''; 
+        this.keywordAllowedTermsInput = '';
+        this.keywordBlockedTermsInput = '';
+        this.setKeywordContradictionWarning([]);
         this.setKeywordBlocklistMode(false);
         this.toggleSearch(true); 
+    }
+
+    static getAllowedKeywordTermsInput() {
+        return this.keywordAllowedTermsInput || '';
+    }
+
+    static getBlockedKeywordTermsInput() {
+        return this.keywordBlockedTermsInput || '';
+    }
+
+    static setKeywordContradictionWarning(duplicateTerms) {
+        const warningEl = DOM_CACHE.get('keyword-contradiction-warning');
+        if (!warningEl) return;
+        const duplicates = Array.isArray(duplicateTerms) ? duplicateTerms : [];
+        if (duplicates.length === 0) {
+            warningEl.textContent = '';
+            warningEl.style.display = 'none';
+            return;
+        }
+        warningEl.textContent = `${duplicates.join(', ')} ${duplicates.length === 1 ? 'appears' : 'appear'} in Allowed and Blocked Terms`;
+        warningEl.style.display = 'inline';
+    }
+
+    static refreshKeywordContradictionWarning() {
+        const allowedTerms = SearchEngine.parseAllowedKeywordTerms(this.getAllowedKeywordTermsInput());
+        const blockedTerms = SearchEngine.parseBlockedKeywordTerms(this.getBlockedKeywordTermsInput());
+        const validation = SearchEngine.collectKeywordTermSetValidation(allowedTerms, blockedTerms);
+        this.setKeywordContradictionWarning(validation.duplicates);
+    }
+
+    static handleKeywordInputChange() {
+        const keywordInput = DOM_CACHE.get('keywordInput');
+        if (!keywordInput) return;
+        if (this.isKeywordBlocklistMode()) {
+            this.keywordBlockedTermsInput = keywordInput.value || '';
+        } else {
+            this.keywordAllowedTermsInput = keywordInput.value || '';
+        }
+        this.refreshKeywordContradictionWarning();
     }
 
     static isKeywordBlocklistMode() {
@@ -7095,12 +7186,21 @@ class UI {
     }
 
     static setKeywordBlocklistMode(isActive) {
-        this.keywordBlocklistMode = isActive === true;
         const keywordInput = DOM_CACHE.get('keywordInput');
+        if (keywordInput) {
+            if (this.isKeywordBlocklistMode()) {
+                this.keywordBlockedTermsInput = keywordInput.value || '';
+            } else {
+                this.keywordAllowedTermsInput = keywordInput.value || '';
+            }
+        }
+
+        this.keywordBlocklistMode = isActive === true;
         const blocklistToggle = DOM_CACHE.get('keyword-blocklist-toggle');
         const isBlocklist = this.isKeywordBlocklistMode();
 
         if (keywordInput) {
+            keywordInput.value = isBlocklist ? this.getBlockedKeywordTermsInput() : this.getAllowedKeywordTermsInput();
             keywordInput.placeholder = isBlocklist ? this.keywordBlockedPlaceholder : this.keywordAllowedPlaceholder;
             keywordInput.classList.toggle('keyword-input-blocklist-active', isBlocklist);
         }
@@ -7117,6 +7217,8 @@ class UI {
                 ? 'Blocklist mode is ON (click to switch to allowed terms mode)'
                 : 'Blocklist mode is OFF (click to switch to blocked terms mode)';
         }
+
+        this.refreshKeywordContradictionWarning();
     }
 
     static toggleKeywordBlocklistMode() {
@@ -7400,6 +7502,7 @@ class UI {
     
 static pop() { 
     // === PRESERVE CURRENT SELECTIONS ===
+    this.handleKeywordInputChange();
     const savedValues = {
         mfg: DOM_CACHE.get('mfgInput')?.value,
         hp: DOM_CACHE.get('hpInput')?.value,
@@ -7407,7 +7510,9 @@ static pop() {
         phase: DOM_CACHE.get('phaseInput')?.value,
         enc: DOM_CACHE.get('encInput')?.value,
         cat: DOM_CACHE.get('catInput')?.value,
-        keyword: DOM_CACHE.get('keywordInput')?.value
+        keywordAllowed: this.getAllowedKeywordTermsInput(),
+        keywordBlocked: this.getBlockedKeywordTermsInput(),
+        keywordModeBlocked: this.isKeywordBlocklistMode()
     };
 
     // === MANUFACTURER LIST ===
@@ -7439,11 +7544,9 @@ static pop() {
         const catInput = DOM_CACHE.get('catInput');
         if (catInput) catInput.value = savedValues.cat;
     }
-    if (savedValues.keyword) {
-        const keywordInput = DOM_CACHE.get('keywordInput');
-        if (keywordInput) keywordInput.value = savedValues.keyword;
-    }
-    this.setKeywordBlocklistMode(this.isKeywordBlocklistMode());
+    this.keywordAllowedTermsInput = savedValues.keywordAllowed || '';
+    this.keywordBlockedTermsInput = savedValues.keywordBlocked || '';
+    this.setKeywordBlocklistMode(savedValues.keywordModeBlocked === true);
 }
 
 /**
@@ -7494,7 +7597,7 @@ static _generateBadges(record, criteria) {
     }
 
     // Keyword badges (avoid duplicating mfg badge)
-    if (criteria.kw && criteria.kw.length > 0 && !criteria.blocklistMode) {
+    if (criteria.kw && criteria.kw.length > 0 && (!criteria.blockedKw || criteria.blockedKw.length === 0)) {
         criteria.kw.forEach(k => {
             if (!(criteria.mfg !== "Any" && record.mfg === k.toUpperCase())) {
                 badges.push(`<span class="hud-badge match-keyword">${k.toUpperCase()}</span>`);
