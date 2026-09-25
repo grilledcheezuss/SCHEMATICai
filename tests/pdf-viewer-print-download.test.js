@@ -102,7 +102,8 @@ function wait(ms) {
         }
     };
     const maintainPositionToggle = {
-        checked: false,
+        tagName: 'BUTTON',
+        type: 'button',
         attributes: {},
         classes: new Set(),
         setAttribute(name, value) {
@@ -341,7 +342,6 @@ function wait(ms) {
     PdfViewer.initToolbarState();
     assert(toolbarDownloadLabel.textContent === 'Download', 'non-iOS browsers should keep the Download label');
     PdfViewer.setMaintainPositionBetweenResults(true);
-    assert(maintainPositionToggle.checked === true, 'maintain-position toggle should sync checked state');
     assert(maintainPositionToggle.attributes['aria-pressed'] === 'true', 'maintain-position toggle should expose aria-pressed true when enabled');
     assert(maintainPositionToggle.classes.has('is-active') === true, 'maintain-position toggle should expose active class when enabled');
     assert(localStorageState.get(PdfViewer.MAINTAIN_POSITION_STORAGE_KEY) === 'true', 'maintain-position preference should persist to localStorage');

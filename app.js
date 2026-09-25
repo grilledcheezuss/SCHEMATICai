@@ -4750,7 +4750,9 @@ class PdfViewer {
             : document.getElementById('pdf-maintain-position-toggle');
         if (toggle) {
             const isEnabled = !!this._maintainPositionBetweenResults;
-            if ('checked' in toggle) {
+            const isCheckboxInput = String(toggle.tagName || '').toUpperCase() === 'INPUT'
+                && String(toggle.type || '').toLowerCase() === 'checkbox';
+            if (isCheckboxInput) {
                 toggle.checked = isEnabled;
             }
             if (typeof toggle.setAttribute === 'function') {
