@@ -3779,6 +3779,10 @@ class KeywordMatcher {
 
         return allGroupsMatch;
     }
+
+    static matchesSingleGroup(record, rawKeyword, expandedGroup) {
+        return this.matches(record, rawKeyword ? [rawKeyword] : [], [expandedGroup]);
+    }
 }
 
 class SearchEngine {
@@ -3795,7 +3799,7 @@ class SearchEngine {
 
         const blockedMatchExists = expandedKeywords.some((group, idx) => {
             const rawKeyword = rawKeywords[idx];
-            return KeywordMatcher.matches(record, rawKeyword ? [rawKeyword] : [], [group]);
+            return KeywordMatcher.matchesSingleGroup(record, rawKeyword, group);
         });
         return !blockedMatchExists;
     }
