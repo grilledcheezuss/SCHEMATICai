@@ -4671,6 +4671,7 @@ class PdfViewer {
     static _activePanelId = '';
     static _committedPanelId = '';
     static _committedUrl = '';
+    static _documentActionsInvalidated = false;
     static _uiState = 'empty';
     static _pendingLoadUiState = '';
 
@@ -4730,6 +4731,7 @@ class PdfViewer {
         this.currentPdfBlob = this._pendingPdfBlob || null;
         this._committedPanelId = this._pendingPanelId || this._committedPanelId;
         this._committedUrl = this._pendingUrl || this._committedUrl;
+        this._documentActionsInvalidated = false;
         this._clearPendingDocumentResources({ revoke: false });
         if (priorBlobUrl && priorBlobUrl !== this.currentBlobUrl && typeof URL?.revokeObjectURL === 'function') {
             try {
@@ -4753,6 +4755,7 @@ class PdfViewer {
         this.currentPdfBlob = null;
         this._committedPanelId = '';
         this._committedUrl = '';
+        this._documentActionsInvalidated = false;
     }
 
     static _hasActiveRenderedSurface() {
@@ -4804,7 +4807,7 @@ class PdfViewer {
         this._clearZoomTimer();
         this._releasePrintSession('document-load');
         this._clearPendingDocumentResources();
-        this._clearCommittedDocumentResources();
+        this._documentActionsInvalidated = true;
         this._documentLoadToken++;
         this.currentRenderToken++;
         this._gestureCommitGeneration++;
@@ -5753,6 +5756,7 @@ class PdfViewer {
     }
 
     static download() {
+        if (this._documentActionsInvalidated) return;
         const attachmentUrl = this._buildAttachmentDownloadUrl();
         if (!this.currentBlobUrl) {
             const fallbackUrl = attachmentUrl || (this._committedUrl ? buildWorkerUrl('PDF', { url: this._committedUrl }) : '');
@@ -5989,6 +5993,7 @@ class PdfViewer {
     }
 
     static print() {
+        if (this._documentActionsInvalidated) return;
         if (!this.currentBlobUrl && !this.currentPdfBlob) return alert("No PDF loaded to print.");
         if (this.isPrinting) {
             console.warn('Print already in progress, ignoring duplicate print request');

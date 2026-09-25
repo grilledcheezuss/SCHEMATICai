@@ -259,9 +259,10 @@ async function wait(ms) {
     assert(PdfViewer._gestureStageElement === activeStage, 'beginDocumentLoad should keep the active stage wired for continuity');
     assert(activeStage.dataset.documentLoadToken === '0', `beginDocumentLoad should annotate the preserved active stage with its original load token, got ${activeStage.dataset.documentLoadToken}`);
     assert(activeStage.dataset.documentIdentity === 'panel:CP-4242', `beginDocumentLoad should annotate the preserved active stage identity, got ${activeStage.dataset.documentIdentity}`);
-    assert(PdfViewer.currentBlobUrl === '', 'beginDocumentLoad should invalidate the committed blob URL so stale downloads cannot fire');
-    assert(PdfViewer.currentPdfBlob === null, 'beginDocumentLoad should clear the committed PDF blob during replacement');
-    assert(PdfViewer._committedPanelId === '', 'beginDocumentLoad should clear the committed panel target during replacement');
+    assert(PdfViewer.currentBlobUrl === 'blob:committed', 'beginDocumentLoad should preserve the committed blob URL until commit or fallback');
+    assert(PdfViewer.currentPdfBlob && PdfViewer.currentPdfBlob.tag === 'committed', 'beginDocumentLoad should preserve the committed PDF blob until commit or fallback');
+    assert(PdfViewer._committedPanelId === 'CP-4242', 'beginDocumentLoad should preserve the committed panel target until commit or fallback');
+    assert(PdfViewer._documentActionsInvalidated === true, 'beginDocumentLoad should invalidate toolbar actions during replacement');
 
     let finalizeRenderOptions = null;
     PdfViewer.renderStack = (options) => { finalizeRenderOptions = options; };
