@@ -4818,6 +4818,10 @@ class PdfViewer {
         }
     }
 
+    static toggleMaintainPositionBetweenResults() {
+        this.setMaintainPositionBetweenResults(!this._maintainPositionBetweenResults);
+    }
+
     static shouldMaintainPositionBetweenResults() {
         return !!this._maintainPositionBetweenResults;
     }
