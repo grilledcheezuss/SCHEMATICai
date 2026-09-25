@@ -1,13 +1,13 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.82)
+CLOUDFLARE WORKER SCRIPT (v2.5.83)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.82):
+RECENT UPDATES (v2.5.83):
 
-- PDF viewer polish pass: centralized first-load vs replacement-load UI states so ordinary result swaps keep the committed viewer surface visible without placeholder/status flicker
-- Toolbar Print/Download actions now stay pinned to the committed document until the new rendered stage actually commits, preventing brief target/filename mismatches during result swaps
-- First-load sequencing now waits to reveal the toolbar until the first rendered PDF stage is committed, so the initial viewer presentation appears in one calm step
-- Version strings aligned to v2.5.82 across the viewer/client and Worker-facing version surfaces
+- PDF transition UX pass: selecting a different result now hides the stale PDF immediately and reuses the existing loading header until the replacement is committed
+- Toolbar Print/Download targets are invalidated at load start and only reactivate after the new document is committed, preventing stale actions and flicker
+- New-document start positioning stays calmer across desktop/mobile while preserving gesture-anchor and MobileScrollCoordinator behavior, and Worker behavior is unchanged
+- Version strings aligned to v2.5.83 across the viewer/client and Worker-facing version surfaces
 
 PREVIOUS UPDATES (v2.5.65):
 

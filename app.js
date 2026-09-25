@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.82 ---
-const APP_VERSION = "v2.5.82";
+// --- SCHEMATICA ai v2.5.83 ---
+const APP_VERSION = "v2.5.83";
 const VERSION_HISTORY = {
+    "v2.5.83": "PDF transition UX pass: hide stale PDFs immediately behind the existing loading header, invalidate toolbar print/download targets until the replacement commit, and keep new-document start positioning calmer across desktop/mobile without changing Worker behavior",
     "v2.5.82": "PDF viewer polish pass: centralize first-load vs replacement-load UI states, keep toolbar actions pinned to the committed document until swap commit, suppress throwaway replacement loading flicker, and only reveal the first toolbar once the first rendered stage is actually ready",
     "v2.5.81": "PDF viewer stability patch: stage replacement renders outside the scroll container until layout settles, new-document loads reset to page-start instead of reusing stale offsets, same-document anchor restores are generation-guarded, and post-swap scroll clamping prevents scrollbar churn across replacement and viewport changes",
     "v2.5.80": "PDF result-swap transition fix: keep the active viewer surface/toolbar stable while replacement documents stage in, clear only stale staging surfaces at load start, and swap rendered stages atomically so rapid document changes do not flicker or expose placeholder gaps",
@@ -173,6 +174,8 @@ const PDF_UI_STATE_HELPERS = typeof PdfUiStateHelper !== 'undefined'
                 placeholderText: '📄 Select a schematic',
                 toolbarDisplay: 'none',
                 viewerDisplay: 'none',
+                mainViewVisibility: 'visible',
+                mainViewPointerEvents: 'auto',
                 fallbackDisplay: 'none',
                 frameDisplay: 'none',
                 printDisabled: true,
@@ -182,12 +185,16 @@ const PDF_UI_STATE_HELPERS = typeof PdfUiStateHelper !== 'undefined'
                 case PDF_UI_STATE.FIRST_LOAD_LOADING:
                     presentation.placeholderDisplay = 'flex';
                     presentation.placeholderText = loadingMessage || '⏳ Loading PDF...';
+                    presentation.viewerDisplay = 'flex';
+                    presentation.mainViewVisibility = 'hidden';
+                    presentation.mainViewPointerEvents = 'none';
                     break;
                 case PDF_UI_STATE.REPLACEMENT_LOADING:
-                    presentation.toolbarDisplay = 'flex';
+                    presentation.placeholderDisplay = 'flex';
+                    presentation.placeholderText = loadingMessage || '⏳ Loading PDF...';
                     presentation.viewerDisplay = 'flex';
-                    presentation.printDisabled = !hasCommittedPdf;
-                    presentation.downloadDisabled = !hasCommittedPdf;
+                    presentation.mainViewVisibility = 'hidden';
+                    presentation.mainViewPointerEvents = 'none';
                     break;
                 case PDF_UI_STATE.READY:
                     presentation.toolbarDisplay = 'flex';
@@ -4406,6 +4413,7 @@ function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl
         placeholder: DOM_CACHE.get('pdf-placeholder-text'),
         toolbar: DOM_CACHE.get('pdf-toolbar'),
         viewer: DOM_CACHE.get('custom-pdf-viewer'),
+        mainView: DOM_CACHE.get('pdf-main-view'),
         fallback: DOM_CACHE.get('pdf-fallback'),
         fallbackLink: DOM_CACHE.get('pdf-fallback-link'),
         frame: DOM_CACHE.get('pdf-viewer-frame'),
@@ -4427,6 +4435,10 @@ function setPdfUiState(state, loadingMessage = '⏳ Loading PDF...', fallbackUrl
     }
     setElementDisplay(elements.toolbar, presentation.toolbarDisplay);
     setElementDisplay(elements.viewer, presentation.viewerDisplay);
+    if (elements.mainView) {
+        elements.mainView.style.visibility = presentation.mainViewVisibility;
+        elements.mainView.style.pointerEvents = presentation.mainViewPointerEvents;
+    }
     setElementDisplay(elements.fallback, presentation.fallbackDisplay);
     setElementDisplay(elements.frame, presentation.frameDisplay);
 
@@ -4660,6 +4672,7 @@ class PdfViewer {
     static _committedPanelId = '';
     static _committedUrl = '';
     static _uiState = 'empty';
+    static _pendingLoadUiState = PDF_UI_STATE.FIRST_LOAD_LOADING;
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -4748,12 +4761,14 @@ class PdfViewer {
     }
 
     static _getLoadingUiState() {
-        return this._hasActiveRenderedSurface() && this.hasCommittedDocumentTarget()
+        return this._pendingLoadUiState
+            || (this._hasActiveRenderedSurface()
             ? PDF_UI_STATE.REPLACEMENT_LOADING
-            : PDF_UI_STATE.FIRST_LOAD_LOADING;
+            : PDF_UI_STATE.FIRST_LOAD_LOADING);
     }
 
     static _transitionToFallback(fallbackUrl = '') {
+        this._pendingLoadUiState = PDF_UI_STATE.FIRST_LOAD_LOADING;
         this._clearPendingDocumentResources();
         this._clearCommittedDocumentResources();
         this._clearStagedPdfSurface();
@@ -4770,6 +4785,9 @@ class PdfViewer {
 
     static _beginDocumentLoad() {
         const activeStage = this._getGestureStage();
+        this._pendingLoadUiState = activeStage?.isConnected
+            ? PDF_UI_STATE.REPLACEMENT_LOADING
+            : PDF_UI_STATE.FIRST_LOAD_LOADING;
         if (activeStage?.isConnected) {
             if (!this._currentDocumentIdentity) {
                 this._setCurrentDocumentIdentity({ panelId: this._activePanelId, url: this.url });
@@ -4779,6 +4797,7 @@ class PdfViewer {
         this._clearZoomTimer();
         this._releasePrintSession('document-load');
         this._clearPendingDocumentResources();
+        this._clearCommittedDocumentResources();
         this._documentLoadToken++;
         this.currentRenderToken++;
         this._gestureCommitGeneration++;
@@ -6190,6 +6209,7 @@ class PdfViewer {
             if (stage.parentNode) stage.remove();
             return false;
         }
+        this._pendingLoadUiState = PDF_UI_STATE.FIRST_LOAD_LOADING;
         const existingStages = Array.from(container.querySelectorAll('.pdf-gesture-stage'));
         if (stage.parentNode !== container) {
             container.appendChild(stage);
