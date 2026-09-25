@@ -5733,8 +5733,12 @@ class PdfViewer {
             if (!fallbackUrl) return;
             const link = document.createElement('a');
             link.href = fallbackUrl;
-            link.target = '_blank';
             link.rel = 'noopener';
+            if (this._supportsBlobDownload()) {
+                link.download = this._buildDownloadFilename();
+            } else {
+                link.target = '_blank';
+            }
             document.body.appendChild(link);
             link.click();
             if (link.parentNode === document.body) {

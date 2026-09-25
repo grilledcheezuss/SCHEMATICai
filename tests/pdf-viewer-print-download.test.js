@@ -260,6 +260,17 @@ function wait(ms) {
     assert(anchorsClicked[0].download === 'CP-OLD.pdf', 'download filename should stay tied to the committed panel until the new stage commits');
 
     anchorsClicked = [];
+    PdfViewer.currentBlobUrl = '';
+    PdfViewer._committedPanelId = 'CP-OLD';
+    PdfViewer._activePanelId = 'CP-NEW';
+    navigatorState.userAgent = 'Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36';
+    navigatorState.vendor = 'Google Inc.';
+    PdfViewer.download();
+    assert(anchorsClicked.length === 1, 'download should still provide a committed-target fallback when the blob URL is temporarily unavailable');
+    assert(anchorsClicked[0].download === 'CP-OLD.pdf', 'fallback download should preserve the committed filename on download-capable browsers');
+    assert(anchorsClicked[0].target === '', 'fallback download should avoid forcing a new tab on download-capable browsers');
+
+    anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
     navigatorState.vendor = 'Apple Computer, Inc.';
     PdfViewer._committedPanelId = 'CP-OLD';
