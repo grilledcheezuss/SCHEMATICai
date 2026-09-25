@@ -197,25 +197,24 @@ header {
 .logo-sub { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.79rem; color: #b39ddb; font-weight: 700; letter-spacing: 4.5px; text-transform: uppercase; margin-top: 3px; margin-left: 2px; }
 
 .app-title-group { 
-    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); 
-    text-align: center; 
-    display: flex; flex-direction: row; align-items: baseline; justify-content: center; gap: 10px;
+    margin-left: 12px;
+    text-align: left;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
     pointer-events: none;
-    background: rgba(255, 255, 255, 0.15); 
-    backdrop-filter: blur(12px); 
-    padding: 8px 28px; 
-    border-radius: 50px; 
-    border: 1px solid rgba(255, 255, 255, 0.3); 
-    box-shadow: 0 8px 30px rgba(0,0,0,0.2);
-    transition: all 0.3s ease;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
 }
 .app-title-main { 
     font-family: 'Inter', sans-serif; 
-    font-size: 24px; 
-    font-weight: 800;
+    font-size: 1.15rem;
+    font-weight: 700;
     color: white; 
-    letter-spacing: -0.5px; 
-    text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    letter-spacing: 0.2px;
+    text-shadow: none;
 }
 .app-title-version { 
     font-family: 'Inter', sans-serif;
@@ -453,6 +452,7 @@ body.dark-mode .thumb-btn { background: #2a2a2a; color: #cbd5e1; }
 body.dark-mode .thumb-btn:hover { background: #3f3f46; }
 
 #pdf-toolbar { display: none; min-height: 45px; padding: 6px 12px; background: var(--bg-sidebar); border-bottom: 1px solid var(--surface-seam-border); align-items: center; justify-content: center; gap: 10px 16px; flex-shrink: 0; flex-wrap: wrap; width: 100%; box-shadow: inset 0 -1px 0 rgba(255,255,255,0.04), var(--surface-soft-shadow); border-radius: 0; box-sizing: border-box; }
+body.pdf-toolbar-session-ready #pdf-toolbar { display: flex; }
 #pdf-toolbar .pdf-tool-btn {
     background: var(--bg-card);
     border: 1px solid var(--surface-seam-border);
@@ -1110,22 +1110,17 @@ input[type="date"].demo-input { text-align: left; }
     }
     
     .app-title-group {
-        position: static;
-        transform: none;
-        padding: 4px 8px;
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        backdrop-filter: none;
+        margin-left: 8px;
+        padding: 0;
     }
-    .app-title-main { display: none; } 
-    .app-title-version { 
+    .app-title-main {
         color: rgba(255,255,255,0.9); 
         background: rgba(255,255,255,0.2); 
         padding: 2px 6px; 
         border-radius: 6px; 
         font-size: 11px;
         letter-spacing: 0.25px;
+        line-height: 1.2;
     }
     .logo-main { font-size: 1.58rem; } 
     .logo-sub { font-size: 0.63rem; letter-spacing: 2px; }
