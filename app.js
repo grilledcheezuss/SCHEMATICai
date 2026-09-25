@@ -4704,6 +4704,7 @@ class PdfViewer {
     static _uiState = 'empty';
     static _pendingLoadUiState = '';
     static IOS_SAVE_TOOLTIP_AUTO_DISMISS_MS = 3200;
+    static IOS_SAVE_TOOLTIP_OUTSIDE_DISMISS_EVENTS = ['pointerdown', 'touchstart', 'mousedown'];
     static _iosSaveTooltipHideTimer = null;
     static _iosSaveTooltipVisible = false;
     static _iosSaveTooltipDocumentIdentity = '';
@@ -4889,7 +4890,9 @@ class PdfViewer {
 
     static _detachIosSavePdfHintOutsideDismissHandler() {
         if (!this._iosSaveTooltipOutsideDismissHandler || typeof document?.removeEventListener !== 'function') return;
-        document.removeEventListener('pointerdown', this._iosSaveTooltipOutsideDismissHandler, true);
+        this.IOS_SAVE_TOOLTIP_OUTSIDE_DISMISS_EVENTS.forEach((eventName) => {
+            document.removeEventListener(eventName, this._iosSaveTooltipOutsideDismissHandler, true);
+        });
         this._iosSaveTooltipOutsideDismissHandler = null;
     }
 
@@ -4970,7 +4973,9 @@ class PdfViewer {
         };
         this._iosSaveTooltipOutsideDismissHandler = dismissHandler;
         if (typeof document?.addEventListener === 'function') {
-            document.addEventListener('pointerdown', dismissHandler, true);
+            this.IOS_SAVE_TOOLTIP_OUTSIDE_DISMISS_EVENTS.forEach((eventName) => {
+                document.addEventListener(eventName, dismissHandler, true);
+            });
         }
         this._iosSaveTooltipHideTimer = setTimeout(() => this._hideIosSavePdfHint(), this.IOS_SAVE_TOOLTIP_AUTO_DISMISS_MS);
     }
