@@ -101,7 +101,7 @@ function wait(ms) {
             return target === toolbarDownloadButton;
         }
     };
-    const maintainPositionToggle = {
+    let maintainPositionToggle = {
         tagName: 'BUTTON',
         type: 'button',
         attributes: {},
@@ -348,6 +348,26 @@ function wait(ms) {
     PdfViewer.setMaintainPositionBetweenResults(false);
     assert(maintainPositionToggle.attributes['aria-pressed'] === 'false', 'maintain-position toggle should expose aria-pressed false when disabled');
     assert(maintainPositionToggle.classes.has('is-active') === false, 'maintain-position toggle active class should clear when disabled');
+
+    maintainPositionToggle = {
+        tagName: 'INPUT',
+        type: 'checkbox',
+        checked: false,
+        classes: new Set(),
+        classList: {
+            toggle(name, force) {
+                if (force) {
+                    maintainPositionToggle.classes.add(name);
+                } else {
+                    maintainPositionToggle.classes.delete(name);
+                }
+            }
+        }
+    };
+    PdfViewer.setMaintainPositionBetweenResults(true);
+    assert(maintainPositionToggle.checked === true, 'checkbox fallback toggle should sync checked state');
+    assert(maintainPositionToggle['aria-pressed'] === 'true', 'fallback toggle should sync aria-pressed without setAttribute');
+    assert(maintainPositionToggle.classes.has('is-active') === true, 'checkbox fallback toggle should still apply active class');
 
     anchorsClicked = [];
     navigatorState.userAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
