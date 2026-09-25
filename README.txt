@@ -1,8 +1,14 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.85)
+CLOUDFLARE WORKER SCRIPT (v2.5.86)
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.85):
+RECENT UPDATES (v2.5.86):
+
+- iOS Save PDF guidance is now nested under the Save PDF button as a tooltip on first tap, while a fast second tap proceeds immediately into the existing preview/share flow
+- Tooltip guidance auto-dismisses, closes on outside taps, and resets per committed PDF so stale instructions cannot linger on the wrong document
+- Version strings aligned to v2.5.86 across the viewer/client and Worker-facing version surfaces, and Worker/backend behavior is unchanged
+
+PREVIOUS UPDATES (v2.5.85):
 
 - Mobile replacement transitions now keep the PDF toolbar session-mounted after the first successful load so controls stay visible on small screens while actions remain disabled until commit
 - iOS Safari Save PDF detection now handles iPhone/iPad Safari user agents more reliably and preserves Share → Save to Files guidance after action handoff

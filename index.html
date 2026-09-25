@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.85)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.86)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -222,7 +222,10 @@
     <div id="preview-pane">
         <div id="pdf-toolbar">
             <button id="pdf-print-btn" class="pdf-tool-btn" onclick="PdfViewer.print()" title="Print original (unredacted) PDF — For redacted print/export, use Submittal Generator preview" aria-label="Print" disabled><span class="pdf-tool-btn-icon" aria-hidden="true">🖨️</span><span class="pdf-tool-btn-label">Print</span></button>
-            <button id="pdf-download-btn" class="pdf-tool-btn" onclick="PdfViewer.download()" title="Download original (unredacted) PDF currently shown in the viewer" aria-label="Download" disabled><span class="pdf-tool-btn-icon" aria-hidden="true">💾</span><span id="pdf-download-btn-label" class="pdf-tool-btn-label">Download</span></button>
+            <div id="pdf-download-control" class="pdf-download-control">
+                <button id="pdf-download-btn" class="pdf-tool-btn" onclick="PdfViewer.download()" title="Download original (unredacted) PDF currently shown in the viewer" aria-label="Download" aria-describedby="pdf-download-hint" aria-expanded="false" disabled><span class="pdf-tool-btn-icon" aria-hidden="true">💾</span><span id="pdf-download-btn-label" class="pdf-tool-btn-label">Download</span></button>
+                <span id="pdf-download-hint" class="pdf-toolbar-hint" role="tooltip" aria-hidden="true">Tap Share, then Save to Files.</span>
+            </div>
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(-0.2)" title="Zoom Out">-</button>
             <span id="pdf-zoom-level">100%</span>
             <button class="pdf-tool-btn" onclick="PdfViewer.zoom(0.2)" title="Zoom In">+</button>
@@ -230,7 +233,6 @@
                 <input type="checkbox" id="pdf-maintain-position-toggle" onchange="PdfViewer.setMaintainPositionBetweenResults(this.checked)">
                 <span>Maintain position between results</span>
             </label>
-            <span id="pdf-download-hint" class="pdf-toolbar-hint" aria-live="polite"></span>
         </div>
         <div id="custom-pdf-viewer" style="display:none;"><div id="pdf-main-view"></div></div>
         <iframe id="pdf-viewer-frame" style="display:none;"></iframe>

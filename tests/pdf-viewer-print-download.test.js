@@ -48,13 +48,38 @@ function wait(ms) {
     const windowListeners = new Map();
     const documentListeners = new Map();
     const popupPrintCalls = [];
-    const toolbarHint = { style: { display: 'none' }, innerText: '' };
+    const toolbarHint = {
+        style: { display: 'none' },
+        innerText: '',
+        attributes: {},
+        setAttribute(name, value) {
+            this.attributes[name] = value;
+        }
+    };
+    const toolbarDownloadControl = {
+        classes: new Set(),
+        classList: {
+            toggle(name, force) {
+                if (force) {
+                    toolbarDownloadControl.classes.add(name);
+                } else {
+                    toolbarDownloadControl.classes.delete(name);
+                }
+            }
+        },
+        contains(target) {
+            return target === toolbarDownloadControl || target === toolbarDownloadButton || target === toolbarHint;
+        }
+    };
     const toolbarDownloadLabel = { textContent: 'Download' };
     const toolbarDownloadButton = {
         title: 'Download original (unredacted) PDF currently shown in the viewer',
         attributes: {},
         setAttribute(name, value) {
             this.attributes[name] = value;
+        },
+        contains(target) {
+            return target === toolbarDownloadButton;
         }
     };
     const maintainPositionToggle = { checked: false };
@@ -134,7 +159,12 @@ function wait(ms) {
         removeEventListener(name) {
             documentListeners.delete(name);
         },
-        getElementById() {
+        getElementById(id) {
+            if (id === 'pdf-download-hint') return toolbarHint;
+            if (id === 'pdf-download-btn-label') return toolbarDownloadLabel;
+            if (id === 'pdf-download-btn') return toolbarDownloadButton;
+            if (id === 'pdf-download-control') return toolbarDownloadControl;
+            if (id === 'pdf-maintain-position-toggle') return maintainPositionToggle;
             return null;
         },
         querySelector() {
@@ -151,6 +181,7 @@ function wait(ms) {
             if (id === 'pdf-download-hint') return toolbarHint;
             if (id === 'pdf-download-btn-label') return toolbarDownloadLabel;
             if (id === 'pdf-download-btn') return toolbarDownloadButton;
+            if (id === 'pdf-download-control') return toolbarDownloadControl;
             if (id === 'pdf-maintain-position-toggle') return maintainPositionToggle;
             return null;
         }
@@ -286,12 +317,60 @@ function wait(ms) {
     assert(PdfViewer._isIosSafariBrowser() === true, 'iPhone Safari should be detected as iOS Safari');
     assert(toolbarDownloadLabel.textContent === 'Save PDF', 'iOS Safari should relabel the action to Save PDF');
     PdfViewer.download();
-    assert(anchorsClicked.length === 1, 'Safari download should use attachment URL path');
+    assert(anchorsClicked.length === 0, 'first iOS Save PDF tap should show guidance without opening the PDF');
+    assert(toolbarHint.style.display === 'block', 'first iOS Save PDF tap should show the nested tooltip');
+    assert(toolbarDownloadControl.classes.has('tooltip-visible') === true, 'first iOS Save PDF tap should mark the control as tooltip-visible');
+    assert(toolbarDownloadButton.attributes['aria-expanded'] === 'true', 'first iOS Save PDF tap should expand the button tooltip state');
+    assert(/Tap Share, then Save to Files\./i.test(toolbarHint.innerText), 'first iOS Save PDF tap should explain the native save path');
+    PdfViewer.download();
+    assert(anchorsClicked.length === 1, 'second iOS Save PDF tap should proceed immediately to the existing share/download flow');
     assert(/target=PDF_BY_ID/.test(anchorsClicked[0].href), 'Safari attachment URL should target PDF_BY_ID');
     assert(/mode=attachment/.test(anchorsClicked[0].href), 'Safari attachment URL should request attachment mode');
     assert(anchorsClicked[0].target === '_blank', 'Safari attachment download should open isolated target');
-    assert(toolbarHint.style.display === 'block', 'iOS Safari save flow should surface the Share → Save to Files hint');
-    assert(/Save to Files/i.test(toolbarHint.innerText), 'iOS Safari save flow hint should explain the native save path');
+    assert(toolbarHint.style.display === 'none', 'second iOS Save PDF tap should dismiss the tooltip');
+    assert(toolbarDownloadButton.attributes['aria-expanded'] === 'false', 'second iOS Save PDF tap should collapse the button tooltip state');
+    PdfViewer.download();
+    assert(anchorsClicked.length === 2, 'acknowledged iOS Save PDF interactions should proceed directly for the same committed PDF');
+
+    anchorsClicked = [];
+    PdfViewer._iosSaveTooltipAcknowledgedDocumentIdentity = '';
+    PdfViewer.download();
+    assert(toolbarHint.style.display === 'block', 'a fresh iOS Save PDF interaction should show the tooltip again');
+    const outsideDismiss = documentListeners.get('pointerdown');
+    assert(typeof outsideDismiss === 'function', 'tooltip should register an outside-dismiss listener while visible');
+    outsideDismiss({ target: { id: 'outside-target' } });
+    assert(toolbarHint.style.display === 'none', 'outside taps should dismiss the tooltip without opening the PDF');
+    assert(anchorsClicked.length === 0, 'outside dismissal should not open the PDF');
+    PdfViewer.download();
+    assert(anchorsClicked.length === 0, 'after outside dismissal, the next iOS Save PDF tap should restart with tooltip-only guidance');
+    assert(toolbarHint.style.display === 'block', 'after outside dismissal, the tooltip should reappear on the next tap');
+    PdfViewer._hideIosSavePdfHint();
+
+    PdfViewer.IOS_SAVE_TOOLTIP_AUTO_DISMISS_MS = 5;
+    PdfViewer._iosSaveTooltipAcknowledgedDocumentIdentity = '';
+    PdfViewer.download();
+    assert(toolbarHint.style.display === 'block', 'auto-dismiss test should start with the tooltip visible');
+    await wait(15);
+    assert(toolbarHint.style.display === 'none', 'tooltip should auto-dismiss after a short idle period');
+    PdfViewer.download();
+    assert(anchorsClicked.length === 0, 'after auto-dismiss, the next iOS Save PDF tap should again be guidance-only');
+    assert(toolbarHint.style.display === 'block', 'after auto-dismiss, the tooltip should restart on the next tap');
+    PdfViewer._hideIosSavePdfHint();
+    PdfViewer.IOS_SAVE_TOOLTIP_AUTO_DISMISS_MS = 3200;
+
+    anchorsClicked = [];
+    PdfViewer._iosSaveTooltipAcknowledgedDocumentIdentity = 'panel:CP-1234';
+    PdfViewer._pendingBlobUrl = 'blob:new-doc';
+    PdfViewer._pendingPdfBlob = { tag: 'new-doc' };
+    PdfViewer._pendingPanelId = 'CP-5678';
+    PdfViewer._pendingUrl = 'https://example.com/new.pdf';
+    PdfViewer._pendingDocumentIdentity = 'panel:CP-5678';
+    PdfViewer._commitPendingDocumentResources({ documentIdentity: 'panel:CP-5678' });
+    assert(PdfViewer._iosSaveTooltipAcknowledgedDocumentIdentity === '', 'committed-document changes should reset the acknowledged iOS Save PDF cycle');
+    PdfViewer.download();
+    assert(anchorsClicked.length === 0, 'after a committed-document change, the next iOS Save PDF tap should return to tooltip-only guidance');
+    assert(toolbarHint.style.display === 'block', 'after a committed-document change, the tooltip should show for the new document');
+    PdfViewer._hideIosSavePdfHint();
 
     navigatorState.vendor = '';
     PdfViewer.initToolbarState();

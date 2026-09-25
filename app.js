@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.85 ---
-const APP_VERSION = "v2.5.85";
+// --- SCHEMATICA ai v2.5.86 ---
+const APP_VERSION = "v2.5.86";
 const VERSION_HISTORY = {
+    "v2.5.86": "iOS Save PDF refinement: the first Save PDF tap now opens a button-anchored Share → Save to Files tooltip, a fast second tap proceeds immediately, and the contextual guidance resets safely per committed document without changing desktop or backend behavior",
     "v2.5.85": "Viewer/header polish follow-up: keep the PDF toolbar session-mounted across mobile replacement transitions, improve iOS Safari Save PDF detection for Share-to-Files guidance, and move the desktop SCHEMATICA ai title beside the Cox logo with simpler chrome while preserving mobile behavior",
     "v2.5.84": "PDF viewer polish follow-up: keep the toolbar mounted after the first successful PDF load, add an optional maintain-position-between-results restore path, hide stale documents through replacements while preserving stage isolation, and tailor iOS Safari download UX without changing Worker behavior",
     "v2.5.83": "PDF transition UX pass: hide stale PDFs immediately behind the existing loading header, invalidate toolbar print/download targets until the replacement commit, and keep new-document start positioning calmer across desktop/mobile without changing Worker behavior",
@@ -4702,6 +4703,12 @@ class PdfViewer {
     static _documentActionsInvalidated = false;
     static _uiState = 'empty';
     static _pendingLoadUiState = '';
+    static IOS_SAVE_TOOLTIP_AUTO_DISMISS_MS = 3200;
+    static _iosSaveTooltipHideTimer = null;
+    static _iosSaveTooltipVisible = false;
+    static _iosSaveTooltipDocumentIdentity = '';
+    static _iosSaveTooltipAcknowledgedDocumentIdentity = '';
+    static _iosSaveTooltipOutsideDismissHandler = null;
 
     static isDocumentValid() {
         return this.doc && !this.doc.destroyed;
@@ -4778,6 +4785,7 @@ class PdfViewer {
                 downloadHint.style.display = 'none';
             }
         }
+        this._syncIosSavePdfHintPresentation();
     }
 
     static initToolbarState() {
@@ -4856,18 +4864,132 @@ class PdfViewer {
         return true;
     }
 
-    static _showIosSavePdfHint() {
+    static _getCommittedDocumentIdentity() {
+        const panelId = String(this._committedPanelId || '').trim();
+        const url = String(this._committedUrl || '').trim();
+        if (!panelId && !url) return '';
+        return this._buildDocumentIdentity({ panelId, url });
+    }
+
+    static _getIosSavePdfHintElements() {
+        const getElement = (id) => (typeof DOM_CACHE !== 'undefined' ? DOM_CACHE.get(id) : document.getElementById(id));
+        return {
+            control: getElement('pdf-download-control'),
+            button: getElement('pdf-download-btn'),
+            hint: getElement('pdf-download-hint')
+        };
+    }
+
+    static _clearIosSavePdfHintAutoDismissTimer() {
+        if (this._iosSaveTooltipHideTimer) {
+            clearTimeout(this._iosSaveTooltipHideTimer);
+            this._iosSaveTooltipHideTimer = null;
+        }
+    }
+
+    static _detachIosSavePdfHintOutsideDismissHandler() {
+        if (!this._iosSaveTooltipOutsideDismissHandler || typeof document?.removeEventListener !== 'function') return;
+        document.removeEventListener('pointerdown', this._iosSaveTooltipOutsideDismissHandler, true);
+        this._iosSaveTooltipOutsideDismissHandler = null;
+    }
+
+    static _applyIosSavePdfHintVisibility(isVisible) {
+        const { control, button, hint } = this._getIosSavePdfHintElements();
+        if (control?.classList?.toggle) {
+            control.classList.toggle('tooltip-visible', !!isVisible);
+        }
+        if (button) {
+            if (typeof button.setAttribute === 'function') {
+                button.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
+            } else {
+                button['aria-expanded'] = isVisible ? 'true' : 'false';
+            }
+        }
+        if (hint) {
+            if (typeof hint.setAttribute === 'function') {
+                hint.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+            } else {
+                hint['aria-hidden'] = isVisible ? 'false' : 'true';
+            }
+            if (hint.style) {
+                hint.style.display = isVisible ? 'block' : 'none';
+            }
+        }
+    }
+
+    static _syncIosSavePdfHintPresentation() {
+        const isStillValid = this._iosSaveTooltipVisible
+            && this._isIosSafariBrowser()
+            && this._areDocumentActionsAvailable()
+            && this._uiState === PDF_UI_STATE.READY
+            && this._iosSaveTooltipDocumentIdentity === this._getCommittedDocumentIdentity();
+        if (!isStillValid && this._iosSaveTooltipVisible) {
+            this._hideIosSavePdfHint();
+            return;
+        }
+        this._applyIosSavePdfHintVisibility(isStillValid);
+        if (!this._isIosSafariBrowser()) {
+            this._iosSaveTooltipAcknowledgedDocumentIdentity = '';
+        }
+    }
+
+    static _hideIosSavePdfHint() {
+        this._clearIosSavePdfHintAutoDismissTimer();
+        this._detachIosSavePdfHintOutsideDismissHandler();
+        this._iosSaveTooltipVisible = false;
+        this._iosSaveTooltipDocumentIdentity = '';
+        this._applyIosSavePdfHintVisibility(false);
+    }
+
+    static _resetIosSavePdfInteraction() {
+        this._iosSaveTooltipAcknowledgedDocumentIdentity = '';
+        this._hideIosSavePdfHint();
+    }
+
+    static _showIosSavePdfHint({ documentIdentity = this._getCommittedDocumentIdentity() } = {}) {
         const downloadHint = typeof DOM_CACHE !== 'undefined'
             ? DOM_CACHE.get('pdf-download-hint')
             : document.getElementById('pdf-download-hint');
-        if (!downloadHint || !this._isIosSafariBrowser()) return;
-        const hintText = 'To save this PDF, tap Share, then Save to Files.';
+        if (!downloadHint || !this._isIosSafariBrowser() || !documentIdentity) return;
+        const hintText = 'Tap Share, then Save to Files.';
         if (downloadHint.innerText !== hintText) {
             downloadHint.innerText = hintText;
         }
-        if ((downloadHint.style?.display || '') !== 'block') {
-            downloadHint.style.display = 'block';
+        this._clearIosSavePdfHintAutoDismissTimer();
+        this._detachIosSavePdfHintOutsideDismissHandler();
+        this._iosSaveTooltipDocumentIdentity = documentIdentity;
+        this._iosSaveTooltipVisible = true;
+        this._applyIosSavePdfHintVisibility(true);
+        const { control } = this._getIosSavePdfHintElements();
+        const dismissHandler = (event) => {
+            const target = event?.target || null;
+            if (!control || (target && typeof control.contains === 'function' && control.contains(target))) {
+                return;
+            }
+            this._hideIosSavePdfHint();
+        };
+        this._iosSaveTooltipOutsideDismissHandler = dismissHandler;
+        if (typeof document?.addEventListener === 'function') {
+            document.addEventListener('pointerdown', dismissHandler, true);
         }
+        this._iosSaveTooltipHideTimer = setTimeout(() => this._hideIosSavePdfHint(), this.IOS_SAVE_TOOLTIP_AUTO_DISMISS_MS);
+    }
+
+    static _consumeIosSavePdfInteractionGate() {
+        if (!this._isIosSafariBrowser()) return false;
+        const documentIdentity = this._getCommittedDocumentIdentity();
+        if (!documentIdentity) return false;
+        if (this._iosSaveTooltipAcknowledgedDocumentIdentity === documentIdentity) {
+            this._hideIosSavePdfHint();
+            return false;
+        }
+        if (this._iosSaveTooltipVisible && this._iosSaveTooltipDocumentIdentity === documentIdentity) {
+            this._iosSaveTooltipAcknowledgedDocumentIdentity = documentIdentity;
+            this._hideIosSavePdfHint();
+            return false;
+        }
+        this._showIosSavePdfHint({ documentIdentity });
+        return true;
     }
 
     static _clearPendingDocumentResources({ revoke = true } = {}) {
@@ -4901,6 +5023,7 @@ class PdfViewer {
             this._clearPendingDocumentResources();
             return false;
         }
+        const priorCommittedDocumentIdentity = this._getCommittedDocumentIdentity();
         const priorBlobUrl = this.currentBlobUrl;
         let nextBlobUrl = this._pendingBlobUrl || '';
         if (!nextBlobUrl && this._pendingPdfBlob && typeof URL?.createObjectURL === 'function') {
@@ -4921,6 +5044,12 @@ class PdfViewer {
         this._hasEverCommittedDocument = true;
         this._documentActionsInvalidated = false;
         this._clearPendingDocumentResources({ revoke: false });
+        const nextCommittedDocumentIdentity = this._getCommittedDocumentIdentity();
+        if (priorCommittedDocumentIdentity !== nextCommittedDocumentIdentity) {
+            this._resetIosSavePdfInteraction();
+        } else {
+            this._hideIosSavePdfHint();
+        }
         if (priorBlobUrl && priorBlobUrl !== this.currentBlobUrl && typeof URL?.revokeObjectURL === 'function') {
             try {
                 URL.revokeObjectURL(priorBlobUrl);
@@ -4944,6 +5073,7 @@ class PdfViewer {
         this._committedPanelId = '';
         this._committedUrl = '';
         this._documentActionsInvalidated = false;
+        this._resetIosSavePdfInteraction();
     }
 
     static _hasActiveRenderedSurface() {
@@ -4987,6 +5117,7 @@ class PdfViewer {
     static _beginDocumentLoad() {
         const activeStage = this._getGestureStage();
         const viewer = document.getElementById('pdf-main-view');
+        this._hideIosSavePdfHint();
         if (this.shouldMaintainPositionBetweenResults() && activeStage?.isConnected && viewer && this._hasCommittedViewerState()) {
             this._pendingReplacementViewportAnchor = this._captureReplacementViewportAnchor(viewer, activeStage, this._documentLoadToken + 1);
         } else {
@@ -6008,6 +6139,7 @@ class PdfViewer {
     static download() {
         if (this._documentActionsInvalidated || this._uiState === PDF_UI_STATE.FALLBACK) return;
         if (!this._areDocumentActionsAvailable()) return;
+        if (this._consumeIosSavePdfInteractionGate()) return;
         const attachmentUrl = this._buildAttachmentDownloadUrl();
         if (!this.currentBlobUrl) {
             const fallbackUrl = attachmentUrl || (this._committedUrl ? buildWorkerUrl('PDF', { url: this._committedUrl }) : '');
@@ -6025,9 +6157,6 @@ class PdfViewer {
             if (link.parentNode === document.body) {
                 document.body.removeChild(link);
             }
-            if (this._isIosSafariBrowser()) {
-                this._showIosSavePdfHint();
-            }
             return;
         }
         if (!this._supportsBlobDownload()) {
@@ -6040,9 +6169,6 @@ class PdfViewer {
                 link.click();
                 if (link.parentNode === document.body) {
                     document.body.removeChild(link);
-                }
-                if (this._isIosSafariBrowser()) {
-                    this._showIosSavePdfHint();
                 }
                 return;
             }
