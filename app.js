@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.86 ---
-const APP_VERSION = "v2.5.86";
+// --- SCHEMATICA ai v2.5.87 ---
+const APP_VERSION = "v2.5.87";
 const VERSION_HISTORY = {
+    "v2.5.87": "Desktop branding + toolbar refinement: tuned the Cox/SCHEMATICA ai desktop lockup, converted maintain-position into a lock-style pill toggle beside zoom controls with active purple state and aria-pressed semantics, and kept maintain-position persistence/behavior unchanged",
     "v2.5.86": "iOS Save PDF refinement: the first Save PDF tap now opens a button-anchored Share → Save to Files tooltip, a fast second tap proceeds immediately, and the contextual guidance resets safely per committed document without changing desktop or backend behavior",
     "v2.5.85": "Viewer/header polish follow-up: keep the PDF toolbar session-mounted across mobile replacement transitions, improve iOS Safari Save PDF detection for Share-to-Files guidance, and move the desktop SCHEMATICA ai title beside the Cox logo with simpler chrome while preserving mobile behavior",
     "v2.5.84": "PDF viewer polish follow-up: keep the toolbar mounted after the first successful PDF load, add an optional maintain-position-between-results restore path, hide stale documents through replacements while preserving stage isolation, and tailor iOS Safari download UX without changing Worker behavior",
@@ -4748,7 +4749,18 @@ class PdfViewer {
             ? DOM_CACHE.get('pdf-maintain-position-toggle')
             : document.getElementById('pdf-maintain-position-toggle');
         if (toggle) {
-            toggle.checked = !!this._maintainPositionBetweenResults;
+            const isEnabled = !!this._maintainPositionBetweenResults;
+            if ('checked' in toggle) {
+                toggle.checked = isEnabled;
+            }
+            if (typeof toggle.setAttribute === 'function') {
+                toggle.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
+            } else {
+                toggle['aria-pressed'] = isEnabled ? 'true' : 'false';
+            }
+            if (toggle.classList?.toggle) {
+                toggle.classList.toggle('is-active', isEnabled);
+            }
         }
     }
 
