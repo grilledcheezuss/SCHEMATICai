@@ -224,26 +224,6 @@ function materialRecords() {
     ];
 }
 
-runTest('CP-8370/CP-8328 excerpts use real material/System Type search and badges, not legacy values', () => {
-    const fixtures = require('./fixtures/parser-repair.js');
-    for (const enc of [null, 'Varied / Multiple', '4XFG', '4XSS']) {
-        const records = [
-            rec('CP-8370', Object.values(fixtures.cp8370).join('\n') + '\nSTAINLESS narrative', { enc }),
-            rec('CP-8328', Object.values(fixtures.cp8328).join('\n') + '\nFIBERGLASS narrative', { enc })
-        ];
-        const fg = searchWith(records, { enc: FG, sys: 'Duplex' });
-        assertEqual(fg.page.map(r => r.id), ['CP-8370'], 'reverse fiberglass only');
-        const fgBadges = UI._generateBadges(records[0], fg.crit).join(' ');
-        assert(fgBadges.includes('match-green">Fiberglass') && fgBadges.includes('match-orange">DUPLEX'), 'clear FG cell / combination count');
-        const ss = searchWith(records, { enc: SS, sys: 'Duplex' });
-        assertEqual(ss.page.map(r => r.id), ['CP-8328'], 'reverse terminal-gap stainless only');
-        const ssBadges = UI._generateBadges(records[1], ss.crit).join(' ');
-        assert(ssBadges.includes('match-orange">Stainless Steel') && ssBadges.includes('match-green">DUPLEX'), 'gap uncertain / reliable plain count');
-        assertEqual(searchWith(records, { enc: PS }).total, 0, 'neither is painted');
-        assertEqual(records.map(r => r.enc), [enc, enc], 'search never rewrites backend enc');
-    }
-});
-
 runTest('Material search filters, sorts clean before uncertain, and badges show material labels', () => {
     const records = materialRecords();
     const snapshot = records.map(r => [r.enc, r.encV]);
@@ -359,8 +339,8 @@ runTest('DataLoader ranks once per applied dataset with allowed list; DERIVED_RE
     const old = { id: 'o', desc: 'Enclosure Material Fiberglass Pump Manufacturer Myers', enc: '4XSS' };
     Object.defineProperty(old, '_derivedRev', { value: 1, writable: true, configurable: true, enumerable: false });
     DataLoader.applySnapshot({ records: [old] });
-    assertEqual(InfoTableParser.DERIVED_REV, 4, 'revision bumped');
-    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [4, 'row', '4XSS'], 'v2.5.96-derived record recomputed, raw enc kept');
+    assertEqual(InfoTableParser.DERIVED_REV, 3, 'revision bumped');
+    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [3, 'row', '4XSS'], 'v2.5.96-derived record recomputed, raw enc kept');
     assertEqual(windowState.MFG_RANKING.options, ['MYERS', 'SULZER'], 'ranking on apply includes reserved Sulzer');
     assert(/const SNAPSHOT_SCHEMA_VERSION = '1';/.test(appJsContent), 'snapshot schema unchanged');
 });

@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.98: re-associate flattened cells on cache restore, without changing raw records.
-    const DERIVED_REV = 4;
+    // v2.5.97: bumped so cached records re-derive manufacturer evidence with Sulzer support.
+    const DERIVED_REV = 3;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -59,47 +59,40 @@
 
     // Maximum characters read after a label. Values are short table cells.
     const VALUE_WINDOW = 40;
-    const REVERSE_WINDOW = 120;
     // One alternation, scanned once per description. Every info-table label acts as a
     // value boundary so a value can never run into a neighboring row.
     // v2.5.96: enclosure-specific labels come BEFORE the generic ENCLOSURE so the
     // material label is matched whole and neighboring enclosure rows (NEMA rating, size,
     // inner swing panel, control sensor, ...) act as value boundaries.
-    const FEATURE_SOURCE = 'PANEL\\s+HEATER(?:\\s*\\/\\s*THERMOSTAT)?(?:\\s+W)?|PHASE\\s+MONITOR|' +
-        'CYCLE\\s+COUNTERS?|FLASHER|TEMP\\s+SWITCH|GREEN\\s+RUN\\s+LIGHTS|POLE,\\s*BOX,\\s*SEAL|' +
-        'OPTI[\\s-]*FLOAT\\s+LEVEL\\s+DEC?TECTOR\\s+PTS\\.?';
-    const FEATURE_RE = new RegExp(`^(?:${FEATURE_SOURCE})$`);
-    const LABEL_SOURCE = '\\b(?:' + FEATURE_SOURCE + '|PANEL[\\s-]+TYPE|NUMBER\\s+OF\\s+MOTORS|NO\\.?\\s*(?:OF\\s+)?MOTORS|PUMP\\s+MANUFACTURER|' +
+    const LABEL_SOURCE = '\\b(?:PANEL\\s+TYPE|NUMBER\\s+OF\\s+MOTORS|NO\\.?\\s*(?:OF\\s+)?MOTORS|PUMP\\s+MANUFACTURER|' +
         'TYPE\\s+OF\\s+PUMP|PUMP\\s+MODEL|PHASE(?:\\s*\\/\\s*HZ)?|VOLTAGE|VOLTS|HORSEPOWER|HP|FLA|FULL\\s+LOAD\\s+AMPS|' +
         'ENCL(?:OSURE|\\.)?\\s*MATERIAL|ENCLOSURE\\s+(?:NEMA\\s+)?RATING|ENCLOSURE\\s+(?:SIZE|TYPE|DIMENSIONS?)|NEMA\\s+RATING|' +
-        'INNER\\s+(?:SWING\\s+)?PANEL|INNER\\s+DOOR|CONTROL\\s+SENSOR|CONTROL\\s+VOLTAGE|' +
+        'INNER\\s+SWING\\s+PANEL|INNER\\s+DOOR|CONTROL\\s+SENSOR|CONTROL\\s+VOLTAGE|' +
         'ENCLOSURE|MODEL|RPM|TAGS?|NOTES?|PANEL\\s+NAME)\\b';
-    const QUICK_CHECK_RE = /PANEL[\s-]+TYPE|MOTORS|PUMP\s+MANUFACTURER|MATERIAL/;
+    const QUICK_CHECK_RE = /PANEL\s+TYPE|MOTORS|PUMP\s+MANUFACTURER|MATERIAL/;
     const LEADING_SEPARATORS_RE = /^[\s:|=\-\u2013]+/;
     const SYSTEM_VALUE_RE = /^(SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX)(?![A-Z0-9\/+&])/;
     const SYSTEM_WORD_GLOBAL_RE = /\b(SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX)\b/g;
-    const PLAIN_COUNT_RE = /^([1-4])(?:\s+(?:PUMPS|MOTORS))?$/;
+    const PLAIN_COUNT_RE = /^([1-4])(?:\s+(.*))?$/;
+    const COUNT_TAIL_REJECT_RE = /^(?:[+\-\/&.,\u00D7]|[X\u00D7]\s*\d|\d|(?:AND|OR|TO|PLUS)\s*\d)/;
     // Material value patterns, applied only to the bounded Enclosure Material cell.
     // Groups: 1 Fiberglass, 2 Stainless Steel (incl. grade notation), 3 Painted Steel.
     // Bare STEEL / CARBON STEEL match nothing (never stainless).
     const MATERIAL_RE = new RegExp(
-        '(\\bFIB(?:ER|RE)[\\s-]*GLASS?\\b|\\bFRP\\b)|' +
-        '(\\bSTAINLESS(?:[\\s-]+STEEL)?\\b|\\b(?:304|316)L?\\)?\\s*(?:SST?\\b|S\\/S\\b|S\\.S\\.?)(?![A-Z0-9])|^\\(?(?:304|316)L?\\)?$|^(?:SST?|S\\/S|S\\.S\\.?)(?![A-Z0-9]))|' +
-        '(\\bPAINTED[\\s-]+(?:(?:CARBON|MILD)[\\s-]+)?STEEL\\b|\\bSTEEL\\s*[,(\\-]?\\s*PAINTED\\b)');
+        '(\\bFIB(?:ER|RE)\\s*GLASS?\\b|\\bFRP\\b)|' +
+        '(\\bSTAINLESS(?:\\s+STEEL)?\\b|\\b(?:304|316)L?\\)?\\s*(?:SST?|S\\/S)\\b|^\\(?(?:304|316)L?\\)?$|^(?:SST?|S\\/S|S\\.S\\.?)(?![A-Z0-9]))|' +
+        '(\\bPAINTED\\s+(?:(?:CARBON|MILD)\\s+)?STEEL\\b|\\bSTEEL\\s*[,(\\-]?\\s*PAINTED\\b)');
     // An explicit alternative ("FIBERGLASS OR 304 SS", "FRP / STAINLESS") right after a
     // material makes the cell ambiguous; any other trailing text (flattened neighbors,
     // hardware notes) is ignored.
     const MATERIAL_ALT_RE = /^\s*[,)]?\s*(?:AND\s*\/\s*OR|OR|AND|\/|&)\s*\(?\s*/;
     const MATERIAL_BY_GROUP = Object.freeze([null, 'Fiberglass', 'Stainless Steel', 'Painted Steel']);
-    const UNSUPPORTED_SOURCE = '(?:POLY(?:CARBONATE|ESTER)?|ALUMIN(?:I)?UM|(?:BARE\\s+|CARBON\\s+|MILD\\s+)?STEEL|PVC|PLASTIC|WOOD)';
-    const UNSUPPORTED_MATERIAL_RE = new RegExp(`^${UNSUPPORTED_SOURCE}(?=$|[\\s.,;])`);
-    const MATERIAL_PREFIX_RE = /^\(?(?:(?:304|316)L?\)?\s*)?$/;
+    const MAT_PLACEHOLDER_RE = /^(?:N\/?A|TBD|TBA|NONE|UNKNOWN|-+|\?+|BY\s+OTHERS)?$/;
     // Whole-description strong signals, consulted ONLY by the legacy r.enc fallback to
     // mark uncertainty (never to override a material row). Bare SS / S/S are excluded.
     const ENC_SIGNAL_RE = /\b(4XFG|4XSS|FIB(?:ER|RE)\s*GLASS|FRP|STAINLESS)\b/g;
 
     function classifyLabel(label) {
-        label = label.replace(/-/g, ' ');
         if (label.startsWith('PANEL') && label.endsWith('TYPE')) return 'panelTypes';
         if (label.endsWith('MOTORS')) return 'motorCounts';
         if (label.startsWith('PUMP') && label.endsWith('MANUFACTURER')) return 'pumpMfgs';
@@ -107,13 +100,9 @@
         return null;
     }
 
-    function readValue(text, start, nextStart, kind) {
+    function readValue(text, start, nextStart) {
         let raw = text.slice(start, Math.min(nextStart, start + VALUE_WINDOW));
-        // A minus sign on a motor count is a value, not a label separator.
-        raw = raw.replace(kind === 'motorCounts' ? /^[\s:|=]+/ : LEADING_SEPARATORS_RE, '');
-        if (kind === 'encMaterials') {
-            raw = raw.replace(/\b(PAINTED|STAINLESS|FIBER|FIBRE)[ \t]*\r?\n[ \t]*(?=STEEL\b|GLASS\b)/g, '$1 ');
-        }
+        raw = raw.replace(LEADING_SEPARATORS_RE, '');
         const cut = raw.search(/[\n\r|]/);
         if (cut >= 0) raw = raw.slice(0, cut);
         return raw.trim();
@@ -140,6 +129,7 @@
         if (typeof value !== 'string') return null;
         const match = PLAIN_COUNT_RE.exec(value.trim().toUpperCase());
         if (!match) return null;
+        if (match[2] && COUNT_TAIL_REJECT_RE.test(match[2])) return null;
         return Number(match[1]);
     }
 
@@ -203,99 +193,25 @@
         return null;
     }
 
-    function identifiedMaterials(value) {
-        const match = MATERIAL_RE.exec(value);
-        if (!match || !MATERIAL_PREFIX_RE.test(value.slice(0, match.index).trim())) return [];
-        const tail = value.slice(match.index + match[0].length);
-        if (/^\s+(?:HARDWARE|TERMINALS?|BOLTS?|SCREWS?|BRACKETS?|PUMPS?)\b/.test(tail)) return [];
-        return materialsInValue(value);
-    }
-
-    // Reverse cells must end at their label. The only non-adjacent suffix accepted is
-    // the terminal BOM row actually present in CP-8328, with neighboring feature anchors.
-    // These are textual association rules, not page/spatial isolation.
-    function reverseValue(text, label, previous, next, kind) {
-        if (previous && (previous.kind || /^(?:TAGS?|NOTES?|PANEL NAME)$/.test(previous.label))) return null;
-        let value = text.slice(Math.max(previous ? previous.end : 0, label.start - REVERSE_WINDOW), label.start);
-        value = value.replace(/[\s:|=\-\u2013]+$/, '');
-        const delimiter = Math.max(value.lastIndexOf('\n'), value.lastIndexOf('\r'), value.lastIndexOf('|'));
-        if (delimiter >= 0) value = value.slice(delimiter + 1);
-        value = value.replace(/^[\s.:|=]+/, '').trim();
-        if (kind === 'panelTypes') {
-            return /^(?:SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX)(?:\s*(?:OR|\/|&)\s*(?:SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX))*$/.test(value)
-                && (!previous || FEATURE_RE.test(previous.label)) ? { value, varied: false, direction: 'reverse' } : null;
-        }
-        if (kind !== 'encMaterials') return null;
-        const anchored = previous && (/^ENCLOSURE (?:NEMA )?RATING$/.test(previous.label) || FEATURE_RE.test(previous.label))
-            && next && FEATURE_RE.test(next.label);
-        const featureAnchored = anchored && FEATURE_RE.test(previous.label);
-        if (new RegExp(`^${UNSUPPORTED_SOURCE}$`).test(value) && (!previous || featureAnchored)) {
-            return { value, varied: false, direction: 'reverse' };
-        }
-        if (identifiedMaterials(value).length && materialsInValue(value).length > 0
-            && !/\b(?:HARDWARE|TERMINAL|BOM|PUMP|ENCLOSURE)\b/.test(value)) {
-            // Without neighboring info rows, only a complete material cell is accepted.
-            const match = MATERIAL_RE.exec(value);
-            const tail = value.slice(match.index + match[0].length);
-            if (!tail.trim() || MATERIAL_ALT_RE.test(tail)) {
-                return !previous || featureAnchored ? { value, varied: false, direction: 'reverse' } : null;
-            }
-        }
-        if (!anchored || /\b(?:HARDWARE|BOM|NOTES?|FIBERGLASS|STAINLESS)\b.*\b(?:HARDWARE|BOM)\b/.test(value)) return null;
-        const matcher = new RegExp(MATERIAL_RE.source, 'g');
-        const candidates = [];
-        let match;
-        while ((match = matcher.exec(value))) {
-            const prefix = value.slice(0, match.index);
-            // A rating such as "4X Fiberglass" is not a separate material cell.
-            if (!featureAnchored && !/\b(?:[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?|AUTOMATIC\s+MODE|ALL\s+PUMPS\s+OFF)\b/.test(prefix)) continue;
-            // Wiring identifiers/numbers and the observed operating-mode text only.
-            if (!/^(?:\d+[A-Z]?[\s]+|[A-Z]{1,3}[\s]+|[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?[\s]+|W\/OR[\s]+|AUTOMATIC\s+MODE\s+|ALL\s+PUMPS\s+OFF\s+)*$/.test(prefix)) continue;
-            if (/\b(?:HARDWARE|TERMINAL|BOM|FIBERGLASS|STAINLESS|PAINTED|STEEL)\b/.test(prefix)) continue;
-            const tail = value.slice(match.index + match[0].length).trim();
-            const bom = /^\d{1,3}\s+\d{1,3}\s+WAGO\s+\d{3}-\d{3}\s+(?:GROUND\s+)?TERMINAL$/.test(tail);
-            if (!tail || bom) candidates.push({ value: match[0], varied: bom, direction: bom ? 'reverse-terminal-gap' : 'reverse' });
-        }
-        return candidates.length === 1 ? candidates[0] : null;
-    }
-
-    // One linear label scan; all forward/reverse work is bounded per info cell.
+    // Single pass over the description: locate every label, then read a short bounded
+    // window after the labels we care about.
     function extractInfoRows(desc) {
         const rows = { panelTypes: [], motorCounts: [], pumpMfgs: [], encMaterials: [] };
-        Object.defineProperty(rows, 'associations', { value: [] });
         if (typeof desc !== 'string' || !desc) return rows;
         const text = desc.toUpperCase();
         if (!QUICK_CHECK_RE.test(text)) return rows;
         const regex = new RegExp(LABEL_SOURCE, 'g');
-        const labels = [];
+        let pending = null;
         let match;
         while ((match = regex.exec(text))) {
-            labels.push({ label: match[0], kind: classifyLabel(match[0]), start: match.index, end: regex.lastIndex });
+            if (pending) {
+                rows[pending.kind].push(readValue(text, pending.end, match.index));
+                pending = null;
+            }
+            const kind = classifyLabel(match[0]);
+            if (kind) pending = { kind, end: regex.lastIndex };
         }
-        labels.forEach((label, i) => {
-            if (!label.kind) return;
-            const next = labels[i + 1];
-            let value = readValue(text, label.end, next ? next.start : text.length, label.kind);
-            let association = { value, varied: false, direction: 'forward' };
-            if (!value && (label.kind === 'encMaterials' || label.kind === 'panelTypes')) {
-                association = reverseValue(text, label, labels[i - 1], next, label.kind) || association;
-            }
-            // Only two complete cells at the start can be genuinely two-sided.
-            // Never add preceding rating/feature-column text to a clear forward cell.
-            if (value && !labels[i - 1] && label.kind === 'encMaterials' && identifiedMaterials(value).length) {
-                const reverse = reverseValue(text, label, labels[i - 1], next, label.kind);
-                if (reverse) {
-                    rows.encMaterials.push(reverse.value);
-                    rows.associations.push({ kind: label.kind, ...reverse });
-                }
-            }
-            if (label.kind === 'motorCounts' && next && next.label === 'FLASHER'
-                && /^[1-4]\s+H\s+A$/.test(value)) {
-                association.value = value[0];
-            }
-            rows[label.kind].push(association.value);
-            rows.associations.push({ kind: label.kind, ...association });
-        });
+        if (pending) rows[pending.kind].push(readValue(text, pending.end, text.length));
         return rows;
     }
 
@@ -305,13 +221,9 @@
 
     function deriveFromRows(rows) {
         const explicit = new Set();
-        const ambiguous = new Set();
         rows.panelTypes.forEach(value => {
             const sys = normalizeSystemType(value);
             if (sys) explicit.add(sys);
-            else if (/^(?:SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX)\b/.test(value)) {
-                for (const match of value.matchAll(new RegExp(SYSTEM_WORD_GLOBAL_RE.source, 'g'))) ambiguous.add(SYSTEM_WORDS[match[1]]);
-            }
         });
         const counts = new Set();
         let hasNonPlainCount = false;
@@ -328,13 +240,10 @@
             const agrees = counts.size === 1 && SYSTEM_TYPES[[...counts][0] - 1] === sys;
             const hasCountEvidence = counts.size > 0 || hasNonPlainCount;
             // Panel Type wins; disagreement or a combination count marks it uncertain.
-            sysV = ambiguous.size > 0 || (hasCountEvidence && !(agrees && !hasNonPlainCount));
+            sysV = hasCountEvidence && !(agrees && !hasNonPlainCount);
         } else if (explicit.size === 0 && !hasNonPlainCount && counts.size === 1) {
-            const inferred = SYSTEM_TYPES[[...counts][0] - 1];
-            if (!ambiguous.size || ambiguous.has(inferred)) {
-                sys = inferred;
-                sysV = true;
-            }
+            sys = SYSTEM_TYPES[[...counts][0] - 1];
+            sysV = true;
         }
 
         const mfgs = new Set();
@@ -351,18 +260,18 @@
     // Enclosure Material evidence (v2.5.96). status:
     //   'row'        one material across all readable rows (varied if extra rows are blank/other)
     //   'conflict'   rows/values name several materials -> all candidates, always varied
-    //   'other'      positively identified unsupported material (bare steel, polycarbonate, ...)
-    //   'unreadable' row present but blank/placeholder/unassociated column noise -> legacy fallback
+    //   'other'      readable value that is none of the three (bare steel, polycarbonate, ...)
+    //   'unreadable' row present but blank/placeholder -> legacy fallback
     //   'none'       no material row -> legacy fallback
     function deriveMaterialFromRows(rows, desc) {
         const materials = new Set();
         let other = 0;
         let blank = 0;
         rows.encMaterials.forEach(value => {
-            const found = identifiedMaterials(value);
+            const found = materialsInValue(value);
             if (found.length) found.forEach(m => materials.add(m));
-            else if (UNSUPPORTED_MATERIAL_RE.test(value.trim().toUpperCase())) other++;
-            else blank++;
+            else if (MAT_PLACEHOLDER_RE.test(value.trim().toUpperCase())) blank++;
+            else other++;
         });
         let status;
         if (materials.size > 1) status = 'conflict';
@@ -384,8 +293,7 @@
         return Object.freeze({
             status,
             materials: Object.freeze(ENCLOSURE_MATERIALS.filter(m => materials.has(m))),
-            varied: status === 'conflict' || (status === 'row' && (other > 0 || blank > 0
-                || rows.associations.some(a => a.kind === 'encMaterials' && a.varied))),
+            varied: status === 'conflict' || (status === 'row' && (other > 0 || blank > 0)),
             fgSignal,
             ssSignal
         });
