@@ -42,6 +42,15 @@ for (const label of ['Panel Type', 'Panel Configuration', 'System Type', 'Type o
 }
 expect('Configuration Duplex Voltage 480', ['Duplex', false]);
 expect('Configuration Duplex', [null, false]);
+expect('No. Motors 2 Configuration Duplex Voltage 480', ['Duplex', false]);
+for (const desc of [
+    'No. Motors 2 Configuration Duplex\nreceptacle Voltage 480',
+    `No. Motors 2 Configuration Duplex\n${' '.repeat(120)}receptacle Voltage 480`,
+    'Notes Pump Manufacturer Sulzer Configuration Duplex Voltage 480'
+]) {
+    assert.strictEqual(parser.extractInfoRows(desc).labels.some(label => label.label === 'CONFIGURATION'), false, desc);
+    expect(desc, [null, false]);
+}
 for (const context of ['Notes', 'BOM', 'TAG', 'Bill of Materials']) {
     expect(`${context} System Type Duplex`, [null, false]);
     expect(`${context} Panel Type Duplex Voltage 480 No. Motors 2`, [null, false]);

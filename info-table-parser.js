@@ -358,20 +358,26 @@
         while ((match = regex.exec(text))) {
             labels.push({ label: match[0], kind: classifyLabel(match[0]), start: match.index, end: regex.lastIndex });
         }
+        const tableAnchor = label => label && (label.kind || FEATURE_RE.test(label.label)
+            || /^(?:VOLTAGE|VOLTS|PHASE(?:\/HZ)?|HORSEPOWER|HP|FLA|FULL LOAD AMPS|RPM|ENCLOSURE(?: .+)?)$/.test(label.label));
+        let configurationBlock = null;
         // A bare configuration label is useful only within a nearby info-table cluster.
         labels = labels.filter((label, i, scanned) => {
+            if (/^(?:TAGS?|NOTES?|BOM|BILL OF MATERIALS|PANEL NAME)$/.test(label.label)) configurationBlock = label;
+            else if (configurationBlock && tableAnchor(label)
+                && (tableAnchor(scanned[i - 1]) || tableAnchor(scanned[i + 1]))
+                && /[\n\r|]/.test(text.slice(Math.max(configurationBlock.end, label.start - REVERSE_WINDOW), label.start))) configurationBlock = null;
             if (label.label !== 'CONFIGURATION') return true;
             const supported = [scanned[i - 1], scanned[i + 1]].some(neighbor => neighbor
                 && Math.abs(neighbor.start - label.start) <= REVERSE_WINDOW
                 && /^(?:VOLTAGE|VOLTS|PHASE|NO\.?|NUMBER|QTY|PUMP MANUFACTURER|ENCLOSURE)/.test(neighbor.label));
             const next = scanned[i + 1];
-            return supported && completeCell(text, label, next)
+            return !configurationBlock && supported && completeCell(text, label, next)
+                && !invalidContinuation(text, label, next)
                 && !!associatedSystemCell(readValue(text, label.end, next ? next.start : text.length, label.kind));
         });
         Object.defineProperty(rows, 'labels', { value: labels });
         let contextBlock = null;
-        const tableAnchor = label => label && (label.kind || FEATURE_RE.test(label.label)
-            || /^(?:VOLTAGE|VOLTS|PHASE(?:\/HZ)?|HORSEPOWER|HP|FLA|FULL LOAD AMPS|RPM|ENCLOSURE(?: .+)?)$/.test(label.label));
         labels.forEach((label, i) => {
             if (/^(?:TAGS?|NOTES?|BOM|BILL OF MATERIALS|PANEL NAME)$/.test(label.label)) contextBlock = label;
             else if (contextBlock && tableAnchor(label)
