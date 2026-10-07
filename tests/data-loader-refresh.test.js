@@ -501,7 +501,7 @@ async function flushAsync() {
         resetHarness();
         localStorage.setItem('cox_user', 'user');
         localStorage.setItem('cox_pass', 'pass');
-        for (const k of ['mfg', 'hp', 'volt', 'phase', 'enc', 'cat']) {
+        for (const k of ['sys', 'mfg', 'hp', 'volt', 'phase', 'enc', 'cat']) {
             inputs[k + 'Input'] = {
                 value: k === 'cat' ? 'Standard' : 'Any',
                 options: [],
@@ -529,7 +529,7 @@ async function flushAsync() {
         let edited = false;
         const editAndApply = async () => {
             await flushAsync();
-            Object.entries({ mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
+            Object.entries({ sys: 'Duplex', mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
                 .forEach(([k, value]) => { inputs[k + 'Input'].value = value; });
             inputs.keywordInput.value = 'allowed during sync';
             RealUI.toggleKeywordBlocklistMode();
@@ -563,7 +563,7 @@ async function flushAsync() {
             await DataLoader.preload();
         }
         assert(edited && popCount === 1, `${flow}: must exercise async edit, snapshot apply, and real UI restore`);
-        Object.entries({ mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
+        Object.entries({ sys: 'Duplex', mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
             .forEach(([k, value]) => assertEqual(inputs[k + 'Input'].value, value, `${flow}: ${k} must survive`));
         assertEqual(inputs.keywordInput.value, 'blocked during apply', `${flow}: latest visible edit must survive`);
         assertEqual(RealUI.getAllowedKeywordTermsInput(), 'allowed during sync', `${flow}: inactive allowed list must survive`);
