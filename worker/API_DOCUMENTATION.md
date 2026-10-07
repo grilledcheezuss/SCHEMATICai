@@ -1,8 +1,10 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.103 (frontend; Worker remains v2.5.97)
+## Version: v2.5.104 (frontend; Worker remains v2.5.97)
 
-_Release note: v2.5.103 is frontend-only: IndexedDB sync locks carry owner/app version/heartbeat and are taken over after 30 s without a heartbeat or when written by another release, are released on pagehide/beforeunload and before release navigation, peer waits end within 60 s, and a mixed HTML/app.js release triggers one guarded reload. The Worker remains byte-identical to v2.5.97; no backend redeployment is needed._
+_Release note: v2.5.104 is frontend-only: System Type uses bounded row association, conservative panel-title/count fallback, hardware exclusions and explicit confidence evidence. Uncorroborated count-only Quadraplex matches are intentionally removed; combinations are never summed. DERIVED_REV 6 refreshes existing descriptions without a schema change/cache reset. Selected PDF cards gain theme-aware purple glow/tint and reduced-motion handling. Worker v2.5.97, API/auth, search scoring and PDF selection are unchanged; no backend redeployment is needed._
+
+_v2.5.103 was frontend-only: IndexedDB sync locks carry owner/app version/heartbeat and are taken over after 30 s without a heartbeat or when written by another release, are released on pagehide/beforeunload and before release navigation, peer waits end within 60 s, and a mixed HTML/app.js release triggers one guarded reload. The Worker remains byte-identical to v2.5.97; no backend redeployment is needed._
 
 _v2.5.102 was frontend-only: release revalidation fetches the loaded entry document path and follows only same-origin redirects (so /index.html -> / no longer fails), versioned assets must stay same-origin with JS/CSS MIME types and no HTML fallback body before navigation, and the waiting-for-update indicator stays stable instead of restarting a percentage. The Worker remains byte-identical to v2.5.97; no backend redeployment is needed._
 
@@ -16,6 +18,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.104**: Browser-only System Type repair with explicit-row precedence, bounded symmetric association, validated panel-title fallback, aliases, hardware/part-number exclusions and conservative count inference. Title/gap/count evidence remains uncertain; conflicting rows abstain, combination counts are not summed, and count-only four no longer classifies Quadraplex. Non-enumerable browser evidence re-derives at revision 6 with snapshot schema 1 unchanged. Active result cards add a purple ring/glow and tint in both themes, safe scroll inset and reduced-motion treatment. No Worker/API/scoring/PDF-selection changes; live accuracy is not measured.
 - **v2.5.103**: Frontend-only update/sync-lock reliability: stale/previous-release locks are taken over, waiting states always end in synced/restored/retry, and mixed HTML/JS releases get one guarded reload. No Worker/API changes.
 - **v2.5.102**: Frontend-only redirect-safe deployed-release revalidation and stable waiting/update indicator. Failed or unavailable revalidation keeps the installed app and cached data. No Worker/API changes.
 - **v2.5.101**: Frontend-only card/menu housekeeping and deployment-aware login update. Compatible encrypted generations remain available until a full successful replacement; failed updates retain cached data, profiles and preferences. No Worker/API changes.

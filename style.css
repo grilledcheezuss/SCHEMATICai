@@ -453,7 +453,7 @@ body.results-ready #results-header { display: flex; }
 #results-count { font-size: 9px; font-weight: 800; color: var(--app-primary); letter-spacing: 0.5px; text-transform: uppercase; order: 2; margin-left: auto; text-align: right; }
 body.dark-mode #results-count { color: #c4b5fd; }
 #results-list { flex: 1; min-height: 0; overflow-y: auto; }
-#results-area { display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 10px; transition: opacity 0.2s ease; }
+#results-area { display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 10px; transition: opacity 0.2s ease; }
 .results-toggle-btn {
     display: none;
     align-items: center;
@@ -500,7 +500,6 @@ body.dark-mode #results-count { color: #c4b5fd; }
 
 .record-card { background: var(--bg-card); padding: 6px 8px; border-radius: 6px; border: 1px solid var(--surface-seam-border); border-left: 4px solid var(--app-primary); box-shadow: var(--surface-soft-shadow); position: relative; transition: transform 0.2s ease, box-shadow 0.2s ease; display: flex; flex-direction: column; gap: 4px; } 
 .record-card:hover { transform: translateY(-1px); box-shadow: var(--surface-soft-shadow), 0 2px 5px rgba(0,0,0,0.1); } 
-.record-card.active-view { background: rgba(70, 29, 124, 0.1); border-color: var(--app-primary); }
 .panel-name { font-size: 14px; font-weight: 800; color: var(--panel-id-color); margin: 0; letter-spacing: -0.3px; line-height: 1.1; } 
 .badge-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 2px; padding: 0; background: none; border: none; border-radius: 0; }
 
@@ -684,8 +683,8 @@ body:not(.dark-mode) #pagination-footer {
     border-color: var(--shell-divider-strong);
 }
 
-/* v2.5.100: light-mode result cards keep a purple brand outline (1px) and 4px left accent.
-   Precedence: normal/hover = purple; active-view = purple + inset ring + tint;
+/* v2.5.104: selection adds an outer ring and compact glow without changing card geometry.
+   Precedence: normal/hover = purple; active-view = theme tint + ring + glow;
    no-PDF (disabled) = neutral outline + gray left accent, no hover lift (beats the hover rule). */
 body:not(.dark-mode) .record-card {
     border-color: var(--app-primary);
@@ -696,12 +695,24 @@ body:not(.dark-mode) .record-card:hover {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), var(--surface-soft-shadow), 0 2px 5px rgba(15, 23, 42, 0.12);
 }
 
-body:not(.dark-mode) .record-card.active-view {
-    box-shadow: inset 0 0 0 1px var(--app-primary), var(--surface-soft-shadow);
+body:not(.dark-mode) .record-card.active-view:not(.no-pdf-card) {
+    background: #f3eef9;
+    border-color: var(--app-primary);
+    box-shadow: inset 0 1px 0 var(--shell-divider-highlight), var(--surface-soft-shadow), 0 0 0 2px rgba(70, 29, 124, 0.32), 0 0 4px rgba(70, 29, 124, 0.22);
 }
 
-body:not(.dark-mode) .record-card.active-view:hover {
-    box-shadow: inset 0 0 0 1px var(--app-primary), var(--surface-soft-shadow), 0 2px 5px rgba(15, 23, 42, 0.12);
+body:not(.dark-mode) .record-card.active-view:not(.no-pdf-card):hover {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), var(--surface-soft-shadow), 0 2px 5px rgba(15, 23, 42, 0.12), 0 0 0 2px rgba(70, 29, 124, 0.32), 0 0 4px rgba(70, 29, 124, 0.22);
+}
+
+body.dark-mode .record-card.active-view:not(.no-pdf-card) {
+    background: #302c3b;
+    border-color: var(--app-primary);
+    box-shadow: var(--surface-soft-shadow), 0 0 0 2px rgba(167, 139, 250, 0.42), 0 0 4px rgba(167, 139, 250, 0.24);
+}
+
+body.dark-mode .record-card.active-view:not(.no-pdf-card):hover {
+    box-shadow: var(--surface-soft-shadow), 0 2px 5px rgba(0, 0, 0, 0.1), 0 0 0 2px rgba(167, 139, 250, 0.42), 0 0 4px rgba(167, 139, 250, 0.24);
 }
 
 body:not(.dark-mode) .record-card.no-pdf-card,
@@ -709,6 +720,15 @@ body:not(.dark-mode) .record-card.no-pdf-card:hover {
     border-color: var(--shell-divider-strong);
     border-left-color: #9ca3af;
     box-shadow: inset 0 1px 0 var(--shell-divider-highlight), var(--surface-soft-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .record-card {
+        transition: none;
+    }
+    .record-card:hover {
+        transform: none;
+    }
 }
 
 body:not(.dark-mode) .collapse-btn {

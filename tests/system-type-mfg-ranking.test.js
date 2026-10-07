@@ -97,7 +97,7 @@ runTest('Plain count only -> inferred with sysV=true; nothing -> no type', () =>
     assertEqual(sysOf('No. Motors 1 HP 5'), { sys: 'Simplex', sysV: true }, 'count 1');
     assertEqual(sysOf('Number of Motors: 2'), { sys: 'Duplex', sysV: true }, 'count 2');
     assertEqual(sysOf('NO. OF MOTORS 3 PUMPS'), { sys: 'Triplex', sysV: true }, 'count 3 with trailing word');
-    assertEqual(sysOf('No. Motors 4'), { sys: 'Quadraplex', sysV: true }, 'count 4');
+    assertEqual(sysOf('No. Motors 4'), { sys: null, sysV: false }, 'uncorroborated count 4 abstains');
     assertEqual(sysOf('No. Motors 2 No. Motors 3'), { sys: null, sysV: false }, 'disagreeing counts infer nothing');
     assertEqual(sysOf('Duplex pump station with 2 motors'), { sys: null, sysV: false }, 'free text is never evidence');
     assertEqual(sysOf(''), { sys: null, sysV: false }, 'empty');
@@ -350,6 +350,30 @@ runTest('Sulzer search uses strict backend confidence and safe orange descriptio
     assert(oldCacheBadge.includes('match-orange">SULZER'), 'description-only old-cache Sulzer is orange, never green');
     assert(records[0].w > records[2].w, 'strict backend match scores above description fallback');
     assertEqual([records[0].mfg, records[2].mfg], ['SULZER', null], 'search does not overwrite backend manufacturer fields');
+});
+
+runTest('Repaired System Type evidence drives real search counts, sorting, and badge colors', () => {
+    const records = [
+        makeRecord('title', 'Duplex Blower Control Panel', { pdfUrl: 'x' }),
+        makeRecord('reverse', 'Duplex Panel Type Voltage 480', { pdfUrl: 'x' }),
+        makeRecord('count', 'Number of Pumps 2', { pdfUrl: 'x' }),
+        makeRecord('hardware', 'Duplex receptacle Control Panel', { pdfUrl: 'x' }),
+        makeRecord('four', 'No. Motors 4', { pdfUrl: 'x' }),
+        makeRecord('conflict', 'Panel Type Duplex Panel Type Triplex', { pdfUrl: 'x' }),
+        makeRecord('alias', 'System Type DUP Voltage 480', { pdfUrl: 'x' }),
+        makeRecord('quad-title', '4-Pump Control Panel', { pdfUrl: 'x' }),
+        makeRecord('mismatch', 'Simplex Control Panel\nPanel Configuration Duplex', { pdfUrl: 'x' })
+    ];
+    InfoTableParser.deriveRecordsSync(records);
+    const result = searchWith(records, { sys: 'Duplex', cat: 'Any' });
+    assertEqual(result.total, 5, 'title, reverse, count and two verified aliases match');
+    assertEqual(result.page.slice(0, 2).map(r => r.id).sort(), ['alias', 'mismatch'], 'verified rows sort before all orange evidence');
+    for (const record of result.page) {
+        const badge = UI._generateBadges(record, result.crit).join(' ');
+        assert(badge.includes(`match-${record._sysV ? 'orange' : 'green'}">DUPLEX`), `${record.id} badge confidence`);
+    }
+    assertEqual(searchWith(records, { sys: 'Quadraplex', cat: 'Any' }).page.map(r => r.id), ['quad-title'], 'uncorroborated four is excluded');
+    assertEqual(searchWith(records, { sys: 'Any', cat: 'Any' }).total, 9, 'abstaining rows remain in Any');
 });
 
 runTest('System Type branch is isolated from keywords, enclosure, and never re-parses', () => {

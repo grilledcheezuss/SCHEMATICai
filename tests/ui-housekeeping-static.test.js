@@ -61,12 +61,35 @@ check(desktopBranch.includes('this.syncMobileLayout()'), 'desktop/tablet search 
 check(uiSrc.includes('UI.syncMobileResultsCount(Number.isFinite(totalCount) ? totalCount : res.length)'), 'render keeps an explicit 0 total instead of a falsy fallback');
 
 console.log('\n🧪 Light-mode card border specificity');
-check(/#results-area \{[^}]*padding: 4px 4px 10px;/.test(css), 'scroll content has top/side breathing room and bottom allowance');
+check(/#results-area \{[^}]*padding: 8px 8px 10px;/.test(css), 'scroll content has 8px top/side glow clearance and 10px bottom allowance');
 check(!/#results-area\s*\{[^}]*padding-bottom:/.test(css), 'media overrides do not reduce the scroll content bottom allowance');
 check(/#results-list \{[^}]*min-height: 0;[^}]*overflow-y: auto;/.test(css), 'results list remains the shrinkable scroll container');
 check(/body:not\(\.dark-mode\) \.record-card \{\s*border-color: var\(--app-primary\);/.test(css), 'light card outline uses the brand token');
 check(/body:not\(\.dark-mode\) \.record-card:hover \{\s*border-color: var\(--app-primary\);/.test(css), 'light hover outline stays purple');
 check(/body:not\(\.dark-mode\) \.record-card\.no-pdf-card,\s*body:not\(\.dark-mode\) \.record-card\.no-pdf-card:hover \{[^}]*border-left-color: #9ca3af;/.test(css), 'no-PDF card keeps neutral left accent over light rules');
+
+console.log('\n🧪 Selected-card theme, glow and motion guards');
+const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+for (const theme of ['body:not(.dark-mode)', 'body.dark-mode']) {
+    for (const hover of ['', ':hover']) {
+        const selector = `${theme} .record-card.active-view:not(.no-pdf-card)${hover}`;
+        const block = rules.find(([, selectors]) => selectors.trim() === selector)?.[2] || '';
+        check(Boolean(block), `exact selected-card selector: ${selector}`);
+        check(/0 0 0 2px rgba\([^)]*, 0\.\d+\)/.test(block), `${selector}: translucent 2px outer ring`);
+        check(/0 0 4px rgba\([^)]*, 0\.\d+\)/.test(block), `${selector}: compact 4px soft glow`);
+        check(block.includes('var(--surface-soft-shadow)'), `${selector}: preserves surface shadow`);
+        check(!/border(?:-width|-radius)?:|transform:|transition:/.test(block), `${selector}: no geometry or motion changes`);
+    }
+}
+check(!rules.some(([, selectors]) => selectors.includes('.active-view') && !selectors.includes(':not(.no-pdf-card)')),
+    'every active-view style excludes no-PDF cards, including background tint');
+check(/body:not\(\.dark-mode\) \.record-card\.active-view:not\(\.no-pdf-card\) \{[^}]*background: #f3eef9;/.test(css),
+    'light selection uses a pale purple surface tint');
+check(/body\.dark-mode \.record-card\.active-view:not\(\.no-pdf-card\) \{[^}]*background: #302c3b;/.test(css),
+    'dark selection uses an opaque, surface-preserving lavender tint');
+const reducedMotion = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
+check(/\.record-card \{\s*transition: none;\s*\}/.test(reducedMotion), 'reduced motion disables card transitions only');
+check(/\.record-card:hover \{\s*transform: none;\s*\}/.test(reducedMotion), 'reduced motion removes hover lift without removing selection shadows');
 
 console.log('\n🧪 Menu housekeeping');
 const menu = html.slice(html.indexOf('id="main-menu"'), html.indexOf('</header>', html.indexOf('id="main-menu"')));
