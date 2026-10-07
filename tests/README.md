@@ -62,6 +62,17 @@ label stays stable (no restarting percentage) and the search button ellipsizes r
 UI housekeeping tests also cover first-card hover clipping and cleaned-up menu keyboard order.
 Live hosting/cache headers and physical-device acceptance remain separate deployment checks.
 
+### System Type adjacent-token rules (v2.5.107)
+
+`tests/system-type-adjacent.test.js` uses the verbatim flattened CP-8025 (Duplex) and CP-8374 (Simplex) descriptions in
+`tests/fixtures/system-type-adjacent.js` plus mutated variants: forward/reverse adjacent values for all four types and
+N PUMP(S), hardware-only/negated/conflicting/other-panel/RTF-fonttable/part-number negatives, combination counts,
+metamorphic BOM-noise insertion and forward/reverse layout swaps, and 8k-record derivation timing.
+
+```bash
+node tests/system-type-adjacent.test.js
+```
+
 ### System Type parser and audit regressions (v2.5.106)
 
 The production parser tests cover all four types in forward/reverse cells, count disagreement versus blank/noisy

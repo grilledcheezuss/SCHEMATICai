@@ -119,8 +119,9 @@ runTest('Flattened neighbor labels are never consumed as values', () => {
     assertEqual(sysOf('Panel Type Voltage 480 No. Motors Phase 3'), { sys: null, sysV: false }, 'empty cells do not borrow the next label value');
     assertEqual(sysOf('No. Motors FLA 2'), { sys: null, sysV: false }, 'count cannot be read across FLA');
     assertEqual(derive('Pump Manufacturer Type of Pump Barnes').pumpMfg, null, 'pump mfg cannot be read across Type of Pump');
-    const longGap = 'Panel Type' + ' '.repeat(80) + 'Duplex';
-    assertEqual(sysOf(longGap), { sys: null, sysV: false }, 'value window is bounded');
+    // v2.5.107: whitespace runs collapse to one token gap inside the bounded adjacency window.
+    assertEqual(sysOf('Panel Type' + ' '.repeat(80) + 'Duplex'), { sys: 'Duplex', sysV: false }, 'whitespace is a token separator');
+    assertEqual(sysOf('Panel Type' + ' '.repeat(400) + 'Duplex'), { sys: null, sysV: false }, 'value window is bounded');
 });
 
 runTest('Pump Manufacturer normalization uses the canonical aliases', () => {
@@ -367,7 +368,8 @@ runTest('Repaired System Type evidence drives real search counts, sorting, and b
     InfoTableParser.deriveRecordsSync(records);
     const result = searchWith(records, { sys: 'Duplex', cat: 'Any' });
     assertEqual(result.total, 5, 'title, reverse, count and two verified aliases match');
-    assertEqual(result.page.slice(0, 2).map(r => r.id).sort(), ['alias', 'mismatch'], 'verified rows sort before all orange evidence');
+    // v2.5.107: the adjacent reverse row is explicit (green) evidence.
+    assertEqual(result.page.slice(0, 3).map(r => r.id).sort(), ['alias', 'mismatch', 'reverse'], 'verified rows sort before all orange evidence');
     for (const record of result.page) {
         const badge = UI._generateBadges(record, result.crit).join(' ');
         assert(badge.includes(`match-${record._sysV ? 'orange' : 'green'}">DUPLEX`), `${record.id} badge confidence`);

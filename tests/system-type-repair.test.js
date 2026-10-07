@@ -43,13 +43,15 @@ for (const label of ['Panel Type', 'Panel Configuration', 'System Type', 'Type o
 expect('Configuration Duplex Voltage 480', ['Duplex', false]);
 expect('Configuration Duplex', [null, false]);
 expect('No. Motors 2 Configuration Duplex Voltage 480', ['Duplex', false]);
-for (const desc of [
-    'No. Motors 2 Configuration Duplex\nreceptacle Voltage 480',
-    `No. Motors 2 Configuration Duplex\n${' '.repeat(120)}receptacle Voltage 480`,
-    'Notes Pump Manufacturer Sulzer Configuration Duplex Voltage 480'
+// v2.5.107: the unsupported CONFIGURATION label is still dropped; the plain leading
+// count "No. Motors 2" (rule 2) now supplies count-only (orange) evidence on its own.
+for (const [desc, wanted] of [
+    ['No. Motors 2 Configuration Duplex\nreceptacle Voltage 480', ['Duplex', true]],
+    [`No. Motors 2 Configuration Duplex\n${' '.repeat(120)}receptacle Voltage 480`, ['Duplex', true]],
+    ['Notes Pump Manufacturer Sulzer Configuration Duplex Voltage 480', [null, false]]
 ]) {
     assert.strictEqual(parser.extractInfoRows(desc).labels.some(label => label.label === 'CONFIGURATION'), false, desc);
-    expect(desc, [null, false]);
+    expect(desc, wanted);
 }
 for (const context of ['Notes', 'BOM', 'TAG', 'Bill of Materials']) {
     expect(`${context} System Type Duplex`, [null, false]);
@@ -96,7 +98,8 @@ for (const label of ['No. Motors', 'Number of Motors', 'No of Pumps', 'Number of
     expect(`${label} 2${' '.repeat(40)} or 3`, [null, false]);
 }
 expect('Panel Type Duplex No. Motors 2 H A Flasher', ['Duplex', false]);
-expect('Panel Type Duplex No. Motors 2 A Flasher', ['Duplex', true]);
+// v2.5.107 rule 2: "2 A" is a plain leading count followed by a wiring token.
+expect('Panel Type Duplex No. Motors 2 A Flasher', ['Duplex', false]);
 
 for (const title of [
     'Duplex Panel', 'Duplex Pump Control Panel', 'Duplex Blower Control Panel', 'Two Pump Control Panel',
@@ -107,7 +110,9 @@ for (const title of [
     expect(title, ['Duplex', true]);
     expect(`${title}\nPanel Type Simplex`, ['Simplex', false]);
     for (const prefix of ['TAG ', 'Notes ', 'BOM ', 'Bill of Materials ', 'Not ', 'Not\n', 'Other | ', 'Non-', 'Other ', 'See ', 'Ref. ', 'Other Panel\n', 'Replacement for ']) {
-        expect(`${prefix}${title}`, [null, false]);
+        // v2.5.107 rule 4: TAG no longer blocks a bounded <type> PUMP|BLOWER|GRINDER CONTROL PANEL title.
+        const tagged = prefix === 'TAG ' && /(?:PUMP|BLOWER|GRINDER) CONTROL PANEL$/i.test(title);
+        expect(`${prefix}${title}`, tagged ? ['Duplex', true] : [null, false]);
     }
     for (const suffix of [' receptacle', '\nreceptacle', ' | alternating relay', ' outlet', ' alternator', ' alternating relay', ' indicator', ' light', ' component', ' mounted on other panel', '\nmounted on other panel', ' for other panel', ' or Triplex']) {
         expect(`${title}${suffix}`, [null, false]);
@@ -137,9 +142,6 @@ for (const desc of [
     'Panel Type Duplex Alternating Relay',
     'Panel Type Duplex Alternating\nRelay',
     'Duplex Alternating Relay Panel Type Voltage 480',
-    'Phase Monitor Yes Duplex Panel Type Voltage 480',
-    'Voltage 480 Duplex Panel Type Cycle Counters',
-    'No. Motors 2 Duplex Panel Type Cycle Counters',
     'TAG Duplex Panel Type Cycle Counters',
     'Notes Duplex Panel Type Cycle Counters',
     'BOM Duplex Panel Type Cycle Counters',
@@ -150,44 +152,59 @@ for (const desc of [
     `Panel Type Duplex\n${' '.repeat(120)}or Triplex`,
     `Panel Type Duplex\n${' '.repeat(120)}receptacle`,
     `Panel Type Duplex\n${' '.repeat(112)}receptacle`,
-    `Panel Type Duplex\nX\n${' '.repeat(120)}or Triplex`,
     `No. Motors 2\n${' '.repeat(120)}+2`,
     `No. Motors 2\n${' '.repeat(120)}or 3`,
     `No. Motors 2\n${' '.repeat(120)}fan`,
-    `No. Motors 2\nX\n${' '.repeat(120)}+2`,
     'Panel Type Duplex\nor Triplex',
     'Panel Type Duplex\nreceptacle',
     'No. Motors 2\n+2',
-    'No. Motors 2\nfan',
-    `unrelated ${' '.repeat(120)}Duplex Panel Type Voltage 480`
+    'No. Motors 2\nfan'
 ]) expect(desc, [null, false]);
+// v2.5.107 rule 1: the token immediately before/after the label is the value; earlier
+// cells, distance and trailing checkbox/wiring columns no longer veto it.
+for (const desc of [
+    'Phase Monitor Yes Duplex Panel Type Voltage 480',
+    'Voltage 480 Duplex Panel Type Cycle Counters',
+    'No. Motors 2 Duplex Panel Type Cycle Counters',
+    `Panel Type Duplex\nX\n${' '.repeat(120)}or Triplex`,
+    `unrelated ${' '.repeat(120)}Duplex Panel Type Voltage 480`
+]) expect(desc, ['Duplex', false]);
+// Rule 2: "X" is a checkbox column token, so the leading 2 is a plain (count-only) count.
+expect(`No. Motors 2\nX\n${' '.repeat(120)}+2`, ['Duplex', true]);
 
 for (const desc of [
-    'Duplex Panel Type Voltage 480',
     'Duplex Control Panel | System Type | Voltage 480',
-    'Phase Monitor CR1 5 Duplex Panel Type Voltage 480',
     'Panel Type CR1 5 Duplex Voltage 480',
-    'Panel Type Duplex CR1 5 Voltage 480',
     'Panel Type 28 2 WAGO 285-137 GROUND TERMINAL Duplex Voltage 480',
-    'Panel Type Duplex 28 2 WAGO 285-137 GROUND TERMINAL Voltage 480',
     'Phase Monitor Duplex 28 2 WAGO 285-137 GROUND TERMINAL Panel Type Voltage 480'
 ]) expect(desc, ['Duplex', true]);
+// v2.5.107 rule 1/3: an adjacent forward or reverse token is explicit row evidence (green).
+for (const desc of [
+    'Duplex Panel Type Voltage 480',
+    'Phase Monitor CR1 5 Duplex Panel Type Voltage 480',
+    'Panel Type Duplex CR1 5 Voltage 480',
+    'Panel Type Duplex 28 2 WAGO 285-137 GROUND TERMINAL Voltage 480'
+]) expect(desc, ['Duplex', false]);
 for (const [phrase, canonical] of [['DUPLEX GRINDER', 'Duplex'], ['DUPLEX ALTERNATING', 'Duplex'], ['SIMPLEX GRINDER PUMP PANEL', 'Simplex'], ['(2) PUMP', 'Duplex']]) {
-    expect(`${phrase} Panel Type Voltage 480`, [canonical, true]);
+    // Reverse adjacency accepts only a bare type word or N PUMP(S) form (rule 1).
+    expect(`${phrase} Panel Type Voltage 480`, [canonical, phrase !== '(2) PUMP']);
     expect(`Panel Type ${phrase} Voltage 480`, [canonical, false]);
 }
 for (const qualifier of ['NOT', 'NO', 'NON', 'WITHOUT', 'OTHER', 'ANOTHER', 'SEE', 'REF', 'REFERENCE', 'FOR', 'EXISTING']) {
     expect(`Panel Type CR1 ${qualifier} DUPLEX Voltage 480`, [null, false]);
     expect(`Phase Monitor CR1 ${qualifier} DUPLEX Panel Type Voltage 480`, [null, false]);
-    expect(`Panel Type DUPLEX CR1 ${qualifier} Voltage 480`, [null, false]);
+    // Rule 1: trailing tokens after a forward leading value are ignored.
+    expect(`Panel Type DUPLEX CR1 ${qualifier} Voltage 480`, ['Duplex', false]);
     expect(`Phase Monitor DUPLEX CR1 ${qualifier} Panel Type Voltage 480`, [null, false]);
 }
 for (const wire of ['H', 'A', 'N', 'OL', 'W/OR']) {
     expect(`Panel Type CR1 ${wire} Duplex Voltage 480`, ['Duplex', true]);
-    expect(`Phase Monitor CR1 ${wire} Duplex Panel Type Voltage 480`, ['Duplex', true]);
+    expect(`Phase Monitor CR1 ${wire} Duplex Panel Type Voltage 480`, ['Duplex', false]);
 }
-expect('Triplex Panel Type Duplex Voltage 480', ['Duplex', false]);
-for (const gap of ['28 2 OTHER 285-137 GROUND TERMINAL', '28 2 WAGO 285-137 BOLT', '28 2 WAGO 285-137 GROUND TERMINAL Triplex']) {
+// v2.5.107 rule 1: disagreeing forward and reverse adjacent values are a conflict.
+expect('Triplex Panel Type Duplex Voltage 480', [null, false]);
+expect('Phase Monitor Duplex 28 2 WAGO 285-137 GROUND TERMINAL Triplex Panel Type Voltage 480', ['Triplex', false]);
+for (const gap of ['28 2 OTHER 285-137 GROUND TERMINAL', '28 2 WAGO 285-137 BOLT']) {
     expect(`Phase Monitor Duplex ${gap} Panel Type Voltage 480`, [null, false]);
 }
 
@@ -198,7 +215,7 @@ for (const value of ['', 'CAPACITORS', 'CATALOG NUMBER', 'YES', 'VFD1', 'HSP3/RU
 for (const value of ['3', '2+2', '2 + Ex', '4+2', '2/1', '2.5', '-2']) {
     expect(`Panel Type Duplex\nNo. Motors ${value}\nVoltage 480`, ['Duplex', true]);
 }
-for (const type of parser.SYSTEM_TYPES) expect(`${type} | Panel Type | Voltage 480`, [type, true]);
+for (const type of parser.SYSTEM_TYPES) expect(`${type} | Panel Type | Voltage 480`, [type, false]);
 expect('Panel Type Duplex\nNo. Motors 2\nNo. Motors 3', ['Duplex', true]);
 expect('Panel Type Duplex\nPanel Type\nNo. Motors 2', ['Duplex', false]);
 expect('Panel Type Duplex\nPanel Type Triplex\nNo. Motors 2', [null, false]);
@@ -252,9 +269,9 @@ for (const desc of [rtf('Panel Type Duplex\\par Pump Manufacturer Sulzer\\par'),
 }
 
 // Existing derived revisions must be replaced without changing snapshot serialization.
-assert.strictEqual(parser.DERIVED_REV, 7);
+assert.strictEqual(parser.DERIVED_REV, 8);
 for (const desc of ['No. Motors 4', 'Duplex Control Panel', 'Panel Type Duplex']) {
-    for (const previousRevision of [5, 6]) {
+    for (const previousRevision of [5, 6, 7]) {
         const record = { id: desc, desc, sys: 'legacy' };
         for (const [key, value] of [['_derivedRev', previousRevision], ['_sys', 'Quadraplex'], ['_sysV', false]]) {
             Object.defineProperty(record, key, { value, configurable: true });
@@ -281,10 +298,10 @@ assert.strictEqual(evidence('Panel Type Duplex').source, 'row');
 assert.strictEqual(evidence('Panel Type Duplex').confidence, 'verified');
 assert.strictEqual(evidence('Duplex Control Panel').source, 'title');
 assert.strictEqual(evidence('No. Motors 2').source, 'count');
-assert.strictEqual(evidence('Duplex Panel Type Voltage 480').direction, 'reverse');
+assert.strictEqual(evidence('Duplex Panel Type Voltage 480').direction, 'reverse-adjacent');
+assert.strictEqual(evidence('Panel Type Duplex CR1 5 Voltage 480').direction, 'forward-adjacent');
 assert(evidence('Panel Type CR1 5 Duplex Voltage 480').reasons.includes('wiring-gap'));
-assert(evidence('Phase Monitor CR1 5 Duplex Panel Type Voltage 480').reasons.includes('wiring-gap'));
-assert(evidence('Panel Type Duplex 28 2 WAGO 285-137 GROUND TERMINAL Voltage 480').reasons.includes('terminal-gap'));
+assert(evidence('Panel Type 28 2 WAGO 285-137 GROUND TERMINAL Duplex Voltage 480').reasons.includes('terminal-gap'));
 assert.deepStrictEqual(evidence('Panel Type Duplex Panel Type Triplex').candidates, ['Duplex', 'Triplex']);
 
 // Exercise long no-row/title-heavy inputs, not merely cached record fast paths.
