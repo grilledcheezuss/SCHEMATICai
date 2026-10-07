@@ -3987,6 +3987,7 @@ class SearchEngine {
         // legacy r.enc fallback). The old full-description reclassification that mutated
         // r.enc/r.encV was removed so it can no longer undo a material-row decision.
         const encMatcher = typeof InfoTableParser !== 'undefined' ? InfoTableParser.matchEnclosureMaterial : null;
+        if (!encMatcher && crit.enc !== 'Any') console.warn('[Search] InfoTableParser unavailable; enclosure material filter cannot match any record');
         const encVariedByRecord = new Map();
 
         let res = [];
