@@ -1625,7 +1625,9 @@ class DemoManager {
     // matchMedia so menu, handlers and CSS can never disagree. UI.isSmallMobile() (< 768, general
     // search/results layout) is deliberately NOT changed.
     static SMALL_DEVICE_MAX_SHORT_SIDE = 430;
-    static SMALL_DEVICE_MEDIA_QUERY = '(max-width: 430px), (max-width: 767px) and (max-height: 430px)';
+    static DOCKED_LAYOUT_MIN_WIDTH = 768;
+    // Must stay identical to the small-phone media query in style.css.
+    static SMALL_DEVICE_MEDIA_QUERY = `(max-width: ${this.SMALL_DEVICE_MAX_SHORT_SIDE}px), (max-width: ${this.DOCKED_LAYOUT_MIN_WIDTH - 1}px) and (max-height: ${this.SMALL_DEVICE_MAX_SHORT_SIDE}px)`;
 
     static isGeneratorAvailable() {
         if (typeof window.matchMedia === 'function') {
@@ -1633,7 +1635,7 @@ class DemoManager {
         }
         const width = Math.max(0, window.innerWidth || 0);
         const height = Math.max(0, window.innerHeight || 0) || width;
-        return !(width < 768 && Math.min(width, height) <= this.SMALL_DEVICE_MAX_SHORT_SIDE);
+        return !(width < this.DOCKED_LAYOUT_MIN_WIDTH && Math.min(width, height) <= this.SMALL_DEVICE_MAX_SHORT_SIDE);
     }
 
     static toggleGenerator() {

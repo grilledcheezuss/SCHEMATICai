@@ -28,7 +28,10 @@ function extractClass(className) {
 }
 
 console.log('🧪 Generator small-device policy (JS constant, CSS media query, geometry fallback)');
-const jsQuery = appJs.match(/static SMALL_DEVICE_MEDIA_QUERY = '([^']+)'/)[1];
+const fakeWindow = { innerWidth: 0, innerHeight: 0 };
+const DemoManager = new Function('window', 'UI', 'document', 'PdfViewer', `${extractClass('DemoManager')}; return DemoManager;`)(fakeWindow, {}, {}, {});
+const jsQuery = DemoManager.SMALL_DEVICE_MEDIA_QUERY;
+check(jsQuery === '(max-width: 430px), (max-width: 767px) and (max-height: 430px)', `JS query derived from constants: ${jsQuery}`);
 check(css.includes(`@media ${jsQuery} {`), `style.css hides generator surfaces with the identical query: ${jsQuery}`);
 const excludedBlock = css.slice(css.indexOf(`@media ${jsQuery} {`)).split('}')[0];
 ['#menu-demo', '#generator-panel', '#generator-restore-btn', '#toggle-right', '#left-generator-context']
@@ -37,8 +40,6 @@ check(!/#menu-demo\s*\{\s*display:\s*none\s*!important;\s*\}/.test(css.slice(css
     'generator is no longer hidden for every < 768 px viewport');
 check(/static isSmallMobile\(\) \{ return window\.innerWidth < 768; \}/.test(appJs), 'general UI.isSmallMobile breakpoint unchanged (< 768)');
 
-const fakeWindow = { innerWidth: 0, innerHeight: 0 };
-const DemoManager = new Function('window', 'UI', 'document', 'PdfViewer', `${extractClass('DemoManager')}; return DemoManager;`)(fakeWindow, {}, {}, {});
 const matrix = [
     // [width, height, available]
     [320, 568, false], [375, 667, false], [390, 844, false], [430, 932, false], [431, 932, true],

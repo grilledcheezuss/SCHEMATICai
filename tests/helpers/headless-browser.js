@@ -73,7 +73,10 @@ class HeadlessBrowser {
             ], { stdio: ['ignore', 'ignore', 'pipe'] });
             const wsUrl = await waitForDevtoolsUrl(proc);
             ws = new WebSocket(wsUrl);
-            await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+            await new Promise((resolve, reject) => {
+                ws.onopen = resolve;
+                ws.onerror = () => reject(new Error('Failed to connect to DevTools WebSocket'));
+            });
             browser = new HeadlessBrowser(proc, ws, server, userDataDir);
             await browser._attach();
             return browser;
@@ -144,8 +147,19 @@ class HeadlessBrowser {
         const payload = { id, method, params };
         if (sessionId) payload.sessionId = sessionId;
         return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
-            this.ws.send(JSON.stringify(payload));
+            const timer = setTimeout(() => {
+                this.pending.delete(id);
+                reject(new Error(`DevTools request timed out: ${method}`));
+            }, 30000);
+            const settle = fn => value => { clearTimeout(timer); fn(value); };
+            this.pending.set(id, { resolve: settle(resolve), reject: settle(reject) });
+            try {
+                this.ws.send(JSON.stringify(payload));
+            } catch (err) {
+                this.pending.delete(id);
+                clearTimeout(timer);
+                reject(err);
+            }
         });
     }
 
