@@ -159,6 +159,7 @@ runTest('Documented legacy fallback when the row is missing or unreadable', () =
 global.window = global.window || {};
 global.PDF_STATUS = { MISSING: 'missing' };
 global.KeywordMatcher = new Function(`return ${extractClassSource('KeywordMatcher')}`)();
+global.VoltageMatcher = new Function(`return ${extractClassSource('VoltageMatcher')}`)();
 global.AI_TRAINING_DATA = {
     ALIASES: {},
     MANUFACTURERS: ['GORMAN RUPP', 'BARNES', 'SULZER', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 'ZOELLER', 'LIBERTY', 'WILO', 'PENTAIR', 'ABS', 'GODWIN', 'FRANKLIN', 'EBARA', 'HIDROSTAL'],
@@ -262,6 +263,27 @@ runTest('Material search filters, sorts clean before uncertain, and badges show 
     assert(records.every(r => !Object.keys(r).includes('_encEvidence')) && !JSON.stringify(records).includes('_encEvidence'), 'derived evidence non-enumerable/non-persisted');
 });
 
+runTest('Record-like flattened cells preserve all materials, voltage, keywords, badges and pagination', () => {
+    const fixtures = require('./fixtures/enclosure-association.js');
+    for (const wanted of [FG, SS, PS]) {
+        const records = Array.from({ length: 30 }, (_, i) => rec(`panel-${i}`,
+            fixtures.description(fixtures.cells(wanted)[i % 6]), { enc: '4XFG', volt: '240', phase: '1' }));
+        records.push(rec('wrong-voltage', fixtures.description(fixtures.cells(wanted)[0]).replace(/120\/240|230V/g, '480'), { volt: '480' }));
+        records.push(rec('bare-steel', fixtures.description('Enclosure Material Steel'), { enc: '4XSS', volt: '240' }));
+        const rawFields = () => records.map(({ id, desc, enc, volt, phase }) => ({ id, desc, enc, volt, phase }));
+        const raw = JSON.stringify(rawFields());
+        const result = searchWith(records, { enc: wanted, sys: 'Duplex', volt: '240', keyword: 'control', blocked: 'unrelated' });
+        assertEqual([result.page.length, result.total], [25, 30], `${wanted} pagination/voltage/system`);
+        assertEqual(DOM_CACHE.get('page-info').textContent, 'Page 1 of 2', 'page count');
+        assert(UI._generateBadges(result.page[0], result.crit).join(' ').includes(`">${wanted}</span>`), 'badge agrees with filter');
+        assertEqual(searchWith(records, { enc: wanted, volt: '240', blocked: 'control' }).total, 0, 'blocked keyword still excludes');
+        assertEqual(JSON.stringify(rawFields()), raw, 'search leaves raw fields unchanged');
+        assert(records.some(r => InfoTableParser.matchEnclosureMaterial(r, wanted).varied), 'interleaved association stays uncertain');
+        assert(records.some(r => InfoTableParser.matchEnclosureMaterial(r, wanted).matches
+            && !InfoTableParser.matchEnclosureMaterial(r, wanted).varied), 'adjacent cells remain clean');
+    }
+});
+
 runTest('Material filter combines with mfg, category, keywords and pagination', () => {
     const records = materialRecords();
     assertEqual(searchWith(records, { enc: FG, mfg: 'FLYGT', cat: 'Any' }).page.map(r => r.id), ['8', '6'], 'mfg + material + category Any');
@@ -356,11 +378,12 @@ runTest('DataLoader ranks once per applied dataset with allowed list; DERIVED_RE
     const windowState = { LOCAL_DB: [], ID_MAP: new Map(), FOUND_MFGS: new Set(), FOUND_ENCS: new Set() };
     const DataLoader = new Function('window', 'localStorage', 'InfoTableParser', `${extractClassSource('DataLoader')}; return DataLoader;`)(
         windowState, { getItem: () => null, setItem() {}, removeItem() {} }, InfoTableParser);
-    const old = { id: 'o', desc: 'Enclosure Material Fiberglass Pump Manufacturer Myers', enc: '4XSS' };
-    Object.defineProperty(old, '_derivedRev', { value: 1, writable: true, configurable: true, enumerable: false });
+    const old = { id: 'o', desc: 'Phase Monitor Painted Steel Enclosure Material W = M2 23 Panel Heater / Thermostat W Pump Manufacturer Myers', enc: '4XSS' };
+    Object.defineProperty(old, '_derivedRev', { value: 4, writable: true, configurable: true, enumerable: false });
     DataLoader.applySnapshot({ records: [old] });
-    assertEqual(InfoTableParser.DERIVED_REV, 4, 'revision bumped');
-    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [4, 'row', '4XSS'], 'v2.5.96-derived record recomputed, raw enc kept');
+    assertEqual(InfoTableParser.DERIVED_REV, 5, 'association revision re-derives old snapshots');
+    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [5, 'row', '4XSS'], 'older derived record recomputed, raw enc kept');
+    assertEqual(old._encEvidence.materials, [PS], 'revision 4 descriptions gain the new association on snapshot apply');
     assertEqual(windowState.MFG_RANKING.options, ['MYERS', 'SULZER'], 'ranking on apply includes reserved Sulzer');
     assert(/const SNAPSHOT_SCHEMA_VERSION = '1';/.test(appJsContent), 'snapshot schema unchanged');
 });
