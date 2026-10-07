@@ -60,7 +60,7 @@ assert.deepStrictEqual(report.states, { green: 4, orange: 5, absent: 4, conflict
 assert.deepStrictEqual(report.sources, { explicitRow: 5, titlePhrase: 2, countInference: 2, conflict: 2, unknown: 4 }, 'evidence source buckets');
 const typeCounts = Object.fromEntries(Object.entries(report.types).map(([k, t]) => [k, [t.total, t.green, t.orange]]));
 assert.deepStrictEqual(typeCounts, {
-    Simplex: [3, 1, 2], Duplex: [2, 1, 1], Triplex: [2, 1, 1], Quadraplex: [2, 1, 1]
+    Simplex: [3, 1, 2],         Duplex: [2, 1, 1], Triplex: [2, 1, 1], Quadraplex: [2, 1, 1]
 }, 'per-type green/orange counts');
 assert.deepStrictEqual(report.types.Simplex.bySource, { explicitRow: 1, titlePhrase: 1, countInference: 1 });
 assert.deepStrictEqual(report.types.Simplex.orangeCauses, { 'count-inference': 1, 'title-narrative-only': 1 });
@@ -136,6 +136,27 @@ assert.strictEqual(missing.cause, 'type-word-without-accepted-evidence');
 assert(missing.evidence.typeMentions.length === 1 && missing.evidence.typeMentions[0].context.startsWith('QUADRAPLEX LIFT STATION'));
 const fourCount = SystemTypeAudit.inspect('CP-601', { records });
 assert.strictEqual(fourCount.types.Quadraplex.verdict, 'evidence-rejected', 'four-count alone is explained, not promoted');
+const corroboratedTitle = derived([
+    { id: 'CP-701', desc: 'DUPLEX PUMP CONTROL PANEL\nNo. Motors 2' },
+    { id: 'CP-702', desc: 'Panel Type Duplex\nNo. Motors\nVoltage 480' },
+    { id: 'CP-703', desc: 'Panel Type Duplex\nNo. Motors CAPACITORS\nVoltage 480' },
+    { id: 'CP-704', desc: '{\\rtf1\\ansi{\\fonttbl{\\f0\\fnil SIMPLEX;}}\\pard Panel Type Duplex\\par No. Motors 2\\par}' }
+]);
+const corroboratedReport = SystemTypeAudit.report({ records: corroboratedTitle, badgeRenderer: false });
+assert.deepStrictEqual(corroboratedReport.states, { green: 4, orange: 0, absent: 0, conflicting: 0 });
+assert.deepStrictEqual(corroboratedReport.sampleIds['state:green'], ['CP-701', 'CP-702', 'CP-703', 'CP-704']);
+const rtfInspection = SystemTypeAudit.inspect('CP-704', { records: corroboratedTitle });
+assert.deepStrictEqual([rtfInspection.state, rtfInspection.derived.sys, rtfInspection.stored.matchesFresh], ['green', 'Duplex', true]);
+const countCases = derived([
+    { id: 'CP-705', desc: 'No. Motors CAPACITORS' },
+    { id: 'CP-706', desc: 'No. Motors 2+2' },
+    { id: 'CP-707', desc: 'Panel Type Duplex\nNo. Motors 3\nNo. Motors CAPACITORS' },
+    { id: 'CP-708', desc: 'Panel Type Duplex\nNo. Motors 2\nNo. Motors 3\nNo. Motors CAPACITORS' }
+]);
+const countReport = SystemTypeAudit.report({ records: countCases, badgeRenderer: false });
+assert.deepStrictEqual(countReport.absentReasons, { 'count-cell-non-count-text': 1, 'count-not-plain': 1 });
+assert.strictEqual(SystemTypeAudit.inspect('CP-707', { records: countCases }).countDetail, 'count-implies-different-type');
+assert.strictEqual(SystemTypeAudit.inspect('CP-708', { records: countCases }).countDetail, 'multiple-count-values');
 const strings = [];
 (function walk(value) {
     if (typeof value === 'string') strings.push(value);
@@ -203,7 +224,7 @@ assert.deepStrictEqual([throwing.badge.errors, throwing.badge.mismatches], [9, 0
 delete globalThis.UI;
 
 // --- Classification is untouched by the audit -------------------------------------------
-assert.strictEqual(parser.DERIVED_REV, 6, 'diagnostic PR keeps DERIVED_REV 6 (no re-derivation)');
+assert.strictEqual(parser.DERIVED_REV, 7, 'parser repair refreshes cached derived fields');
 const searchSrc = appJs.slice(appJs.indexOf('class SearchEngine {'), appJs.indexOf('class SearchEngine {') + 60000);
 assert(searchSrc.includes("if (r._sys !== crit.sys) return;"), 'System Type search filter unchanged');
 assert(appJs.includes("const badgeClass = record._sysV === true ? 'match-orange' : 'match-green';"), 'badge semantics unchanged');

@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.104: refresh System Type evidence in existing snapshots.
-    const DERIVED_REV = 6;
+    // v2.5.106: refresh System Type evidence in existing snapshots.
+    const DERIVED_REV = 7;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -127,6 +127,142 @@
         return raw.trim();
     }
 
+    const RTF_DESTINATIONS = new Set([
+        'annotation', 'atnauthor', 'atndate', 'colortbl', 'colorschememapping', 'datastore',
+        'filetbl', 'fldinst', 'fonttbl', 'footer', 'footerl', 'footerr', 'generator',
+        'header', 'headerl', 'headerr', 'info', 'listoverridetable', 'listtable',
+        'nonshppict', 'object', 'objdata', 'pict', 'revtbl', 'shppict', 'stylesheet',
+        'themedata', 'xmlnstbl'
+    ]);
+
+    function visibleRtfText(source) {
+        const output = [];
+        const groups = [];
+        let fallback = 0;
+        let i = 0;
+        let rootSeen = false;
+        for (; i < source.length; i++) {
+            const ch = source[i];
+            if (ch === '\r' || ch === '\n') continue;
+            if (ch === '{') {
+                if (!groups.length) rootSeen = true;
+                const parent = groups[groups.length - 1];
+                groups.push({ skip: !!(parent && parent.skip), first: true, uc: parent ? parent.uc : 1 });
+                continue;
+            }
+            if (ch === '}') {
+                if (!groups.length) return '';
+                groups.pop();
+                continue;
+            }
+            if (!groups.length) return '';
+            const group = groups[groups.length - 1];
+            if (ch !== '\\') {
+                if (fallback) fallback--;
+                else if (!group.skip) output.push(ch);
+                group.first = false;
+                continue;
+            }
+            if (++i >= source.length) return '';
+            const next = source[i];
+            if (next === '\\' || next === '{' || next === '}') {
+                if (fallback) fallback--;
+                else if (!group.skip) output.push(next);
+                group.first = false;
+                continue;
+            }
+            if (next === '*') {
+                group.skip = true;
+                group.first = false;
+                continue;
+            }
+            if (next === '\'') {
+                const hex = source.slice(i + 1, i + 3);
+                if (!/^[0-9a-f]{2}$/i.test(hex)) return '';
+                i += 2;
+                if (fallback) fallback--;
+                else if (!group.skip) output.push(String.fromCharCode(parseInt(hex, 16)));
+                group.first = false;
+                continue;
+            }
+            if (!/[a-z]/i.test(next)) {
+                if (fallback) fallback--;
+                else if (!group.skip && next === '~') output.push(' ');
+                else if (!group.skip && next === '_') output.push('-');
+                group.first = false;
+                continue;
+            }
+            const wordStart = i;
+            while (i + 1 < source.length && /[a-z]/i.test(source[i + 1])) i++;
+            const word = source.slice(wordStart, i + 1).toLowerCase();
+            let parameter = null;
+            if (source[i + 1] === '-' || /\d/.test(source[i + 1] || '')) {
+                const numberStart = i + 1;
+                i++;
+                while (i + 1 < source.length && /\d/.test(source[i + 1])) i++;
+                parameter = Number(source.slice(numberStart, i + 1));
+            }
+            if (source[i + 1] === ' ') i++;
+            if (group.first && RTF_DESTINATIONS.has(word)) group.skip = true;
+            group.first = false;
+            if (word === 'uc' && Number.isFinite(parameter)) group.uc = Math.max(0, Math.min(16, parameter));
+            else if (word === 'u' && Number.isFinite(parameter)) {
+                if (!group.skip) output.push(String.fromCharCode(parameter < 0 ? parameter + 65536 : parameter));
+                fallback = group.uc;
+            } else if (word === 'bin' && Number.isFinite(parameter)) {
+                i += Math.max(0, parameter);
+                if (i >= source.length) return '';
+            } else if (!group.skip && (word === 'par' || word === 'line')) output.push('\n');
+            else if (!group.skip && word === 'tab') output.push(' ');
+        }
+        return rootSeen && groups.length === 0 ? output.join('') : '';
+    }
+
+    function isDxfText(source) {
+        return /^\s*0\s*\r?\n(?:SECTION|TEXT)\s*(?:\r?\n|$)/i.test(source);
+    }
+
+    function visibleDxfText(source) {
+        const lines = source.split(/\r?\n/);
+        if (lines[lines.length - 1] === '') lines.pop();
+        if (lines.length < 4 || lines.length % 2) return '';
+        const output = [];
+        let entity = '';
+        let entityLayer = '';
+        let lastTextLayer = null;
+        let textEntities = 0;
+        for (let i = 0; i < lines.length; i += 2) {
+            const codeText = lines[i].trim();
+            if (!/^\d{1,4}$/.test(codeText)) return '';
+            const code = Number(codeText);
+            if (code > 1071) return '';
+            const value = lines[i + 1];
+            if (code === 0) {
+                entity = value.trim().toUpperCase();
+                entityLayer = '';
+                if (entity === 'TEXT') textEntities++;
+            } else if (code === 8 && entity === 'TEXT') {
+                entityLayer = value.trim().toUpperCase();
+            } else if (code === 1 && entity === 'TEXT') {
+                const layer = entityLayer || '0';
+                if (/\b(?:BOM|NOTES?|TAGS?|HARDWARE)\b/.test(layer)) {
+                    output.push('BOM');
+                } else {
+                    if (lastTextLayer !== null && lastTextLayer !== layer) output.push('BOM');
+                    output.push(value);
+                }
+                lastTextLayer = layer;
+            }
+        }
+        return textEntities && output.length ? output.join('\n') : '';
+    }
+
+    function systemTypeView(desc) {
+        if (typeof desc !== 'string') return '';
+        if (/^\s*\{\\rtf\d+/i.test(desc)) return visibleRtfText(desc);
+        return isDxfText(desc) ? visibleDxfText(desc) : desc;
+    }
+
     function joinMaterialLines(value) {
         return value.replace(/\b(PAINTED|STAINLESS|FIBER|FIBRE)[ \t]*\r?\n[ \t]*(?=STEEL\b|GLASS\b)/g, '$1 ');
     }
@@ -190,6 +326,11 @@
         const match = PLAIN_COUNT_RE.exec(value.trim().toUpperCase());
         if (!match) return null;
         return Number(match[1]);
+    }
+
+    function meaningfulMotorCount(value) {
+        if (typeof value !== 'string' || parseMotorCount(value) !== null) return false;
+        return /^(?:[+-]?\d+(?:\.\d+)?|\([1-4]\)|ONE|TWO|THREE|FOUR)(?=$|[\s+&/x-])/i.test(value.trim());
     }
 
     function normalizeManufacturer(value) {
@@ -445,16 +586,19 @@
     }
 
     function deriveFromDesc(desc) {
-        return deriveFromRows(extractInfoRows(desc), desc);
+        const rows = extractInfoRows(desc);
+        const systemDesc = systemTypeView(desc);
+        const systemRows = systemDesc === desc ? rows : extractInfoRows(systemDesc);
+        return deriveFromRows(rows, desc, systemRows, systemDesc);
     }
 
-    function titleCandidates(desc, labels) {
+    function titleMatches(desc, labels) {
         if (typeof desc !== 'string' || !desc) return [];
         const text = desc.toUpperCase();
         const token = SYSTEM_TOKEN_SOURCE.replace('|DUP|', '|');
         const gap = '[\\s|]{1,8}';
         const matcher = new RegExp(`(?:\\b|(?=\\([1-4]\\)))(?:(${token})${gap}(?:(?:PUMP|PUMPS|BLOWER|MOTOR|GRINDER|ALTERNATING|SEWAGE|LIFT|STATION|WATER|WASTEWATER|CONTROL)${gap}){0,5}PANEL|(?:PUMP${gap})?CONTROL${gap}PANEL(?:[ \\t]*[:=-][ \\t]*|${gap}(?:FOR${gap})?)(${token}))\\b`, 'g');
-        const candidates = new Set();
+        const matches = [];
         let index = 0;
         let match;
         while ((match = matcher.exec(text))) {
@@ -482,27 +626,49 @@
                 || /^\s*(?:OR|AND|\/|&|FOR|ON|IN|OF|WITH|PART|MOUNTED|ATTACHED)\b/.test(after)) continue;
             const sys = normalizeSystemType(match[1] || match[2]);
             if (sys) {
-                candidates.add(sys);
+                matches.push({ type: sys, start: match.index, end });
                 matcher.lastIndex = end;
             }
         }
-        return SYSTEM_TYPES.filter(sys => candidates.has(sys));
+        return matches;
     }
 
-    function deriveFromRows(rows, desc) {
+    function titleCandidates(desc, labels) {
+        const matches = titleMatches(desc, labels);
+        return SYSTEM_TYPES.filter(sys => matches.some(match => match.type === sys));
+    }
+
+    function titleHasNearbyCount(desc, rows, title, count) {
+        const matches = titleMatches(desc, rows.labels || []).filter(match => match.type === title);
+        if (!matches.length) return false;
+        let countIndex = 0;
+        for (const label of rows.labels || []) {
+            if (label.kind !== 'motorCounts') continue;
+            const value = rows.motorCounts[countIndex++];
+            if (parseMotorCount(value) !== count) continue;
+            for (const match of matches) {
+                if (Math.max(label.start, match.end) - Math.min(label.start, match.start) > REVERSE_WINDOW) continue;
+                const region = desc.slice(Math.min(label.start, match.start), Math.max(label.start, match.end));
+                if (/\b(?:TAGS?|NOTES?|BOM|BILL\s+OF\s+MATERIALS|PANEL\s+NAME)\b/i.test(region)) continue;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function deriveFromRows(rows, desc, systemRows = rows, systemDesc = desc) {
         const explicit = new Set();
         const ambiguous = [];
-        rows.panelTypes.forEach(value => {
+        systemRows.panelTypes.forEach(value => {
             const candidates = systemCandidates(value);
             if (candidates.length === 1) explicit.add(candidates[0]);
             else if (candidates.length > 1) ambiguous.push(candidates);
         });
         const counts = new Set();
-        let hasNonPlainCount = false;
-        rows.motorCounts.forEach(value => {
+        const hasNonPlainCount = systemRows.motorCounts.some(value => parseMotorCount(value) === null && meaningfulMotorCount(value));
+        systemRows.motorCounts.forEach(value => {
             const count = parseMotorCount(value);
-            if (count === null) hasNonPlainCount = true;
-            else counts.add(count);
+            if (count !== null) counts.add(count);
         });
 
         let sys = null;
@@ -515,32 +681,38 @@
         if (explicit.size === 1) {
             sys = [...explicit][0];
             source = 'row';
-            const associations = rows.associations.filter(a => a.kind === 'panelTypes');
+            const associations = systemRows.associations.filter(a => a.kind === 'panelTypes');
             direction = associations.find(a => normalizeSystemType(a.value) === sys).direction;
             const agrees = counts.size === 1 && SYSTEM_TYPES[[...counts][0] - 1] === sys;
-            const hasCountEvidence = counts.size > 0 || hasNonPlainCount;
-            // Panel Type wins; disagreement or a combination count marks it uncertain.
-            sysV = ambiguous.length > 0 || associations.some(a => a.varied)
-                || (hasCountEvidence && !(agrees && !hasNonPlainCount));
+            const countConflict = hasNonPlainCount || (counts.size > 0 && !(agrees && counts.size === 1));
+            const uncertainAssociation = associations.some(a => a.varied && a.direction !== 'unreadable');
+            // Empty/unreadable cells are unavailable evidence; only associated facts conflict.
+            sysV = ambiguous.length > 0 || uncertainAssociation || countConflict;
             reasons.push('complete-explicit-cell');
             if (ambiguous.length) reasons.push('ambiguous-additional-row');
-            if (associations.some(a => a.varied)) reasons.push('uncertain-row-association');
+            if (uncertainAssociation) reasons.push('uncertain-row-association');
             if (associations.some(a => a.direction.includes('wiring-gap'))) reasons.push('wiring-gap');
             if (associations.some(a => a.direction.includes('terminal-gap'))) reasons.push('terminal-gap');
             if (associations.some(a => a.direction === 'reverse')) reasons.push('reverse-cell');
-            if (hasCountEvidence && !(agrees && !hasNonPlainCount)) reasons.push('unresolved-or-conflicting-count');
+            if (countConflict) reasons.push('unresolved-or-conflicting-count');
         } else if (explicit.size > 1) {
             source = 'conflict';
             reasons.push('conflicting-explicit-rows');
         } else {
-            const titles = titleCandidates(desc, rows.labels || []);
+            const titles = titleCandidates(systemDesc, systemRows.labels || []);
             candidates = ambiguous.length ? SYSTEM_TYPES.filter(allows) : titles;
             if (titles.length === 1 && allows(titles[0])) {
                 sys = titles[0];
                 source = 'title';
                 direction = 'narrative';
-                sysV = true;
+                const count = counts.size === 1 ? [...counts][0] : null;
+                const corroborated = count !== null && !hasNonPlainCount
+                    && SYSTEM_TYPES[count - 1] === sys
+                    && !ambiguous.length
+                    && titleHasNearbyCount(systemDesc, systemRows, sys, count);
+                sysV = !corroborated;
                 reasons.push('validated-panel-phrase');
+                if (corroborated) reasons.push('corroborated-panel-phrase-count');
             } else if (titles.length > 1) {
                 source = 'conflict';
                 candidates = titles;
@@ -682,7 +854,9 @@
         if (!record || typeof record !== 'object') return false;
         if (record._derivedRev === DERIVED_REV) return false;
         const rows = extractInfoRows(record.desc);
-        const derived = deriveFromRows(rows, record.desc);
+        const systemDesc = systemTypeView(record.desc);
+        const systemRows = systemDesc === record.desc ? rows : extractInfoRows(systemDesc);
+        const derived = deriveFromRows(rows, record.desc, systemRows, systemDesc);
         defineDerived(record, '_sys', derived.sys);
         defineDerived(record, '_sysV', derived.sysV);
         defineDerived(record, '_sysEvidence', derived.sysEvidence);
@@ -836,9 +1010,10 @@
     // Pure per-record analysis; never writes to the record.
     function auditAnalyze(record) {
         const desc = record && typeof record.desc === 'string' ? record.desc : '';
-        const text = desc.toUpperCase();
-        const rows = extractInfoRows(desc);
-        const derived = deriveFromRows(rows, desc);
+        const systemDesc = systemTypeView(desc);
+        const text = systemDesc.toUpperCase();
+        const rows = extractInfoRows(systemDesc);
+        const derived = deriveFromRows(rows, systemDesc);
         const evidence = derived.sysEvidence;
         const titles = titleCandidates(desc, rows.labels || []);
         const panelRows = rows.associations.filter(a => a.kind === 'panelTypes');
@@ -877,8 +1052,9 @@
                 cause = panelRows.every(a => a.direction === 'unreadable' || !a.value) ? 'panel-type-label-unreadable' : 'panel-type-value-unrecognized';
             } else if (counts.length) {
                 if (rows.motorCounts.some(v => !v)) cause = 'count-cell-incomplete';
-                else if (counts.some(c => c === null)) cause = 'count-not-plain';
-                else if (new Set(counts).size > 1) cause = 'count-disagreement';
+                else if (counts.some(c => c === null)) {
+                    cause = rows.motorCounts.some(meaningfulMotorCount) ? 'count-not-plain' : 'count-cell-non-count-text';
+                } else if (new Set(counts).size > 1) cause = 'count-disagreement';
                 else if (counts[0] === 4) cause = 'four-count-without-row-or-title';
                 else cause = 'count-unused';
             } else if (Object.keys(mentions).length) cause = 'type-word-without-accepted-evidence';
@@ -887,9 +1063,8 @@
         }
         let countDetail = null;
         if (state === 'orange' && evidence.source === 'row' && evidence.reasons.includes('unresolved-or-conflicting-count')) {
-            if (rows.motorCounts.some(v => !v)) countDetail = 'blank-count-cell';
-            else if (counts.some(c => c === null)) countDetail = 'combination-or-non-plain-count';
-            else if (new Set(counts).size > 1) countDetail = 'multiple-count-values';
+            if (rows.motorCounts.some(meaningfulMotorCount)) countDetail = 'combination-or-non-plain-count';
+            else if (new Set(counts.filter(c => c !== null)).size > 1) countDetail = 'multiple-count-values';
             else countDetail = 'count-implies-different-type';
         }
         return { desc, text, rows, derived, evidence, titles, panelRows, ambiguous, explicit, counts, mentions, state, source, cause, countDetail };

@@ -62,16 +62,21 @@ label stays stable (no restarting percentage) and the search button ellipsizes r
 UI housekeeping tests also cover first-card hover clipping and cleaned-up menu keyboard order.
 Live hosting/cache headers and physical-device acceptance remain separate deployment checks.
 
-### system-type-audit.test.js (v2.5.105)
+### System Type parser and audit regressions (v2.5.106)
 
-Diagnostic-only System Type audit (`SystemTypeAudit.report()/text()/inspect(id)` in `info-table-parser.js`).
-Synthetic Simplex/Duplex/Triplex/Quadraplex fixtures check deterministic green/orange/absent/conflicting counts,
-source buckets, orange causes, opt-in sanitized snippets, bounded inspect output, no record mutation, and
-rendered-badge agreement through the real `UI._generateBadges` extracted from `app.js`. Hover-ring coexistence
-with the selected-card glow is covered by the UI housekeeping static/browser tests.
+The production parser tests cover all four types in forward/reverse cells, count disagreement versus blank/noisy
+cells, bounded title/count corroboration, and System-Type-only RTF/DXF text extraction (including metadata,
+coordinates, malformed records, and preservation of raw/enclosure/manufacturer fields). Audit tests exercise stale
+derivations and confirm that structured records report the same evidence as snapshot derivation. The diagnostic
+remains read-only, bounded, sanitized and opt-in; badge agreement uses the real `UI._generateBadges`.
 
 ```bash
+node tests/system-type-repair.test.js
 node tests/system-type-audit.test.js
+node tests/parser-repair.test.js
+node tests/system-type-mfg-ranking.test.js
+node tests/enclosure-material-mfg-coverage.test.js
+node tests/data-loader-refresh.test.js
 ```
 
 ## Future Tests
