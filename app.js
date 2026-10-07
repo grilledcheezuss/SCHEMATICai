@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.99 ---
-const APP_VERSION = "v2.5.99";
+// --- SCHEMATICA ai v2.5.100 ---
+const APP_VERSION = "v2.5.100";
 const VERSION_HISTORY = {
+    "v2.5.100": "UI housekeeping: Submittal Generator unavailable only on small phones (short side <= 430 px in the < 768 px layout, one media query shared by JS matchMedia and CSS); eligible 431-767 px viewports get a compact floating Control Panel with restore/minimize controls; resize into/out of small-phone mode preserves zones/context/minimized state. Light-mode result cards keep purple brand borders on normal/hover/active, while no-PDF cards keep their neutral disabled treatment. First desktop/tablet search now shows the total count immediately (results-ready synced on completion; explicit 0 kept). UI.isSmallMobile breakpoint, search/parser/DERIVED_REV, Worker v2.5.97, auth/cache/network unchanged; no Worker redeploy",
     "v2.5.99": "Browser-only enclosure refinement: symmetric Fiberglass, Stainless Steel, and Painted Steel association for split material names, bounded wiring noise, WAGO terminal/end-block gaps, and adjacent enclosure labels. Clear rows remain primary; gap evidence and conflicts remain uncertain, and unsupported steel is never promoted. Derived revision 5 re-associates existing cached descriptions without a snapshot schema bump or cache wipe. Worker, auth/network/cache, System Type/manufacturer, search criteria, sorting/pagination, badges, feedback, and PDF behavior unchanged; no Worker redeploy",
     "v2.5.98": "Browser-only parser repair: bounded forward/reverse Enclosure Material cells, feature-column boundaries, and unresolved noise no longer treated as unsupported material. CP-8370 Fiberglass and CP-8328 Stainless Steel excerpts now match; the terminal-BOM-gap association stays uncertain. Plain motor counts reject auxiliary/combination expressions; explicit System Type remains primary. Derived revision 4 refreshes existing cached descriptions without a schema bump or cache wipe. Manufacturer ranking, feedback encodings, Worker behavior, and live search/PDF state unchanged; no backend redeploy",
     "v2.5.97": "Manufacturer menu now shows a fixed top 12 by bounded Pump Manufacturer row frequency, with alphabetical ties and a reserved Sulzer slot when outside the natural cutoff; no-row fallback is alphabetical and capped at 12, while an out-of-list live selection is temporarily preserved (up to 13 manufacturer choices plus Any). Feedback retains every supported manufacturer. Sulzer is canonical across browser and Worker extraction, search, confidence badges, and feedback. Browser-derived fields refresh on existing cache restore; the minimal Worker manufacturer update requires separate deployment, followed by normal data/edge-cache refresh. No forced cache wipe",
@@ -1607,50 +1608,56 @@ class DragManager {
 
 class DemoManager {
     static isGeneratorActive = false;
+    // Persistent Control Panel preference (minimized vs expanded), kept across viewport modes.
+    static isPanelMinimized = true;
+
+    // v2.5.100: the Submittal Generator is unavailable ONLY on small phone viewports.
+    // Small device = short side <= 430 CSS px (the same short-side cutoff PdfViewer._setScaleForDevice
+    // uses for small-mobile zoom) while the app is in its mobile layout (< 768 px wide):
+    //   - portrait phones up to 430 px wide (375/390/414/430) are excluded;
+    //   - narrow phone landscape (e.g. 667x375, 740x360, 767x430) is excluded because its short side
+    //     is still <= 430 (PdfViewer's extra width <= 600 cap is intentionally not reused here, so
+    //     600-767 px landscape phones are not enabled by accident);
+    //   - larger phones/tablets/narrow windows in the mobile layout (431-767 px wide with a short side
+    //     above 430, e.g. 600x960, 744x1133) get a compact floating Control Panel;
+    //   - >= 768 px keeps the unchanged docked 3-column layout (incl. phones already that wide).
+    // The identical media query hides the entry point/panel in style.css, and JS evaluates it with
+    // matchMedia so menu, handlers and CSS can never disagree. UI.isSmallMobile() (< 768, general
+    // search/results layout) is deliberately NOT changed.
+    static SMALL_DEVICE_MAX_SHORT_SIDE = 430;
+    static SMALL_DEVICE_MEDIA_QUERY = '(max-width: 430px), (max-width: 767px) and (max-height: 430px)';
+
+    static isGeneratorAvailable() {
+        if (typeof window.matchMedia === 'function') {
+            return !window.matchMedia(this.SMALL_DEVICE_MEDIA_QUERY).matches;
+        }
+        const width = Math.max(0, window.innerWidth || 0);
+        const height = Math.max(0, window.innerHeight || 0) || width;
+        return !(width < 768 && Math.min(width, height) <= this.SMALL_DEVICE_MAX_SHORT_SIDE);
+    }
 
     static toggleGenerator() {
-        if (UI.isSmallMobile()) {
+        if (!this.isGeneratorAvailable()) {
             console.log('[DemoManager] Generator not available on small mobile devices.');
             return;
         }
         this.isGeneratorActive = !this.isGeneratorActive;
         const btn = document.getElementById('menu-demo');
         const indicator = document.getElementById('gen-status');
-        const panel = document.getElementById('generator-panel');
-        const restoreBtn = document.getElementById('generator-restore-btn');
 
         document.body.classList.add('generator-transition');
         
         if(this.isGeneratorActive) { 
-            document.body.classList.add('demo-mode'); 
-            if (UI.isTablet()) {
-                const rail = document.getElementById('toggle-right');
-                if (rail) rail.style.display = 'flex';
-            }
-            // Show left-sidebar context block
-            const leftCtx = document.getElementById('left-generator-context');
-            if (leftCtx) leftCtx.style.display = 'block';
             // Default right control panel to collapsed so first view is clean redacted title page
-            this.minimizePanel();
+            this.isPanelMinimized = true;
+            this.syncLayoutForViewport();
             if(indicator) indicator.style.display = 'inline-block';
             if(btn) btn.style.color = 'var(--app-primary)';
             if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
         } else { 
-            document.body.classList.remove('demo-mode'); 
-            document.body.classList.remove('editor-active'); 
-            // Hide left-sidebar context block
-            const leftCtx = document.getElementById('left-generator-context');
-            if (leftCtx) leftCtx.style.display = 'none';
-            if (UI.isTablet()) {
-                panel.classList.remove('gen-collapsed');
-                panel.style.display = 'none';
-                const rail = document.getElementById('toggle-right');
-                if (rail) rail.style.display = 'none';
-            } else {
-                panel.style.display = 'none';
-                restoreBtn.style.display = 'none';
-            }
+            // Hides panel, rail, restore button and left-sidebar context block
+            this.syncLayoutForViewport();
             if(indicator) indicator.style.display = 'none';
             if(btn) btn.style.color = ''; 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
@@ -1659,7 +1666,8 @@ class DemoManager {
 
     static minimizePanel() {
         const panel = document.getElementById('generator-panel');
-        if (!panel) return;
+        if (!panel || !this.isGeneratorActive || !this.isGeneratorAvailable()) return;
+        this.isPanelMinimized = true;
         panel.classList.remove('minimized', 'gen-collapsed');
         if (UI.isTablet()) {
             // On tablet: collapse the docked sidebar
@@ -1677,7 +1685,8 @@ class DemoManager {
 
     static restorePanel() {
         const panel = document.getElementById('generator-panel');
-        if (!panel) return;
+        if (!panel || !this.isGeneratorActive || !this.isGeneratorAvailable()) return;
+        this.isPanelMinimized = false;
         panel.classList.remove('minimized', 'gen-collapsed');
         if (UI.isTablet()) {
             panel.style.display = '';
@@ -1710,38 +1719,40 @@ class DemoManager {
 
         document.body.classList.add('demo-mode');
 
-        if (UI.isSmallMobile()) {
+        if (!this.isGeneratorAvailable()) {
+            // Small phone: hide every generator surface without touching zones, context inputs,
+            // isGeneratorActive or the minimized preference; the rendered redacted preview stays
+            // read-only (gen-minimized) until the viewport becomes eligible again.
             panel.style.display = 'none';
-            panel.classList.remove('minimized');
             if (rail) rail.style.display = 'none';
             if (restoreBtn) restoreBtn.style.display = 'none';
             if (leftCtx) leftCtx.style.display = 'none';
-            document.body.classList.remove('editor-active', 'gen-minimized');
+            document.body.classList.remove('editor-active');
+            document.body.classList.add('gen-minimized');
             return;
         }
 
         if (leftCtx) leftCtx.style.display = 'block';
-        panel.classList.remove('minimized');
-        panel.style.display = '';
-        if (restoreBtn) restoreBtn.style.display = 'none';
-        if (rail) rail.style.display = 'flex';
-
-        if (panel.classList.contains('gen-collapsed')) {
-            if (rail) rail.innerText = '⚙';
-            document.body.classList.remove('editor-active');
-            document.body.classList.add('gen-minimized');
+        if (UI.isTablet()) {
+            // Docked 3-column layout: rail toggles the sidebar, floating restore button unused
+            if (rail) rail.style.display = 'flex';
+            if (restoreBtn) restoreBtn.style.display = 'none';
         } else {
-            if (rail) rail.innerText = '›';
-            document.body.classList.add('editor-active');
-            document.body.classList.remove('gen-minimized');
+            // Compact layout: floating panel with restore button, no docked rail
+            if (rail) rail.style.display = 'none';
         }
 
+        if (this.isPanelMinimized) {
+            this.minimizePanel();
+        } else {
+            this.restorePanel();
+        }
     }
 
     static toggleGeneratorSidebar() {
         const panel = document.getElementById('generator-panel');
         if (!panel) return;
-        if (panel.classList.contains('gen-collapsed')) {
+        if (this.isPanelMinimized) {
             this.restorePanel();
         } else {
             this.minimizePanel();
@@ -7605,6 +7616,9 @@ class UI {
         this.mobilePdfFocus = false;
         if (!this.isSmallMobile()) {
             this.toggleSearch(!hasResults);
+            // v2.5.100: body.results-ready (which reveals #results-header / #results-count) was only
+            // synced by syncMobileLayout(), so desktop/tablet first searches hid the total until a resize.
+            this.syncMobileLayout();
             return;
         }
 
@@ -7830,7 +7844,7 @@ static render(res, crit, totalCount) {
     const a = DOM_CACHE.get('results-area');
     if (!a) return;
     
-    UI.syncMobileResultsCount(totalCount || res.length);
+    UI.syncMobileResultsCount(Number.isFinite(totalCount) ? totalCount : res.length);
     a.innerHTML = ''; 
     
     res.forEach(i => { 

@@ -514,7 +514,7 @@ body.dark-mode #results-count { color: #c4b5fd; }
 
 .record-card.no-pdf-card {
     opacity: 0.65;
-    cursor: not-allowed;
+    cursor: not-allowed !important; /* beats the global interactive cursor: pointer !important */
     border-left-color: #9ca3af;
 }
 .record-card.no-pdf-card:hover {
@@ -684,13 +684,31 @@ body:not(.dark-mode) #pagination-footer {
     border-color: var(--shell-divider-strong);
 }
 
+/* v2.5.100: light-mode result cards keep a purple brand outline (1px) and 4px left accent.
+   Precedence: normal/hover = purple; active-view = purple + inset ring + tint;
+   no-PDF (disabled) = neutral outline + gray left accent, no hover lift (beats the hover rule). */
 body:not(.dark-mode) .record-card {
-    border-color: var(--shell-divider-strong);
+    border-color: var(--app-primary);
 }
 
 body:not(.dark-mode) .record-card:hover {
-    border-color: var(--shell-divider-strong);
+    border-color: var(--app-primary);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), var(--surface-soft-shadow), 0 2px 5px rgba(15, 23, 42, 0.12);
+}
+
+body:not(.dark-mode) .record-card.active-view {
+    box-shadow: inset 0 0 0 1px var(--app-primary), var(--surface-soft-shadow);
+}
+
+body:not(.dark-mode) .record-card.active-view:hover {
+    box-shadow: inset 0 0 0 1px var(--app-primary), var(--surface-soft-shadow), 0 2px 5px rgba(15, 23, 42, 0.12);
+}
+
+body:not(.dark-mode) .record-card.no-pdf-card,
+body:not(.dark-mode) .record-card.no-pdf-card:hover {
+    border-color: var(--shell-divider-strong);
+    border-left-color: #9ca3af;
+    box-shadow: inset 0 1px 0 var(--shell-divider-highlight), var(--surface-soft-shadow);
 }
 
 body:not(.dark-mode) .collapse-btn {
@@ -978,6 +996,24 @@ body.editor-active .redaction-resize-handle {
 }
 #generator-restore-btn:hover { transform: scale(1.1); }
 
+/* Minimize control for the compact (floating) Control Panel; docked layouts use the rail instead */
+#generator-minimize-btn {
+    display: none;
+    margin-left: auto;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+}
+
 .editor-section { margin-bottom: 10px; } 
 .editor-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); display: block; margin-bottom: 5px; } 
 .disabled-overlay { opacity: 0.5; pointer-events: none; } 
@@ -1257,8 +1293,24 @@ input[type="date"].demo-input { text-align: left; }
         white-space: nowrap;
     }
     #toggle-left { display: none; }
-    #menu-demo { display: none !important; }
-    #generator-panel { display: none !important; }
+    /* v2.5.100: compact Submittal Generator for eligible < 768 px viewports (small phones are
+       excluded by the dedicated media query below). Floating panel + restore button, no rail. */
+    #toggle-right { display: none !important; }
+    #generator-panel {
+        right: 12px;
+        width: min(295px, calc(100vw - 24px));
+        max-height: calc(var(--app-viewport-height) - 110px);
+    }
+    #generator-restore-btn { right: 12px; }
+    #generator-minimize-btn { display: inline-flex; }
+    #left-generator-context {
+        order: 4;
+        flex: 0 1 auto;
+        width: 100%;
+        min-height: 0;
+        max-height: 28vh;
+        max-height: 28dvh;
+    }
 
     body.mobile-search-hidden #search-main-fields {
         display: none;
@@ -1325,6 +1377,22 @@ input[type="date"].demo-input { text-align: left; }
         min-width: 34px;
         font-size: 12px;
     }
+}
+
+/* v2.5.100: Submittal Generator unavailable ONLY on small phones (short side <= 430 px while in the
+   < 768 px mobile layout). Must stay identical to DemoManager.SMALL_DEVICE_MEDIA_QUERY in app.js. */
+@media (max-width: 430px), (max-width: 767px) and (max-height: 430px) {
+    #menu-demo,
+    #generator-panel,
+    #generator-restore-btn,
+    #toggle-right,
+    #left-generator-context { display: none !important; }
+}
+
+/* Eligible compact generator range (complement of the query above within < 768 px): keep part of the
+   PDF visible while the context block shrinks and scrolls on short viewports */
+@media (min-width: 431px) and (max-width: 767px) and (min-height: 431px) {
+    body.demo-mode #preview-pane { min-height: 30%; }
 }
 
 @media (max-width: 360px) {
