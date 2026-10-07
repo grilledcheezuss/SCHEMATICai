@@ -29,6 +29,19 @@ TEST_USER=myuser TEST_PASS=mypass node tests/worker.integration.test.js
 
 **Note:** These tests run against the live Worker instance at `https://cox-proxy.thomas-85a.workers.dev`.
 
+### ui-housekeeping.browser.test.js / ui-housekeeping-static.test.js (v2.5.100)
+
+Real-DOM regressions for Submittal Generator availability (small-phone cutoff matrix, resize transitions),
+light-mode result-card borders, and first-search result count visibility. The browser test serves the
+repository locally, drives headless Chrome/Chromium through the DevTools protocol
+(`tests/helpers/headless-browser.js`, Node >= 22, no npm dependencies) and blocks all external network.
+
+```bash
+node tests/ui-housekeeping-static.test.js
+node tests/ui-housekeeping.browser.test.js            # CHROME_PATH=/path/to/chrome to override
+REQUIRE_BROWSER=1 node tests/ui-housekeeping.browser.test.js   # fail instead of skip without Chrome
+```
+
 ## Future Tests
 
 Additional test coverage planned for v2.5.4+:

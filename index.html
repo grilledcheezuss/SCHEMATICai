@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.99)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.100)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -33,7 +33,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.5.100">
 </head>
 <body>
 
@@ -292,6 +292,7 @@
     <div id="generator-panel" style="display:none;">
         <div id="gen-drag-handle" class="panel-sidebar-header">
             <span class="editor-title">CONTROL PANEL</span>
+            <button id="generator-minimize-btn" type="button" onclick="DemoManager.minimizePanel()" title="Minimize Control Panel" aria-label="Minimize Control Panel">–</button>
         </div>
         
         <div id="redaction-editor-content">
@@ -431,7 +432,7 @@
 
 <script src="pdf-render-helper.js"></script>
 <script src="pdf-ui-state.js"></script>
-<script src="info-table-parser.js?v=2.5.99"></script>
-<script src="app.js?v=2.5.99"></script>
+<script src="info-table-parser.js?v=2.5.100"></script>
+<script src="app.js?v=2.5.100"></script>
 </body>
 </html>
