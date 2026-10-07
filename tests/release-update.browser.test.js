@@ -37,11 +37,27 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
                 const fetch = async (url, init) => {
                     state.fetches++;
                     state.request = { url, cache: init.cache, credentials: init.credentials, redirect: init.redirect };
+                    state.requests = [...(state.requests || []), state.request];
                     if (options.offline) throw new Error('offline');
-                    if (options.assetFailure && new URL(url).pathname.endsWith('.js')) throw new Error('asset unavailable');
+                    const requested = new URL(url);
+                    const isAsset = /\.(js|css)$/.test(requested.pathname);
+                    if (options.assetFailure && requested.pathname.endsWith('.js')) throw new Error('asset unavailable');
                     if (options.timeout) return new Promise((_, reject) =>
                         init.signal.addEventListener('abort', () => reject(new Error('aborted'))));
-                    return { ok: options.ok !== false, text: async () => documentHtml };
+                    if (!isAsset) {
+                        // Hosts may canonicalize /index.html to /; fetch exposes the final URL after following.
+                        const final = options.entryRedirect ? new URL(options.entryRedirect, requested).href : url;
+                        if (init.redirect !== 'follow' && final !== url) throw new TypeError('Failed to fetch');
+                        return { ok: options.ok !== false, url: final, redirected: final !== url,
+                            headers: new Headers({ 'Content-Type': 'text/html' }), text: async () => documentHtml };
+                    }
+                    const css = requested.pathname.endsWith('.css');
+                    const asset = (options.assetResponse && options.assetResponse(requested)) || {};
+                    const type = 'type' in asset ? asset.type : (css ? 'text/css; charset=utf-8' : 'application/javascript');
+                    return { ok: asset.ok !== false, url: asset.url ? new URL(asset.url, requested).href : url,
+                        headers: new Headers(type ? { 'Content-Type': type } : {}),
+                        text: async () => 'body' in asset ? asset.body
+                            : (css ? 'body{}' : `const APP_VERSION = "v${requested.searchParams.get('v')}";`) };
                 };
                 const Release = new Function('location', 'sessionStorage', 'fetch',
                     `${source}; return ReleaseUpdate;`)(location, sessionStorage, fetch);
@@ -53,7 +69,28 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
             await h.run();
             check(h.state.fetches === 1, 'single flight / one discovery per startup');
             check(h.state.request.cache === 'no-store' && h.state.request.credentials === 'omit'
-                && h.state.request.redirect === 'error', 'entry revalidation bypasses old HTTP cache without auth headers');
+                && h.state.request.redirect === 'follow', 'entry revalidation bypasses old HTTP cache without auth headers');
+            check(h.state.request.url === `${window.location.origin}/index.html`, 'entry revalidation targets the loaded document path without query/hash');
+
+            // Same-origin canonical redirect /index.html -> / is a valid entry, not a fatal failure.
+            const warnings = [];
+            const originalWarn = console.warn;
+            console.warn = (...args) => warnings.push(args.join(' '));
+            try {
+                h = harness(version, html, { entryRedirect: '/' });
+                check((await h.run()).status === 'current' && !h.state.navigations.length, 'same-origin /index.html -> / redirect revalidates current release');
+                h = harness('v2.5.100', html, { entryRedirect: '/' });
+                const redirected = await h.run();
+                check(redirected.navigating && h.state.navigations.length === 1, 'same-origin redirected entry still discovers newer release');
+                check(h.state.requests.slice(1).every(r => new URL(r.url).origin === window.location.origin
+                    && r.redirect === 'follow' && r.credentials === 'omit'), 'assets resolved against same-origin final entry URL');
+                check(!warnings.some(w => w.includes('Entry revalidation unavailable')), 'redirected entry does not log the unavailable warning');
+            } finally {
+                console.warn = originalWarn;
+            }
+            h = harness('v2.5.100', html, { entryRedirect: 'https://example.invalid/' });
+            check((await h.run()).status === 'unavailable' && !h.state.navigations.length && !h.storage.size,
+                'off-site entry redirect is rejected and keeps the installed app');
             h = harness('v2.5.100');
             check((await h.run()).navigating && h.state.navigations.length === 1, 'old executing JS discovers deployed release');
             const destination = new URL(h.state.navigations[0]);
@@ -80,6 +117,23 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
                 h = harness('v2.5.100', html, options);
                 check((await h.run()).status === 'unavailable' && !h.storage.size, 'network/HTTP/timeout failure leaves retry unpoisoned');
             }
+            for (const [label, response] of [
+                ['asset served as HTML MIME', url => url.pathname.endsWith('/app.js') && { type: 'text/html', body: '<!doctype html><html></html>' }],
+                ['stylesheet served as JS MIME', url => url.pathname.endsWith('.css') && { type: 'application/javascript' }],
+                ['HTML fallback without Content-Type', url => url.pathname.endsWith('/release-update.js') && { type: '', body: '<!DOCTYPE html><title>app</title>' }],
+                ['missing asset (404)', url => url.pathname.endsWith('/pdf-ui-state.js') && { ok: false }],
+                ['empty asset body', url => url.pathname.endsWith('/info-table-parser.js') && { body: '  ' }],
+                ['asset redirected to entry', url => url.pathname.endsWith('/app.js') && { url: '/', type: 'text/html', body: html }],
+                ['asset redirected to other path', url => url.pathname.endsWith('/app.js') && { url: '/old/app.js' }],
+                ['stale app.js served for new cachebuster', url => url.pathname.endsWith('/app.js') && { body: 'const APP_VERSION = "v2.5.100";' }],
+                ['asset redirected off-site', url => url.pathname.endsWith('/app.js') && { url: 'https://example.invalid/app.js' }]
+            ]) {
+                h = harness('v2.5.100', html, { assetResponse: response });
+                check((await h.run()).status === 'unavailable' && !h.state.navigations.length && !h.storage.size,
+                    `${label} blocks navigation`);
+            }
+            h = harness('v2.5.100', html, { assetResponse: url => url.pathname.endsWith('/app.js') && { type: 'text/javascript; charset=utf-8' } });
+            check((await h.run()).navigating, 'text/javascript MIME variant is accepted');
             h = harness('v2.5.100', html, { assetFailure: true });
             check((await h.run()).status === 'unavailable' && !h.state.navigations.length && !h.storage.size,
                 'failed new asset download retains working entry and permits later retry');
@@ -113,6 +167,28 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
         }
         const headers = fs.readFileSync(path.join(root, '_headers'), 'utf8');
         assert.equal(headers, '/\n  Cache-Control: no-cache\n/index.html\n  Cache-Control: no-cache\n/*.js\n  Cache-Control: no-cache\n/*.css\n  Cache-Control: no-cache\n');
+        const realRedirect = await browser.evaluate(async (source, version) => {
+            // Real Chrome fetch against a host that redirects /index.html -> / (no mocked network).
+            const state = { navigations: [] };
+            const location = { href: `${window.location.origin}/__redirect/index.html?keep=1`, replace: url => state.navigations.push(url) };
+            const storage = new Map();
+            const sessionStorage = { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) };
+            const warnings = [];
+            const originalWarn = console.warn;
+            console.warn = (...args) => warnings.push(args.join(' '));
+            try {
+                const make = () => new Function('location', 'sessionStorage', 'fetch', `${source}; return ReleaseUpdate;`)(location, sessionStorage, window.fetch.bind(window));
+                const current = await make().check(version);
+                const older = await make().check('v2.5.100');
+                return { current: current.status, older: older.status, navigations: state.navigations, warnings };
+            } finally {
+                console.warn = originalWarn;
+            }
+        }, source, version);
+        assert.equal(realRedirect.current, 'current', 'real same-origin index redirect revalidates current release');
+        assert.equal(realRedirect.older, 'updating', 'real redirected entry warms assets and navigates to newer release');
+        assert(new URL(realRedirect.navigations[0]).searchParams.get('cox_release') === version, 'redirected navigation targets deployed release');
+        assert.deepEqual(realRedirect.warnings, [], 'no Entry revalidation unavailable warning for redirected entry');
         const navigated = browser.waitForEvent('Page.loadEventFired');
         await browser.evaluate(() => { ReleaseUpdate.check('v2.5.100'); return true; });
         await navigated;

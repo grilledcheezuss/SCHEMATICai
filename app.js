@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.101 ---
-const APP_VERSION = "v2.5.101";
+// --- SCHEMATICA ai v2.5.102 ---
+const APP_VERSION = "v2.5.102";
 const VERSION_HISTORY = {
+    "v2.5.102": "Redirect-safe release revalidation: login/startup revalidates the loaded entry document path and follows only same-origin redirects (for example /index.html -> /), so hosts that canonicalize index.html no longer abort the check with ERR_FAILED. Versioned assets must stay on their same-origin path with JS/CSS MIME types, no HTML fallback body and an app.js declaring the deployed version before navigation; failures keep the installed app and cached data. Waiting-for-update indicator no longer restarts a per-poll percentage and the search button ellipsizes instead of clipping. Worker v2.5.97, search/parser/sync/cache behavior unchanged; no Worker redeploy",
     "v2.5.101": "First-card hover clipping fixed with scroll-content inset; obsolete CSV/cache/reset menu buttons removed. Login/startup revalidates deployed frontend assets and release-stale data refreshes through atomic encrypted generations, retaining working cache on failure. Worker v2.5.97, schema 1 and DERIVED_REV 5 unchanged",
     "v2.5.100": "UI housekeeping: Submittal Generator unavailable only on small phones (short side <= 430 px in the < 768 px layout, one media query shared by JS matchMedia and CSS); eligible 431-767 px viewports get a compact floating Control Panel with restore/minimize controls; resize into/out of small-phone mode preserves zones/context/minimized state. Light-mode result cards keep purple brand borders on normal/hover/active, while no-PDF cards keep their neutral disabled treatment. First desktop/tablet search now shows the total count immediately (results-ready synced on completion; explicit 0 kept). UI.isSmallMobile breakpoint, search/parser/DERIVED_REV, Worker v2.5.97, auth/cache/network unchanged; no Worker redeploy",
     "v2.5.99": "Browser-only enclosure refinement: symmetric Fiberglass, Stainless Steel, and Painted Steel association for split material names, bounded wiring noise, WAGO terminal/end-block gaps, and adjacent enclosure labels. Clear rows remain primary; gap evidence and conflicts remain uncertain, and unsupported steel is never promoted. Derived revision 5 re-associates existing cached descriptions without a snapshot schema bump or cache wipe. Worker, auth/network/cache, System Type/manufacturer, search criteria, sorting/pagination, badges, feedback, and PDF behavior unchanged; no Worker redeploy",
@@ -1025,9 +1026,8 @@ class DataLoader {
                 continue;
             }
             this.showWaitingForUpdate(btn, "⏳ WAITING FOR UPDATE...");
-            const restored = await CacheService.loadAllWithProgress((pct) => {
-                if (btn) btn.innerText = `⏳ WAITING FOR UPDATE... ${pct}%`;
-            }).catch(() => null);
+            // Each poll re-reads the peer's partial cache; a per-poll 0-100% would restart on every attempt.
+            const restored = await CacheService.loadAllWithProgress(null).catch(() => null);
             if (restored && this.isCacheComplete()) {
                 return { success: true, restoredFromPeer: true };
             }

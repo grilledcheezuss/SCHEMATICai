@@ -31,7 +31,10 @@ function findChrome() {
 
 function startServer() {
     const server = http.createServer((req, res) => {
-        const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+        let urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+        // Test-only host quirk: /__redirect/index.html canonicalizes to /__redirect/ like static hosts do.
+        if (urlPath === '/__redirect/index.html') { res.writeHead(308, { Location: '/__redirect/' }); res.end(); return; }
+        if (urlPath.startsWith('/__redirect/')) urlPath = urlPath.slice('/__redirect'.length);
         const filePath = path.resolve(REPO_ROOT, '.' + (urlPath === '/' ? '/index.html' : urlPath));
         if (!filePath.startsWith(REPO_ROOT + path.sep)) { res.writeHead(403); res.end(); return; }
         fs.readFile(filePath, (err, data) => {

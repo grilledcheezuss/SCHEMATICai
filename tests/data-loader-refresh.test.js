@@ -403,6 +403,41 @@ async function flushAsync() {
     assert(staleWaitResult && staleWaitResult.success === false, 'wait helper should fail fast when no cache and timeout expires');
 
     resetHarness();
+    console.log('🧪 Testing stable waiting-for-update indicator');
+    const waitingLabels = [];
+    const waitingBtn = { disabled: false, onclick: null, classList: createClassList() };
+    let waitingLabel = 'SEARCH';
+    Object.defineProperty(waitingBtn, 'innerText', {
+        get: () => waitingLabel,
+        set: value => { waitingLabel = value; waitingLabels.push(value); }
+    });
+    let peerPolls = 0;
+    cacheState.loadAllWithProgress = async (progressCallback) => {
+        peerPolls++;
+        // A peer's partial cache is re-read each poll; progress must not restart 0-100% on the button.
+        if (progressCallback) [0, 50, 100].forEach(pct => progressCallback(pct));
+        return null;
+    };
+    const originalSleep = DataLoader.sleep;
+    DataLoader.sleep = () => new Promise(resolve => setTimeout(resolve, 5));
+    let unavailableWait;
+    try {
+        unavailableWait = await originalMethods.waitForPeerSyncAndRestore.call(DataLoader, waitingBtn, 60);
+    } finally {
+        DataLoader.sleep = originalSleep;
+    }
+    assert(peerPolls >= 2, 'waiting indicator test should exercise repeated peer polls');
+    assert(unavailableWait && unavailableWait.success === false && unavailableWait.timedOut, 'waiting loop must finish when peer update is unavailable');
+    assert(waitingLabels.length > 0 && waitingLabels.every(label => label === '⏳ WAITING FOR UPDATE...'), 'waiting label must stay stable without a repeating percentage');
+    assert(waitingBtn.disabled === true, 'waiting state keeps search disabled until the attempt finishes');
+    DataLoader.showSyncInterrupted(waitingBtn);
+    assertEqual(waitingBtn.innerText, '⚠️ SYNC INTERRUPTED', 'finished/unavailable wait shows the stable retry fallback');
+    assert(waitingBtn.disabled === false && waitingBtn.classList.contains('warning'), 'fallback state is actionable and not waiting');
+    const searchBtnRule = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8').match(/\.search-btn \{[^}]*\}/)[0];
+    assert(/white-space:\s*nowrap/.test(searchBtnRule) && /overflow:\s*hidden/.test(searchBtnRule)
+        && /text-overflow:\s*ellipsis/.test(searchBtnRule), 'search button status labels ellipsize instead of clipping');
+
+    resetHarness();
     console.log('🧪 Testing fetchPartition progress phases');
     configState.estTotal = 2;
     const syncProgressUpdates = [];

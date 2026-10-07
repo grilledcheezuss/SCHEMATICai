@@ -30,6 +30,17 @@ class ReleaseUpdate {
             url.searchParams.get('v') === version.slice(1))) ? version : null;
     }
 
+    // Follows same-origin redirects; an off-site final URL (or unreadable opaque response) is rejected.
+    // Cross-origin redirects without CORS already reject inside fetch and fall back the same way.
+    static async fetchSameOrigin(url, init) {
+        const response = await fetch(url.href, { ...init, credentials: 'omit', redirect: 'follow' });
+        const finalUrl = new URL(response.url || url.href, url);
+        if (finalUrl.origin !== url.origin || response.type === 'opaque') {
+            throw new Error('Cross-origin release redirect');
+        }
+        return { response, finalUrl };
+    }
+
     static check(currentVersion) {
         if (!this._check) this._check = this.checkOnce(currentVersion);
         return this._check;
@@ -39,9 +50,12 @@ class ReleaseUpdate {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
         try {
-            const entryUrl = new URL('index.html', location.href);
-            const response = await fetch(entryUrl.href, {
-                cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal
+            // Revalidate the document path actually loaded; hosts may redirect /index.html to /.
+            const requested = new URL(location.href);
+            requested.search = '';
+            requested.hash = '';
+            const { response, finalUrl: entryUrl } = await this.fetchSameOrigin(requested, {
+                cache: 'no-store', signal: controller.signal
             });
             if (!response.ok) throw new Error('Entry revalidation failed');
             const version = this.deployedVersion(await response.text(), entryUrl);
@@ -59,15 +73,23 @@ class ReleaseUpdate {
             // Warm only the newer release's assets before leaving the working page.
             await Promise.all(this.ASSETS.map(async asset => {
                 const url = new URL(`${asset}?v=${version.slice(1)}`, entryUrl);
-                const response = await fetch(url.href, {
-                    cache: 'reload', credentials: 'omit', redirect: 'error', signal: controller.signal
+                const { response, finalUrl } = await this.fetchSameOrigin(url, {
+                    cache: 'reload', signal: controller.signal
                 });
                 const type = response.headers?.get('Content-Type') || '';
-                if (!response.ok || (type && !(asset.endsWith('.css')
+                if (!response.ok || finalUrl.pathname !== url.pathname || (type && !(asset.endsWith('.css')
                     ? /text\/css/i.test(type) : /javascript|ecmascript/i.test(type)))) {
-                    throw new Error('Release asset unavailable');
+                    throw new Error(`Release asset unavailable: ${asset}`);
                 }
-                if (!(await response.text()).trim()) throw new Error('Empty release asset');
+                const body = (await response.text()).trim();
+                if (!body) throw new Error(`Empty release asset: ${asset}`);
+                // An HTML fallback page is never a valid script/stylesheet, even without a Content-Type.
+                if (/^<(!doctype|html|head|body)\b/i.test(body)) throw new Error(`HTML fallback for release asset: ${asset}`);
+                // A CDN that ignores ?v= can return the previous app.js; navigating to it would only re-run old code.
+                const declared = asset === 'app.js' && body.match(/\bAPP_VERSION\s*=\s*["'`](v\d+\.\d+\.\d+)["'`]/)?.[1];
+                if (asset === 'app.js' && declared !== version) {
+                    throw new Error(`Stale release app.js (expected ${version}, got ${declared || 'unknown'})`);
+                }
             }));
             // Store the guard before navigation. If storage is unavailable, stay usable rather than loop.
             sessionStorage.setItem(this.ATTEMPT_KEY, JSON.stringify({ version, at: Date.now() }));
@@ -75,8 +97,8 @@ class ReleaseUpdate {
             destination.searchParams.set('cox_release', version);
             location.replace(destination.href);
             return { status: 'updating', navigating: true };
-        } catch (_) {
-            console.warn('[ReleaseUpdate] Entry revalidation unavailable; continuing with installed app and cached data.');
+        } catch (error) {
+            console.warn('[ReleaseUpdate] Entry revalidation unavailable; continuing with installed app and cached data.', error?.message || error);
             return { status: 'unavailable', navigating: false };
         } finally {
             controller.abort();

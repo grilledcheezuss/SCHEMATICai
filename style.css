@@ -424,7 +424,7 @@ body.dark-mode .panel-toggle-btn {
 
 input[type=range] { accent-color: var(--lsu-purple); }
 
-.search-btn { flex: 1; min-width: 0; height: 34px; background-color: var(--app-primary) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; transition: 0.2s; font-size: 11px; letter-spacing: 0.5px; white-space: nowrap; } 
+.search-btn { flex: 1; min-width: 0; height: 34px; background-color: var(--app-primary) !important; color: white !important; border: none; border-radius: 4px; font-weight: 800; transition: 0.2s; font-size: 11px; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; } 
 .search-btn:hover { filter: brightness(1.2); }
 .search-btn:disabled { background-color: #9ca3af !important; opacity: 0.7; filter: none; cursor: default !important; } 
 .search-btn.error { background-color: #991b1b !important; border-color: #7f1d1d !important; }
