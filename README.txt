@@ -42,6 +42,7 @@ VALIDATION SCOPE (v2.5.95):
 - Synthetic parser, Worker mocks and frontend state tests cover extraction/parity, uncertainty, combinations, ranking and cache/live-criteria behavior. These are not live Airtable coverage or deployment tests
 - Existing offline frontend regression run: 22 of 23 scripts passed, covering cache/refresh, keywords, feedback, sorting, voltage/HP/enclosure, page classification, mobile scrolling and PDF rendering/state/preload/print/zoom/scroll behavior
 - Existing enclosure-parsing test 18 also fails on the unchanged baseline; this unrelated pre-existing expectation is not changed by this release
+- Final read-only code review found no remaining significant issues after resolving wrapped-value ambiguity; secret scans passed. Earlier CodeQL runs reported zero alerts, but the final automated validation request was blocked by the service time limit, so a final automated pass is not claimed
 - Real authenticated extraction/ranking coverage, production refresh, physical touch-device/PDF workflows and Worker deployment remain operator acceptance checks
 
 PREVIOUS UPDATES (v2.5.94):

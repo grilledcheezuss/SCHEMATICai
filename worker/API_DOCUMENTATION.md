@@ -376,6 +376,8 @@ Worker validation passed 59 existing assertions and 102 parser cases with Worker
 
 No real Airtable descriptions or rankings were evaluated, and no production deployment, authenticated refresh or physical touch-device/PDF acceptance is claimed. Use the manual checks in README.txt before production sign-off.
 
+Final read-only code review found no remaining significant issues after the wrapped-alternative fix, and secret scanning passed. Earlier CodeQL runs reported zero alerts; the final automated validation request was blocked by the service time limit, so this release does not claim a final automated validation pass.
+
 ### Environment Variables
 Configure these secrets in your Cloudflare Worker dashboard:
 1. `AIRTABLE_WRITE_KEY`: Airtable personal access token with read/write permissions
