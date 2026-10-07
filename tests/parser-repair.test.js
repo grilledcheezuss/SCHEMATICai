@@ -69,6 +69,7 @@ async function main() {
         'Enclosure Material Fiberglass BRACKETS',
         'Notes Fiberglass Enclosure Material Panel Heater / Thermostat W',
         'Enclosure NEMA Rating Stainless Enclosure Material Enclosure Size',
+        'Enclosure NEMA Rating 4X Fiberglass Enclosure Material Panel Heater / Thermostat W',
         'Enclosure NEMA Rating 4X Fiberglass HARDWARE Enclosure Material Panel Heater / Thermostat W',
         'Enclosure NEMA Rating 4X STAINLESS HARDWARE Fiberglass Enclosure Material Panel Heater / Thermostat W',
         `Enclosure NEMA Rating 4X Fiberglass ${' '.repeat(200)}Enclosure Material Panel Heater / Thermostat W`
@@ -79,17 +80,23 @@ async function main() {
     for (const desc of [
         'Fiberglass | Enclosure Material | Panel Heater / Thermostat W',
         'Fiberglass\nEnclosure Material\nPanel Heater / Thermostat W',
-        'Enclosure NEMA Rating 4X Fiberglass Enclosure Material Panel Heater / Thermostat W'
+        'Enclosure NEMA Rating 4X CR1 5 4 Fiberglass Enclosure Material Panel Heater / Thermostat W'
     ]) assert.deepStrictEqual([...material(desc).materials], ['Fiberglass'], desc);
     assert.strictEqual(material('Polycarbonate Enclosure Material Panel Heater / Thermostat W').status, 'other');
     assert.strictEqual(material('Fiberglass Enclosure Material Stainless Steel Panel Heater / Thermostat W').status, 'conflict');
-    assert.strictEqual(material('Enclosure NEMA Rating 4X Fiberglass 28 2 WAGO 285-137 GROUND TERMINAL Enclosure Material Panel Heater / Thermostat W').varied, true);
+    assert.strictEqual(material('Enclosure NEMA Rating 4X CR1 5 Fiberglass 28 2 WAGO 285-137 GROUND TERMINAL Enclosure Material Panel Heater / Thermostat W').varied, true);
     for (const suffix of ['28 2 OTHER 285-137 GROUND TERMINAL', '28 2 WAGO 285-137 GROUND TERMINAL Stainless Steel', '28 2 WAGO 285-137 BOLT']) {
         assert.strictEqual(material(`Enclosure NEMA Rating 4X Fiberglass ${suffix} Enclosure Material Panel Heater / Thermostat W`).status, 'unreadable', suffix);
     }
     assert.strictEqual(material('Enclosure NEMA Rating 4X Fiberglass Stainless Steel Enclosure Material Panel Heater / Thermostat W').status, 'unreadable', 'no arbitrary nearest winner');
     assert.strictEqual(material('Enclosure NEMA Rating 4X BILL OF MATERIALS Fiberglass Enclosure Material Panel Heater / Thermostat W').status, 'unreadable');
-    assert.strictEqual(material('Enclosure NEMA Rating 4X Fiberglass Enclosure Material Panel Heater / Thermostat W | Enclosure Material Painted Steel').status, 'conflict');
+    assert.strictEqual(material('Enclosure NEMA Rating 4X CR1 5 Fiberglass Enclosure Material Panel Heater / Thermostat W | Enclosure Material Painted Steel').status, 'conflict');
+    for (const preceding of ['4X Fiberglass', '4X Stainless Steel', '4X CR1 Fiberglass']) {
+        const desc = `Enclosure NEMA Rating ${preceding} Enclosure Material Stainless Steel Panel Heater / Thermostat W`;
+        assert.deepStrictEqual([...material(desc).materials], ['Stainless Steel'], 'clear forward row cannot borrow rating text');
+        assert.strictEqual(material(desc).varied, false, 'clear forward row stays clean');
+    }
+    assert.deepStrictEqual([...material('Phase Monitor Fiberglass Enclosure Material Stainless Steel Panel Heater / Thermostat W').materials], ['Stainless Steel']);
     assert.strictEqual(material('Enclosure Material Fiberglass or Stainless Steel').varied, true);
     assert.strictEqual(material('Enclosure Material Fiberglass Enclosure Material Stainless Steel').status, 'conflict');
     assert.strictEqual(material('Enclosure Material Fiberglass Enclosure Material W = M2').varied, true);

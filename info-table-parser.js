@@ -228,7 +228,8 @@
         if (kind !== 'encMaterials') return null;
         const anchored = previous && (/^ENCLOSURE (?:NEMA )?RATING$/.test(previous.label) || FEATURE_RE.test(previous.label))
             && next && FEATURE_RE.test(next.label);
-        if (new RegExp(`^${UNSUPPORTED_SOURCE}$`).test(value) && (!previous || anchored)) {
+        const featureAnchored = anchored && FEATURE_RE.test(previous.label);
+        if (new RegExp(`^${UNSUPPORTED_SOURCE}$`).test(value) && (!previous || featureAnchored)) {
             return { value, varied: false, direction: 'reverse' };
         }
         if (identifiedMaterials(value).length && materialsInValue(value).length > 0
@@ -237,7 +238,7 @@
             const match = MATERIAL_RE.exec(value);
             const tail = value.slice(match.index + match[0].length);
             if (!tail.trim() || MATERIAL_ALT_RE.test(tail)) {
-                return !previous || anchored ? { value, varied: false, direction: 'reverse' } : null;
+                return !previous || featureAnchored ? { value, varied: false, direction: 'reverse' } : null;
             }
         }
         if (!anchored || /\b(?:HARDWARE|BOM|NOTES?|FIBERGLASS|STAINLESS)\b.*\b(?:HARDWARE|BOM)\b/.test(value)) return null;
@@ -246,6 +247,8 @@
         let match;
         while ((match = matcher.exec(value))) {
             const prefix = value.slice(0, match.index);
+            // A rating such as "4X Fiberglass" is not a separate material cell.
+            if (!featureAnchored && !/\b(?:[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?|AUTOMATIC\s+MODE|ALL\s+PUMPS\s+OFF)\b/.test(prefix)) continue;
             // Wiring identifiers/numbers and the observed operating-mode text only.
             if (!/^(?:\d+[A-Z]?[\s]+|[A-Z]{1,3}[\s]+|[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?[\s]+|W\/OR[\s]+|AUTOMATIC\s+MODE\s+|ALL\s+PUMPS\s+OFF\s+)*$/.test(prefix)) continue;
             if (/\b(?:HARDWARE|TERMINAL|BOM|FIBERGLASS|STAINLESS|PAINTED|STEEL)\b/.test(prefix)) continue;
@@ -277,7 +280,9 @@
             if (!value && (label.kind === 'encMaterials' || label.kind === 'panelTypes')) {
                 association = reverseValue(text, label, labels[i - 1], next, label.kind) || association;
             }
-            if (value && label.kind === 'encMaterials' && identifiedMaterials(value).length) {
+            // Only two complete cells at the start can be genuinely two-sided.
+            // Never add preceding rating/feature-column text to a clear forward cell.
+            if (value && !labels[i - 1] && label.kind === 'encMaterials' && identifiedMaterials(value).length) {
                 const reverse = reverseValue(text, label, labels[i - 1], next, label.kind);
                 if (reverse) {
                     rows.encMaterials.push(reverse.value);
