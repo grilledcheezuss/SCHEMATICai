@@ -1,12 +1,12 @@
-// Browser-only info-table parsing (v2.5.95, extended in v2.5.96).
-// Derives System Type, Pump Manufacturer, and (v2.5.96) Enclosure Material evidence
+// Browser-only info-table parsing (v2.5.95, extended in v2.5.96 and v2.5.97).
+// Derives System Type, Pump Manufacturer, and Enclosure Material evidence
 // from the `desc` field the Worker already returns. This file is intentionally NOT imported by the Worker:
 // the v2.5.95 attempt in PR #188 parsed per record inside the Worker MAIN loop and
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.96: bumped so records derived in memory by v2.5.95 recompute material evidence.
-    const DERIVED_REV = 2;
+    // v2.5.97: bumped so cached records re-derive manufacturer evidence with Sulzer support.
+    const DERIVED_REV = 3;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -20,6 +20,7 @@
     const MFG_ALIASES = Object.freeze({
         'GORMAN RUPP': ['GORMAN RUPP', 'GORMAN', 'GR', 'GRSP'],
         'BARNES': ['BARNES', 'SITHE', 'CRANE'],
+        'SULZER': ['SULZER PUMPS', 'SULZER'],
         'HYDROMATIC': ['HYDROMATIC'],
         'FLYGT': ['FLYGT'],
         'MYERS': ['MYERS'],
@@ -38,6 +39,10 @@
     const MFG_ALIAS_LIST = Object.freeze(Object.entries(MFG_ALIASES)
         .flatMap(([canonical, aliases]) => aliases.map(alias => [alias, canonical]))
         .sort((a, b) => b[0].length - a[0].length));
+    const MFG_MATCHERS = Object.freeze(Object.fromEntries(Object.entries(MFG_ALIASES).map(([canonical, aliases]) => [
+        canonical,
+        new RegExp(`(^|[^A-Z0-9])(?:${aliases.map(alias => alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?=$|[^A-Z0-9])`, 'i')
+    ])));
 
     // v2.5.96 material-only enclosure search values. NEMA rating plays no role.
     const ENCLOSURE_MATERIALS = Object.freeze(['Fiberglass', 'Stainless Steel', 'Painted Steel']);
@@ -49,8 +54,8 @@
         'Stainless Steel': '4XSS',
         'Painted Steel': 'PAINTED STEEL'
     });
-    // Coverage of eligible manufacturer record occurrences used for the search menu.
-    const MFG_COVERAGE_PERCENT = 90;
+    const MFG_MENU_LIMIT = 12;
+    const MFG_REQUIRED = 'SULZER';
 
     // Maximum characters read after a label. Values are short table cells.
     const VALUE_WINDOW = 40;
@@ -130,7 +135,7 @@
 
     function normalizeManufacturer(value) {
         if (typeof value !== 'string') return null;
-        const normalized = value.toUpperCase().replace(/[\-\u2013_.]/g, ' ').replace(/\s+/g, ' ').trim();
+        const normalized = value.toUpperCase().replace(/^[^A-Z0-9]+|[^A-Z0-9]+$/g, '').replace(/[\-\u2013_.]/g, ' ').replace(/\s+/g, ' ').trim();
         if (!normalized) return null;
         for (const [alias, canonical] of MFG_ALIAS_LIST) {
             if (!normalized.startsWith(alias)) continue;
@@ -138,6 +143,12 @@
             if (!next || !/[A-Z0-9]/.test(next)) return canonical;
         }
         return null;
+    }
+
+    function matchesManufacturer(text, canonical) {
+        if (typeof text !== 'string' || !Object.prototype.hasOwnProperty.call(MFG_MATCHERS, canonical)) return false;
+        const matcher = MFG_MATCHERS[canonical];
+        return matcher.test(text);
     }
 
     function materialOfMatch(match) {
@@ -383,14 +394,10 @@
         return { records: list.length, derived, ms };
     }
 
-    // Counts each unique record id once from its bounded Pump Manufacturer row, then keeps
-    // the shortest descending-frequency prefix whose cumulative count reaches
-    // `coveragePercent` of all eligible (canonical, allowed) record occurrences, including
-    // the manufacturer that crosses the threshold. Ties sort alphabetically and are not
-    // extended past the minimal prefix. Integer comparison avoids rounding errors.
-    function rankManufacturers(records, { allowed = null, coveragePercent = MFG_COVERAGE_PERCENT } = {}) {
-        const percent = Number.isInteger(coveragePercent) && coveragePercent > 0 && coveragePercent <= 100
-            ? coveragePercent : MFG_COVERAGE_PERCENT;
+    // Counts each unique record id once from its bounded Pump Manufacturer row and keeps the
+    // twelve most frequent manufacturers. Sulzer reserves a slot if it falls below the natural
+    // cutoff; included options are then ordered by actual frequency, with alphabetical ties.
+    function rankManufacturers(records, { allowed = null } = {}) {
         const allowedSet = Array.isArray(allowed) ? new Set(allowed) : null;
         const counts = {};
         const seen = new Set();
@@ -409,16 +416,15 @@
         }
         const ranked = Object.keys(counts)
             .sort((a, b) => (counts[b] - counts[a]) || a.localeCompare(b));
-        const options = [];
-        let coveredRecords = 0;
+        let options = [];
         if (eligibleRecords > 0) {
-            for (let i = 0; i < ranked.length; i++) {
-                options.push(ranked[i]);
-                coveredRecords += counts[ranked[i]];
-                if (coveredRecords * 100 >= eligibleRecords * percent) break;
+            options = ranked.slice(0, MFG_MENU_LIMIT);
+            if ((!allowedSet || allowedSet.has(MFG_REQUIRED)) && !options.includes(MFG_REQUIRED)) {
+                options = ranked.filter(mfg => mfg !== MFG_REQUIRED).slice(0, MFG_MENU_LIMIT - 1).concat(MFG_REQUIRED);
             }
+            options.sort((a, b) => ((counts[b] || 0) - (counts[a] || 0)) || a.localeCompare(b));
         }
-        return { options, ranked, counts, eligibleRecords, coveredRecords, coveragePercent: percent };
+        return { options, ranked, counts, eligibleRecords, menuLimit: MFG_MENU_LIMIT, required: MFG_REQUIRED };
     }
 
     const InfoTableParser = Object.freeze({
@@ -427,11 +433,13 @@
         MFG_ALIASES,
         ENCLOSURE_MATERIALS,
         MATERIAL_FEEDBACK_CODES,
-        MFG_COVERAGE_PERCENT,
+        MFG_MENU_LIMIT,
+        MFG_REQUIRED,
         VALUE_WINDOW,
         normalizeSystemType,
         parseMotorCount,
         normalizeManufacturer,
+        matchesManufacturer,
         extractInfoRows,
         deriveFromDesc,
         materialsInValue,

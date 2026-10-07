@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.96 ---
-const APP_VERSION = "v2.5.96";
+// --- SCHEMATICA ai v2.5.97 ---
+const APP_VERSION = "v2.5.97";
 const VERSION_HISTORY = {
+    "v2.5.97": "Manufacturer menu now shows a fixed top 12 by bounded Pump Manufacturer row frequency, with alphabetical ties and a reserved Sulzer slot when outside the natural cutoff; no-row fallback is alphabetical and capped at 12, while an out-of-list live selection is temporarily preserved (up to 13 manufacturer choices plus Any). Feedback retains every supported manufacturer. Sulzer is canonical across browser and Worker extraction, search, confidence badges, and feedback. Browser-derived fields refresh on existing cache restore; the minimal Worker manufacturer update requires separate deployment, followed by normal data/edge-cache refresh. No forced cache wipe",
     "v2.5.96": "Frontend-only: Enclosure search becomes material-based (Any / Fiberglass / Stainless Steel / Painted Steel) using only the bounded Enclosure Material info-table row, which excludes the other two materials regardless of r.enc or narrative mentions; NEMA rating plays no role. Without a usable row, legacy 4XFG/4XSS codes are a conservative (usually uncertain) fallback; POLY records stay reachable via Any/keywords. Manufacturer menu now shows the shortest frequency-ordered set covering 90% of eligible Pump Manufacturer row occurrences (no top-eight cap). Feedback dropdowns mirror the search grid. Worker unchanged; no redeploy",
     "v2.5.95": "Frontend-only retry of the reverted #188 attempt (Worker CPU limit): System Type dropdown/search branch, top-eight Pump Manufacturer ranking, and reordered parameter grid. Info-table evidence is derived once per record in the browser (info-table-parser.js) when a snapshot is applied; the Worker API is unchanged and does not need redeploying",
     "v2.5.94": "Frontend-only search state fix: reset clears both Allowed/Blocked keyword editors, and live criteria survive startup, sync, snapshot swaps, and background refresh option rebuilds without changing results/PDF state or Worker/backend behavior",
@@ -359,7 +360,7 @@ const LAYOUT_RULES = {
 
 const AI_TRAINING_DATA = { 
     MANUFACTURERS: [
-        'GORMAN RUPP', 'BARNES', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 
+        'GORMAN RUPP', 'BARNES', 'SULZER', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS',
         'ZOELLER', 'LIBERTY', 'WILO', 'PENTAIR', 'ABS', 'GODWIN', 'FRANKLIN', 
         'EBARA', 'HIDROSTAL'
     ],
@@ -4008,7 +4009,9 @@ class SearchEngine {
             if(crit.mfg !== "Any") { 
                 if (r.mfg === crit.mfg) { 
                     w += 10000; 
-                } else if (r.desc && r.desc.includes(crit.mfg)) { 
+                } else if (r.desc && (crit.mfg === 'SULZER'
+                    ? InfoTableParser.matchesManufacturer(r.desc, crit.mfg)
+                    : r.desc.includes(crit.mfg))) {
                     w += 1000;
                     mfgV = true; // Mark as varied when matched via description (fuzzy/uncertain match)
                 } else { 
@@ -7685,21 +7688,27 @@ static pop() {
     };
 
     // === MANUFACTURER LIST ===
-    // v2.5.96: shortest frequency-ordered set covering 90% of eligible Pump Manufacturer row
-    // occurrences (no fixed cap). The ranking is computed once per applied dataset
-    // (DataLoader.refreshDerivedIndexes); this only reads it. Matching on r.mfg is unchanged.
-    // Falls back to the existing list when no row evidence exists.
+    // v2.5.97: fixed top-12 by bounded row frequency, with Sulzer reserved when below the
+    // natural cutoff. Ranking is computed once per applied dataset; zero-row fallback is capped
+    // alphabetically. A selected supported manufacturer outside the base list gets a temporary
+    // option so refreshes never silently change live search criteria (up to 13 choices total).
     const m = DOM_CACHE.get('mfgInput');
     if (m) {
         const ranking = window.MFG_RANKING;
-        const rankedList = ranking && ranking.eligibleRecords > 0 && Array.isArray(ranking.options)
-            ? ranking.options.filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf))
+        let rankedList = ranking && ranking.eligibleRecords > 0 && Array.isArray(ranking.options)
+            ? ranking.options.filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).slice(0, InfoTableParser.MFG_MENU_LIMIT)
             : [];
-        const cleanList = rankedList.length > 0
-            ? rankedList
-            : (window.FOUND_MFGS.size > 0
-                ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
-                : [...AI_TRAINING_DATA.MANUFACTURERS].sort());
+        if (rankedList.length && !rankedList.includes(InfoTableParser.MFG_REQUIRED)) {
+            rankedList = rankedList.slice(0, InfoTableParser.MFG_MENU_LIMIT - 1).concat(InfoTableParser.MFG_REQUIRED);
+        }
+        const fallbackSource = window.FOUND_MFGS.size > 0
+            ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf))
+            : [...AI_TRAINING_DATA.MANUFACTURERS];
+        const fallbackOthers = Array.from(new Set(fallbackSource.filter(mf => mf !== InfoTableParser.MFG_REQUIRED)))
+            .sort()
+            .slice(0, InfoTableParser.MFG_MENU_LIMIT - 1);
+        const fallbackList = [...fallbackOthers, InfoTableParser.MFG_REQUIRED].sort();
+        const cleanList = rankedList.length > 0 ? rankedList : fallbackList;
 
         m.innerHTML = '';
         m.add(new Option('Any', 'Any'));
@@ -7758,10 +7767,11 @@ static _generateBadges(record, criteria) {
     }
 
     // Manufacturer badge - only show when actively filtering
-    if (criteria.mfg !== "Any" && record.mfg) {
+    const badgeMfg = record.mfg || (criteria.mfg === 'SULZER' && record.desc && InfoTableParser.matchesManufacturer(record.desc, criteria.mfg) ? criteria.mfg : null);
+    if (criteria.mfg !== "Any" && badgeMfg) {
         const isMatch = (record.mfg === criteria.mfg);
         const badgeClass = record.mfgV ? 'match-orange' : (isMatch ? 'match-green' : 'match-orange');
-        badges.push(`<span class="hud-badge ${badgeClass}">${record.mfg}</span>`);
+        badges.push(`<span class="hud-badge ${badgeClass}">${badgeMfg}</span>`);
     }
 
     // Voltage badge

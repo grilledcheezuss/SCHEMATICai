@@ -3,6 +3,8 @@
 // Run with: node worker/tests/run.js
 
 const { extractSpecsStrict, normalizeCADText, parseHP, parseEnclosure, parseVoltageContextAware } = require('../lib/extract.js');
+const fs = require('fs');
+const path = require('path');
 const {
     CP8078_TEXT,
     PANEL_480V_TEXT,
@@ -34,6 +36,29 @@ function assertEqual(actual, expected, label) {
         console.error(`  ❌ ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
         failed++;
     }
+}
+
+function assertDeepEqual(actual, expected, label) {
+    const ok = JSON.stringify(actual) === JSON.stringify(expected);
+    if (ok) {
+        console.log(`  ✅ ${label}: ${JSON.stringify(actual)}`);
+        passed++;
+    } else {
+        console.error(`  ❌ ${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+        failed++;
+    }
+}
+
+function functionSource(source, name) {
+    const start = source.indexOf(`function ${name}(`);
+    if (start < 0) throw new Error(`Missing function ${name}`);
+    const brace = source.indexOf('{', start);
+    let depth = 0;
+    for (let i = brace; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+    }
+    throw new Error(`Unterminated function ${name}`);
 }
 
 // ─── normalizeCADText ────────────────────────────────────────────────────────
@@ -180,6 +205,99 @@ console.log('\n=== extractSpecsStrict: NEMA4X no-space enclosure ===');
     const s = extractSpecsStrict(PANEL_NEMA4X_NOSPACE_TEXT);
     assertEqual(s.enc, '4XSS', 'NEMA4X no-space → 4XSS');
     assertEqual(s.encV, false, 'NEMA4X no-space → encV false');
+}
+
+// ─── Sulzer manufacturer extraction ───────────────────────────────────────────
+console.log('\n=== Sulzer manufacturer extraction ===');
+{
+    const cases = [
+        ['SULZER', 'SULZER'],
+        ['Sulzer Pumps', 'SULZER'],
+        ['PUMP MANUFACTURER: Sulzer', 'SULZER'],
+        ['(Sulzer),', 'SULZER']
+    ];
+    for (const [text, expected] of cases) {
+        const result = extractSpecsStrict(text);
+        assertDeepEqual([result.mfg, result.mfgV], [expected, false], `${text} → clean Sulzer`);
+    }
+    for (const text of ['NOTSULZER', 'SULZERISH']) {
+        assertEqual(extractSpecsStrict(text).mfg, null, `${text} is not Sulzer`);
+    }
+    const mixed = extractSpecsStrict('SULZER PUMPS / BARNES');
+    assert(mixed.mfg === 'BARNES' && mixed.mfgV === true, 'Sulzer + Barnes retains varied semantics');
+    assertEqual(extractSpecsStrict('ABS PUMP').mfg, 'ABS', 'ABS remains independent');
+    assertEqual(extractSpecsStrict('GORMAN RUPP PUMP').mfg, 'GORMAN RUPP', 'Gorman Rupp unchanged');
+    assertEqual(extractSpecsStrict('BARNES PUMP').mfg, 'BARNES', 'Barnes unchanged');
+}
+
+// Execute the actual extraction functions embedded in the deployed Worker source as well as
+// the pure helper, so dictionary and behavior parity are covered without invoking MAIN/network.
+{
+    const workerSource = fs.readFileSync(path.join(__dirname, '..', 'worker.js'), 'utf8');
+    const dictStart = workerSource.indexOf('const EXACT_MFGS = ');
+    const dictOpen = workerSource.indexOf('{', dictStart);
+    const dictClose = workerSource.indexOf('\n};', dictOpen) + 2;
+    const workerMfgs = new Function(`return (${workerSource.slice(dictOpen, dictClose)});`)();
+    const helper = require('../lib/extract.js');
+    assertDeepEqual(workerMfgs, helper.EXACT_MFGS, 'deployed Worker and pure helper dictionaries match');
+    const workerExtract = new Function(
+        'EXACT_MFGS', 'normalizeCADText', '_parseHP', '_parseVoltageContextAware', '_parseEnclosure',
+        'CANONICAL_DUAL_VOLTAGE_PAIRS', 'VOLT_PRIORITY',
+        `return (${functionSource(workerSource, 'extractSpecsStrict')});`
+    )(
+        workerMfgs, normalizeCADText, parseHP, parseVoltageContextAware, parseEnclosure,
+        helper.CANONICAL_DUAL_VOLTAGE_PAIRS, helper.VOLT_PRIORITY
+    );
+    const workerNormalize = new Function('EXACT_MFGS', `return (${functionSource(workerSource, 'normalizeLegacyMfg')});`)(workerMfgs);
+    for (const text of ['SULZER', 'Sulzer Pumps', 'PUMP MANUFACTURER: Sulzer', '(Sulzer),', 'NOTSULZER', 'SULZERISH', 'SULZER / BARNES']) {
+        const expected = extractSpecsStrict(text);
+        const actual = workerExtract(text);
+        assertDeepEqual([actual.mfg, actual.mfgV], [expected.mfg, expected.mfgV], `deployed parity: ${text}`);
+    }
+    assertEqual(workerNormalize('Sulzer Pumps'), 'SULZER', 'deployed legacy normalization accepts Sulzer Pumps');
+    assertEqual(workerNormalize('(Sulzer),'), 'SULZER', 'deployed legacy normalization accepts punctuation-bounded Sulzer');
+    assertEqual(workerNormalize('NOTSULZER'), null, 'deployed legacy normalization rejects embedded Sulzer');
+    assertEqual(workerNormalize('SULZERISH'), null, 'deployed legacy normalization rejects Sulzer suffix');
+    assertEqual(workerNormalize('BARNES'), 'BARNES', 'deployed legacy normalization preserves Barnes');
+    assertEqual(workerNormalize('ABS'), 'ABS', 'deployed legacy normalization preserves ABS independently');
+}
+
+// ─── 100-record Worker extraction comparison ──────────────────────────────────
+{
+    const helper = require('../lib/extract.js');
+    const baselineMfgs = { ...helper.EXACT_MFGS };
+    delete baselineMfgs.SULZER;
+    const helperSource = fs.readFileSync(path.join(__dirname, '..', 'lib', 'extract.js'), 'utf8');
+    const baselineExtract = new Function(
+        'EXACT_MFGS', 'normalizeCADText', 'parseHP', 'parseVoltageContextAware', 'parseEnclosure',
+        'VOLT_PRIORITY', 'CANONICAL_DUAL_VOLTAGE_PAIRS',
+        `return (${functionSource(helperSource, 'extractSpecsStrict')});`
+    )(
+        baselineMfgs, normalizeCADText, parseHP, parseVoltageContextAware, parseEnclosure,
+        helper.VOLT_PRIORITY, helper.CANONICAL_DUAL_VOLTAGE_PAIRS
+    );
+    const mfgs = ['SULZER PUMPS', 'BARNES', 'GORMAN RUPP', 'ABS'];
+    const records = Array.from({ length: 100 }, (_, i) =>
+        `PUMP MANUFACTURER: ${mfgs[i % mfgs.length]} PANEL TYPE DUPLEX NO. MOTORS 2 HP 10 480V 3PH NEMA 4X`);
+    const baselineResults = records.map(baselineExtract);
+    const currentResults = records.map(extractSpecsStrict);
+    let otherSpecsUnchanged = true;
+    for (let i = 0; i < records.length; i++) {
+        const { mfg: _beforeMfg, mfgV: _beforeMfgV, ...beforeOtherSpecs } = baselineResults[i];
+        const { mfg: _afterMfg, mfgV: _afterMfgV, ...afterOtherSpecs } = currentResults[i];
+        if (JSON.stringify(afterOtherSpecs) !== JSON.stringify(beforeOtherSpecs)) otherSpecsUnchanged = false;
+    }
+    assert(otherSpecsUnchanged, '100-record baseline/new comparison leaves every non-manufacturer spec unchanged');
+    assertDeepEqual([baselineResults.filter(r => r.mfg === 'SULZER').length, currentResults.filter(r => r.mfg === 'SULZER').length],
+        [0, 25], 'baseline/current Sulzer recognition count');
+    const measure = extract => {
+        const start = process.hrtime.bigint();
+        for (let i = 0; i < 20; i++) records.forEach(text => extract(text));
+        return Number(process.hrtime.bigint() - start) / 1e6;
+    };
+    const baselineMs = measure(baselineExtract);
+    const currentMs = measure(extractSpecsStrict);
+    console.log(`  ℹ️  Worker helper synthetic benchmark (100 records × 20): baseline=${baselineMs.toFixed(1)}ms, Sulzer=${currentMs.toFixed(1)}ms`);
 }
 
 // ─── Voltage: 208V boundary regression tests ────────────────────────────────
