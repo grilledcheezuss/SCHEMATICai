@@ -786,7 +786,12 @@
 
     function auditId(record, index) {
         if (!record || record.id === undefined || record.id === null || record.id === '') return `(no id #${index})`;
-        return String(record.id).slice(0, AUDIT_ID_MAX).replace(/[^A-Za-z0-9._-]/g, '');
+        return String(record.id).slice(0, AUDIT_ID_MAX).replace(/[^A-Za-z0-9._-]/g, '') || `(unprintable id #${index})`;
+    }
+
+    // Uniqueness uses the raw id; auditId() is display-only and may collapse distinct ids.
+    function auditKey(record, index) {
+        return record.id === undefined || record.id === null || record.id === '' ? `#${index}` : `id:${String(record.id)}`;
     }
 
     function auditLimit(value, limits) {
@@ -953,7 +958,8 @@
         };
     }
 
-    function auditReport(options = {}) {
+    function auditReport(options) {
+        options = options || {};
         const sampleLimit = auditLimit(options.samples, AUDIT_SAMPLES);
         const patternLimit = auditLimit(options.patterns, AUDIT_PATTERNS);
         const snippets = options.snippets === true;
@@ -987,9 +993,10 @@
         for (let i = 0; i < total; i++) {
             const record = list[i];
             if (!record || typeof record !== 'object') continue;
+            const key = auditKey(record, i);
+            if (seen.has(key)) { duplicates++; continue; }
+            seen.add(key);
             const id = auditId(record, i);
-            if (seen.has(id)) { duplicates++; continue; }
-            seen.add(id);
             unique++;
             const a = auditAnalyze(record);
             states[a.state]++;
@@ -1040,9 +1047,11 @@
             if (rendered) {
                 badge.checked++;
                 if (rendered === 'error') badge.errors++;
-                else if (SYSTEM_TYPES.includes(record._sys)) types[record._sys].rendered[rendered in types[record._sys].rendered ? rendered : 'other']++;
-                const expected = record._sysV === true ? 'orange' : 'green';
-                if (rendered !== expected) { badge.mismatches++; sample('badge:mismatch', id); }
+                else {
+                    types[record._sys].rendered[rendered in types[record._sys].rendered ? rendered : 'other']++;
+                    const expected = record._sysV === true ? 'orange' : 'green';
+                    if (rendered !== expected) { badge.mismatches++; sample('badge:mismatch', id); }
+                }
             }
 
             if (AUDIT_FAILING.includes(a.state) && a.text) {
@@ -1114,7 +1123,8 @@
         return null;
     }
 
-    function auditInspect(id, options = {}) {
+    function auditInspect(id, options) {
+        options = options || {};
         const { scope, list } = auditRecords(options);
         const found = auditFind(list, id);
         if (!found) return { tool: 'SystemTypeAudit', ...auditInfo(), scope, found: false, id: auditClean(id, AUDIT_ID_MAX) };

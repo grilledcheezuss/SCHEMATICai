@@ -150,6 +150,19 @@ assert(!('desc' in inspected) && !('desc' in inspected.evidence), 'inspect never
 assert.deepStrictEqual(SystemTypeAudit.inspect('CP-999', { records }).found, false);
 assert.strictEqual(SystemTypeAudit.inspect('', { records }).found, false);
 
+// --- Distinct raw ids never collapse; null options are tolerated -------------------------
+const lookalikes = derived([
+    { id: 'CP 1', desc: 'Panel Type Simplex\nVoltage 480' }, { id: 'CP1', desc: 'Panel Type Simplex\nVoltage 480' },
+    { id: 'ÄÖ', desc: '' }, { id: 'ÜÜ', desc: '' }, { id: `${'X'.repeat(40)}A`, desc: '' }, { id: `${'X'.repeat(40)}B`, desc: '' },
+    null, { desc: 'no id' }, { desc: 'no id either' }
+]);
+const lookalikeReport = SystemTypeAudit.report({ records: lookalikes });
+assert.deepStrictEqual(lookalikeReport.records, { scanned: 9, unique: 8, duplicates: 0 }, 'display-sanitized ids never merge distinct records');
+assert.strictEqual(lookalikeReport.types.Simplex.green, 2);
+assert(!JSON.stringify(lookalikeReport.sampleIds).includes('""'), 'unprintable ids get a visible placeholder');
+assert.strictEqual(SystemTypeAudit.report(null).tool, 'SystemTypeAudit', 'report(null) uses defaults');
+assert.strictEqual(SystemTypeAudit.inspect('CP-101', null).found, false, 'inspect with null options uses defaults');
+
 // --- Frozen records, stale derivations and default LOCAL_DB scope -----------------------
 const frozen = derived(fixtures()).map(r => Object.freeze(r));
 assert.strictEqual(JSON.stringify(SystemTypeAudit.report({ records: frozen }).states), JSON.stringify(report.states), 'works on frozen records');
@@ -186,7 +199,7 @@ const alwaysOrange = SystemTypeAudit.report({ records, badgeRenderer: (r, c) => 
 assert.strictEqual(alwaysOrange.badge.mismatches, 4, 'a propagation bug (green evidence drawn orange) is detected');
 assert.deepStrictEqual(alwaysOrange.sampleIds['badge:mismatch'], ['CP-101', 'CP-201', 'CP-301', 'CP-401']);
 const throwing = SystemTypeAudit.report({ records, badgeRenderer: () => { throw new Error('boom'); } });
-assert.strictEqual(throwing.badge.errors, 9, 'renderer errors are contained');
+assert.deepStrictEqual([throwing.badge.errors, throwing.badge.mismatches], [9, 0], 'renderer errors are contained, not counted as mismatches');
 delete globalThis.UI;
 
 // --- Classification is untouched by the audit -------------------------------------------
