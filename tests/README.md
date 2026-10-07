@@ -62,16 +62,19 @@ label stays stable (no restarting percentage) and the search button ellipsizes r
 UI housekeeping tests also cover first-card hover clipping and cleaned-up menu keyboard order.
 Live hosting/cache headers and physical-device acceptance remain separate deployment checks.
 
-### System Type equipment-title rules and local evaluator (v2.5.108)
+### System Type equipment-title rules, caption recovery and local evaluator (v2.5.109)
 
 `system-type-adjacent.test.js` covers bounded type/equipment phrases, panel/title context, hardware/reference and multi-type exclusions, and the existing CP-8025/CP-8374 fixtures. `system-type-repair.test.js` covers numeric combinations in Panel Type cells versus the unchanged motor-count combination policy. The local-only evaluator accepts CSV/JSON rows with `app_result`, `ground_truth`, `gt_confidence`, `root_cause`, and either a full description field or `evidence_snippet`; output contains aggregate metrics only.
 
 ```bash
 node tests/system-type-adjacent.test.js
 node tests/system-type-repair.test.js
+node tests/system-type-caption.test.js
 node tests/system-type-evaluate.test.js
 node tests/system-type-evaluate.js /path/to/local-labels.csv
 ```
+
+The caption test compares frozen v2.5.108 outcomes on a representative fixture corpus and verifies CP-1245r1 recovery and CP-1409 abstention. This fixture comparison is not a full-catalog coverage measurement.
 
 Snippet-only results are a snippet benchmark, not complete-record or live-catalog accuracy. No comparison dataset is checked in.
 

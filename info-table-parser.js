@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.108: bounded equipment-title evidence; refresh existing snapshots.
-    const DERIVED_REV = 9;
+    // v2.5.109: additive caption-separated title recovery; refresh existing snapshots.
+    const DERIVED_REV = 10;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -832,10 +832,9 @@
             if (value) cells.push({ value, start: cell.index + cell[0].indexOf(value), end: cellRe.lastIndex });
         }
 
-        const equipment = new RegExp(`^(${SYSTEM_TOKEN_SOURCE})(?:\\s+(?:PUMPS?|BLOWERS?|GRINDERS?))?$`);
+        const equipment = /^(SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX|QUAD)\s+(?:PUMPS?|BLOWERS?|GRINDERS?)$/;
         const caption = /^(?:POWER|CONTROL) DIAGRAM$/;
         const primary = /^(?:PANEL DESCRIPTION|DRAWING TITLE)$/;
-        const unsupported = /^(?:FIVE|SIX|[5-9]) PUMPS?$/;
         const matches = [];
         const anchorIndex = (start, end) => {
             const before = cells[start - 1]?.value || '';
@@ -892,7 +891,7 @@
 
     function titleCandidates(desc, labels) {
         const matches = titleEvidenceMatches(desc, labels);
-        const evidence = matches.length ? matches : captionTitleMatches(desc);
+        const evidence = matches.length ? matches : captionTitleMatches(systemTypeView(desc));
         return SYSTEM_TYPES.filter(sys => evidence.some(match => match.type === sys));
     }
 

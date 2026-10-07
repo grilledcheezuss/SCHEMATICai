@@ -1,6 +1,6 @@
-CLOUDFLARE WORKER SCRIPT (frontend release v2.5.108; Worker remains v2.5.97)
+CLOUDFLARE WORKER SCRIPT (frontend release v2.5.109; Worker remains v2.5.97)
 
-Release note: v2.5.108 adds browser-only, orange-only evidence for a directly adjacent system type and equipment phrase when a panel/title marker is within 42 characters. Multiple supported types abstain; hardware, component, reference and notes/BOM contexts are rejected. ALTERNATOR requires a following CONTROL PANEL; the short DUP alias remains excluded from title/equipment evidence. Numeric combinations in a Panel Type cell abstain as an internal Mixed conflict; motor-count behavior is unchanged. Existing explicit-row precedence, RTF/DXF handling, raw descriptions, manufacturer/material parsing, search/badges, snapshot schema 1 and Worker v2.5.97 remain unchanged. DERIVED_REV 9 refreshes cached records; no cache wipe or Worker redeploy.
+Release note: v2.5.109 adds an anchored, caption-separated title fallback for `<type> PUMP/BLOWER/GRINDER | POWER/CONTROL DIAGRAM | CONTROL PANEL` in either order. It runs only when existing evidence leaves the record unclassified; explicit rows, prior title/count/conflict outcomes, RTF/DXF handling, raw descriptions, manufacturer/material parsing, search/badges, snapshot schema 1 and Worker v2.5.97 remain unchanged. Title-only recovery is orange; existing matching plain-count corroboration is unchanged. Fixture comparison: CP-1245r1 NULL → Simplex orange; CP-1409 remains absent; CP-8025 Duplex green and CP-8374 Simplex green remain unchanged, along with the tested v2.5.108 cross-cell positives. DERIVED_REV 10 refreshes cached records; no cache wipe or Worker redeploy. No live catalog delta was measured.
 
 SYSTEM TYPE COVERAGE DECISIONS:
 
@@ -19,7 +19,7 @@ Previous release note: v2.5.107 is a browser-only System Type parser fix for fla
 
 Previous release note: v2.5.106 is a browser-only System Type parser repair. It filters RTF metadata and reads only validated DXF TEXT group-code 1 payloads for System Type; raw descriptions and adjacent manufacturer/material parsing remain unchanged. Blank/unreadable counts and unrelated cell noise no longer conflict with a complete explicit type row; contradictory plain counts, recognizable combinations, ambiguous rows, and uncertain row associations remain orange/abstain. Title-only matches remain orange unless a bounded matching plain count independently corroborates the primary panel title. DERIVED_REV 7 re-derives cached records without changing snapshot schema 1, search/badge semantics, auth/cache, release-update or Worker v2.5.97. No cache wipe or Worker redeploy.
 
-SYSTEM TYPE DIAGNOSTIC (v2.5.105 API; parser v2.5.108):
+SYSTEM TYPE DIAGNOSTIC (v2.5.105 API; parser v2.5.109):
 
 - When to run: after login, once the sync/refresh has finished (Search is enabled). Open the browser DevTools console on the app page. Nothing runs automatically; the report only exists while you call it.
 - Commands:

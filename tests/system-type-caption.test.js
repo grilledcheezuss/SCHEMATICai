@@ -1,6 +1,7 @@
 const assert = require('assert');
 const parser = require('../info-table-parser.js');
 const { cases, cp1245, cp1409 } = require('./fixtures/system-type-caption.js');
+assert.strictEqual(parser.DERIVED_REV, 10);
 
 const derive = desc => {
     const record = { id: 'fixture', desc };
@@ -27,6 +28,10 @@ const unrelatedGap = derive(cp1245.replace(' | POWER DIAGRAM | ', ' | UNRELATED 
 assert.deepStrictEqual([unrelatedGap._sys, unrelatedGap._sysV], [null, false]);
 assert(!unrelatedGap._sysEvidence.reasons.includes('validated-caption-title'));
 assert.deepStrictEqual(result(cp1245.replace(' | PANEL DESCRIPTION | 24 | ', ' | NOTES | PANEL DESCRIPTION | 24 | ')), [null, false]);
+assert.deepStrictEqual(result('PANEL DESCRIPTION | 24 | DUP PUMP | POWER DIAGRAM | CONTROL PANEL'), [null, false]);
+assert.deepStrictEqual(result('PANEL DESCRIPTION | 24 | SIMPLEX | POWER DIAGRAM | CONTROL PANEL'), [null, false]);
+const rtf = '{\\rtf1\\ansi{\\fonttbl{\\f0\\fnil DUPLEX;}}\\pard PANEL DESCRIPTION\\par 24\\par SIMPLEX PUMP\\par POWER DIAGRAM\\par CONTROL PANEL\\par}';
+assert.deepStrictEqual(result(rtf), ['Simplex', true]);
 
 const unsupported = derive(cp1409);
 assert.deepStrictEqual([unsupported._sys, unsupported._sysV], [null, false]);
