@@ -87,6 +87,25 @@ check(/body:not\(\.dark-mode\) \.record-card\.active-view:not\(\.no-pdf-card\) \
     'light selection uses a pale purple surface tint');
 check(/body\.dark-mode \.record-card\.active-view:not\(\.no-pdf-card\) \{[^}]*background: #302c3b;/.test(css),
     'dark selection uses an opaque, surface-preserving lavender tint');
+console.log('\n🧪 Hover outline thickening (v2.5.105)');
+const HOVER_RING = 'inset 0 0 0 1px var(--card-hover-ring)';
+const ruleBlock = selector => rules.find(([, selectors]) => selectors.trim() === selector)?.[2] || '';
+check(/:root \{[^}]*--card-hover-ring: var\(--lsu-purple\);/.test(css), 'light hover ring token is brand purple');
+check(/body\.dark-mode \{[^}]*--card-hover-ring: rgba\(167, 139, 250, 0\.6\);/.test(css), 'dark hover ring token is translucent lavender');
+for (const selector of ['.record-card:hover', 'body:not(.dark-mode) .record-card:hover',
+    'body:not(.dark-mode) .record-card.active-view:not(.no-pdf-card):hover', 'body.dark-mode .record-card.active-view:not(.no-pdf-card):hover']) {
+    const block = ruleBlock(selector);
+    check(new RegExp(`box-shadow: ${HOVER_RING.replace(/[()-]/g, '\\$&')},`).test(block), `${selector}: hover ring is the first (top) shadow layer`);
+    check(!/border(?:-width)?:|padding|margin|width:|height:|outline:/.test(block.replace(/border-color:[^;]*;/, '')), `${selector}: hover ring changes no geometry`);
+}
+for (const selector of ['body:not(.dark-mode) .record-card.active-view:not(.no-pdf-card)', 'body.dark-mode .record-card.active-view:not(.no-pdf-card)']) {
+    check(!ruleBlock(selector).includes('--card-hover-ring'), `${selector}: approved non-hover selected glow has no hover ring`);
+}
+check(/\.record-card\.no-pdf-card:hover \{[^}]*box-shadow: none;/.test(css), 'dark/no-theme no-PDF hover clears the ring');
+const noPdfRules = rules.filter(([, selectors]) => selectors.replace(/:not\(\.no-pdf-card\)/g, '').includes('.no-pdf-card'));
+check(noPdfRules.length >= 2 && noPdfRules.every(([, , block]) => !block.includes('--card-hover-ring')), 'no-PDF rules never draw the hover ring');
+check(/\.record-card \{[^}]*transition: transform 0\.2s ease, box-shadow 0\.2s ease;/.test(css), 'ring fades in with the existing box-shadow transition');
+
 const reducedMotion = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
 check(/\.record-card \{\s*transition: none;\s*\}/.test(reducedMotion), 'reduced motion disables card transitions only');
 check(/\.record-card:hover \{\s*transform: none;\s*\}/.test(reducedMotion), 'reduced motion removes hover lift without removing selection shadows');

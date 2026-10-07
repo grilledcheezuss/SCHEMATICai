@@ -345,6 +345,7 @@ function cardStyleInPage(selector) {
         leftWidth: cs.borderLeftWidth, topWidth: cs.borderTopWidth, radius: cs.borderTopLeftRadius,
         shadow: cs.boxShadow, shadows, bg: cs.backgroundColor, opacity: cs.opacity, cursor: cs.cursor,
         transform: cs.transform, transition: cs.transitionDuration, hovered: card.matches(':hover'),
+        size: { width: card.offsetWidth, height: card.offsetHeight },
         center: { x: r.left + r.width / 2, y: r.top + r.height / 2 }
     };
 }
@@ -383,6 +384,11 @@ async function testCardBorders(browser) {
             await settle(browser);
             const hover = await browser.evaluate(cardStyleInPage, normalSel);
             check(hover.hovered && hover.transform === (reduced ? 'none' : 'matrix(1, 0, 0, 1, 0, -1)'), `${label}: genuine hover with expected lift`);
+            const ringOf = style => style.shadows.find(s => s.inset && s.lengths.join(',') === '0,0,0,1');
+            check(!ringOf(normal) && Boolean(ringOf(hover)), `${label}: hover adds a 1px inset outline ring (${hover.shadow})`);
+            check(ringOf(hover)?.color === (dark ? 'rgba(167, 139, 250, 0.6)' : PURPLE), `${label}: hover ring uses the theme outline colour`);
+            check(hover.topWidth === normal.topWidth && hover.leftWidth === normal.leftWidth
+                && hover.size.width === normal.size.width && hover.size.height === normal.size.height, `${label}: hover ring keeps card size/layout`);
             await browser.evaluate(sel => document.querySelector(sel).classList.add('active-view'), normalSel);
             await settle(browser);
             const activeHover = await browser.evaluate(cardStyleInPage, normalSel);
@@ -393,6 +399,7 @@ async function testCardBorders(browser) {
             await settle(browser);
             const active = await browser.evaluate(cardStyleInPage, normalSel);
             checkSelection(active, normal, `${label} active`);
+            check(!ringOf(active) && Boolean(ringOf(activeHover)), `${label}: hover ring coexists with the glow only while hovered`);
             check(active.bg === (dark ? 'rgb(48, 44, 59)' : 'rgb(243, 238, 249)'), `${label}: opaque theme-appropriate tint`);
 
             const disabled = await browser.evaluate(cardStyleInPage, disabledSel);
@@ -408,6 +415,7 @@ async function testCardBorders(browser) {
                 && disabledHover.top === disabled.top && disabledHover.bg === disabled.bg
                 && disabledHover.opacity === disabled.opacity && disabledHover.cursor === disabled.cursor
                 && disabledHover.shadow === (dark ? 'none' : disabled.shadow), `${label}: no-PDF active:hover stays neutral and does not lift/glow`);
+            check(!ringOf(disabledHover), `${label}: no-PDF hover has no outline ring`);
         }
         await browser.evaluate(() => {
             document.body.classList.remove('dark-mode');

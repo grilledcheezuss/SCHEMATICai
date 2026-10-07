@@ -62,6 +62,18 @@ label stays stable (no restarting percentage) and the search button ellipsizes r
 UI housekeeping tests also cover first-card hover clipping and cleaned-up menu keyboard order.
 Live hosting/cache headers and physical-device acceptance remain separate deployment checks.
 
+### system-type-audit.test.js (v2.5.105)
+
+Diagnostic-only System Type audit (`SystemTypeAudit.report()/text()/inspect(id)` in `info-table-parser.js`).
+Synthetic Simplex/Duplex/Triplex/Quadraplex fixtures check deterministic green/orange/absent/conflicting counts,
+source buckets, orange causes, opt-in sanitized snippets, bounded inspect output, no record mutation, and
+rendered-badge agreement through the real `UI._generateBadges` extracted from `app.js`. Hover-ring coexistence
+with the selected-card glow is covered by the UI housekeeping static/browser tests.
+
+```bash
+node tests/system-type-audit.test.js
+```
+
 ## Future Tests
 
 Additional test coverage planned for v2.5.4+:
