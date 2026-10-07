@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.100 ---
-const APP_VERSION = "v2.5.100";
+// --- SCHEMATICA ai v2.5.101 ---
+const APP_VERSION = "v2.5.101";
 const VERSION_HISTORY = {
+    "v2.5.101": "First-card hover clipping fixed with scroll-content inset; obsolete CSV/cache/reset menu buttons removed. Login/startup revalidates deployed frontend assets and release-stale data refreshes through atomic encrypted generations, retaining working cache on failure. Worker v2.5.97, schema 1 and DERIVED_REV 5 unchanged",
     "v2.5.100": "UI housekeeping: Submittal Generator unavailable only on small phones (short side <= 430 px in the < 768 px layout, one media query shared by JS matchMedia and CSS); eligible 431-767 px viewports get a compact floating Control Panel with restore/minimize controls; resize into/out of small-phone mode preserves zones/context/minimized state. Light-mode result cards keep purple brand borders on normal/hover/active, while no-PDF cards keep their neutral disabled treatment. First desktop/tablet search now shows the total count immediately (results-ready synced on completion; explicit 0 kept). UI.isSmallMobile breakpoint, search/parser/DERIVED_REV, Worker v2.5.97, auth/cache/network unchanged; no Worker redeploy",
     "v2.5.99": "Browser-only enclosure refinement: symmetric Fiberglass, Stainless Steel, and Painted Steel association for split material names, bounded wiring noise, WAGO terminal/end-block gaps, and adjacent enclosure labels. Clear rows remain primary; gap evidence and conflicts remain uncertain, and unsupported steel is never promoted. Derived revision 5 re-associates existing cached descriptions without a snapshot schema bump or cache wipe. Worker, auth/network/cache, System Type/manufacturer, search criteria, sorting/pagination, badges, feedback, and PDF behavior unchanged; no Worker redeploy",
     "v2.5.98": "Browser-only parser repair: bounded forward/reverse Enclosure Material cells, feature-column boundaries, and unresolved noise no longer treated as unsupported material. CP-8370 Fiberglass and CP-8328 Stainless Steel excerpts now match; the terminal-BOM-gap association stays uncertain. Plain motor counts reject auxiliary/combination expressions; explicit System Type remains primary. Derived revision 4 refreshes existing cached descriptions without a schema bump or cache wipe. Manufacturer ranking, feedback encodings, Worker behavior, and live search/PDF state unchanged; no backend redeploy",
@@ -461,6 +462,7 @@ class DB {
 }
 
 class CacheService {
+    static loadedReleaseVersion = null;
     static ACTIVE_GENERATION_KEY = '__meta_active_generation';
     static PREVIOUS_GENERATION_KEY = '__meta_previous_generation';
     static GENERATION_PREFIX = 'gen_';
@@ -471,7 +473,7 @@ class CacheService {
     }
     static async prepareKey(p) { if(!p) return null; const e = new TextEncoder(); const k = await crypto.subtle.importKey("raw", e.encode(p), "PBKDF2", false, ["deriveKey"]); this.activeKey = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: e.encode("COX_SALT_V1"), iterations: 100000, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]); return this.activeKey; }
     static async saveShard(id, data) { if(!this.activeKey) return; const j = JSON.stringify(data); const e = await this.enc(j); await DB.putChunk(id, e); }
-    static async saveSnapshot(records, { chunkSize = 50, progressCallback } = {}) {
+    static async saveSnapshot(records, { chunkSize = 50, progressCallback, releaseVersion = null } = {}) {
         if (!this.activeKey) throw new Error('Cache encryption key missing');
         const safeRecords = Array.isArray(records) ? records : [];
         const previousGeneration = await DB.getChunk(this.ACTIVE_GENERATION_KEY).catch(() => null);
@@ -501,7 +503,7 @@ class CacheService {
         const writeStart = this.now();
         const writeEntries = [
             ...shardEntries,
-            [`${generation}:manifest`, { shardCount, createdAt: Date.now() }],
+            [`${generation}:manifest`, { shardCount, createdAt: Date.now(), releaseVersion }],
             [this.ACTIVE_GENERATION_KEY, generation],
             [this.PREVIOUS_GENERATION_KEY, (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== generation) ? previousGeneration : '']
         ];
@@ -624,9 +626,10 @@ class CacheService {
             if(progressCallback) progressCallback(Math.round(((i + 1) / shardKeys.length) * 100));
         }
         if (stageMap.size === 0) return { success: false, reason: 'empty-generation' };
-        return { success: true, stageMap, stageMfgs, stageEncs };
+        return { success: true, stageMap, stageMfgs, stageEncs, releaseVersion: manifest.releaseVersion || null };
     }
     static async loadAllWithProgress(progressCallback) { 
+        this.loadedReleaseVersion = null;
         if(!this.activeKey) return null; 
         const keys = await DB.getChunkKeys(); 
         if(!keys || keys.length === 0) return null; 
@@ -638,6 +641,7 @@ class CacheService {
         if (typeof activeGeneration === 'string' && activeGeneration) {
             const activeResult = await this.loadGeneration(activeGeneration, keys, progressCallback);
             if (activeResult?.success) {
+                this.loadedReleaseVersion = activeResult.releaseVersion;
                 stageMap = activeResult.stageMap;
                 stageMfgs = activeResult.stageMfgs;
                 stageEncs = activeResult.stageEncs;
@@ -646,6 +650,7 @@ class CacheService {
                 if (typeof previousGeneration === 'string' && previousGeneration && previousGeneration !== activeGeneration) {
                     const previousResult = await this.loadGeneration(previousGeneration, keys, progressCallback);
                     if (previousResult?.success) {
+                        this.loadedReleaseVersion = previousResult.releaseVersion;
                         await DB.putChunk(this.ACTIVE_GENERATION_KEY, previousGeneration);
                         stageMap = previousResult.stageMap;
                         stageMfgs = previousResult.stageMfgs;
@@ -718,7 +723,7 @@ class CacheService {
 
 class AuthService {
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
-    static login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); location.reload(); }
+    static async login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); const update = await ReleaseUpdate.check(APP_VERSION); if (!update.navigating) location.reload(); }
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
@@ -750,6 +755,7 @@ class DataLoader {
     static SYNC_TIMESTAMP_KEY = 'cox_db_synced_at';
     static SYNC_LOCK_KEY = 'cox_db_sync_lock_at';
     static APP_VERSION_KEY = 'cox_version';
+    static DATA_RELEASE_VERSION_KEY = 'cox_data_release_version';
     static SNAPSHOT_SCHEMA_VERSION_KEY = 'cox_cache_schema_version';
     static SYNC_DB_LOCK_KEY = '__cox_db_sync_lock';
     static SYNC_LOCK_TTL_MS = 10 * 60 * 1000;
@@ -903,7 +909,7 @@ class DataLoader {
     }
     static shouldRefreshStaleCache(now = Date.now()) {
         if (!this.isCacheComplete()) return false;
-        return !this.isSyncFresh(now);
+        return localStorage.getItem(this.DATA_RELEASE_VERSION_KEY) !== APP_VERSION || !this.isSyncFresh(now);
     }
     static shouldAbortEmptySync({ fetchedCount, hadExistingData }) {
         return fetchedCount === 0 && (hadExistingData || this.isCacheComplete());
@@ -1157,6 +1163,11 @@ class DataLoader {
             await DB.deleteLegacy();
 
             const hasData = await CacheService.loadAllWithProgress((pct) => { btn.innerText = `🔒 DECRYPTING ${pct}%`; });
+            // The validated generation is authoritative, including when recovery selected an older snapshot.
+            if (hasData && CacheService.loadedReleaseVersion !== undefined) {
+                if (CacheService.loadedReleaseVersion) localStorage.setItem(this.DATA_RELEASE_VERSION_KEY, CacheService.loadedReleaseVersion);
+                else localStorage.removeItem(this.DATA_RELEASE_VERSION_KEY);
+            }
             const hasCompleteCache = !!hasData && this.isCacheComplete();
             
             if (hasCompleteCache) {
@@ -1481,6 +1492,7 @@ class DataLoader {
             const snapshotMs = Math.round(this.now() - snapshotStart);
             await this.yieldMainThread();
             const persistStats = await CacheService.saveSnapshot(snapshot.records, {
+                releaseVersion: APP_VERSION,
                 progressCallback: ({ phase, pct = 0 }) => {
                     if (!btn || background) return;
                     if (phase === 'encrypting') {
@@ -1498,6 +1510,7 @@ class DataLoader {
             const applyMs = Math.round(this.now() - applyStart);
             localStorage.setItem('cox_db_complete', 'true');
             localStorage.setItem(this.SYNC_TIMESTAMP_KEY, String(Date.now()));
+            localStorage.setItem(this.DATA_RELEASE_VERSION_KEY, APP_VERSION);
             const activeGeneration = await DB.getChunk(CacheService.ACTIVE_GENERATION_KEY).catch(() => null);
             CacheService.cleanupInactiveGenerations({ keepGeneration: typeof activeGeneration === 'string' ? activeGeneration : null }).catch(() => {});
             console.info(`[SyncTiming] fetch=${fetchMs}ms snapshot=${snapshotMs}ms encrypt=${persistStats?.encryptMs ?? 0}ms write=${persistStats?.writeMs ?? 0}ms persist=${persistStats?.totalMs ?? 0}ms apply=${applyMs}ms`);
@@ -1540,7 +1553,6 @@ class DataLoader {
         } 
     }
 
-    static harvestCSV() { alert('Harvesting...'); }
 }
 
 class DragManager {
@@ -7935,7 +7947,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, { once: true });
         if(AuthService.init()) { 
-            DataLoader.preload(); 
+            ReleaseUpdate.check(APP_VERSION).then(update => {
+                if (!update.navigating) DataLoader.preload();
+            });
         }
     } catch(e) {
         console.error("Critical Init Error:", e);

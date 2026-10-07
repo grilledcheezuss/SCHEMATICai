@@ -3,6 +3,7 @@
 //   1. Submittal Generator availability: small phones only (short side <= 430 in the < 768 layout)
 //   2. Light-mode purple result-card borders (normal / hover / active / disabled no-PDF / dark)
 //   3. Total result count visible immediately on the FIRST search at every viewport
+//   4. Scroll-content breathing room and streamlined, keyboard-accessible hamburger menu
 // Run: node tests/ui-housekeeping.browser.test.js   (CHROME_PATH=/path/to/chrome to override;
 // REQUIRE_BROWSER=1 turns a missing browser into a failure instead of a loud skip.)
 const { HeadlessBrowser } = require('./helpers/headless-browser');
@@ -396,6 +397,146 @@ async function testCardBorders(browser) {
     await browser.evaluate(() => localStorage.removeItem('cox_theme'));
 }
 
+function cardBoundsInPage(last = false) {
+    const list = document.getElementById('results-list');
+    const area = document.getElementById('results-area');
+    const cards = area.querySelectorAll('.record-card');
+    const card = last ? cards[cards.length - 1] : cards[0];
+    const clip = list.getBoundingClientRect();
+    const bounds = card.getBoundingClientRect();
+    const cs = getComputedStyle(area);
+    return {
+        top: bounds.top - clip.top,
+        left: bounds.left - clip.left,
+        right: clip.right - bounds.right,
+        bottom: clip.bottom - bounds.bottom,
+        contentBottom: area.getBoundingClientRect().bottom - bounds.bottom,
+        padding: [cs.paddingTop, cs.paddingRight, cs.paddingBottom, cs.paddingLeft],
+        scrollTop: list.scrollTop,
+        scrollable: list.scrollHeight > list.clientHeight,
+        horizontalOverflow: list.scrollWidth > list.clientWidth,
+        overflow: getComputedStyle(list).overflowY,
+        hovered: card.matches(':hover'),
+        active: card.classList.contains('active-view'),
+        center: { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
+    };
+}
+
+async function testCardScrollBounds(browser) {
+    console.log('\n🧪 First-card bounds: light/dark normal/hover/active, sides, bottom, pagination');
+    for (const [w, h] of [[1280, 800], [768, 1024], [700, 1000], [390, 844], [667, 375]]) {
+        await openApp(browser, w, h);
+        await browser.evaluate(firstSearchInPage, makeRecords(51));
+        await settle(browser);
+        for (const dark of [false, true]) {
+            if (dark) await browser.evaluate(() => UI.toggleDarkMode());
+            await browser.evaluate(() => {
+                document.getElementById('results-list').scrollTop = 0;
+                document.querySelector('#results-area .record-card').classList.remove('active-view');
+            });
+            await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+            await settle(browser);
+            const label = `${w}x${h} ${dark ? 'dark' : 'light'}`;
+            const normal = await browser.evaluate(cardBoundsInPage);
+            check(normal.padding.join(',') === '4px,4px,10px,4px', `${label}: consistent scroll-content padding (${normal.padding})`);
+            check(normal.overflow === 'auto' && normal.scrollable && !normal.horizontalOverflow, `${label}: vertical scrolling without horizontal overflow`);
+            const checkBounds = (r, state, top) => {
+                check(r.scrollTop === 0 && Math.abs(r.top - top) < 0.6, `${label} ${state}: first card clear of upper clip (${JSON.stringify(r)})`);
+                check(r.left >= 3.5 && r.right >= 3.5, `${label} ${state}: side outlines/shadows have allowance`);
+            };
+            checkBounds(normal, 'normal', 4);
+            await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...normal.center });
+            await settle(browser);
+            const hover = await browser.evaluate(cardBoundsInPage);
+            check(hover.hovered, `${label}: first card really hovered`);
+            checkBounds(hover, 'hover', 3);
+            await browser.evaluate(() => document.querySelector('#results-area .record-card').classList.add('active-view'));
+            await settle(browser);
+            const activeHover = await browser.evaluate(cardBoundsInPage);
+            check(activeHover.active && activeHover.hovered, `${label}: active card remains hovered`);
+            checkBounds(activeHover, 'active hover', 3);
+            await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+            await settle(browser);
+            checkBounds(await browser.evaluate(cardBoundsInPage), 'active', 4);
+            await browser.evaluate(() => {
+                const list = document.getElementById('results-list');
+                list.scrollTop = list.scrollHeight;
+            });
+            const bottom = await browser.evaluate(cardBoundsInPage, true);
+            check(bottom.bottom >= 9.5 && Math.abs(bottom.contentBottom - 10) < 0.6, `${label}: last card clears bottom clip by 10px (${JSON.stringify(bottom)})`);
+        }
+        await browser.evaluate(() => {
+            UI.toggleDarkMode();
+            localStorage.removeItem('cox_theme');
+            SearchEngine.nextPage();
+            document.getElementById('results-list').scrollTop = 0;
+        });
+        const page2 = await browser.evaluate(cardBoundsInPage);
+        check(Math.abs(page2.top - 4) < 0.6 && !page2.horizontalOverflow, `${w}x${h}: page 2 preserves padding and list width`);
+        check(browser.pageErrors.length === 0, `${w}x${h}: bounds tests have no page errors`);
+    }
+}
+
+async function testMenuHousekeeping(browser) {
+    console.log('\n🧪 Streamlined menu: retained handlers, tab controls, small-phone headers, outside click');
+    for (const [w, h] of [[1280, 800], [390, 844]]) {
+        await openApp(browser, w, h);
+        const label = `${w}x${h}`;
+        const state = await browser.evaluate(() => {
+            document.getElementById('main-menu-btn').click();
+            const menu = document.getElementById('main-menu');
+            const shown = el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().height > 0;
+            return {
+                open: menu.classList.contains('visible'),
+                removed: [...menu.querySelectorAll('button, a, [tabindex]')].some(el =>
+                    /Harvest CSV|Clear PDF Cache|Force Reset|harvestCSV|clearPdfCache|resetSync/.test(el.textContent + el.getAttribute('onclick'))),
+                headers: [...menu.querySelectorAll('.menu-header')].filter(shown).map(el => el.textContent.trim()),
+                controls: [...menu.querySelectorAll('button')].filter(shown).map(el => el.textContent.trim().replace(/\s+/g, ' ')),
+                logoutHandler: [...menu.querySelectorAll('button')].find(el => /Logout/.test(el.textContent))?.getAttribute('onclick')
+            };
+        });
+        check(state.open && !state.removed, `${label}: removed utilities are absent, not just hidden`);
+        check(!state.headers.includes('Admin Tools'), `${label}: no empty Admin Tools header`);
+        check(state.controls.length === (w < 768 ? 2 : 3), `${label}: only retained controls displayed (${state.controls})`);
+        check(state.logoutHandler === 'AuthService.logout(); UI.toggleMenu()', `${label}: logout handler retained (never invoked)`);
+        await browser.evaluate(() => document.getElementById('main-menu-btn').focus());
+        for (const expected of state.controls) {
+            await browser.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+            await browser.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+            const focused = await browser.evaluate(() => document.activeElement.textContent.trim().replace(/\s+/g, ' '));
+            check(focused === expected, `${label}: Tab reaches only retained control "${expected}" (got "${focused}")`);
+        }
+        const theme = await browser.evaluate(() => {
+            const before = document.body.classList.contains('dark-mode');
+            [...document.querySelectorAll('#main-menu button')].find(el => /Switch Theme/.test(el.textContent)).click();
+            return { changed: before !== document.body.classList.contains('dark-mode'), closed: !document.getElementById('main-menu').classList.contains('visible') };
+        });
+        check(theme.changed && theme.closed, `${label}: theme handler still toggles theme and closes menu`);
+        await browser.evaluate(() => {
+            UI.toggleDarkMode();
+            localStorage.removeItem('cox_theme');
+            document.getElementById('main-menu-btn').click();
+        });
+        if (w >= 768) {
+            const generator = await browser.evaluate(() => {
+                document.getElementById('menu-demo').click();
+                return { active: DemoManager.isGeneratorActive, closed: !document.getElementById('main-menu').classList.contains('visible') };
+            });
+            check(generator.active && generator.closed, `${label}: generator handler still activates and closes menu`);
+            await browser.evaluate(() => {
+                DemoManager.toggleGenerator();
+                document.getElementById('main-menu-btn').click();
+            });
+        }
+        const outside = await browser.evaluate(() => {
+            document.body.click();
+            return !document.getElementById('main-menu').classList.contains('visible');
+        });
+        check(outside, `${label}: outside click still closes menu`);
+        check(browser.pageErrors.length === 0, `${label}: menu tests have no page errors`);
+    }
+}
+
 (async () => {
     const browser = await HeadlessBrowser.launch();
     if (!browser) {
@@ -409,6 +550,8 @@ async function testCardBorders(browser) {
         await testGeneratorMatrix(browser);
         await testGeneratorResizeTransitions(browser);
         await testCardBorders(browser);
+        await testCardScrollBounds(browser);
+        await testMenuHousekeeping(browser);
     } catch (err) {
         failed++;
         console.error('❌ Unexpected error:', err);

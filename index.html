@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.100)</title>
+    <meta name="app-version" content="v2.5.101">
+    <title>Cox Research | SCHEMATICA ai (v2.5.101)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -33,7 +34,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="style.css?v=2.5.100">
+    <link rel="stylesheet" href="style.css?v=2.5.101">
 </head>
 <body>
 
@@ -117,17 +118,13 @@
         <div id="main-menu" class="menu-dropdown">
             <div class="menu-version" id="menu-version">VERSION</div>
             <div class="menu-section" id="admin-tools-section">
-                <div class="menu-header">Admin Tools</div>
                 <button id="menu-demo" class="menu-item" onclick="DemoManager.toggleGenerator(); UI.toggleMenu()">
                     <span class="menu-icon">📄</span> Submittal Generator <span id="gen-status" style="margin-left:auto; display:none;">●</span>
                 </button>
-                <button class="menu-item" onclick="DataLoader.harvestCSV(); UI.toggleMenu()"><span class="menu-icon">📥</span> Harvest CSV</button>
             </div>
             <div class="menu-section">
                 <div class="menu-header">General</div>
                 <button class="menu-item" onclick="UI.toggleDarkMode(); UI.toggleMenu()"><span class="menu-icon">🌓</span> Switch Theme</button>
-                <button class="menu-item" onclick="UI.clearPdfCache(); UI.toggleMenu()"><span class="menu-icon">🗑️</span> Clear PDF Cache</button>
-                <button class="menu-item" onclick="DataLoader.resetSync(); UI.toggleMenu()"><span class="menu-icon">🔄</span> Force Reset</button>
                 <button class="menu-item danger" onclick="AuthService.logout(); UI.toggleMenu()"><span class="menu-icon">⏻</span> Logout</button>
             </div>
         </div>
@@ -430,9 +427,10 @@
 
     <button id="generator-restore-btn" onclick="DemoManager.restorePanel()" title="Open Control Panel">⚙️</button>
 
-<script src="pdf-render-helper.js"></script>
-<script src="pdf-ui-state.js"></script>
-<script src="info-table-parser.js?v=2.5.100"></script>
-<script src="app.js?v=2.5.100"></script>
+<script src="release-update.js?v=2.5.101"></script>
+<script src="pdf-render-helper.js?v=2.5.101"></script>
+<script src="pdf-ui-state.js?v=2.5.101"></script>
+<script src="info-table-parser.js?v=2.5.101"></script>
+<script src="app.js?v=2.5.101"></script>
 </body>
 </html>

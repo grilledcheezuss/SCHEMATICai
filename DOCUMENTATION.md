@@ -450,7 +450,7 @@ The system now supports **fuzzy, tolerant HP matching**:
 
 - **Export Configuration**: Use "Export Config" to save current state
 - **Check Browser Console**: F12 → Console for error messages
-- **Clear Cache**: Force Reset in menu if persistent issues
+- **Automatic Updates**: Login (including saved-credential startup) revalidates the deployed frontend. Release-stale schematic data refreshes in the background without deleting profiles, theme or a working snapshot. Offline or failed updates retain cached data and can retry at a later login; report persistent errors rather than clearing browser storage.
 - **Report Issue**: Use feedback system for data problems
 
 ### Data Integrity
@@ -458,7 +458,7 @@ The system now supports **fuzzy, tolerant HP matching**:
 - **Local Storage**: Profiles saved in browser only
 - **Backup**: Regularly export configurations
 - **Sync**: No cloud sync - export/import to transfer
-- **Clear Data**: "Force Reset" clears all local storage
+- **Recovery**: A failed data refresh keeps the last complete encrypted snapshot; generation recovery can use the previous complete snapshot. Export profiles before deliberately clearing browser site data. Logout retains its existing session-clearing behavior.
 
 ### Performance Tips
 

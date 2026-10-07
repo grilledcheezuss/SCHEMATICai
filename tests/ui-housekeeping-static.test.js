@@ -61,9 +61,20 @@ check(desktopBranch.includes('this.syncMobileLayout()'), 'desktop/tablet search 
 check(uiSrc.includes('UI.syncMobileResultsCount(Number.isFinite(totalCount) ? totalCount : res.length)'), 'render keeps an explicit 0 total instead of a falsy fallback');
 
 console.log('\n🧪 Light-mode card border specificity');
+check(/#results-area \{[^}]*padding: 4px 4px 10px;/.test(css), 'scroll content has top/side breathing room and bottom allowance');
+check(!/#results-area\s*\{[^}]*padding-bottom:/.test(css), 'media overrides do not reduce the scroll content bottom allowance');
+check(/#results-list \{[^}]*min-height: 0;[^}]*overflow-y: auto;/.test(css), 'results list remains the shrinkable scroll container');
 check(/body:not\(\.dark-mode\) \.record-card \{\s*border-color: var\(--app-primary\);/.test(css), 'light card outline uses the brand token');
 check(/body:not\(\.dark-mode\) \.record-card:hover \{\s*border-color: var\(--app-primary\);/.test(css), 'light hover outline stays purple');
 check(/body:not\(\.dark-mode\) \.record-card\.no-pdf-card,\s*body:not\(\.dark-mode\) \.record-card\.no-pdf-card:hover \{[^}]*border-left-color: #9ca3af;/.test(css), 'no-PDF card keeps neutral left accent over light rules');
+
+console.log('\n🧪 Menu housekeeping');
+const menu = html.slice(html.indexOf('id="main-menu"'), html.indexOf('</header>', html.indexOf('id="main-menu"')));
+['Harvest CSV', 'Clear PDF Cache', 'Force Reset', 'DataLoader.harvestCSV()', 'UI.clearPdfCache()', 'DataLoader.resetSync()']
+    .forEach(text => check(!menu.includes(text), `menu excludes ${text}`));
+check(!/Admin\s*Tools/i.test(menu), 'menu has no empty Admin Tools header on small phones');
+['DemoManager.toggleGenerator(); UI.toggleMenu()', 'UI.toggleDarkMode(); UI.toggleMenu()', 'AuthService.logout(); UI.toggleMenu()']
+    .forEach(handler => check(menu.includes(handler), `menu retains ${handler}`));
 
 console.log('\n🧪 Version surfaces');
 const version = appJs.match(/const APP_VERSION = "v([^"]+)"/)[1];
