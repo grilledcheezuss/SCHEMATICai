@@ -191,24 +191,86 @@ for (const gap of ['28 2 OTHER 285-137 GROUND TERMINAL', '28 2 WAGO 285-137 BOLT
     expect(`Phase Monitor Duplex ${gap} Panel Type Voltage 480`, [null, false]);
 }
 
-// Revision-five derived fields must be replaced without changing snapshot serialization.
-assert.strictEqual(parser.DERIVED_REV, 6);
-for (const desc of ['No. Motors 4', 'Duplex Control Panel', 'Panel Type Duplex']) {
-    const record = { id: desc, desc, sys: 'legacy' };
-    for (const [key, value] of [['_derivedRev', 5], ['_sys', 'Quadraplex'], ['_sysV', false]]) {
-        Object.defineProperty(record, key, { value, configurable: true });
-    }
+// Missing/unreadable motor-count cells and unrelated cell noise are not count conflicts.
+for (const value of ['', 'CAPACITORS', 'CATALOG NUMBER', 'YES', 'VFD1', 'HSP3/RUN']) {
+    expect(`Panel Type Duplex\nNo. Motors ${value}\nVoltage 480`, ['Duplex', false]);
+}
+for (const value of ['3', '2+2', '2 + Ex', '4+2', '2/1', '2.5', '-2']) {
+    expect(`Panel Type Duplex\nNo. Motors ${value}\nVoltage 480`, ['Duplex', true]);
+}
+for (const type of parser.SYSTEM_TYPES) expect(`${type} | Panel Type | Voltage 480`, [type, true]);
+expect('Panel Type Duplex\nNo. Motors 2\nNo. Motors 3', ['Duplex', true]);
+expect('Panel Type Duplex\nPanel Type\nNo. Motors 2', ['Duplex', false]);
+expect('Panel Type Duplex\nPanel Type Triplex\nNo. Motors 2', [null, false]);
+
+// A panel title remains uncertain alone; only a bounded matching plain count corroborates it.
+expect('DUPLEX PUMP CONTROL PANEL', ['Duplex', true]);
+expect('DUPLEX PUMP CONTROL PANEL\nNo. Motors 2', ['Duplex', false]);
+expect('DUPLEX PUMP CONTROL PANEL\nNo. Motors 3', ['Duplex', true]);
+expect('DUPLEX PUMP CONTROL PANEL\nNotes\nNo. Motors 2', ['Duplex', true]);
+expect('BOM DUPLEX PUMP CONTROL PANEL\nNo. Motors 2', [null, false]);
+
+// RTF parsing reads visible body text, not font tables or other destinations.
+const rtf = body => `{\\rtf1\\ansi{\\fonttbl{\\f0\\fnil SIMPLEX;}}\\colortbl;\\pard ${body}}`;
+for (const type of parser.SYSTEM_TYPES) {
+    expect(rtf(`Panel Type ${type}\\par`), [type, false]);
+}
+expect(rtf('Panel Type Duplex\\par No. Motors 2\\par'), ['Duplex', false]);
+expect(rtf('DUPLEX PUMP\\par CONTROL PANEL\\par No. Motors 2\\par'), ['Duplex', false]);
+expect('{\\rtf1\\ansi\\pard Panel Type Dupl\\u101?x\\par Escaped \\{braces\\} and \\\\ slash}', ['Duplex', false]);
+expect('{\\rtf1\\ansi{\\fonttbl{\\f0\\fnil SIMPLEX;}}}', [null, false]);
+expect('{\\rtf1\\ansi{\\fonttbl{\\f0\\fnil DUPLEX;}}\\pard Panel Type Duplex receptacle\\par}', [null, false]);
+expect('{\\rtf1\\ansi\\pard Panel Type Triplex\\par {\\*\\unknown DUPLEX PUMP CONTROL PANEL}}', ['Triplex', false]);
+
+// DXF group-code 1 payloads are visible text; numeric coordinate groups are ignored.
+const dxfEntity = (value, coordinate, layer = 'PANEL') => `0\nTEXT\n8\n${layer}\n10\n${coordinate}\n20\n480\n1\n${value}\n`;
+const dxf = values => `0\nSECTION\n2\nENTITIES\n${values.map((item, i) => typeof item === 'string'
+    ? dxfEntity(item, i + 1)
+    : dxfEntity(item.value, i + 1, item.layer)).join('')}0\nENDSEC\n0\nEOF\n`;
+for (const type of parser.SYSTEM_TYPES) {
+    expect(dxf([`Panel Type ${type}`, 'Voltage 480']), [type, false]);
+}
+expect(dxf(['Panel Type', 'Duplex', 'No. Motors', '2']), ['Duplex', false]);
+expect(dxf(['DUPLEX PUMP', 'CONTROL PANEL', 'No. Motors', '2']), ['Duplex', false]);
+expect(dxf([{ value: 'Panel Type', layer: 'INFO' }, { value: 'Duplex', layer: 'NOTES' }]), [null, false]);
+expect(dxf([{ value: 'Panel Type Duplex', layer: 'BOM' }]), [null, false]);
+expect('0\nSECTION\n2\nENTITIES\n0\nPOINT\n10\n2\n20\n1\n1\nPanel Type Duplex\n0\nEOF\n', [null, false]);
+expect('0\nSECTION\n2\nENTITIES\n0\nMTEXT\n10\n2\n20\n1\n1\nPanel Type Duplex\n0\nEOF\n', [null, false]);
+expect('0\nSECTION\n2\nENTITIES\n0\nTEXT\n10\nPanel Type Duplex\n20\n1\n0\nEOF\n', [null, false]);
+expect('0\nSECTION\n2\nENTITIES\n0\nTEXT\n10\n2\n20\n1\n1\nPanel Type Duplex\n0\n', [null, false]);
+
+// Structural System Type parsing never alters raw descriptions or neighboring derived fields.
+for (const desc of [rtf('Panel Type Duplex\\par Pump Manufacturer Sulzer\\par'), dxf(['Panel Type Duplex'])]) {
+    const record = { id: 'structured', desc, enc: 'Varied / Multiple', encV: true, untouched: { raw: true } };
     const serialized = JSON.stringify(record);
-    assert.strictEqual(parser.deriveRecord(record), true);
-    assert.strictEqual(parser.deriveRecord(record), false);
+    parser.deriveRecord(record);
     assert.strictEqual(JSON.stringify(record), serialized);
-    assert.deepStrictEqual([record._sys, record._sysV], sys(desc));
-    assert.strictEqual(Object.getOwnPropertyDescriptor(record, '_sysEvidence').enumerable, false);
-    assert.deepStrictEqual(Object.keys(record._sysEvidence), ['source', 'candidates', 'direction', 'confidence', 'reasons']);
-    assert(Object.isFrozen(record._sysEvidence));
-    assert(Object.isFrozen(record._sysEvidence.candidates));
-    assert(record._sysEvidence.reasons.length || record._sysEvidence.confidence === 'verified');
-    assert.deepStrictEqual(Object.keys(derive(desc)), ['sys', 'sysV', 'pumpMfg']);
+    assert.strictEqual(record._sys, 'Duplex');
+    assert.strictEqual(record._pumpMfg, desc.includes('Pump Manufacturer Sulzer') ? 'SULZER' : null);
+    assert.deepStrictEqual(record._encEvidence, parser.deriveMaterialFromDesc(desc));
+    assert.strictEqual(record._derivedRev, parser.DERIVED_REV);
+}
+
+// Existing derived revisions must be replaced without changing snapshot serialization.
+assert.strictEqual(parser.DERIVED_REV, 7);
+for (const desc of ['No. Motors 4', 'Duplex Control Panel', 'Panel Type Duplex']) {
+    for (const previousRevision of [5, 6]) {
+        const record = { id: desc, desc, sys: 'legacy' };
+        for (const [key, value] of [['_derivedRev', previousRevision], ['_sys', 'Quadraplex'], ['_sysV', false]]) {
+            Object.defineProperty(record, key, { value, configurable: true });
+        }
+        const serialized = JSON.stringify(record);
+        assert.strictEqual(parser.deriveRecord(record), true);
+        assert.strictEqual(parser.deriveRecord(record), false);
+        assert.strictEqual(JSON.stringify(record), serialized);
+        assert.deepStrictEqual([record._sys, record._sysV], sys(desc));
+        assert.strictEqual(Object.getOwnPropertyDescriptor(record, '_sysEvidence').enumerable, false);
+        assert.deepStrictEqual(Object.keys(record._sysEvidence), ['source', 'candidates', 'direction', 'confidence', 'reasons']);
+        assert(Object.isFrozen(record._sysEvidence));
+        assert(Object.isFrozen(record._sysEvidence.candidates));
+        assert(record._sysEvidence.reasons.length || record._sysEvidence.confidence === 'verified');
+        assert.deepStrictEqual(Object.keys(derive(desc)), ['sys', 'sysV', 'pumpMfg']);
+    }
 }
 const evidence = desc => {
     const r = { desc };

@@ -1,8 +1,10 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.105 (frontend; Worker remains v2.5.97)
+## Version: v2.5.106 (frontend; Worker remains v2.5.97)
 
-_Release note: v2.5.105 is frontend-only and diagnostic-only: an opt-in, read-only `SystemTypeAudit` browser-console API explains where System Type green/orange/absent/conflicting states come from, and result-card hover regains a subtle outline thickening. System Type classification, search/badge semantics, snapshot schema, release-update and the Worker are unchanged; no Worker redeploy._
+_Release note: v2.5.106 is a browser-only System Type parser repair. System-Type-specific RTF parsing excludes metadata destinations; validated DXF TEXT reads only group-code 1 payloads. Blank/unreadable counts and unrelated count-cell text no longer conflict with clear explicit rows, while contradictory/combination counts, ambiguous rows and uncertain associations remain orange or abstain. Title evidence remains orange unless a nearby matching plain count corroborates it. DERIVED_REV 7 re-derives cached records; snapshot schema 1, raw descriptions, adjacent manufacturer/material parsing, search/badge semantics, release-update and Worker v2.5.97 remain unchanged. No cache reset or Worker redeploy._
+
+_The supplied audit fragments do not include complete raw descriptions, so the supported synthetic encodings are not claimed to represent every production CAD export. Verify remaining misses against actual documents after publication._
 
 _v2.5.104 was frontend-only: System Type uses bounded row association, conservative panel-title/count fallback, hardware exclusions and explicit confidence evidence. Uncorroborated count-only Quadraplex matches are intentionally removed; combinations are never summed. DERIVED_REV 6 refreshes existing descriptions without a schema change/cache reset. Selected PDF cards gain theme-aware purple glow/tint and reduced-motion handling. Worker v2.5.97, API/auth, search scoring and PDF selection are unchanged; no backend redeployment is needed._
 
@@ -20,6 +22,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.106**: Browser-only System Type parser repair with guarded RTF visible-text extraction, validated DXF TEXT group-code 1 extraction, corrected blank/noisy count confidence, and bounded matching title/count corroboration. Combinations are never summed; count-only four remains unclassified. DERIVED_REV 7; raw records/snapshot schema 1, manufacturer/material parsing, badge/search semantics, and Worker unchanged. Synthetic tests do not establish live dataset accuracy.
 - **v2.5.105**: Frontend-only, diagnostic-only. Local opt-in `SystemTypeAudit.report()/text()/inspect(id)` summarizes System Type states, evidence sources, orange causes, unclassified reasons and rendered-badge agreement from already-loaded records (no network, persistence, mutation or auto-run; snippets opt-in and sanitized). Hover outline thickening via inset ring. No parser/Worker/API changes.
 - **v2.5.104**: Browser-only System Type repair with explicit-row precedence, bounded symmetric association, validated panel-title fallback, aliases, hardware/part-number exclusions and conservative count inference. Title/gap/count evidence remains uncertain; conflicting rows abstain, combination counts are not summed, and count-only four no longer classifies Quadraplex. Non-enumerable browser evidence re-derives at revision 6 with snapshot schema 1 unchanged. Active result cards add a purple ring/glow and tint in both themes, safe scroll inset and reduced-motion treatment. No Worker/API/scoring/PDF-selection changes; live accuracy is not measured.
 - **v2.5.103**: Frontend-only update/sync-lock reliability: stale/previous-release locks are taken over, waiting states always end in synced/restored/retry, and mixed HTML/JS releases get one guarded reload. No Worker/API changes.
