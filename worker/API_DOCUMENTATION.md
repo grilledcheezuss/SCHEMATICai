@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.93
+## Version: v2.5.94
 
-_Release-alignment note: this patch version is mirrored here for app/Worker bookkeeping, but the Worker API surface and backend behavior are unchanged from v2.5.92._
+_Release-alignment note: v2.5.94 is frontend-only and mirrored here for app/Worker bookkeeping; Worker API/backend behavior is unchanged._
 
 ## Overview
 
@@ -12,6 +12,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.94**: Frontend-only search-state fixes: reset clears both Allowed/Blocked keyword lists and warning/mode state; live filters, Panel Type, keywords, and mode survive caching/sync/snapshot/background refresh while results and PDF viewer state remain intact. No keyword persistence added; Worker API/backend behavior is unchanged
 - **v2.5.93**: Frontend-only mobile PDF geometry fix: the viewer no longer relies on flex-centered negative horizontal overflow when a zoomed stage becomes wider than the viewport, so left-edge mobile pan/commit restores use real scrollable extents while preserving the existing gesture/render guardrails; Worker API/backend behavior is unchanged
 - **v2.5.92**: Frontend-only PDF zoom/pan stability follow-up: pan clamping now derives directional movement bounds from live viewer scroll geometry (avoiding inconsistent lockouts near edges), viewport restore sequences are invalidated when touch gestures take ownership, and stale restore callbacks no longer overwrite newer touch/wheel zoom interactions; Worker API/backend behavior is unchanged
 - **v2.5.91**: Frontend-only keyword dominance follow-up: mixed Allowed and Blocked term searches now use an explicit dominance branch that compares occurrence counts per eligible record (allowed must exceed blocked or the record stays hidden), while contradiction validation, pagination/count behavior, and Worker API/backend behavior remain unchanged

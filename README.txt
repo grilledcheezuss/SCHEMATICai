@@ -1,17 +1,42 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.91)
+CLOUDFLARE WORKER SCRIPT (v2.5.94)
 
-Release-alignment note: this patch is frontend-only; the Worker-facing version strings are mirrored to v2.5.91 for release tracking, but Worker/API behavior is unchanged from v2.5.90.
+Release-alignment note: v2.5.94 is frontend-only; Worker-facing version strings are mirrored for release tracking, but Worker/API behavior is unchanged.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.91):
+RECENT UPDATES (v2.5.94):
+
+- Reset (↺) explicitly clears the keyword input and both Allowed/Blocked term lists, restores inactive blocklist mode and Allowed Terms guidance, and hides the contradiction warning
+- Numeric filter selections survive option rebuilds during initial/resume sync, cache restore, snapshot apply/swap, and hourly stale-cache refresh; live keyword edits, both lists, mode, and Panel Type remain unchanged
+- Background refresh leaves current results, count, pagination, badges, and PDF viewer state untouched; keyword state remains transient with no new localStorage persistence
+- Reset restores filters to Any and Panel Type to Standard while preserving existing SHOW/HIDE behavior; Logout and Force Reset remain session boundaries
+- Current release version surfaces aligned to v2.5.94; Worker/API behavior unchanged
+
+MANUAL ACCEPTANCE CHECKS:
+
+- Desktop/tablet/mobile: enter Allowed terms, switch to Blocked and enter overlapping terms, then press ↺. Verify empty input, inactive toggle (aria-pressed=false), normal input border, Allowed Terms placeholder, and empty/hidden warning. Switch modes repeatedly: both lists stay empty, and an empty-keyword search uses neither old list
+- During INITIALIZING, resume sync, or a forced stale-cache refresh, select manufacturer/HP/voltage/phase/enclosure and Panel Type, edit both keyword lists, and leave blocklist mode active. Verify every value survives completion and subsequent mode switches, including edits made just before snapshot apply
+- Background refresh with an active search/PDF: verify results, count, pagination, badges, and PDF/zoom/position remain unchanged
+- Press ↺ with search controls collapsed: verify controls reopen, filter defaults and Standard Panel Type return, and existing results/count/pagination/badge behavior is unchanged
+- Logout and Force Reset: verify the new page has no keyword lists and inactive blocklist mode
+- Run node worker/tests/run.js: Worker regression tests pass
+
+PREVIOUS UPDATES (v2.5.93):
+
+- Mobile PDF viewer geometry gives wide zoomed stages a real scrollable left origin while keeping narrow layouts centered
+
+PREVIOUS UPDATES (v2.5.92):
+
+- PDF zoom/pan uses directional scroll-aware bounds and prevents stale viewport restores from overriding gestures
+
+PREVIOUS UPDATES (v2.5.91):
 
 - Mixed Allowed + Blocked keyword searches now use a single explicit dominance branch: eligible records stay visible only when total allowed-term occurrences exceed total blocked-term occurrences; ties and blocked-majority records stay hidden
 - Allowed-only and blocked-only keyword searches retain their existing behaviors, contradiction validation remains unchanged, and empty/duplicate comma-separated entries are still normalized away before search
 - Result counts and pagination now reflect the dominantly filtered set while maintaining the same responsive search/reset lifecycle on desktop, tablet, and mobile
 - Version strings aligned to v2.5.91 across the viewer/client and Worker-facing version surfaces for release bookkeeping only; Worker/API behavior is unchanged
 
-MANUAL ACCEPTANCE CHECKS:
+PREVIOUS MANUAL ACCEPTANCE CHECKS (v2.5.91):
 
 - Desktop/tablet/mobile: Allowed Terms only still return the same inclusive matches as before
 - Desktop/tablet/mobile: Blocked Terms only still hide any matching record

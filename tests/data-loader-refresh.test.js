@@ -484,6 +484,124 @@ async function flushAsync() {
     assert(quotaResult && quotaResult.success === false && quotaResult.reason === 'quota', 'quota write failures should be classified explicitly');
     assertEqual(searchBtn.innerText, '💾 STORAGE FULL - FREE SPACE', 'quota write failures should expose actionable message');
 
+    console.log('🧪 Testing live search criteria through cache/sync/snapshot completion');
+    const SearchEngine = new Function(`${extractClass('SearchEngine', appJsContent)}; return SearchEngine;`)();
+    const inputs = {};
+    const domCache = { get: id => inputs[id] || null };
+    const trainingData = {
+        MANUFACTURERS: ['COX'],
+        DATA: { HP: [0.5, 7.5], VOLT: [208, 480], PHASE: [1, 3] }
+    };
+    const Option = function(text, value) { this.text = String(text); this.value = String(value); };
+    const RealUI = new Function('DOM_CACHE', 'window', 'AI_TRAINING_DATA', 'SearchEngine', 'Option',
+        `${extractClass('UI', appJsContent)}; return UI;`
+    )(domCache, windowState, trainingData, SearchEngine, Option);
+
+    for (const flow of ['initial', 'resume', 'cache', 'peer', 'background']) {
+        resetHarness();
+        localStorage.setItem('cox_user', 'user');
+        localStorage.setItem('cox_pass', 'pass');
+        for (const k of ['mfg', 'hp', 'volt', 'phase', 'enc', 'cat']) {
+            inputs[k + 'Input'] = {
+                value: k === 'cat' ? 'Standard' : 'Any',
+                options: [],
+                set innerHTML(_value) { this.options = []; this.value = ''; },
+                add(option) { this.options.push(option); if (this.options.length === 1) this.value = option.value; }
+            };
+        }
+        inputs.keywordInput = { value: '', classList: { toggle() {} } };
+        const attributes = {};
+        inputs['keyword-blocklist-toggle'] = { setAttribute(k, v) { attributes[k] = v; } };
+        inputs['keyword-contradiction-warning'] = { textContent: '', style: { display: 'none' } };
+        RealUI.keywordBlocklistMode = false;
+        RealUI.keywordAllowedTermsInput = '';
+        RealUI.keywordBlockedTermsInput = '';
+        let popCount = 0;
+        uiState.pop = () => { popCount++; RealUI.pop(); };
+        DataLoader.installLifecycleRefreshHooks = () => {};
+        const results = [{ id: 'current-result' }];
+        const criteria = { hp: '7.5' };
+        SearchEngine.currentResults = results;
+        SearchEngine.lastCriteria = criteria;
+        SearchEngine.currentPage = 2;
+        windowState.pdfViewerState = { document: 'current.pdf', zoom: 1.5, scrollTop: 120 };
+        const viewerState = windowState.pdfViewerState;
+        let edited = false;
+        const editAndApply = async () => {
+            await flushAsync();
+            Object.entries({ mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
+                .forEach(([k, value]) => { inputs[k + 'Input'].value = value; });
+            inputs.keywordInput.value = 'allowed during sync';
+            RealUI.toggleKeywordBlocklistMode();
+            // Leave the latest edit only in the DOM until the completion-time UI restore.
+            inputs.keywordInput.value = 'blocked during apply';
+            DataLoader.applySnapshot({
+                records: [{ id: 'new-record', mfg: 'COX', enc: '4XFG' }]
+            });
+            edited = true;
+            return { success: true };
+        };
+        if (flow === 'background' || flow === 'cache' || flow === 'peer') {
+            localStorage.setItem('cox_db_complete', 'true');
+            localStorage.setItem('cox_db_synced_at', String(Date.now() - 2 * 60 * 60 * 1000));
+        }
+        if (flow === 'resume') cacheState.loadAllWithProgress = async () => true;
+        DataLoader.fetchPartition = editAndApply;
+        if (flow === 'cache') {
+            cacheState.loadAllWithProgress = async () => { await editAndApply(); return true; };
+            DataLoader.maybeRefreshStaleCache = async () => ({ success: false, skipped: true });
+        } else if (flow === 'peer') {
+            DataLoader.fetchPartition = async () => ({ skipped: true });
+            DataLoader.waitForPeerSyncAndRestore = editAndApply;
+            DataLoader.maybeRefreshStaleCache = async () => ({ success: false, skipped: true });
+        }
+        if (flow === 'background') {
+            DataLoader.acquireSyncLock = async () => true;
+            DataLoader.releaseSyncLock = async () => {};
+            await DataLoader.maybeRefreshStaleCache({ reason: 'test-live-criteria' });
+        } else {
+            await DataLoader.preload();
+        }
+        assert(edited && popCount === 1, `${flow}: must exercise async edit, snapshot apply, and real UI restore`);
+        Object.entries({ mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
+            .forEach(([k, value]) => assertEqual(inputs[k + 'Input'].value, value, `${flow}: ${k} must survive`));
+        assertEqual(inputs.keywordInput.value, 'blocked during apply', `${flow}: latest visible edit must survive`);
+        assertEqual(RealUI.getAllowedKeywordTermsInput(), 'allowed during sync', `${flow}: inactive allowed list must survive`);
+        assertEqual(RealUI.getBlockedKeywordTermsInput(), 'blocked during apply', `${flow}: blocked backing list must capture latest edit`);
+        assertEqual(attributes['aria-pressed'], 'true', `${flow}: mode must survive`);
+        assertEqual(inputs['keyword-contradiction-warning'].style.display, 'none', `${flow}: valid lists must have no warning`);
+        assert(SearchEngine.currentResults === results && SearchEngine.lastCriteria === criteria && SearchEngine.currentPage === 2, `${flow}: results and pagination must be untouched`);
+        assert(windowState.pdfViewerState === viewerState, `${flow}: viewer state must be untouched`);
+        assert(searchBtn.disabled === false, `${flow}: Search must be enabled after completion`);
+        RealUI.toggleKeywordBlocklistMode();
+        assertEqual(inputs.keywordInput.value, 'allowed during sync', `${flow}: switching editors must restore allowed list`);
+        await flushAsync();
+    }
+
+    resetHarness();
+    localStorage.setItem('cox_db_complete', 'true');
+    localStorage.setItem('cox_db_synced_at', String(Date.now()));
+    localStorage.setItem('cox_db_sync_lock_at', String(Date.now()));
+    DataLoader.resetSync();
+    await flushAsync();
+    assertEqual(locationState.reloadCalls, 1, 'Force Reset must reload the page to clear transient search state');
+    assertEqual(localStorage.getItem('cox_db_complete'), null, 'Force Reset must clear cache completion');
+    assertEqual(localStorage.getItem('cox_db_synced_at'), null, 'Force Reset must clear cache timestamp');
+    assertEqual(localStorage.getItem('cox_db_sync_lock_at'), null, 'Force Reset must clear sync lock');
+
+    let localCleared = false;
+    let sessionCleared = false;
+    const AuthService = new Function('localStorage', 'sessionStorage', 'location',
+        `${extractClass('AuthService', appJsContent)}; return AuthService;`
+    )(
+        { clear() { localCleared = true; } },
+        { clear() { sessionCleared = true; } },
+        locationState
+    );
+    AuthService.logout();
+    assert(localCleared && sessionCleared, 'Logout must still clear both storage scopes');
+    assertEqual(locationState.reloadCalls, 2, 'Logout must reload the page to clear transient search state');
+
     console.log('✅ DataLoader stale-refresh tests passed');
 })().catch((err) => {
     console.error(err);
