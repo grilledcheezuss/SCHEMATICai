@@ -259,6 +259,7 @@ runTest('pop() offers Any + three materials, keeps live material value; reset re
     UI.keywordBlockedTermsInput = '';
     UI.pop();
     assertEqual(inputs.encInput.options.map(o => o.value), ['Any', FG, SS, PS], 'enclosure options (no POLY)');
+    assertEqual(UI.ENCLOSURE_MATERIALS, [...InfoTableParser.ENCLOSURE_MATERIALS], 'UI list mirrors the parser list');
     assertEqual(inputs.encInput.value, SS, 'material survives');
     inputs.encInput.value = '4XFG';
     UI.pop();
