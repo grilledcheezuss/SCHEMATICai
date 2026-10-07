@@ -276,9 +276,9 @@ for (const desc of [rtf('Panel Type Duplex\\par Pump Manufacturer Sulzer\\par'),
 }
 
 // Existing derived revisions must be replaced without changing snapshot serialization.
-assert.strictEqual(parser.DERIVED_REV, 9);
+assert.strictEqual(parser.DERIVED_REV, 10);
 for (const desc of ['No. Motors 4', 'Duplex Control Panel', 'Panel Type Duplex']) {
-    for (const previousRevision of [5, 6, 7]) {
+    for (const previousRevision of [5, 6, 7, 8, 9]) {
         const record = { id: desc, desc, sys: 'legacy' };
         for (const [key, value] of [['_derivedRev', previousRevision], ['_sys', 'Quadraplex'], ['_sysV', false]]) {
             Object.defineProperty(record, key, { value, configurable: true });

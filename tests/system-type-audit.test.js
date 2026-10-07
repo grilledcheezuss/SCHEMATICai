@@ -219,6 +219,16 @@ function extractClass(className) {
 }
 globalThis.PDF_STATUS = { MISSING: 'missing' };
 globalThis.UI = extractClass('UI');
+const { cp1245Excerpt, cp1409Excerpt } = require('./fixtures/system-type-caption.js');
+const captionRecords = derived([
+    { id: 'CP1245-excerpt', desc: cp1245Excerpt },
+    { id: 'CP1409-excerpt', desc: cp1409Excerpt }
+]);
+const captionReport = SystemTypeAudit.report({ records: captionRecords });
+assert.deepStrictEqual(captionReport.badge, { renderer: 'UI._generateBadges', checked: 1, mismatches: 0, errors: 0 });
+assert.strictEqual(captionReport.orangeCauses['title-caption-separated'], 1);
+assert.strictEqual(captionReport.absentReasons['unsupported-primary-pump-title'], 1);
+assert.strictEqual(SystemTypeAudit.inspect('CP1245-excerpt', { records: captionRecords }).derived.direction, 'caption-title');
 const uiReport = SystemTypeAudit.report({ records });
 assert.deepStrictEqual(uiReport.badge, { renderer: 'UI._generateBadges', checked: 9, mismatches: 0, errors: 0 }, 'UI badges follow parser confidence');
 for (const [type, t] of Object.entries(uiReport.types)) {
@@ -233,7 +243,7 @@ assert.deepStrictEqual([throwing.badge.errors, throwing.badge.mismatches], [9, 0
 delete globalThis.UI;
 
 // --- Classification is untouched by the audit -------------------------------------------
-assert.strictEqual(parser.DERIVED_REV, 9, 'parser repair refreshes cached derived fields');
+assert.strictEqual(parser.DERIVED_REV, 10, 'parser repair refreshes cached derived fields');
 const searchSrc = appJs.slice(appJs.indexOf('class SearchEngine {'), appJs.indexOf('class SearchEngine {') + 60000);
 assert(searchSrc.includes("if (r._sys !== crit.sys) return;"), 'System Type search filter unchanged');
 assert(appJs.includes("const badgeClass = record._sysV === true ? 'match-orange' : 'match-green';"), 'badge semantics unchanged');

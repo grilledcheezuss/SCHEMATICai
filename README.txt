@@ -1,6 +1,8 @@
-CLOUDFLARE WORKER SCRIPT (frontend release v2.5.108; Worker remains v2.5.97)
+CLOUDFLARE WORKER SCRIPT (frontend release v2.5.109; Worker remains v2.5.97)
 
-Release note: v2.5.108 adds browser-only, orange-only evidence for a directly adjacent system type and equipment phrase when a panel/title marker is within 42 characters. Multiple supported types abstain; hardware, component, reference and notes/BOM contexts are rejected. ALTERNATOR requires a following CONTROL PANEL; the short DUP alias remains excluded from title/equipment evidence. Numeric combinations in a Panel Type cell abstain as an internal Mixed conflict; motor-count behavior is unchanged. Existing explicit-row precedence, RTF/DXF handling, raw descriptions, manufacturer/material parsing, search/badges, snapshot schema 1 and Worker v2.5.97 remain unchanged. DERIVED_REV 9 refreshes cached records; no cache wipe or Worker redeploy.
+Release note: v2.5.109 recovers complete System Type title cells through one POWER DIAGRAM or CONTROL DIAGRAM caption: <type> PUMP/BLOWER/GRINDER | caption | CONTROL PANEL, or the reverse, within 120 characters. This is structural assembly, not a wider free-text window. PANEL DESCRIPTION/DRAWING TITLE can reset older BOM-column context; one numeric drawing-item cell after that marker is not a motor count. System-Type-only CAD control-code removal follows the existing extract.js grammar; raw desc/material/manufacturer data are untouched. Equivalent canonical aliases apply to all four types. Hardware, unknown intervening cells, notes/references and competing primary titles remain excluded or abstain. Complete five/six (5-9) pump primary titles abstain before weaker title/count inference, never sum/clamp counts; a verified explicit row retains precedence. Title alone is orange; only existing plain-count corroboration can make it green. DERIVED_REV 10 refreshes once, with schema 1 and 250-record yielding unchanged. Worker v2.5.97 is byte-identical; no redeploy, cache wipe or automatic audit.
+
+Bounded fixture comparison with v2.5.108: supplied CP1245r1 technical EXCERPT NULL -> Simplex orange; CP1409 technical EXCERPT remains absent (unsupported primary five-pump title, not Triplex/Duplex alternators); CP8025 Duplex green and CP8374 Simplex green unchanged. Twenty-four paired synthetic canonical/alias forward/reverse caption fixtures NULL -> orange; these are not new real Triplex/Quadraplex misses or measured live-catalog accuracy. No local production catalog/labels are available for a catalog-wide comparison. After user publication, rerun the opt-in SystemTypeAudit; rollback is the prior frontend release, not a Worker deployment.
 
 SYSTEM TYPE COVERAGE DECISIONS:
 
@@ -19,7 +21,7 @@ Previous release note: v2.5.107 is a browser-only System Type parser fix for fla
 
 Previous release note: v2.5.106 is a browser-only System Type parser repair. It filters RTF metadata and reads only validated DXF TEXT group-code 1 payloads for System Type; raw descriptions and adjacent manufacturer/material parsing remain unchanged. Blank/unreadable counts and unrelated cell noise no longer conflict with a complete explicit type row; contradictory plain counts, recognizable combinations, ambiguous rows, and uncertain row associations remain orange/abstain. Title-only matches remain orange unless a bounded matching plain count independently corroborates the primary panel title. DERIVED_REV 7 re-derives cached records without changing snapshot schema 1, search/badge semantics, auth/cache, release-update or Worker v2.5.97. No cache wipe or Worker redeploy.
 
-SYSTEM TYPE DIAGNOSTIC (v2.5.105 API; parser v2.5.108):
+SYSTEM TYPE DIAGNOSTIC (v2.5.105 API; parser v2.5.109):
 
 - When to run: after login, once the sync/refresh has finished (Search is enabled). Open the browser DevTools console on the app page. Nothing runs automatically; the report only exists while you call it.
 - Commands:

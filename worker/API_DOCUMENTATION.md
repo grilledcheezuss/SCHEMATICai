@@ -1,8 +1,32 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.108 (frontend; Worker remains v2.5.97)
+## Version: v2.5.109 (frontend; Worker remains v2.5.97)
 
-_Release note: v2.5.108 adds browser-only, orange-only evidence for a directly adjacent system type/equipment phrase with a panel/title marker within 42 characters. Conflicting type phrases abstain; nearby hardware, references and notes/BOM are excluded. ALTERNATOR requires a following CONTROL PANEL. Numeric combinations in a Panel Type cell abstain as an internal Mixed conflict; motor-count behavior is unchanged. DERIVED_REV 9 refreshes records; raw descriptions, snapshot schema 1, Worker v2.5.97, search/badges and manufacturer/material derivation are unchanged. No cache reset or Worker redeploy. Full-catalog accuracy is unmeasured; tests use synthetic cases and the verbatim CP-8025/CP-8374 regressions._
+_Release note: v2.5.109 adds browser-only complete-cell title assembly, not a wider proximity window: `<type> PUMP/BLOWER/GRINDER | [POWER DIAGRAM or CONTROL DIAGRAM] | CONTROL PANEL`, or reverse, at most three complete pipe/newline cells and 120 characters. Canonical aliases share this policy. A primary PANEL DESCRIPTION/DRAWING TITLE marker can reset older BOM-column context, with one optional numeric drawing-item cell after it; notes/reference/hardware boundaries and arbitrary intervening values are not crossed. CAD control-code removal is System-Type-only, using the existing extract.js grammar after RTF/DXF visibility filtering. Explicit-row precedence, existing plain-count corroboration and orange title-only confidence remain. Complete FIVE/SIX/5-9 PUMP primary titles (including contiguous CONTROL PANEL titles) abstain before weaker title/count inference; components are not types and counts are never summed or clamped. DERIVED_REV 10 refreshes once; raw descriptions, snapshot schema 1, 250-record yielding, Worker v2.5.97, search/PDF/badges and manufacturer/material derivation are unchanged. No cache reset or Worker redeploy._
+
+### Focused recovery verification
+
+| Bounded fixture | v2.5.108 | v2.5.109 |
+| --- | --- | --- |
+| CP1245r1 supplied technical excerpt (not a full raw record) | NULL | Simplex, orange title evidence |
+| CP1409 supplied five-pump/add-pump-6 technical excerpt | NULL | NULL, unsupported primary title |
+| Existing CP8025 / CP8374 fixtures | Duplex green / Simplex green | Unchanged |
+| 24 paired synthetic canonical/alias caption titles, both orderings | NULL | Canonical type, orange |
+
+`validated-caption-title` evidence and `title-caption-separated` orange cause distinguish recovery from badge recoloring. `unsupported-primary-pump-title` is an internal abstention/absent reason, not a new dropdown type. The opt-in, read-only audit uses the same normalized System Type view as derivation and preserves sanitized output. See `tests/system-type-caption.test.js` for negative/mutation, frozen-baseline and 8k refresh checks. No production catalog or reviewed labels are available locally; synthetic rule coverage is not recall/precision, nor preservation of all 4,093 live Duplex results. User post-publication audit remains pending; reverting the frontend release is the iterative rollback path. This PR does not merge or deploy.
+
+The extended deterministic comparison (28 frozen fixtures plus 436 synthetic checks, including repeated metamorphic variants) against the v2.5.108 parser reports every changed fixture and its evidence reasons when `SYSTEM_TYPE_BASELINE` is supplied:
+
+| Classification transition | Checks | Reason |
+| --- | ---: | --- |
+| NULL → orange | 123 | Complete caption title (includes CP1245 excerpt and 24 paired transfers) |
+| NULL → green | 6 | Complete Quadraplex title plus independently associated agreeing plain count |
+| Orange → green | 18 | Existing plain-count corroboration policy, not badge recoloring |
+| Orange → NULL | 8 | Rejected arbitrary/invalid title-cell associations |
+| Orange → NULL | 8 | Unsupported primary pump title; no count fallback |
+| Unchanged | 301 | Includes CP1409 abstention and both green baseline fixtures |
+
+These are bounded fixture outcomes, not unique live records or catalog gains. Eight-thousand-record refresh tests retain yielding, once-only derivation and unchanged raw serialization.
 
 _Previous release note: v2.5.107 is a browser-only System Type parser fix for flattened CAD descriptions. Panel/System Type/Type of Panel accept the adjacent leading (forward) or immediately preceding (reverse) system token while ignoring neighboring BOM/wiring/checklist columns; disagreeing sides abstain and only an adjacent NOT/NON/NO negates. No. Motors/Number of Pumps accept a plain leading 1-4; combinations stay non-plain and are never summed. TAG-prefixed bounded titles and repeated title blocks are title evidence (orange unless a bounded title agrees with a plain count). DERIVED_REV 8 re-derives cached records; snapshot schema 1, manufacturer/material parsing, search/badge semantics and Worker v2.5.97 unchanged. No cache reset or Worker redeploy._
 
@@ -25,6 +49,8 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 ---
 
 ## Version History
+
+- **v2.5.109**: Focused complete-cell caption-separated title recovery and System-Type-only CAD formatting; bounded unsupported primary pump titles abstain. DERIVED_REV 10; Worker unchanged. CP1245/CP1409 supplied excerpt regressions and paired synthetic transfers, with preserved CP8025/CP8374 confidence.
 
 - **v2.5.108**: Browser-only bounded adjective/equipment title evidence, orange absent existing corroboration; panel-type numeric combinations abstain and new outlet/electrical hardware terms are guarded. DERIVED_REV 9. Local `tests/system-type-evaluate.js` compares supplied labels to both app_result and current parser without exporting record identifiers/descriptions. No benchmark dataset is checked in; snippet metrics are not full-record accuracy. Worker unchanged.
 - **v2.5.107**: Browser-only adjacent-token System Type association (forward leading token, else immediately preceding token; conflicts abstain), plain leading-count association (combinations never summed), TAG-prefixed bounded titles and orange repeated title blocks. DERIVED_REV 8; Worker unchanged. Synthetic fixtures (including verbatim CP-8025/CP-8374) do not establish live accuracy.

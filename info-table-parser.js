@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.108: bounded equipment-title evidence; refresh existing snapshots.
-    const DERIVED_REV = 9;
+    // v2.5.109: complete caption-separated title cells; refresh existing snapshots.
+    const DERIVED_REV = 10;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -287,8 +287,10 @@
 
     function systemTypeView(desc) {
         if (typeof desc !== 'string') return '';
-        if (/^\s*\{\\rtf\d+/i.test(desc)) return visibleRtfText(desc);
-        return isDxfText(desc) ? visibleDxfText(desc) : desc;
+        const visible = /^\s*\{\\rtf\d+/i.test(desc) ? visibleRtfText(desc)
+            : isDxfText(desc) ? visibleDxfText(desc) : desc;
+        // Same CAD control-code grammar as extract.js, only in the System Type view.
+        return visible.replace(/%%(?:[A-Za-z]|\d{3})/g, '');
     }
 
     function joinMaterialLines(value) {
@@ -769,13 +771,77 @@
         return EQUIPMENT_PANEL_CONTEXT_RE.test(value.replace(/\bPANEL\s+TYPE\b|\bTYPE\s+OF\s+PANEL\b/g, ''));
     }
 
+    // Complete pipe/newline cells only: <type> PUMP/BLOWER/GRINDER, optionally one
+    // POWER DIAGRAM or CONTROL DIAGRAM cell, then CONTROL PANEL (or reverse).
+    // At most three cells / 120 characters; PANEL DESCRIPTION/DRAWING TITLE resets
+    // older BOM-column context, with one optional numeric drawing-item cell after it.
+    function captionTitleMatches(desc, labels) {
+        if (typeof desc !== 'string' || !desc) return [];
+        const text = desc.toUpperCase();
+        const cells = [];
+        const cellRe = /[^|\n\r]+/g;
+        let cell;
+        while ((cell = cellRe.exec(text))) {
+            const value = cell[0].trim();
+            cells.push({ value, start: cell.index + cell[0].indexOf(value), end: cellRe.lastIndex });
+        }
+        const equipment = new RegExp(`^(${SYSTEM_TOKEN_SOURCE})(?:\\s+(?:PUMPS?|BLOWERS?|GRINDERS?))?$`);
+        const unsupported = /^(?:FIVE|SIX|[5-9]) PUMPS?$/;
+        const unsupportedPanel = /^(?:(?:FIVE|SIX|[5-9]) PUMPS? CONTROL PANEL|CONTROL PANEL (?:FIVE|SIX|[5-9]) PUMPS?)$/;
+        const caption = /^(?:POWER|CONTROL) DIAGRAM$/;
+        const primary = /^(?:PANEL DESCRIPTION|DRAWING TITLE)$/;
+        const boundary = /\b(?:NOT|NO|NON|WITHOUT|OTHER|ANOTHER|EXISTING|SEE|REF(?:ERENCE)?|NOTES?|BOM|BILL OF MATERIALS)\b/;
+        const matches = [];
+        let labelIndex = 0;
+        for (let i = 0; i < cells.length; i++) {
+            const first = cells[i];
+            const singleUnsupported = unsupportedPanel.test(first.value);
+            const reverse = first.value === 'CONTROL PANEL';
+            const lastIndex = singleUnsupported ? i : i + (cells[i + 1] && caption.test(cells[i + 1].value) ? 2 : 1);
+            const last = cells[lastIndex];
+            const typed = reverse ? last : first;
+            if (!last || (!singleUnsupported && !reverse && last.value !== 'CONTROL PANEL')) continue;
+            if (last.end - first.start > REVERSE_WINDOW
+                || /[|\n\r]\s*[|\n\r]/.test(text.slice(first.start, last.end))) continue;
+            const token = equipment.exec(typed.value);
+            const outOfRange = singleUnsupported || unsupported.test(typed.value);
+            if (!outOfRange && (!token || !/\b(?:PUMPS?|BLOWERS?|GRINDERS?)$/.test(typed.value))) continue;
+            let anchorIndex = i - 1;
+            if (cells[anchorIndex] && /^\d{1,3}$/.test(cells[anchorIndex].value)) anchorIndex--;
+            const anchored = cells[anchorIndex] && primary.test(cells[anchorIndex].value)
+                && first.start - cells[anchorIndex].start <= REVERSE_WINDOW;
+            const trailingAnchor = cells[lastIndex + 1] && primary.test(cells[lastIndex + 1].value);
+            const before = cells[anchored ? anchorIndex - 1 : i - 1];
+            const after = cells[lastIndex + (trailingAnchor ? 2 : 1)];
+            if ((before && (boundary.test(before.value) || SYSTEM_HARDWARE_RE.test(before.value)))
+                || (after && (SYSTEM_HARDWARE_RE.test(after.value)
+                    || boundary.test(after.value.replace(/\bNO\.?\s*(?:OF\s+)?(?:MOTORS|PUMPS)\b/g, ''))
+                    || /^(?:OR|AND|FOR|ON|IN|OF|WITH|PART|MOUNTED|ATTACHED)\b/.test(after.value)))) continue;
+            while (labelIndex < labels.length && labels[labelIndex].start < first.start) labelIndex++;
+            const previous = labels[labelIndex - 1];
+            let nearbyNotes = false;
+            for (let j = labelIndex - 1; j >= 0 && first.start - labels[j].start <= REVERSE_WINDOW; j--) {
+                if (/^NOTES?$/.test(labels[j].label)) nearbyNotes = true;
+            }
+            if (nearbyNotes) continue;
+            if (!anchored && !trailingAnchor && previous && (previous.systemBlocked
+                || /^(?:TAGS?|NOTES?|BOM|BILL OF MATERIALS|PANEL NAME)$/.test(previous.label))) continue;
+            matches.push({
+                type: outOfRange ? null : normalizeSystemType(token[1]),
+                start: first.start, end: last.end, bounded: true,
+                source: outOfRange ? 'unsupported-title' : 'caption-title'
+            });
+        }
+        return matches;
+    }
+
     // A type directly attached to equipment can support an orange classification only
     // when a panel/title marker is within 42 characters. Component, hardware and
     // other-panel references are rejected; this never creates verified evidence alone.
     function equipmentTitleMatches(desc, labels) {
         if (typeof desc !== 'string' || !desc) return [];
         const text = desc.toUpperCase();
-        const matches = [];
+        const matches = captionTitleMatches(desc, labels).filter(match => match.type);
         let labelIndex = 0;
         EQUIPMENT_TYPE_RE.lastIndex = 0;
         let match;
@@ -784,6 +850,12 @@
             const end = EQUIPMENT_TYPE_RE.lastIndex;
             const beforeWindow = text.slice(Math.max(0, start - 42), start);
             const afterWindow = text.slice(end, Math.min(text.length, end + 42));
+            // Delimited CONTROL PANEL associations use the complete-cell grammar,
+            // not the free-text proximity path (which could bridge arbitrary values).
+            if (/[\n\r|]/.test(beforeWindow + afterWindow)
+                && /\bCONTROL\s+PANEL\b/.test(beforeWindow + afterWindow)
+                && /^(?:PUMPS?|BLOWERS?|GRINDERS?|ALTERNATORS?)$/.test(match[2])
+                && !/\bCONTROL\s+PANEL\b/.test(match[0])) continue;
             if (!hasEquipmentPanelContext(beforeWindow) && !hasEquipmentPanelContext(afterWindow)) continue;
             if (/^ALTERNATORS?$/.test(match[2]) && !/\bCONTROL\s+PANEL\b/.test(afterWindow)) continue;
 
@@ -818,7 +890,17 @@
     }
 
     function titleEvidenceMatches(desc, labels) {
-        return titleMatches(desc, labels).concat(equipmentTitleMatches(desc, labels));
+        if (typeof desc !== 'string' || !desc) return [];
+        const equipment = equipmentTitleMatches(desc, labels);
+        const captions = equipment.filter(match => match.source === 'caption-title');
+        const text = desc.toUpperCase();
+        // A CONTROL PANEL cell consumed by a complete equipment title cannot also
+        // borrow a bare type from the next cell. Complete competing titles still count.
+        const titles = titleMatches(desc, labels).filter(title => !captions.some(caption =>
+            caption.start <= title.start && title.start < caption.end && caption.end < title.end
+            && /^[|\n\r]\s*(?:SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX|QUAD)\s*$/.test(text.slice(caption.end, title.end))
+            && !text.slice(title.end).split(/[|\n\r]/)[0].trim()));
+        return titles.concat(equipment);
     }
 
     function titleCandidates(desc, labels) {
@@ -921,15 +1003,21 @@
             reasons.push('conflicting-adjacent-values');
         } else {
             const phraseMatches = titleEvidenceMatches(systemDesc, systemRows.labels || []);
+            const unsupportedTitle = captionTitleMatches(systemDesc, systemRows.labels || [])
+                .some(match => match.source === 'unsupported-title');
             const phrases = SYSTEM_TYPES.filter(type => phraseMatches.some(match => match.type === type));
             const block = titleBlockCandidates(systemDesc);
             const titles = SYSTEM_TYPES.filter(type => phrases.includes(type) || block.includes(type));
             candidates = ambiguous.length ? SYSTEM_TYPES.filter(allows) : titles;
-            if (titles.length === 1 && allows(titles[0])) {
+            if (unsupportedTitle) {
+                candidates = [];
+                reasons.push('unsupported-primary-pump-title');
+            } else if (titles.length === 1 && allows(titles[0])) {
                 sys = titles[0];
                 source = 'title';
                 direction = phrases.length
-                    ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title') ? 'narrative' : 'equipment-title'
+                    ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title') ? 'narrative'
+                        : phraseMatches.some(match => match.type === sys && match.source === 'caption-title') ? 'caption-title' : 'equipment-title'
                     : 'title-block';
                 const count = counts.size === 1 ? [...counts][0] : null;
                 const corroborated = phrases.length > 0 && count !== null && !hasNonPlainCount
@@ -940,7 +1028,8 @@
                 reasons.push(phrases.length
                     ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title')
                         ? 'validated-panel-phrase'
-                        : 'validated-equipment-phrase'
+                        : phraseMatches.some(match => match.type === sys && match.source === 'caption-title')
+                            ? 'validated-caption-title' : 'validated-equipment-phrase'
                     : 'repeated-title-block');
                 if (corroborated) reasons.push('corroborated-panel-phrase-count');
             } else if (titles.length > 1) {
@@ -1245,7 +1334,7 @@
         const rows = extractInfoRows(systemDesc);
         const derived = deriveFromRows(rows, systemDesc);
         const evidence = derived.sysEvidence;
-        const phraseTitles = titleCandidates(desc, rows.labels || []);
+        const phraseTitles = titleCandidates(systemDesc, rows.labels || []);
         const blockTitles = titleBlockCandidates(systemDesc);
         const titles = SYSTEM_TYPES.filter(type => phraseTitles.includes(type) || blockTitles.includes(type));
         const panelRows = rows.associations.filter(a => a.kind === 'panelTypes');
@@ -1269,7 +1358,8 @@
         if (state === 'orange') {
             const reasons = evidence.reasons;
             if (evidence.source === 'title') {
-                cause = reasons.includes('validated-equipment-phrase') ? 'title-equipment-phrase' : 'title-narrative-only';
+                cause = reasons.includes('validated-caption-title') ? 'title-caption-separated'
+                    : reasons.includes('validated-equipment-phrase') ? 'title-equipment-phrase' : 'title-narrative-only';
             } else if (evidence.source === 'count') cause = 'count-inference';
             else if (reasons.includes('ambiguous-additional-row')) cause = 'row-plus-ambiguous-row';
             else if (reasons.includes('unresolved-or-conflicting-count')) cause = 'row-count-disagreement';
@@ -1281,6 +1371,7 @@
             cause = evidence.source === 'conflict' ? evidence.reasons[0] : 'ambiguous-panel-type-row';
         } else if (state === 'absent') {
             if (!desc.trim()) cause = 'no-description';
+            else if (evidence.reasons.includes('unsupported-primary-pump-title')) cause = 'unsupported-primary-pump-title';
             else if (panelRows.length) {
                 cause = panelRows.every(a => a.direction === 'unreadable' || !a.value) ? 'panel-type-label-unreadable' : 'panel-type-value-unrecognized';
             } else if (counts.length) {

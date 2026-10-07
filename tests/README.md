@@ -62,6 +62,16 @@ label stays stable (no restarting percentage) and the search button ellipsizes r
 UI housekeeping tests also cover first-card hover clipping and cleaned-up menu keyboard order.
 Live hosting/cache headers and physical-device acceptance remain separate deployment checks.
 
+### System Type caption-separated recovery (v2.5.109)
+
+`system-type-caption.test.js` uses the supplied CP1245r1 and CP1409 technical excerpts (not full raw records), paired synthetic transfers for all four types/aliases, and the unchanged CP8025/CP8374 baseline. It covers complete title cells, one diagram caption in either ordering, unknown-cell/hardware/notes/reference/conflict negatives, unsupported five/six-pump titles, CAD/case/noise mutations, opt-in audit reasons and non-enumerable once-only revision refresh with 250-record yielding over 8k records. Synthetic coverage is not measured catalog accuracy.
+
+```bash
+node tests/system-type-caption.test.js
+# Optional comparison against an independently preserved v2.5.108 parser:
+SYSTEM_TYPE_BASELINE=/absolute/path/to/v108-info-table-parser.js node tests/system-type-caption.test.js
+```
+
 ### System Type equipment-title rules and local evaluator (v2.5.108)
 
 `system-type-adjacent.test.js` covers bounded type/equipment phrases, panel/title context, hardware/reference and multi-type exclusions, and the existing CP-8025/CP-8374 fixtures. `system-type-repair.test.js` covers numeric combinations in Panel Type cells versus the unchanged motor-count combination policy. The local-only evaluator accepts CSV/JSON rows with `app_result`, `ground_truth`, `gt_confidence`, `root_cause`, and either a full description field or `evidence_snippet`; output contains aggregate metrics only.
