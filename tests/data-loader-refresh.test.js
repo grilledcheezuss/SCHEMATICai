@@ -743,6 +743,233 @@ async function flushAsync() {
     assert(localCleared && sessionCleared, 'Logout must still clear both storage scopes');
     assertEqual(locationState.reloadCalls, 2, 'Logout must reload the page to clear transient search state');
 
+    // v2.5.103: sync-lock ownership, takeover, bounded peer waits and terminal UI states.
+    function createLockStore(initial) {
+        const state = { lock: initial, peerHeartbeat: false, forceError: null };
+        const touchPeer = () => {
+            if (state.peerHeartbeat && state.lock && state.lock.token === 'peer') state.lock.heartbeatAt = Date.now();
+        };
+        return {
+            state,
+            claimLock: async (_key, token, { isStale = () => false, force = false, meta = {} } = {}) => {
+                touchPeer();
+                if (force && state.forceError) throw state.forceError;
+                const existing = state.lock;
+                const now = Date.now();
+                const ours = !!existing && existing.token === token;
+                if (existing && !ours && !force && !isStale(existing, now)) return false;
+                state.lock = { ...meta, token, at: ours ? existing.at : now, heartbeatAt: now };
+                return true;
+            },
+            releaseLock: async (_key, token) => {
+                if (!state.lock || state.lock.token === token) state.lock = undefined;
+            },
+            getChunk: async key => {
+                touchPeer();
+                return key === DataLoader.SYNC_DB_LOCK_KEY ? state.lock : null;
+            }
+        };
+    }
+    const lockDefaults = {
+        SYNC_LOCK_STALE_MS: DataLoader.SYNC_LOCK_STALE_MS,
+        SYNC_LOCK_WAIT_TIMEOUT_MS: DataLoader.SYNC_LOCK_WAIT_TIMEOUT_MS,
+        STARTUP_WATCHDOG_MS: DataLoader.STARTUP_WATCHDOG_MS,
+        sleep: DataLoader.sleep
+    };
+    async function resetLockHarness(initialLock) {
+        resetHarness();
+        await DataLoader.releaseSyncLock();
+        Object.assign(DataLoader, lockDefaults);
+        DataLoader.sleep = ms => lockDefaults.sleep.call(DataLoader, Math.min(ms, 5));
+        const lockDb = createLockStore(initialLock);
+        Object.assign(dbState, { claimLock: lockDb.claimLock, releaseLock: lockDb.releaseLock, getChunk: lockDb.getChunk });
+        return lockDb.state;
+    }
+    function primeBlockingStartup() {
+        localStorage.setItem('cox_user', 'user');
+        localStorage.setItem('cox_pass', 'pass');
+        localStorage.setItem('cox_cache_schema_version', SNAPSHOT_SCHEMA_VERSION);
+        DataLoader.installLifecycleRefreshHooks = () => {};
+        DataLoader.maybeRefreshStaleCache = async () => ({ skipped: true });
+        cacheState.saveSnapshot = async () => ({ encryptMs: 0, writeMs: 0, totalMs: 0 });
+        let requests = 0;
+        networkState.fetch = async () => {
+            requests++;
+            return { status: 200, headers: { get: () => null }, json: async () => ({ records: [{ id: 'fresh', desc: 'FRESH PANEL' }] }) };
+        };
+        return () => requests;
+    }
+
+    console.log('🧪 Testing previous-version and dead-heartbeat sync locks are taken over');
+    let now = Date.now();
+    assert(DataLoader.isSyncLockStale(null), 'missing lock is free');
+    assert(DataLoader.isSyncLockStale({ token: 'legacy', at: now, heartbeatAt: now, ttlMs: 10 * 60 * 1000 }),
+        'pre-v2.5.103 lock without app version is not honored despite its stored ten-minute TTL');
+    assert(DataLoader.isSyncLockStale({ token: 'old', appVersion: 'v2.5.102', heartbeatAt: now }), 'previous-release lock is stale');
+    assert(DataLoader.isSyncLockStale({ token: 'dead', appVersion: APP_VERSION, heartbeatAt: now - DataLoader.SYNC_LOCK_STALE_MS - 1 }),
+        'lock without heartbeat for the stale bound is stale');
+    assert(DataLoader.isSyncLockStale({ token: 'skew', appVersion: APP_VERSION, heartbeatAt: now + DataLoader.SYNC_LOCK_STALE_MS + 1000 }),
+        'far-future heartbeat (clock skew) cannot pin the lock');
+    assert(!DataLoader.isSyncLockStale({ token: 'live', appVersion: APP_VERSION, heartbeatAt: now - 5000 }), 'live same-release lock is honored');
+    assert(DataLoader.SYNC_LOCK_STALE_MS >= 15000 && DataLoader.SYNC_LOCK_STALE_MS <= 30000
+        && DataLoader.SYNC_LOCK_HEARTBEAT_MS * 3 <= DataLoader.SYNC_LOCK_STALE_MS, 'short stale bound with several heartbeats per bound');
+    for (const [label, lock] of [
+        ['pre-v2.5.103 lock', { token: 'legacy', at: now, heartbeatAt: now, ttlMs: 10 * 60 * 1000 }],
+        ['previous-version lock', { token: 'old', appVersion: 'v2.5.102', owner: 'old-tab', at: now, heartbeatAt: now }],
+        ['dead-heartbeat lock', { token: 'dead', appVersion: APP_VERSION, owner: 'dead-tab', at: now - 60000, heartbeatAt: now - DataLoader.SYNC_LOCK_STALE_MS - 1 }]
+    ]) {
+        const lockState = await resetLockHarness(lock);
+        assert(await DataLoader.acquireSyncLock(), `${label}: taken over`);
+        assert(lockState.lock.token === DataLoader._lockToken && lockState.lock.owner === DataLoader.TAB_ID
+            && lockState.lock.appVersion === APP_VERSION && lockState.lock.heartbeatAt > 0, `${label}: new lock carries owner, app version and heartbeat`);
+        const mirror = JSON.parse(localStorage.getItem(DataLoader.SYNC_LOCK_KEY));
+        assert(mirror.owner === DataLoader.TAB_ID && mirror.appVersion === APP_VERSION, `${label}: localStorage mirror carries owner/version`);
+        await DataLoader.releaseSyncLock();
+        assert(lockState.lock === undefined && localStorage.getItem(DataLoader.SYNC_LOCK_KEY) === null, `${label}: released`);
+    }
+    let lockState = await resetLockHarness({ token: 'peer', appVersion: APP_VERSION, owner: 'peer-tab', at: now, heartbeatAt: Date.now() - 5000 });
+    assert(!(await DataLoader.acquireSyncLock()), 'live same-release peer lock is respected');
+    assertEqual(lockState.lock.token, 'peer', 'live peer lock untouched');
+
+    console.log('🧪 Testing lock won while waiting for a dead peer is reused (no self-wait dead end)');
+    lockState = await resetLockHarness({ token: 'peer', appVersion: APP_VERSION, owner: 'peer-tab', at: Date.now(), heartbeatAt: Date.now() });
+    let syncRequests = primeBlockingStartup();
+    DataLoader.SYNC_LOCK_STALE_MS = 40;
+    popCalls = 0;
+    uiState.pop = () => { popCalls++; };
+    let startedAt = Date.now();
+    await DataLoader.preload();
+    assert(syncRequests() === 1 && popCalls === 1, 'peer that stops heartbeating is taken over and this tab syncs once');
+    assertEqual(searchBtn.innerText, 'SEARCH', 'takeover sync ends ready');
+    assert(searchBtn.disabled === false && typeof searchBtn.onclick === 'function', 'recovered Search button is enabled and wired');
+    assert(lockState.lock === undefined && DataLoader._lockToken === null && !DataLoader._lockReservedForSync, 'takeover lock released after sync');
+    assert(Date.now() - startedAt < 5000, 'dead peer takeover is bounded');
+
+    console.log('🧪 Testing live peer lock is waited on and restores the peer snapshot');
+    lockState = await resetLockHarness({ token: 'peer', appVersion: APP_VERSION, owner: 'peer-tab', at: Date.now(), heartbeatAt: Date.now() });
+    lockState.peerHeartbeat = true;
+    syncRequests = primeBlockingStartup();
+    peerPolls = 0;
+    cacheState.loadAllWithProgress = async () => {
+        peerPolls++;
+        if (peerPolls === 3) {
+            localStorage.setItem('cox_db_complete', 'true');
+            lockState.lock = undefined;
+        }
+        return peerPolls >= 3 ? true : null;
+    };
+    popCalls = 0;
+    uiState.pop = () => { popCalls++; };
+    await DataLoader.preload();
+    assert(peerPolls >= 3 && syncRequests() === 0 && popCalls === 1, 'live peer completes; this tab restores without a duplicate sync');
+    assertEqual(searchBtn.innerText, 'SEARCH', 'peer restore ends ready');
+    assert(searchBtn.disabled === false && typeof searchBtn.onclick === 'function', 'restored Search button is enabled and wired after waiting');
+
+    console.log('🧪 Testing peer-wait timeout reaches a terminal state');
+    lockState = await resetLockHarness({ token: 'peer', appVersion: APP_VERSION, owner: 'peer-tab', at: Date.now(), heartbeatAt: Date.now() });
+    lockState.peerHeartbeat = true;
+    syncRequests = primeBlockingStartup();
+    DataLoader.SYNC_LOCK_WAIT_TIMEOUT_MS = 30;
+    popCalls = 0;
+    uiState.pop = () => { popCalls++; };
+    await DataLoader.preload();
+    assert(syncRequests() === 1 && popCalls === 1, 'peer heartbeating past the bounded wait cannot strand this tab: own sync runs');
+    assertEqual(searchBtn.innerText, 'SEARCH', 'timed-out wait ends synced');
+    assert(lockState.lock === undefined, 'forced own-sync lock released after completion');
+
+    lockState = await resetLockHarness({ token: 'peer', appVersion: APP_VERSION, owner: 'peer-tab', at: Date.now(), heartbeatAt: Date.now() });
+    lockState.peerHeartbeat = true;
+    lockState.forceError = new Error('IndexedDB unavailable');
+    syncRequests = primeBlockingStartup();
+    DataLoader.SYNC_LOCK_WAIT_TIMEOUT_MS = 30;
+    await DataLoader.preload();
+    assert(syncRequests() === 0, 'failed forced takeover does not sync');
+    assertEqual(searchBtn.innerText, '⚠️ SYNC INTERRUPTED', 'failed takeover ends in the retry state');
+    assert(searchBtn.disabled === false && typeof searchBtn.onclick === 'function', 'retry state is actionable, not waiting');
+
+    console.log('🧪 Testing preload sync rounds are capped');
+    await resetLockHarness();
+    primeBlockingStartup();
+    let skippedRounds = 0;
+    DataLoader.fetchPartition = async () => { skippedRounds++; return { success: false, skipped: true }; };
+    DataLoader.waitForPeerSyncAndRestore = async () => ({ success: false, shouldSync: true });
+    await DataLoader.preload();
+    assertEqual(skippedRounds, DataLoader.MAX_PRELOAD_SYNC_ROUNDS, 'skip/takeover ping-pong is bounded');
+    assertEqual(searchBtn.innerText, '⚠️ SYNC INTERRUPTED', 'capped rounds end in the retry state');
+
+    console.log('🧪 Testing startup watchdog ends waiting with retry, and late success still recovers');
+    await resetLockHarness();
+    primeBlockingStartup();
+    DataLoader.STARTUP_WATCHDOG_MS = 20;
+    DataLoader.STARTUP_WATCHDOG_RESUME_MS = 20;
+    const watchdogLabels = [];
+    DataLoader.fetchPartition = async (_dir, btn) => {
+        // A waiting state that starts after the first watchdog window must still end in Retry.
+        DataLoader.showWaitingForUpdate(btn, '⏳ WAITING FOR UPDATE...');
+        await new Promise(resolve => setTimeout(resolve, 80));
+        watchdogLabels.push(btn.innerText);
+        if (watchdogLabels.length === 1) return { success: false, skipped: true };
+        return { success: true, count: 1 };
+    };
+    DataLoader.waitForPeerSyncAndRestore = async btn => {
+        DataLoader.showWaitingForUpdate(btn, '⏳ WAITING FOR UPDATE...');
+        await new Promise(resolve => setTimeout(resolve, 80));
+        watchdogLabels.push(btn.innerText);
+        return { success: false, shouldSync: true };
+    };
+    await DataLoader.preload();
+    assert(watchdogLabels.length === 3 && watchdogLabels.every(label => label === '⚠️ SYNC INTERRUPTED'),
+        'watchdog turns every long waiting state into an enabled retry');
+    assertEqual(searchBtn.innerText, 'SEARCH', 'sync that completes after the watchdog still restores Search');
+    assert(searchBtn.disabled === false && typeof searchBtn.onclick === 'function', 'late success restores the Search handler');
+
+    console.log('🧪 Testing lock release on pagehide/beforeunload');
+    for (const eventName of ['pagehide', 'beforeunload']) {
+        lockState = await resetLockHarness();
+        const listeners = {};
+        windowState.addEventListener = (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); };
+        DataLoader._lockExitHooksInstalled = false;
+        assert(await DataLoader.acquireSyncLock(), `${eventName}: acquired`);
+        assert(DataLoader._lockHeartbeatTimer, `${eventName}: heartbeat running`);
+        (listeners[eventName] || []).forEach(fn => fn({ persisted: false }));
+        await flushAsync();
+        assert(lockState.lock === undefined && DataLoader._lockHeartbeatTimer === null
+            && localStorage.getItem(DataLoader.SYNC_LOCK_KEY) === null, `${eventName}: lock released and heartbeat stopped`);
+        await DataLoader.releaseSyncLock();
+        delete windowState.addEventListener;
+        DataLoader._lockExitHooksInstalled = false;
+    }
+    Object.assign(DataLoader, lockDefaults);
+    DataLoader.STARTUP_WATCHDOG_RESUME_MS = 30000;
+    resetHarness();
+
+    console.log('🧪 Testing login/startup tolerate a missing or failing release checker');
+    const authSource = extractClass('AuthService', appJsContent);
+    for (const [label, release, expectImmediate] of [
+        ['missing release-update.js', undefined, 1],
+        ['throwing release check', { check: () => { throw new Error('boom'); } }, 1],
+        ['rejecting release check', { check: async () => { throw new Error('boom'); } }, 1],
+        ['stalled release navigation', { check: async () => ({ status: 'updating', navigating: true }) }, 0]
+    ]) {
+        const reloads = { count: 0, reload() { this.count++; } };
+        const local = new Map();
+        const authDocument = { getElementById: id => ({ value: id === 'auth-user' ? 'user' : 'pass' }) };
+        const Auth = new Function('localStorage', 'document', 'location', 'ReleaseUpdate', 'APP_VERSION', 'console',
+            `${authSource}; return AuthService;`)(
+            { setItem: (k, v) => local.set(k, v), getItem: k => local.get(k) }, authDocument, reloads, release, APP_VERSION,
+            { warn: () => {} });
+        Auth.RELEASE_NAVIGATION_FALLBACK_MS = 10;
+        await Auth.login();
+        assertEqual(reloads.count, expectImmediate, `${label}: login reload decision`);
+        await new Promise(resolve => setTimeout(resolve, 30));
+        assertEqual(reloads.count, 1, `${label}: login always reaches exactly one reload`);
+        assert(local.get('cox_user') === 'user' && local.get('cox_pass') === 'pass', `${label}: credentials stored`);
+    }
+    assert(/if \(typeof ReleaseUpdate !== 'undefined'\) \{\s*ReleaseUpdate\.beforeNavigate = \(\) => DataLoader\.releaseSyncLock\(\);/.test(appJsContent),
+        'release navigation releases this tab\'s sync lock first');
+    assert(/else setTimeout\(\(\) => DataLoader\.preload\(\), AuthService\.RELEASE_NAVIGATION_FALLBACK_MS\);/.test(appJsContent),
+        'stalled release navigation still preloads the installed app');
+
     console.log('✅ DataLoader stale-refresh tests passed');
 })().catch((err) => {
     console.error(err);

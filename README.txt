@@ -1,8 +1,42 @@
-CLOUDFLARE WORKER SCRIPT (frontend release v2.5.102; Worker remains v2.5.97)
+CLOUDFLARE WORKER SCRIPT (frontend release v2.5.103; Worker remains v2.5.97)
+
+Release note: v2.5.103 makes returning browsers reach the new release and a terminal data state after every deployment, including rapid back-to-back deployments. Frontend-only; Worker files remain byte-identical to v2.5.97. Snapshot schema 1, DERIVED_REV, encrypted generations/atomic commit/fallback recovery, release-freshness marking, profiles/theme/credentials and live search/results/PDF state are unchanged. No backend redeployment and no cache reset are required.
+
+ROOT CAUSE (v2.5.103): "returning browser stuck on WAITING FOR UPDATE; private window works"
+
+- What survives between versions is IndexedDB, and the sync lock lives there (__cox_db_sync_lock). Logout clears localStorage (including cox_db_complete) but not IndexedDB, so the next login runs a blocking sync and competes for that lock. A private window/cleared cache has no lock, which is why it always worked.
+- The old lock was honored for ten minutes after its last heartbeat (SYNC_LOCK_TTL_MS, and claimLock trusted the TTL stored in the record). Nothing released it on pagehide/beforeunload or before ReleaseUpdate's location.replace, so a tab that closed, was reloaded or was navigated to a new release mid-sync left a lock every later tab respected; locks carried no app version, so a previous release's lock blocked the new build too.
+- Worse, a takeover dead-ended: waitForPeerSyncAndRestore took over an expired lock (setting _inFlightSync) and returned shouldSync, but fetchPartition then called acquireSyncLock again, which returns false while _inFlightSync is set, so the tab reported its own lock as a peer and waited on itself for the full 120 s wait, then showed SYNC INTERRUPTED while its heartbeat kept the lock alive indefinitely (blocking every other tab and the next deployment). Reproduced against the v2.5.102 DataLoader: fetchPartition -> skipped (dead lock), wait -> shouldSync (owner=self), fetchPartition -> skipped again, wait -> lock-wait-timeout with the heartbeat timer still running.
+- Waiting states also never restored the Search handler: showWaitingForUpdate cleared btn.onclick (which removes the inline onclick="SearchEngine.perform()"), so even a successful peer restore left a SEARCH button that did nothing. The 180 s startup watchdog only relabeled the disabled button "RETRYING SYNC...".
+- Deploy-window mixed releases: if release-update.js is refused (host HTML fallback, text/html MIME) the global ReleaseUpdate is undefined, and the startup call threw inside the init try block ("System failed to initialize" alert, no preload) while manual login rejected silently. app.js?v=2.5.101 serving v2.5.100 code was already rejected by the v2.5.102 warm check, but nothing compared the executing APP_VERSION with the loaded HTML.
+
+CURRENT FRONTEND UPDATE POLICY (v2.5.103):
+
+- Sync locks record token, owner tab id, appVersion, at and heartbeatAt. The owner renews every 5 s and on every fetched page. A lock is taken over when it has no heartbeat for 30 s (or a far-future heartbeat), was written by another frontend release (including pre-v2.5.103 locks without appVersion; stored ttlMs is ignored) or is missing. A lock won while waiting for a peer is reused by fetchPartition. Locks are released on pagehide/beforeunload (best effort; bfcache restores renew or detect takeover) and, via ReleaseUpdate.beforeNavigate (bounded to 1 s), before any release navigation. The release check still runs before preload, so a tab never navigates while starting its own sync.
+- Peer waiting is bounded to 60 s; on timeout the tab force-claims the lock and runs its own single-flight sync (an unchanged existing complete snapshot is used whenever cox_db_complete is set). Preload sync rounds are capped at 6. The startup watchdog (180 s, then every 30 s until preload settles) turns any still-disabled waiting label into the enabled SYNC INTERRUPTED retry; a sync that completes later still restores Search. Every recovered Search button is re-wired to SearchEngine.perform().
+- Mixed HTML/app.js handshake (release-update.js): the document's meta app-version is compared with the executing APP_VERSION. A newer deployed release navigates as before; stale entry HTML around the deployed app.js, or newer HTML around an older app.js when the entry cannot be revalidated, triggers one guarded reload with ?cox_release= after re-downloading (cache:'reload') and validating every versioned asset (same-origin path, JS/CSS MIME, no HTML fallback, app.js declaring the target version). The existing per-tab ten-minute guard prevents a second attempt: if HTML and JS still disagree the loaded app simply continues. Never downgrades.
+- app.js tolerates a missing/failed release checker (AuthService.releaseCheck) and a release navigation that never unloads the page (preload/reload fallback after 10 s).
+
+CLOUDFLARE HOSTING CHECKS (documentation only; this repo has no frontend hosting config):
+
+- The repository cannot determine the static host: wrangler.toml only routes api.coxpanelfinder.app/* to the API Worker and there is no Pages/static-assets config, 404.html or service worker. _headers is the Cloudflare Pages / Workers static-assets header format. The dashboard "Cache: Enabled/Disabled" toggle under build settings is most likely the Build cache (dependency cache for builds), which does not affect served HTTP caching; verify which setting it is.
+- Verify _headers is effective: curl -sI https://coxpanelfinder.app/ , /index.html, /app.js?v=2.5.103, /style.css?v=2.5.103 and confirm "cache-control: no-cache" plus the expected content-type (text/html, application/javascript, text/css).
+- Missing assets must return 404, not index.html: curl -sI https://coxpanelfinder.app/does-not-exist.js should be 404 with no text/html body of the app. Cloudflare Pages treats a project without a top-level 404.html as a single-page application and serves index.html for unmatched paths (the release-update.js text/html symptom); Workers static assets do so when not_found_handling = "single-page-application". Use "none"/"404-page" (Workers) or publish a top-level 404.html (Pages) if SPA fallback is enabled.
+- Query strings in the cache key: in the zone's Caching > Configuration, Caching Level must be Standard (not "Ignore Query String"), and no Cache Rule should drop the query string from the cache key. Check that /app.js?v=2.5.103 and /app.js?v=2.5.102 are cached separately (cf-cache-status / body APP_VERSION).
+- Purge on deploy: after each production deployment, purge (or "Purge Everything") at least /, /index.html and the versioned *.js/*.css URLs so the edge cannot keep a previous HTML. Publish every asset from the same commit in one deployment; release-update.js must be deployed with index.html.
+
+MANUAL ACCEPTANCE CHECKS (pending; not performed here):
+
+- Returning browser with old-version state: log in on v2.5.102 (or older), leave a tab mid-sync or close it, deploy v2.5.103, log in again without clearing cache: the app updates on that login (cox_release=v2.5.103 once), shows at most a brief WAITING FOR UPDATE (<= 30 s for a dead lock, <= 60 s for a live peer) and ends at SEARCH with the synced count.
+- Two tabs open across a deployment: the old tab's lock is taken over by the new tab; no endless waiting in either tab.
+- Rapid deployments (v2.5.103 then v2.5.104 within minutes): the second deployment is picked up on next login; a mixed HTML/JS window produces at most one extra reload and never a loop.
+- Deploy window with a missing asset: app keeps working with the installed version; console shows the [ReleaseUpdate] unavailable warning, no alert.
+
+v2.5.102 HISTORY:
 
 Release note: v2.5.102 makes deployed-release revalidation redirect-safe and stabilizes the waiting indicator. Frontend-only; Worker files remain byte-identical to v2.5.97, and search/parser/data sync/cache behavior is unchanged. No backend redeployment or cache reset is required.
 
-CURRENT FRONTEND UPDATE POLICY (v2.5.102):
+FRONTEND UPDATE POLICY (v2.5.102; lock/handshake behavior superseded by v2.5.103 above):
 
 - Root cause of the v2.5.101 "Entry revalidation unavailable" warning and (index) net::ERR_FAILED: the checker fetched index.html with redirect:'error', and hosts that canonicalize /index.html to / turned that ordinary redirect into a fetch failure.
 - The checker now revalidates the entry document path the app was actually loaded from (query/hash removed) and follows redirects only while the final URL stays same-origin; an off-site redirect is rejected and the installed app keeps running. Asset URLs and version metadata are resolved against the final entry URL.

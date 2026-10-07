@@ -1,8 +1,10 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.102 (frontend; Worker remains v2.5.97)
+## Version: v2.5.103 (frontend; Worker remains v2.5.97)
 
-_Release note: v2.5.102 is frontend-only: release revalidation fetches the loaded entry document path and follows only same-origin redirects (so /index.html -> / no longer fails), versioned assets must stay same-origin with JS/CSS MIME types and no HTML fallback body before navigation, and the waiting-for-update indicator stays stable instead of restarting a percentage. The Worker remains byte-identical to v2.5.97; no backend redeployment is needed._
+_Release note: v2.5.103 is frontend-only: IndexedDB sync locks carry owner/app version/heartbeat and are taken over after 30 s without a heartbeat or when written by another release, are released on pagehide/beforeunload and before release navigation, peer waits end within 60 s, and a mixed HTML/app.js release triggers one guarded reload. The Worker remains byte-identical to v2.5.97; no backend redeployment is needed._
+
+_v2.5.102 was frontend-only: release revalidation fetches the loaded entry document path and follows only same-origin redirects (so /index.html -> / no longer fails), versioned assets must stay same-origin with JS/CSS MIME types and no HTML fallback body before navigation, and the waiting-for-update indicator stays stable instead of restarting a percentage. The Worker remains byte-identical to v2.5.97; no backend redeployment is needed._
 
 _v2.5.101 was frontend-only: hover clipping inset, obsolete menu command removal, entry/asset revalidation at login and safe release-triggered data refresh. The Worker implementation remains byte-identical to v2.5.97; no backend redeployment is needed. MAIN/API/auth/edge TTL/cache keys, parser DERIVED_REV 5 and snapshot schema 1 are unchanged. Frontend revalidation does not bypass the Worker's cached Airtable pages. See README.txt for static-host cache-header publication and old-client limitations._
 
@@ -14,6 +16,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.103**: Frontend-only update/sync-lock reliability: stale/previous-release locks are taken over, waiting states always end in synced/restored/retry, and mixed HTML/JS releases get one guarded reload. No Worker/API changes.
 - **v2.5.102**: Frontend-only redirect-safe deployed-release revalidation and stable waiting/update indicator. Failed or unavailable revalidation keeps the installed app and cached data. No Worker/API changes.
 - **v2.5.101**: Frontend-only card/menu housekeeping and deployment-aware login update. Compatible encrypted generations remain available until a full successful replacement; failed updates retain cached data, profiles and preferences. No Worker/API changes.
 
