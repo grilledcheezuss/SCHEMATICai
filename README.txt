@@ -1,10 +1,31 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.95)
+CLOUDFLARE WORKER SCRIPT (v2.5.96)
 
-Release-alignment note: v2.5.95 is frontend-only. The Worker API is unchanged (worker/worker.js, worker/lib/extract.js, and wrangler.toml keep v2.5.94 behavior byte-for-byte) and does NOT need redeploying; publish the frontend only.
+Release-alignment note: v2.5.96 is frontend-only, like v2.5.95. The Worker API is unchanged (worker/worker.js, worker/lib/extract.js, and wrangler.toml keep v2.5.94 behavior byte-for-byte; the Worker banner intentionally still reads v2.5.94 because that is the deployed implementation) and does NOT need redeploying; publish the frontend only.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.95):
+RECENT UPDATES (v2.5.96):
+
+- Enclosure search is material-based: Any / Fiberglass / Stainless Steel / Painted Steel (half-width cell beside System Type). NEMA rating plays no role, and a material never implies a rating
+- Primary evidence is ONLY the bounded ENCLOSURE MATERIAL info-table value, read by the browser-only info-table-parser.js once per record (DERIVED_REV 2 re-derives v2.5.95 in-memory records). Neighboring enclosure rows (Enclosure NEMA Rating, Enclosure Size/Type, Inner Swing Panel, Inner Door, Control Sensor, Control Voltage, ...) are value boundaries, so blank cells never borrow a neighbor's value. Recognized values: FIBERGLASS / FIBER GLASS / FIBREGLASS / FRP; STAINLESS, (304) STAINLESS STEEL, 304/316(L) SS, SS, S/S; PAINTED (CARBON/MILD) STEEL. Bare STEEL, CARBON STEEL, POLYCARBONATE, etc. are none of the three
+- Exclusion safeguard: when the material row names one material it controls the branch and excludes the other two, regardless of the backend r.enc or narrative mentions (stainless hardware, pumps, notes). Several materials across rows, or explicit alternatives in one cell (FIBERGLASS OR 304 SS), match each named material as uncertain (orange) and never become a clean winner
+- Fallback policy when the row is missing or blank/placeholder (N/A, TBD, ...): legacy 4XFG -> Fiberglass and 4XSS -> Stainless Steel; clean only when the description has a supporting strong signal (4XFG/FIBERGLASS/FRP or 4XSS/STAINLESS), no opposite strong signal, and the backend encV is false — otherwise uncertain. 'PAINTED STEEL' (new feedback code) -> Painted Steel. Empty or 'Varied / Multiple' enc -> strong-signal candidates, always uncertain; bare SS / S/S never counts. POLY and other codes match no material and are never relabeled (still reachable via Any / keywords). No prefix parsing, no painted-steel guessing. The Worker's bare-4X -> 4XSS default therefore shows as an uncertain stainless result, never a clean one
+- Search no longer offers POLY as an enclosure option (per the requested material menu); POLY records are not deleted or relabeled
+- The backend r.enc / r.encV are no longer rewritten by the browser: the old full-description reclassification in SearchEngine.perform was removed, and material variance lives per search only. One shared matcher (InfoTableParser.matchEnclosureMaterial) drives filtering, uncertain-after-clean sorting, and badges, which show Fiberglass / Stainless Steel / Painted Steel (never 4X codes) only while the filter is active
+- Manufacturer menu: Any, then the shortest descending-frequency list of canonical manufacturers whose Pump Manufacturer row counts reach 90% of all eligible record occurrences (each record id counted once; unknown/unsupported values excluded from the denominator), including the manufacturer that crosses 90%; ties alphabetical; no eight-item cap; integer arithmetic. Coverage applies only to usable supported row evidence. With no row evidence the previous list is used (no 90% claim). A selection outside the list is kept through refreshes. Feedback still lists every supported manufacturer
+- Report Inaccuracy dropdowns mirror the search grid: System Type | Enclosure, Voltage | Phase, Manufacturer | Horsepower, then the Low Voltage / Control Only action, keyword rejections, Submit/Cancel. Labels are associated with their selects
+- Enclosure corrections display Fiberglass / Stainless Steel / Painted Steel (plus Varied / Multiple) and submit enc = 4XFG / 4XSS / PAINTED STEEL. 4XFG/4XSS stay the payload encodings so new votes tally with previously stored corrections in the unchanged healer (which keys votes by exact value); PAINTED STEEL is new and unambiguous. POLY is no longer offered; previously stored POLY corrections still apply
+- Fixed: rejected-keyword collection no longer picks up the selected Low Voltage button (it is scoped to the keyword cluster)
+- Known limitations: MAIN does not expose correction provenance, so a healed enc value is indistinguishable from a parsed one and a clear material row still wins over it. System Type feedback remains stored-only (not applied by the Worker)
+
+MANUAL ACCEPTANCE CHECKS (v2.5.96, not automated):
+
+- Search Enclosure = Fiberglass on a panel whose info table reads Enclosure Material: Fiberglass but mentions stainless hardware: green Fiberglass badge; the same panel is absent from Stainless Steel and Painted Steel searches
+- Search Painted Steel: only row-verified painted panels (or panels corrected to Painted Steel by feedback) appear
+- Confirm the manufacturer menu length looks sensible against real data and an out-of-list selection survives a background refresh
+- Open Report Inaccuracy on desktop, tablet, and mobile: Tab order is System Type, Enclosure, Voltage, Phase, Manufacturer, Horsepower
+
+PREVIOUS UPDATES (v2.5.95):
 
 - Retry of the reverted PR #188 attempt: #188 added per-record info-table parsing to the Worker MAIN loop, which exceeded the Cloudflare Worker CPU time limit and stalled sync (reverted in #189). This release moves all new parsing into the browser
 - New browser-only info-table-parser.js derives System Type and Pump Manufacturer evidence once per record from the existing `desc` field when a snapshot is applied (initial/resume sync, cache restore, background refresh), in chunks that yield to the main thread, with a [DeriveTiming] console log. Searches never re-parse descriptions
@@ -14,7 +35,7 @@ RECENT UPDATES (v2.5.95):
 - Report Inaccuracy adds a System Type correction using the existing payload/lockout pattern. The Worker healer already stores arbitrary correction params but does not apply `sys` in this release
 - Old cached snapshots keep working: fields are re-derived on restore (stored as non-enumerable record fields, never persisted); no SNAPSHOT_SCHEMA_VERSION bump and no cache wipe
 
-MANUAL ACCEPTANCE CHECKS (v2.5.95):
+PREVIOUS MANUAL ACCEPTANCE CHECKS (v2.5.95):
 
 - Initial sync and cache restore complete without Worker CPU-limit errors; the console shows [DeriveTiming] records=N ms=X once per applied dataset
 - Search System Type = Duplex: a record with Panel Type Duplex and No. Motors 2 shows a green DUPLEX badge; mismatched or inferred records show orange and sort after clean matches; ↺ resets System Type to Any

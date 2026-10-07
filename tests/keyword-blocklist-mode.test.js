@@ -488,7 +488,7 @@ runTest('Option rebuilds preserve string-valued numeric filters and live keyword
     window.FOUND_MFGS = new Set(['COX']);
     const inputs = {
         mfgInput: select('COX'), hpInput: select('7.5'), voltInput: select('480'),
-        phaseInput: select('3'), encInput: select('4XFG'), catInput: select('LowVoltage'),
+        phaseInput: select('3'), encInput: select('Stainless Steel'), catInput: select('LowVoltage'),
         keywordInput: { value: 'unsaved blocked edit', classList: { toggle() {} } },
         'keyword-blocklist-toggle': { setAttribute() {} },
         'keyword-contradiction-warning': { style: {} }
@@ -499,7 +499,7 @@ runTest('Option rebuilds preserve string-valued numeric filters and live keyword
     UI.keywordBlockedTermsInput = 'old blocked text';
     for (let i = 0; i < 3; i++) UI.pop();
     assert(inputs.mfgInput.value === 'COX' && inputs.hpInput.value === '7.5' && inputs.voltInput.value === '480' && inputs.phaseInput.value === '3', 'Valid numeric/string selections must survive repeated rebuilds');
-    assert(inputs.encInput.value === '4XFG' && inputs.catInput.value === 'LowVoltage', 'Enclosure and Panel Type must survive');
+    assert(inputs.encInput.value === 'Stainless Steel' && inputs.catInput.value === 'LowVoltage', 'Enclosure and Panel Type must survive');
     assert(UI.isKeywordBlocklistMode() && inputs.keywordInput.value === 'unsaved blocked edit', 'Current mode and latest DOM edits must survive');
     UI.toggleKeywordBlocklistMode();
     assert(inputs.keywordInput.value === 'allowed text', 'Inactive keyword list must survive');

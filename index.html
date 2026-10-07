@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cox Research | SCHEMATICA ai (v2.5.95)</title>
+    <title>Cox Research | SCHEMATICA ai (v2.5.96)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -53,12 +53,12 @@
         <h3 style="color:var(--app-primary); margin-bottom:15px;">REPORT INACCURACY</h3>
         <p style="font-size:11px; color:var(--text-secondary); margin-bottom:15px;">Please select the <b style="color:var(--match-green-text); background:var(--match-green-bg); padding:1px 4px; border-radius:3px;">CORRECT</b> values.</p>
         <div class="feedback-grid">
-            <div><span class="feedback-label">Correct Mfg</span><select id="fb-mfg" class="cox-input"></select></div>
-            <div><span class="feedback-label">Correct HP</span><select id="fb-hp" class="cox-input"></select></div>
-            <div><span class="feedback-label">Correct Volt</span><select id="fb-volt" class="cox-input"></select></div>
-            <div><span class="feedback-label">Correct Phase</span><select id="fb-phase" class="cox-input"></select></div>
-            <div><span class="feedback-label">Correct Enclosure</span><select id="fb-enc" class="cox-input"></select></div>
-            <div><span class="feedback-label">Correct System Type</span><select id="fb-sys" class="cox-input"></select></div>
+            <div><label class="feedback-label" for="fb-sys">Correct System Type</label><select id="fb-sys" class="cox-input"></select></div>
+            <div><label class="feedback-label" for="fb-enc">Correct Enclosure</label><select id="fb-enc" class="cox-input"></select></div>
+            <div><label class="feedback-label" for="fb-volt">Correct Voltage</label><select id="fb-volt" class="cox-input"></select></div>
+            <div><label class="feedback-label" for="fb-phase">Correct Phase</label><select id="fb-phase" class="cox-input"></select></div>
+            <div><label class="feedback-label" for="fb-mfg">Correct Manufacturer</label><select id="fb-mfg" class="cox-input"></select></div>
+            <div><label class="feedback-label" for="fb-hp">Correct Horsepower</label><select id="fb-hp" class="cox-input"></select></div>
         </div>
         <div style="border-top:1px solid var(--border-color); padding-top:10px; margin-bottom:10px;">
              <button id="fb-low-volt-btn" class="keyword-toggle" style="width:100%; text-align:center; padding:8px;" onclick="this.classList.toggle('selected')">⚡ Report as Low Voltage / Control Only</button>

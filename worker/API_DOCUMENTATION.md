@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.95
+## Version: v2.5.96
 
-_Release-alignment note: v2.5.95 is frontend-only and mirrored here for app/Worker bookkeeping. The Worker API is unchanged (the deployed Worker keeps v2.5.94 behavior; `worker/worker.js` is byte-identical) and does **not** need redeploying._
+_Release-alignment note: v2.5.96 (like v2.5.95) is frontend-only and mirrored here for app/Worker bookkeeping. The Worker API is unchanged (the deployed Worker keeps v2.5.94 behavior and its banner intentionally still reads v2.5.94; `worker/worker.js`, `worker/lib/extract.js`, and `wrangler.toml` are byte-identical) and does **not** need redeploying._
 
 ## Overview
 
@@ -12,6 +12,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.96**: Frontend-only material-based Enclosure search (Any / Fiberglass / Stainless Steel / Painted Steel) driven by the bounded Enclosure Material info-table value parsed in the browser; a clear row excludes the other two materials regardless of `enc` or narrative text, and NEMA rating is ignored. Without a usable row, legacy `enc` codes are a conservative fallback (4XFG → Fiberglass, 4XSS → Stainless Steel, usually uncertain); POLY is no longer a search option but POLY records are untouched. The browser no longer rewrites `enc`/`encV`. Manufacturer menu uses cumulative 90% coverage of eligible Pump Manufacturer row occurrences instead of a top-eight cap. Feedback dropdowns mirror the search grid; enclosure corrections keep `enc` = `4XFG`/`4XSS` for vote-tally compatibility and add `enc` = `PAINTED STEEL`, which the unchanged healer stores and applies like any other value. MAIN response shape, cache keys, auth, and token routing are unchanged.
 - **v2.5.95**: Frontend-only retry of System Type filtering, top-eight Pump Manufacturer ranking, and the reordered parameter grid. The first attempt (PR #188) parsed info tables per record inside the Worker MAIN loop and was reverted (#189) after production MAIN requests hit the Cloudflare "Worker exceeded CPU time limit" error. This release leaves the Worker, `worker/lib/extract.js`, `wrangler.toml`, the MAIN response shape, and cache keys unchanged; the browser derives System Type / Pump Manufacturer evidence once per record from the existing `desc` field. Feedback may now include a `sys` correction param; the healer tallies/stores it like any other param but does not apply it to MAIN records in this release.
 - **v2.5.94**: Frontend-only search-state fixes: reset clears both Allowed/Blocked keyword lists and warning/mode state; live filters, Panel Type, keywords, and mode survive caching/sync/snapshot/background refresh while results and PDF viewer state remain intact. No keyword persistence added; Worker API/backend behavior is unchanged
 - **v2.5.93**: Frontend-only mobile PDF geometry fix: the viewer no longer relies on flex-centered negative horizontal overflow when a zoomed stage becomes wider than the viewport, so left-edge mobile pan/commit restores use real scrollable extents while preserving the existing gesture/render guardrails; Worker API/backend behavior is unchanged
@@ -256,6 +257,8 @@ Headers:
   ]
 }
 ```
+
+**Enclosure correction values (frontend v2.5.96)**: the modal displays material labels and submits `enc` as `4XFG` (Fiberglass), `4XSS` (Stainless Steel), `PAINTED STEEL` (Painted Steel), or `Varied / Multiple`. The healer applies a value verbatim to `enc` once it reaches the vote threshold; votes are tallied per exact value, which is why the legacy codes are kept. No NEMA metadata is implied by these codes in the frontend material search.
 
 **Security**:
 - Requires valid authentication (401 if invalid)
