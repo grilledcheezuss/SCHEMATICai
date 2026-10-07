@@ -54,6 +54,11 @@ REQUIRE_BROWSER=1 node tests/release-snapshot.browser.test.js
 node tests/data-loader-refresh.test.js
 ```
 
+v2.5.102 adds release checks for same-origin `/index.html` -> `/` entry redirects, rejected off-site
+redirects, asset path/MIME/HTML-fallback/stale-app.js validation (including a real Chrome fetch through a
+local `/__redirect/index.html` 308 redirect), and a data-loader check that the waiting-for-update
+label stays stable (no restarting percentage) and the search button ellipsizes rather than clips.
+
 UI housekeeping tests also cover first-card hover clipping and cleaned-up menu keyboard order.
 Live hosting/cache headers and physical-device acceptance remain separate deployment checks.
 

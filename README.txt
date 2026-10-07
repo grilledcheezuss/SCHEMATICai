@@ -1,8 +1,19 @@
-CLOUDFLARE WORKER SCRIPT (frontend release v2.5.101; Worker remains v2.5.97)
+CLOUDFLARE WORKER SCRIPT (frontend release v2.5.102; Worker remains v2.5.97)
+
+Release note: v2.5.102 makes deployed-release revalidation redirect-safe and stabilizes the waiting indicator. Frontend-only; Worker files remain byte-identical to v2.5.97, and search/parser/data sync/cache behavior is unchanged. No backend redeployment or cache reset is required.
+
+CURRENT FRONTEND UPDATE POLICY (v2.5.102):
+
+- Root cause of the v2.5.101 "Entry revalidation unavailable" warning and (index) net::ERR_FAILED: the checker fetched index.html with redirect:'error', and hosts that canonicalize /index.html to / turned that ordinary redirect into a fetch failure.
+- The checker now revalidates the entry document path the app was actually loaded from (query/hash removed) and follows redirects only while the final URL stays same-origin; an off-site redirect is rejected and the installed app keeps running. Asset URLs and version metadata are resolved against the final entry URL.
+- Before navigating, each versioned first-party JS/CSS asset must load from its same-origin path (same-origin redirects allowed, but not to a different path), return OK with a JS/CSS Content-Type when one is sent, have a non-empty body and must not be an HTML fallback page; the warmed app.js must declare the deployed APP_VERSION, so a CDN that ignores ?v= and returns the previous app.js cannot trigger a navigation that re-runs old code. Any failure keeps the working page and data; the per-tab ten-minute guard still prevents reload loops.
+- While another tab holds the sync lock, the search button shows a stable "WAITING FOR UPDATE..." label instead of a percentage that restarted on every peer-cache poll; it ends with the restored/synced state or the existing SYNC INTERRUPTED retry state. The search button ellipsizes long status labels rather than clipping them.
+
+v2.5.101 HISTORY:
 
 Release note: v2.5.101 fixes first-card hover clipping, removes three obsolete hamburger commands, and adds deployment-aware login updates. Worker files remain byte-identical to v2.5.97; MAIN behavior, authentication, wrangler, parser/DERIVED_REV 5, and PDF/OCR paths are unchanged. No backend redeployment is needed. No cache reset is required.
 
-CURRENT FRONTEND UPDATE POLICY (v2.5.101):
+FRONTEND UPDATE POLICY (v2.5.101; entry fetch superseded by the redirect-safe v2.5.102 checker above):
 
 - Root cause: the first card started exactly at the overflow-y:auto clipping edge, and translateY(-1px) lifted its top border outside it. A 4px top/side inset inside the scroll content preserves hover, purple borders/active ring, disabled no-PDF styling, pagination and mobile collapse.
 - Hamburger menu retains Submittal Generator/status, Switch Theme, Logout and version. Harvest CSV, Clear PDF Cache and Force Reset are removed; generator Export Config/Profile tools and search reset remain. Internal PDF eviction and sync recovery helpers remain available to the app.
