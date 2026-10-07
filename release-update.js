@@ -30,11 +30,12 @@ class ReleaseUpdate {
             url.searchParams.get('v') === version.slice(1))) ? version : null;
     }
 
-    // Follows redirects only while they stay on the requesting origin; off-site results are rejected.
+    // Follows same-origin redirects; an off-site final URL (or unreadable opaque response) is rejected.
+    // Cross-origin redirects without CORS already reject inside fetch and fall back the same way.
     static async fetchSameOrigin(url, init) {
         const response = await fetch(url.href, { ...init, credentials: 'omit', redirect: 'follow' });
         const finalUrl = new URL(response.url || url.href, url);
-        if (finalUrl.origin !== url.origin || response.type === 'opaqueredirect') {
+        if (finalUrl.origin !== url.origin || response.type === 'opaque') {
             throw new Error('Cross-origin release redirect');
         }
         return { response, finalUrl };
@@ -85,8 +86,9 @@ class ReleaseUpdate {
                 // An HTML fallback page is never a valid script/stylesheet, even without a Content-Type.
                 if (/^<(!doctype|html|head|body)\b/i.test(body)) throw new Error(`HTML fallback for release asset: ${asset}`);
                 // A CDN that ignores ?v= can return the previous app.js; navigating to it would only re-run old code.
-                if (asset === 'app.js' && !body.includes(`const APP_VERSION = "${version}"`)) {
-                    throw new Error('Stale release app.js');
+                const declared = asset === 'app.js' && body.match(/\bAPP_VERSION\s*=\s*["'`](v\d+\.\d+\.\d+)["'`]/)?.[1];
+                if (asset === 'app.js' && declared !== version) {
+                    throw new Error(`Stale release app.js (expected ${version}, got ${declared || 'unknown'})`);
                 }
             }));
             // Store the guard before navigation. If storage is unavailable, stay usable rather than loop.
