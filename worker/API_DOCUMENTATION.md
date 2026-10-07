@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.94
+## Version: v2.5.95
 
-_Release-alignment note: v2.5.94 is frontend-only and mirrored here for app/Worker bookkeeping; Worker API/backend behavior is unchanged._
+_Release-alignment note: v2.5.95 is frontend-only and mirrored here for app/Worker bookkeeping. The Worker API is unchanged (the deployed Worker keeps v2.5.94 behavior; `worker/worker.js` is byte-identical) and does **not** need redeploying._
 
 ## Overview
 
@@ -12,6 +12,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.95**: Frontend-only retry of System Type filtering, top-eight Pump Manufacturer ranking, and the reordered parameter grid. The first attempt (PR #188) parsed info tables per record inside the Worker MAIN loop and was reverted (#189) after production MAIN requests hit the Cloudflare "Worker exceeded CPU time limit" error. This release leaves the Worker, `worker/lib/extract.js`, `wrangler.toml`, the MAIN response shape, and cache keys unchanged; the browser derives System Type / Pump Manufacturer evidence once per record from the existing `desc` field. Feedback may now include a `sys` correction param; the healer tallies/stores it like any other param but does not apply it to MAIN records in this release.
 - **v2.5.94**: Frontend-only search-state fixes: reset clears both Allowed/Blocked keyword lists and warning/mode state; live filters, Panel Type, keywords, and mode survive caching/sync/snapshot/background refresh while results and PDF viewer state remain intact. No keyword persistence added; Worker API/backend behavior is unchanged
 - **v2.5.93**: Frontend-only mobile PDF geometry fix: the viewer no longer relies on flex-centered negative horizontal overflow when a zoomed stage becomes wider than the viewport, so left-edge mobile pan/commit restores use real scrollable extents while preserving the existing gesture/render guardrails; Worker API/backend behavior is unchanged
 - **v2.5.92**: Frontend-only PDF zoom/pan stability follow-up: pan clamping now derives directional movement bounds from live viewer scroll geometry (avoiding inconsistent lockouts near edges), viewport restore sequences are invalidated when touch gestures take ownership, and stale restore callbacks no longer overwrite newer touch/wheel zoom interactions; Worker API/backend behavior is unchanged

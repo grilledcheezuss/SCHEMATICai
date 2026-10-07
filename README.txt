@@ -1,10 +1,26 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.94)
+CLOUDFLARE WORKER SCRIPT (v2.5.95)
 
-Release-alignment note: v2.5.94 is frontend-only; Worker-facing version strings are mirrored for release tracking, but Worker/API behavior is unchanged.
+Release-alignment note: v2.5.95 is frontend-only. The Worker API is unchanged (worker/worker.js, worker/lib/extract.js, and wrangler.toml keep v2.5.94 behavior byte-for-byte) and does NOT need redeploying; publish the frontend only.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.94):
+RECENT UPDATES (v2.5.95):
+
+- Retry of the reverted PR #188 attempt: #188 added per-record info-table parsing to the Worker MAIN loop, which exceeded the Cloudflare Worker CPU time limit and stalled sync (reverted in #189). This release moves all new parsing into the browser
+- New browser-only info-table-parser.js derives System Type and Pump Manufacturer evidence once per record from the existing `desc` field when a snapshot is applied (initial/resume sync, cache restore, background refresh), in chunks that yield to the main thread, with a [DeriveTiming] console log. Searches never re-parse descriptions
+- Parameter grid (desktop/tablet/mobile, DOM order = visual order): System Type | Enclosure, Voltage | Phase, Manufacturer | Horsepower, Keywords + Allowed/Blocked toggle (full width), Panel Type (full width) above SHOW/HIDE, Search, and ↺
+- System Type dropdown (Any/Simplex/Duplex/Triplex/Quadraplex) with an independent search branch. Evidence comes only from the bounded PANEL TYPE value (QUADPLEX/QUADRUPLEX → Quadraplex), cross-checked against a plain 1–4 NO. MOTORS value. Agreement is green; disagreement, combination counts (2+2, 2+1, 4+2), or a count-only inference is orange; combination-only or no evidence leaves the type blank. Free text such as TAG lines is never used
+- Manufacturer dropdown lists the top eight canonical manufacturers by Pump Manufacturer row frequency (each record counted once, ties alphabetical), computed once per applied dataset; falls back to the previous list when no row evidence exists. Manufacturer matching (r.mfg) is unchanged, and an out-of-top-eight selection is kept through refreshes
+- Report Inaccuracy adds a System Type correction using the existing payload/lockout pattern. The Worker healer already stores arbitrary correction params but does not apply `sys` in this release
+- Old cached snapshots keep working: fields are re-derived on restore (stored as non-enumerable record fields, never persisted); no SNAPSHOT_SCHEMA_VERSION bump and no cache wipe
+
+MANUAL ACCEPTANCE CHECKS (v2.5.95):
+
+- Initial sync and cache restore complete without Worker CPU-limit errors; the console shows [DeriveTiming] records=N ms=X once per applied dataset
+- Search System Type = Duplex: a record with Panel Type Duplex and No. Motors 2 shows a green DUPLEX badge; mismatched or inferred records show orange and sort after clean matches; ↺ resets System Type to Any
+- Select a manufacturer outside the top eight, trigger a background refresh, and confirm the selection and all other filters survive
+
+PREVIOUS UPDATES (v2.5.94):
 
 - Reset (↺) explicitly clears the keyword input and both Allowed/Blocked term lists, restores inactive blocklist mode and Allowed Terms guidance, and hides the contradiction warning
 - Numeric filter selections survive option rebuilds during initial/resume sync, cache restore, snapshot apply/swap, and hourly stale-cache refresh; live keyword edits, both lists, mode, and Panel Type remain unchanged
@@ -12,7 +28,7 @@ RECENT UPDATES (v2.5.94):
 - Reset restores filters to Any and Panel Type to Standard while preserving existing SHOW/HIDE behavior; Logout and Force Reset remain session boundaries
 - Current release version surfaces aligned to v2.5.94; Worker/API behavior unchanged
 
-MANUAL ACCEPTANCE CHECKS:
+PREVIOUS MANUAL ACCEPTANCE CHECKS (v2.5.94):
 
 - Desktop/tablet/mobile: enter Allowed terms, switch to Blocked and enter overlapping terms, then press ↺. Verify empty input, inactive toggle (aria-pressed=false), normal input border, Allowed Terms placeholder, and empty/hidden warning. Switch modes repeatedly: both lists stay empty, and an empty-keyword search uses neither old list
 - During INITIALIZING, resume sync, or a forced stale-cache refresh, select manufacturer/HP/voltage/phase/enclosure and Panel Type, edit both keyword lists, and leave blocklist mode active. Verify every value survives completion and subsequent mode switches, including edits made just before snapshot apply
