@@ -95,7 +95,7 @@ check(/body\.dark-mode \{[^}]*--card-hover-ring: rgba\(167, 139, 250, 0\.6\);/.t
 for (const selector of ['.record-card:hover', 'body:not(.dark-mode) .record-card:hover',
     'body:not(.dark-mode) .record-card.active-view:not(.no-pdf-card):hover', 'body.dark-mode .record-card.active-view:not(.no-pdf-card):hover']) {
     const block = ruleBlock(selector);
-    check(new RegExp(`box-shadow: ${HOVER_RING.replace(/[()-]/g, '\\$&')},`).test(block), `${selector}: hover ring is the first (top) shadow layer`);
+    check(block.includes(`box-shadow: ${HOVER_RING},`), `${selector}: hover ring is the first (top) shadow layer`);
     check(!/border(?:-width)?:|padding|margin|width:|height:|outline:/.test(block.replace(/border-color:[^;]*;/, '')), `${selector}: hover ring changes no geometry`);
 }
 for (const selector of ['body:not(.dark-mode) .record-card.active-view:not(.no-pdf-card)', 'body.dark-mode .record-card.active-view:not(.no-pdf-card)']) {
