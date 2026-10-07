@@ -331,80 +331,107 @@ async function testGeneratorResizeTransitions(browser) {
     check(browser.pageErrors.length === 0, `transitions: no page errors (${browser.pageErrors.join(' | ')})`);
 }
 
-async function testCardBorders(browser) {
-    console.log('\n🧪 Light-mode purple result-card borders (normal/hover/active/no-PDF/dark)');
-    await openApp(browser, 1280, 800);
-    await browser.evaluate(firstSearchInPage, makeRecords(6, { noPdfEvery: 3 }));
-    const styleOf = async (selector) => browser.evaluate(sel => {
-        const cs = getComputedStyle(document.querySelector(sel));
-        return { top: cs.borderTopColor, right: cs.borderRightColor, left: cs.borderLeftColor, leftWidth: cs.borderLeftWidth, topWidth: cs.borderTopWidth, radius: cs.borderTopLeftRadius, shadow: cs.boxShadow, opacity: cs.opacity, cursor: cs.cursor };
-    }, selector);
-    const normalSel = '#results-area .record-card:not(.no-pdf-card)';
-    const disabledSel = '#results-area .record-card.no-pdf-card';
-    const normal = await styleOf(normalSel);
-    check(normal.top === PURPLE && normal.right === PURPLE && normal.left === PURPLE, `light normal card purple border (${JSON.stringify(normal)})`);
-    check(normal.topWidth === '1px' && normal.leftWidth === '4px' && normal.radius === '6px', 'border widths/radius preserved');
-
-    const center = await browser.evaluate(sel => {
-        const r = document.querySelector(sel).getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }, normalSel);
-    await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: center.x, y: center.y });
-    await settle(browser);
-    const hover = await styleOf(`${normalSel}:hover`);
-    check(hover.top === PURPLE && hover.left === PURPLE, `light hover card stays purple (${JSON.stringify(hover)})`);
-    await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
-    await settle(browser);
-
-    await browser.evaluate(sel => document.querySelector(sel).classList.add('active-view'), normalSel);
-    await settle(browser);
-    const active = await styleOf(`${normalSel}.active-view`);
-    const activeBg = await browser.evaluate(sel => getComputedStyle(document.querySelector(sel)).backgroundColor, `${normalSel}.active-view`);
-    const normalBg = await browser.evaluate(() => getComputedStyle(document.querySelectorAll('#results-area .record-card:not(.no-pdf-card):not(.active-view)')[0]).backgroundColor);
-    check(active.top === PURPLE && active.shadow !== normal.shadow && activeBg !== normalBg, `active-view stays distinguishable (${JSON.stringify({ shadow: active.shadow, activeBg, normalBg })})`);
-
-    const disabled = await styleOf(disabledSel);
-    check(disabled.left === 'rgb(156, 163, 175)' && disabled.top !== PURPLE, `no-PDF card keeps neutral treatment (${JSON.stringify(disabled)})`);
-    check(Number(disabled.opacity) < 1 && disabled.cursor === 'not-allowed', 'no-PDF card keeps opacity/cursor');
-    const dCenter = await browser.evaluate(sel => {
-        const r = document.querySelector(sel).getBoundingClientRect();
-        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }, disabledSel);
-    await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: dCenter.x, y: dCenter.y });
-    await settle(browser);
-    const disabledHover = await styleOf(`${disabledSel}:hover`);
-    check(disabledHover.left === 'rgb(156, 163, 175)' && disabledHover.top === disabled.top && disabledHover.shadow === disabled.shadow, 'no-PDF hover does not light up purple or lift');
-    await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
-    await settle(browser);
-
-    await browser.evaluate(() => {
-        document.querySelectorAll('.record-card.active-view').forEach(card => card.classList.remove('active-view'));
-        UI.toggleDarkMode();
-    });
-    const dark = await styleOf(normalSel);
-    const darkSeam = await browser.evaluate(() => {
-        const probe = document.createElement('div');
-        probe.style.borderTop = '1px solid var(--surface-seam-border)';
-        document.body.appendChild(probe);
-        const color = getComputedStyle(probe).borderTopColor;
-        probe.remove();
-        return color;
-    });
-    check(dark.left === PURPLE && dark.top === darkSeam, `dark-mode card unchanged (seam outline + purple accent) (${JSON.stringify(dark)})`);
-    await browser.evaluate(() => UI.toggleDarkMode());
-    const back = await styleOf(normalSel);
-    check(back.top === PURPLE, 'toggling back to light restores purple border');
-    await browser.evaluate(() => localStorage.removeItem('cox_theme'));
+function cardStyleInPage(selector) {
+    const card = document.querySelector(selector);
+    const cs = getComputedStyle(card);
+    const r = card.getBoundingClientRect();
+    const shadows = cs.boxShadow.split(/,(?![^()]*\))/).map(shadow => ({
+        inset: shadow.includes('inset'),
+        color: shadow.match(/rgba?\([^)]+\)/)?.[0],
+        lengths: (shadow.match(/-?[\d.]+px/g) || []).map(parseFloat)
+    }));
+    return {
+        top: cs.borderTopColor, right: cs.borderRightColor, left: cs.borderLeftColor,
+        leftWidth: cs.borderLeftWidth, topWidth: cs.borderTopWidth, radius: cs.borderTopLeftRadius,
+        shadow: cs.boxShadow, shadows, bg: cs.backgroundColor, opacity: cs.opacity, cursor: cs.cursor,
+        transform: cs.transform, transition: cs.transitionDuration, hovered: card.matches(':hover'),
+        center: { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+    };
 }
 
-function cardBoundsInPage(last = false) {
+function checkSelection(style, baseline, label) {
+    const ring = style.shadows.find(s => !s.inset && s.lengths.join(',') === '0,0,0,2');
+    const glow = style.shadows.find(s => !s.inset && s.lengths.join(',') === '0,0,4,0');
+    check(Boolean(ring && glow), `${label}: computed 2px outer ring and 4px glow (${style.shadow})`);
+    check(ring?.color.startsWith('rgba(') && glow?.color.startsWith('rgba('), `${label}: ring/glow translucent`);
+    check(baseline.shadows.every(s => style.shadows.some(v => JSON.stringify(v) === JSON.stringify(s))), `${label}: preserves baseline surface/hover shadows`);
+    check(style.bg !== baseline.bg && style.top === PURPLE && style.left === PURPLE, `${label}: theme tint and purple outline`);
+    check(style.topWidth === baseline.topWidth && style.leftWidth === baseline.leftWidth && style.radius === baseline.radius, `${label}: geometry unchanged`);
+}
+
+async function testCardBorders(browser) {
+    console.log('\n🧪 Selected-card light/dark, active/hover, disabled and reduced-motion states');
+    const normalSel = '#results-area .record-card:not(.no-pdf-card)';
+    const disabledSel = '#results-area .record-card.no-pdf-card';
+    for (const reduced of [false, true]) {
+        await browser.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: reduced ? 'reduce' : 'no-preference' }] });
+        await openApp(browser, 1280, 800);
+        await browser.evaluate(firstSearchInPage, makeRecords(6, { noPdfEvery: 3 }));
+        for (const dark of [false, true]) {
+            await browser.evaluate(d => {
+                document.body.classList.toggle('dark-mode', d);
+                document.querySelectorAll('.record-card').forEach(card => card.classList.remove('active-view'));
+            }, dark);
+            await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+            await settle(browser);
+            const label = `${dark ? 'dark' : 'light'} ${reduced ? 'reduced motion' : 'normal motion'}`;
+            const normal = await browser.evaluate(cardStyleInPage, normalSel);
+            check(normal.left === PURPLE && (dark ? normal.top !== PURPLE : normal.top === PURPLE), `${label}: ordinary outline unchanged`);
+            check(normal.topWidth === '1px' && normal.leftWidth === '4px' && normal.radius === '6px', `${label}: normal geometry preserved`);
+            check(reduced ? normal.transition === '0s' : normal.transition !== '0s', `${label}: expected transition policy`);
+            await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...normal.center });
+            await settle(browser);
+            const hover = await browser.evaluate(cardStyleInPage, normalSel);
+            check(hover.hovered && hover.transform === (reduced ? 'none' : 'matrix(1, 0, 0, 1, 0, -1)'), `${label}: genuine hover with expected lift`);
+            await browser.evaluate(sel => document.querySelector(sel).classList.add('active-view'), normalSel);
+            await settle(browser);
+            const activeHover = await browser.evaluate(cardStyleInPage, normalSel);
+            checkSelection(activeHover, hover, `${label} active:hover`);
+            check(activeHover.transform === hover.transform, `${label}: selection preserves hover motion`);
+            if (reduced) await checkPaintedSelection(browser, `${label} static active:hover`, { index: 1, edges: ['left', 'right'] });
+            await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+            await settle(browser);
+            const active = await browser.evaluate(cardStyleInPage, normalSel);
+            checkSelection(active, normal, `${label} active`);
+            check(active.bg === (dark ? 'rgb(48, 44, 59)' : 'rgb(243, 238, 249)'), `${label}: opaque theme-appropriate tint`);
+
+            const disabled = await browser.evaluate(cardStyleInPage, disabledSel);
+            check(disabled.left === 'rgb(156, 163, 175)' && disabled.top !== PURPLE && Number(disabled.opacity) < 1 && disabled.cursor === 'not-allowed', `${label}: neutral disabled card`);
+            await browser.evaluate(sel => document.querySelector(sel).classList.add('active-view'), disabledSel);
+            await settle(browser);
+            const disabledActive = await browser.evaluate(cardStyleInPage, disabledSel);
+            check(disabledActive.shadow === disabled.shadow && disabledActive.bg === disabled.bg && disabledActive.top === disabled.top, `${label}: stale active class cannot select no-PDF card`);
+            await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...disabled.center });
+            await settle(browser);
+            const disabledHover = await browser.evaluate(cardStyleInPage, disabledSel);
+            check(disabledHover.hovered && disabledHover.transform === 'none' && disabledHover.left === disabled.left
+                && disabledHover.top === disabled.top && disabledHover.bg === disabled.bg
+                && disabledHover.opacity === disabled.opacity && disabledHover.cursor === disabled.cursor
+                && disabledHover.shadow === (dark ? 'none' : disabled.shadow), `${label}: no-PDF active:hover stays neutral and does not lift/glow`);
+        }
+        await browser.evaluate(() => {
+            document.body.classList.remove('dark-mode');
+            localStorage.removeItem('cox_theme');
+        });
+    }
+    await browser.send('Emulation.setEmulatedMedia', { features: [] });
+}
+
+function cardBoundsInPage(last = false, index = null) {
     const list = document.getElementById('results-list');
     const area = document.getElementById('results-area');
     const cards = area.querySelectorAll('.record-card');
-    const card = last ? cards[cards.length - 1] : cards[0];
+    const card = index !== null ? cards[index] : last ? cards[cards.length - 1] : cards[0];
     const clip = list.getBoundingClientRect();
     const bounds = card.getBoundingClientRect();
     const cs = getComputedStyle(area);
+    // CSS blur has a finite painting support of about 1.5 × its radius in Chromium.
+    // Measure the outer indicator, not merely the card border box.
+    const indicatorShadows = getComputedStyle(card).boxShadow.split(/,(?![^()]*\))/)
+        .filter(s => !s.includes('inset'))
+        .map(s => (s.match(/-?[\d.]+px/g) || []).map(parseFloat))
+        .filter(v => v[0] === 0 && v[1] === 0);
+    const extent = Math.max(0, ...indicatorShadows.map(v => v[2] * 1.5 + (v[3] || 0)));
     return {
         top: bounds.top - clip.top,
         left: bounds.left - clip.left,
@@ -418,8 +445,76 @@ function cardBoundsInPage(last = false) {
         overflow: getComputedStyle(list).overflowY,
         hovered: card.matches(':hover'),
         active: card.classList.contains('active-view'),
+        extent,
+        paintClearance: {
+            top: bounds.top - clip.top - extent, left: bounds.left - clip.left - extent,
+            right: clip.right - bounds.right - extent, bottom: clip.bottom - bounds.bottom - extent
+        },
+        bounds: { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom },
         center: { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }
     };
+}
+
+// Compare actual compositor screenshots using the browser's native PNG decoder + Canvas.
+// Samples outside the border box prove both the ring and softer glow are painted, not clipped.
+async function checkPaintedSelection(browser, label, { last = false, index = null, edges = ['top', 'left', 'right'] } = {}) {
+    await browser.evaluate((lastCard, i) => {
+        const cards = document.querySelectorAll('#results-area .record-card');
+        const card = i !== null ? cards[i] : lastCard ? cards[cards.length - 1] : cards[0];
+        card.classList.remove('active-view');
+    }, last, index);
+    await settle(browser);
+    const before = await browser.send('Page.captureScreenshot', { format: 'png' });
+    await browser.evaluate((lastCard, i) => {
+        const cards = document.querySelectorAll('#results-area .record-card');
+        const card = i !== null ? cards[i] : lastCard ? cards[cards.length - 1] : cards[0];
+        card.classList.add('active-view');
+    }, last, index);
+    await settle(browser);
+    const geometry = await browser.evaluate(cardBoundsInPage, last, index);
+    const after = await browser.send('Page.captureScreenshot', { format: 'png' });
+    const painted = await browser.evaluate(async (beforePng, afterPng, rect, sides) => {
+        async function decode(png) {
+            const image = new Image();
+            image.src = `data:image/png;base64,${png}`;
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(image, 0, 0);
+            return ctx.getImageData(0, 0, canvas.width, canvas.height);
+        }
+        const beforePixels = await decode(beforePng);
+        const afterPixels = await decode(afterPng);
+        const out = [];
+        for (const edge of sides) {
+            for (const [name, distance] of [['ring', 1], ['glow', 3]]) {
+                let difference = 0;
+                let purpleDifference = 0;
+                let inImage = true;
+                for (let offset = -5; offset < 5; offset++) {
+                    const vertical = edge === 'left' || edge === 'right';
+                    const x = vertical ? edge === 'left' ? Math.floor(rect.left) - distance : Math.ceil(rect.right) + distance - 1 : Math.floor((rect.left + rect.right) / 2 + offset);
+                    const y = vertical ? Math.floor((rect.top + rect.bottom) / 2 + offset) : edge === 'top' ? Math.floor(rect.top) - distance : Math.ceil(rect.bottom) + distance - 1;
+                    inImage &&= x >= 0 && y >= 0 && x < afterPixels.width && y < afterPixels.height;
+                    const i = (y * afterPixels.width + x) * 4;
+                    for (let channel = 0; channel < 3; channel++) difference += Math.abs(afterPixels.data[i + channel] - beforePixels.data[i + channel]);
+                    purpleDifference += (afterPixels.data[i + 2] - afterPixels.data[i + 1]) - (beforePixels.data[i + 2] - beforePixels.data[i + 1]);
+                }
+                out.push({ edge, name, difference: difference / 30, purpleDifference: purpleDifference / 10, inImage });
+            }
+        }
+        return out;
+    }, before.data, after.data, geometry.bounds, edges);
+    for (const sample of painted) {
+        check(sample.inImage && sample.difference > 0.5 && sample.purpleDifference > 0,
+            `${label}: ${sample.edge} ${sample.name} visibly painted outside card (${JSON.stringify(sample)})`);
+    }
+    check(geometry.extent === 6, `${label}: computed glow paint extent is 6px`);
+    for (const edge of edges) {
+        check(geometry.paintClearance[edge] >= 0.5, `${label}: ${edge} glow paint bounds inside scroll clip (${JSON.stringify(geometry.paintClearance)})`);
+    }
 }
 
 async function testCardScrollBounds(browser) {
@@ -438,32 +533,50 @@ async function testCardScrollBounds(browser) {
             await settle(browser);
             const label = `${w}x${h} ${dark ? 'dark' : 'light'}`;
             const normal = await browser.evaluate(cardBoundsInPage);
-            check(normal.padding.join(',') === '4px,4px,10px,4px', `${label}: consistent scroll-content padding (${normal.padding})`);
+            check(normal.padding.join(',') === '8px,8px,10px,8px', `${label}: consistent scroll-content padding (${normal.padding})`);
             check(normal.overflow === 'auto' && normal.scrollable && !normal.horizontalOverflow, `${label}: vertical scrolling without horizontal overflow`);
             const checkBounds = (r, state, top) => {
                 check(r.scrollTop === 0 && Math.abs(r.top - top) < 0.6, `${label} ${state}: first card clear of upper clip (${JSON.stringify(r)})`);
-                check(r.left >= 3.5 && r.right >= 3.5, `${label} ${state}: side outlines/shadows have allowance`);
+                check(r.left >= 7.5 && r.right >= 7.5, `${label} ${state}: side outlines/shadows have allowance`);
+                if (r.active) check(r.extent === 6 && r.paintClearance.top >= 0.5 && r.paintClearance.left >= 0.5 && r.paintClearance.right >= 0.5,
+                    `${label} ${state}: computed outer ring/glow bounds clear top and side clips`);
             };
-            checkBounds(normal, 'normal', 4);
+            checkBounds(normal, 'normal', 8);
             await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...normal.center });
             await settle(browser);
             const hover = await browser.evaluate(cardBoundsInPage);
             check(hover.hovered, `${label}: first card really hovered`);
-            checkBounds(hover, 'hover', 3);
+            checkBounds(hover, 'hover', 7);
             await browser.evaluate(() => document.querySelector('#results-area .record-card').classList.add('active-view'));
             await settle(browser);
             const activeHover = await browser.evaluate(cardBoundsInPage);
             check(activeHover.active && activeHover.hovered, `${label}: active card remains hovered`);
-            checkBounds(activeHover, 'active hover', 3);
+            checkBounds(activeHover, 'active hover', 7);
+            await checkPaintedSelection(browser, `${label} first active:hover`);
             await browser.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
             await settle(browser);
-            checkBounds(await browser.evaluate(cardBoundsInPage), 'active', 4);
+            checkBounds(await browser.evaluate(cardBoundsInPage), 'active', 8);
+            await checkPaintedSelection(browser, `${label} first active`);
             await browser.evaluate(() => {
                 const list = document.getElementById('results-list');
                 list.scrollTop = list.scrollHeight;
             });
             const bottom = await browser.evaluate(cardBoundsInPage, true);
             check(bottom.bottom >= 9.5 && Math.abs(bottom.contentBottom - 10) < 0.6, `${label}: last card clears bottom clip by 10px (${JSON.stringify(bottom)})`);
+            await checkPaintedSelection(browser, `${label} last active`, { last: true, edges: ['left', 'right', 'bottom'] });
+            const middleIndex = await browser.evaluate(() => {
+                const cards = document.querySelectorAll('#results-area .record-card');
+                const i = Math.floor(cards.length / 2);
+                const list = document.getElementById('results-list');
+                const card = cards[i].getBoundingClientRect();
+                const clip = list.getBoundingClientRect();
+                list.scrollTop += card.top - clip.top - (list.clientHeight - card.height) / 2;
+                return i;
+            });
+            await settle(browser);
+            const middle = await browser.evaluate(cardBoundsInPage, false, middleIndex);
+            check(middle.scrollTop > 0 && middle.top > 6 && middle.bottom > 6 && !middle.horizontalOverflow, `${label}: selected middle card visible at mid-scroll`);
+            await checkPaintedSelection(browser, `${label} mid-scroll active`, { index: middleIndex, edges: ['left', 'right'] });
         }
         await browser.evaluate(() => {
             UI.toggleDarkMode();
@@ -472,7 +585,15 @@ async function testCardScrollBounds(browser) {
             document.getElementById('results-list').scrollTop = 0;
         });
         const page2 = await browser.evaluate(cardBoundsInPage);
-        check(Math.abs(page2.top - 4) < 0.6 && !page2.horizontalOverflow, `${w}x${h}: page 2 preserves padding and list width`);
+        check(Math.abs(page2.top - 8) < 0.6 && !page2.horizontalOverflow, `${w}x${h}: page 2 preserves padding and list width`);
+        await checkPaintedSelection(browser, `${w}x${h} page 2 active`);
+        await browser.evaluate(() => {
+            SearchEngine.nextPage();
+            document.getElementById('results-list').scrollTop = 0;
+        });
+        const lastPage = await browser.evaluate(cardBoundsInPage);
+        check(!lastPage.scrollable && lastPage.padding.join(',') === '8px,8px,10px,8px', `${w}x${h}: final single-card page preserves padding`);
+        await checkPaintedSelection(browser, `${w}x${h} final page active`, { edges: ['top', 'left', 'right', 'bottom'] });
         check(browser.pageErrors.length === 0, `${w}x${h}: bounds tests have no page errors`);
     }
 }

@@ -1,6 +1,19 @@
-CLOUDFLARE WORKER SCRIPT (frontend release v2.5.103; Worker remains v2.5.97)
+CLOUDFLARE WORKER SCRIPT (frontend release v2.5.104; Worker remains v2.5.97)
 
-Release note: v2.5.103 makes returning browsers reach the new release and a terminal data state after every deployment, including rapid back-to-back deployments. Frontend-only; Worker files remain byte-identical to v2.5.97. Snapshot schema 1, DERIVED_REV, encrypted generations/atomic commit/fallback recovery, release-freshness marking, profiles/theme/credentials and live search/results/PDF state are unchanged. No backend redeployment and no cache reset are required.
+Release note: v2.5.104 repairs browser-only System Type evidence and makes the selected result card more visible. Worker v2.5.97, API fields, auth, search scoring, PDF selection and snapshot schema 1 remain unchanged. No Worker redeploy or cache reset is required.
+
+SYSTEM TYPE POLICY (v2.5.104):
+
+- Precedence is bounded explicit row, then validated panel-title/narrative phrase, then trustworthy count inference. Conflicting explicit rows abstain; ambiguous choices cannot be resolved outside their candidate set. Clear rows are never overridden by weaker title/count evidence.
+- Complete forward/reverse cells accept canonical Simplex/Duplex/Triplex/Quadraplex, Quadplex/Quadruplex aliases, bounded QUAD/DUP and numeric/word pump phrases. Wiring/terminal gaps require bounded validated association and stay orange. TAG/notes/BOM, hardware terms, type-prefixed part numbers and truncated/incomplete cells cannot create verified-green types.
+- Specific configuration/type-of-panel and pump-count label variants are supported; bare CONFIGURATION requires an info-table cluster. Title/narrative evidence requires a panel phrase and remains orange, never a whole-description type-word match.
+- Plain counts can infer only Simplex/Duplex/Triplex with trustworthy complete table cells. A four-motor count alone no longer implies Quadraplex: this intentionally removes weak matches. Counts such as 2+2, 4+2 and 3+1 are never summed; 2 + Ex remains uncertain with an explicit row, not a proven auxiliary exclusion. The narrow H A / FLASHER exception is preserved.
+- _sysEvidence records source/candidates/direction/confidence/reasons; _sys/_sysV continue to drive the unchanged search/sort/badges. DERIVED_REV 6 re-derives existing snapshots once per record in 250-record yielding batches; all derived fields remain non-enumerable and raw JSON/cache generations remain unchanged.
+- Active PDF-enabled cards gain a 2px purple ring, compact glow and theme-aware tint, retained on hover. Scroll-content clearance protects the glow; reduced motion disables card transitions/hover movement. No-PDF cards retain disabled styling and selection JS is unchanged.
+- Regression commands: node tests/system-type-repair.test.js; node tests/parser-repair.test.js; node tests/system-type-mfg-ranking.test.js; node tests/enclosure-material-mfg-coverage.test.js; node tests/ui-housekeeping-static.test.js; REQUIRE_BROWSER=1 node tests/ui-housekeeping.browser.test.js. Existing release-update/release-snapshot browser and data-loader-refresh tests cover publication and cache recovery. The browser suite samples ring/glow pixels from in-memory screenshots as well as checking scroll clearance.
+- Repository excerpts and synthetic tests demonstrate parser behavior, not live accuracy rates. Confirm production CP-8270/CP-8174 and a known missing Duplex against actual Worker desc before making dataset accuracy claims. Publication still needs physical-device and production-data acceptance.
+
+Previous release note: v2.5.103 makes returning browsers reach the new release and a terminal data state after every deployment, including rapid back-to-back deployments. Frontend-only; Worker files remain byte-identical to v2.5.97. Snapshot schema 1, DERIVED_REV, encrypted generations/atomic commit/fallback recovery, release-freshness marking, profiles/theme/credentials and live search/results/PDF state are unchanged. No backend redeployment and no cache reset are required.
 
 ROOT CAUSE (v2.5.103): "returning browser stuck on WAITING FOR UPDATE; private window works"
 

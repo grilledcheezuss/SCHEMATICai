@@ -77,7 +77,7 @@ async function main() {
         assert.strictEqual(parser.parseMotorCount(value), null, value);
         assert.deepStrictEqual(sys(`Panel Type Duplex No. Motors ${value}`), ['Duplex', true], value);
     }
-    assert.deepStrictEqual(sys('Duplex Panel Type Cycle Counters No. Motors 2 Flasher'), ['Duplex', false]);
+    assert.deepStrictEqual(sys('Duplex Panel Type Cycle Counters No. Motors 2 Flasher'), ['Duplex', true], 'reverse association remains uncertain');
     assert.deepStrictEqual(sys('Panel Type Duplex No. Motors 2 A Flasher'), ['Duplex', true]);
     assert.deepStrictEqual(sys('Panel Type Duplex No. Motors 2 H A Flasher'), ['Duplex', false]);
     assert.deepStrictEqual(sys('TAG Duplex Panel Type Voltage 480'), [null, false]);
