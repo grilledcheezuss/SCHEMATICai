@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.108: bounded equipment-title evidence; refresh existing snapshots.
-    const DERIVED_REV = 9;
+    // v2.5.109: bounded caption-title and system-line arbitration; refresh existing snapshots.
+    const DERIVED_REV = 10;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -821,9 +821,98 @@
         return titleMatches(desc, labels).concat(equipmentTitleMatches(desc, labels));
     }
 
+    function captionTitleMatches(desc) {
+        if (typeof desc !== 'string' || !desc) return [];
+        const text = desc.toUpperCase().replace(/%%(?:[A-Z]|\d{3})/g, '');
+        const cells = [];
+        const cellRe = /[^|\r\n]+/g;
+        let cell;
+        while ((cell = cellRe.exec(text))) {
+            const value = cell[0].trim();
+            if (value) cells.push({ value, start: cell.index + cell[0].indexOf(value), end: cellRe.lastIndex });
+        }
+        const equipment = /^(SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX|QUAD)\s+(?:PUMPS?|BLOWERS?|GRINDERS?)$/;
+        const caption = /^(?:POWER|CONTROL) DIAGRAM$/;
+        const primary = /^(?:PANEL DESCRIPTION|DRAWING TITLE)$/;
+        const matches = [];
+        const anchorIndex = (start, end) => {
+            const before = cells[start - 1]?.value || '';
+            const beforeNumber = cells[start - 2]?.value || '';
+            const after = cells[end + 1]?.value || '';
+            const afterNumber = cells[end + 2]?.value || '';
+            if (primary.test(before)) return start - 1;
+            if (primary.test(beforeNumber) && /^\d{1,3}$/.test(before)) return start - 2;
+            if (primary.test(after)) return end + 1;
+            if (primary.test(afterNumber) && /^\d{1,3}$/.test(after)) return end + 2;
+            return -1;
+        };
+        const boundary = (start, end) => {
+            const before = cells[start - 1]?.value || '';
+            const after = cells[end + 1]?.value || '';
+            return /\b(?:NOT|NO|NON|WITHOUT|OTHER|ANOTHER|EXISTING|SEE|REF(?:ERENCE)?|NOTES?|BOM|BILL OF MATERIALS)\b/i.test(`${before} ${after}`)
+                || SYSTEM_HARDWARE_RE.test(before) || SYSTEM_HARDWARE_RE.test(after);
+        };
+
+        for (let i = 0; i + 2 < cells.length; i++) {
+            for (const reverse of [false, true]) {
+                const typeIndex = i + (reverse ? 2 : 0);
+                const panelIndex = i + (reverse ? 0 : 2);
+                if (!caption.test(cells[i + 1].value)) continue;
+                const panel = cells[panelIndex];
+                const anchor = anchorIndex(i, i + 2);
+                if (panel.value !== 'CONTROL PANEL' || anchor < 0
+                    || panel.end - cells[i].start > REVERSE_WINDOW || boundary(i, i + 2)) continue;
+                const beforeAnchor = cells[anchor - 1]?.value || '';
+                if (/^(?:NOTES?|BOM|BILL OF MATERIALS|PANEL NAME)$/.test(beforeAnchor)
+                    || SYSTEM_HARDWARE_RE.test(beforeAnchor)) continue;
+                const match = equipment.exec(cells[typeIndex].value);
+                const type = match && normalizeSystemType(match[1]);
+                if (type) matches.push({ type, start: cells[i].start, end: panel.end, bounded: true, source: 'caption-title' });
+            }
+        }
+        return matches;
+    }
+
+    function systemLineCandidates(desc) {
+        if (typeof desc !== 'string' || !desc) return [];
+        const text = systemTypeView(desc).toUpperCase();
+        const cells = text.split(/[|\r\n]+/).map(value => value.trim());
+        const candidates = new Set();
+        for (let i = 0; i < cells.length; i++) {
+            if (/^SYSTEM\s*[:=]$/.test(cells[i]) && cells[i + 1]) {
+                const type = normalizeSystemType(cells[i + 1]);
+                if (type) candidates.add(type);
+            } else if (/^SYSTEM$/.test(cells[i]) && cells[i + 1]) {
+                const type = normalizeSystemType(cells[i + 1]);
+                if (type) candidates.add(type);
+            } else {
+                const match = /^SYSTEM\s*[:=]\s*(SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX|QUAD)$/i.exec(cells[i]);
+                const type = match && normalizeSystemType(match[1]);
+                if (type) candidates.add(type);
+            }
+        }
+        return SYSTEM_TYPES.filter(type => candidates.has(type));
+    }
+
+    function selectPrimaryCandidate(titleTypes, lineTypes, counts, hasNonPlainCount) {
+        if (titleTypes.length > 1 || lineTypes.length > 1) return null;
+        const title = titleTypes[0] || null;
+        const line = lineTypes[0] || null;
+        if (title && line) {
+            if (title === line) return { type: title, agreement: true, tieBreak: false };
+            if (hasNonPlainCount || counts.size !== 1) return null;
+            const byCount = SYSTEM_TYPES[[...counts][0] - 1];
+            return byCount === title || byCount === line
+                ? { type: byCount, agreement: false, tieBreak: true } : null;
+        }
+        if (title || line) return { type: title || line, agreement: false, tieBreak: false };
+        return null;
+    }
+
     function titleCandidates(desc, labels) {
         const matches = titleEvidenceMatches(desc, labels);
-        return SYSTEM_TYPES.filter(sys => matches.some(match => match.type === sys));
+        const evidence = matches.length ? matches : captionTitleMatches(systemTypeView(desc));
+        return SYSTEM_TYPES.filter(sys => evidence.some(match => match.type === sys));
     }
 
     // Rule 4 (v2.5.107): a repeated title block ("SIMPLEX PUMP SIMPLEX PUMP ... CONTROL PANEL
@@ -922,31 +1011,48 @@
         } else {
             const phraseMatches = titleEvidenceMatches(systemDesc, systemRows.labels || []);
             const phrases = SYSTEM_TYPES.filter(type => phraseMatches.some(match => match.type === type));
+            const captionMatches = phrases.length ? [] : captionTitleMatches(systemDesc);
+            const captionTypes = SYSTEM_TYPES.filter(type => captionMatches.some(match => match.type === type));
             const block = titleBlockCandidates(systemDesc);
-            const titles = SYSTEM_TYPES.filter(type => phrases.includes(type) || block.includes(type));
+            const titles = SYSTEM_TYPES.filter(type => phrases.includes(type) || captionTypes.includes(type) || block.includes(type));
             candidates = ambiguous.length ? SYSTEM_TYPES.filter(allows) : titles;
-            if (titles.length === 1 && allows(titles[0])) {
+            const lineTypes = ambiguous.length ? [] : systemLineCandidates(systemDesc);
+            const selection = !ambiguous.length && lineTypes.length
+                ? selectPrimaryCandidate(titles, lineTypes, counts, hasNonPlainCount) : null;
+            if (selection && titles.length <= 1 && lineTypes.length <= 1 && allows(selection.type)) {
+                sys = selection.type;
+                source = 'title';
+                direction = selection.tieBreak ? 'motor-count-tiebreak' : 'system-line';
+                sysV = !selection.agreement;
+                candidates = [...new Set([...titles, ...lineTypes])];
+                if (selection.tieBreak) reasons.push('motor-count-selected-primary-candidate');
+                else if (selection.agreement) reasons.push('title-system-line-agree');
+                else reasons.push('system-line-evidence');
+            } else if (!lineTypes.length && titles.length === 1 && allows(titles[0])) {
                 sys = titles[0];
                 source = 'title';
-                direction = phrases.length
-                    ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title') ? 'narrative' : 'equipment-title'
-                    : 'title-block';
+                const titleMatches = phrases.length ? phraseMatches : captionMatches;
+                direction = captionTypes.includes(sys) ? 'caption-title'
+                    : phrases.length
+                        ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title') ? 'narrative' : 'equipment-title'
+                        : 'title-block';
                 const count = counts.size === 1 ? [...counts][0] : null;
-                const corroborated = phrases.length > 0 && count !== null && !hasNonPlainCount
+                const corroborated = titleMatches.length > 0 && count !== null && !hasNonPlainCount
                     && SYSTEM_TYPES[count - 1] === sys
                     && !ambiguous.length
-                    && titleHasNearbyCount(systemDesc, systemRows, sys, count);
+                    && titleHasNearbyCount(systemDesc, systemRows, sys, count, titleMatches);
                 sysV = !corroborated;
-                reasons.push(phrases.length
-                    ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title')
+                reasons.push(titleMatches.length
+                    ? captionTypes.includes(sys) ? 'validated-caption-title'
+                        : phraseMatches.some(match => match.type === sys && match.source === 'panel-title')
                         ? 'validated-panel-phrase'
                         : 'validated-equipment-phrase'
                     : 'repeated-title-block');
                 if (corroborated) reasons.push('corroborated-panel-phrase-count');
-            } else if (titles.length > 1) {
+            } else if (titles.length > 1 || lineTypes.length) {
                 source = 'conflict';
-                candidates = titles;
-                reasons.push('conflicting-panel-phrases');
+                candidates = [...new Set([...titles, ...lineTypes])];
+                reasons.push(lineTypes.length ? 'conflicting-title-system-line' : 'conflicting-panel-phrases');
             } else if (!titles.length && !hasNonPlainCount && counts.size === 1) {
                 const count = [...counts][0];
                 const inferred = SYSTEM_TYPES[count - 1];
@@ -1248,6 +1354,7 @@
         const phraseTitles = titleCandidates(desc, rows.labels || []);
         const blockTitles = titleBlockCandidates(systemDesc);
         const titles = SYSTEM_TYPES.filter(type => phraseTitles.includes(type) || blockTitles.includes(type));
+        const systemLines = systemLineCandidates(systemDesc);
         const panelRows = rows.associations.filter(a => a.kind === 'panelTypes');
         const ambiguous = rows.panelTypes.map(systemCandidates).filter(set => set.length > 1);
         const explicit = new Set(rows.panelTypes.map(systemCandidates).filter(set => set.length === 1).map(set => set[0]));
@@ -1269,7 +1376,11 @@
         if (state === 'orange') {
             const reasons = evidence.reasons;
             if (evidence.source === 'title') {
-                cause = reasons.includes('validated-equipment-phrase') ? 'title-equipment-phrase' : 'title-narrative-only';
+                cause = reasons.includes('motor-count-selected-primary-candidate') ? 'motor-count-primary-tiebreak'
+                    : reasons.includes('title-system-line-agree') ? 'title-system-line-agreement'
+                        : reasons.includes('system-line-evidence') ? 'system-line-only'
+                            : reasons.includes('validated-caption-title') ? 'caption-title-only'
+                                : reasons.includes('validated-equipment-phrase') ? 'title-equipment-phrase' : 'title-narrative-only';
             } else if (evidence.source === 'count') cause = 'count-inference';
             else if (reasons.includes('ambiguous-additional-row')) cause = 'row-plus-ambiguous-row';
             else if (reasons.includes('unresolved-or-conflicting-count')) cause = 'row-count-disagreement';
@@ -1300,7 +1411,7 @@
             else if (new Set(counts.filter(c => c !== null)).size > 1) countDetail = 'multiple-count-values';
             else countDetail = 'count-implies-different-type';
         }
-        return { desc, text, rows, derived, evidence, titles, panelRows, ambiguous, explicit, counts, mentions, state, source, cause, countDetail };
+        return { desc, text, rows, derived, evidence, titles, systemLines, panelRows, ambiguous, explicit, counts, mentions, state, source, cause, countDetail };
     }
 
     function auditTypeVerdicts(analysis) {
@@ -1311,10 +1422,11 @@
                 explicitRow: explicit.has(type),
                 ambiguousRow: ambiguous.some(set => set.includes(type)),
                 titlePhrase: titles.includes(type),
+                systemLine: analysis.systemLines.includes(type),
                 countImplies: counts.includes(index + 1),
                 mentions: mentions[type] || 0
             };
-            const anyEvidence = facts.explicitRow || facts.ambiguousRow || facts.titlePhrase || facts.countImplies;
+            const anyEvidence = facts.explicitRow || facts.ambiguousRow || facts.titlePhrase || facts.systemLine || facts.countImplies;
             let verdict;
             if (derived.sys === type) verdict = derived.sysV ? 'matched-orange' : 'matched-green';
             else if (derived.sys) verdict = anyEvidence || facts.mentions ? `lost-to-${derived.sys}` : 'not-mentioned';
@@ -1581,6 +1693,7 @@
                 })),
                 motorCountRows: a.rows.motorCounts.slice(0, 8).map(value => ({ value: auditClean(value, 24), plainCount: parseMotorCount(value) })),
                 titleCandidates: [...a.titles],
+                systemLineCandidates: [...a.systemLines],
                 labelsSeen: labels,
                 typeMentions: mentions
             },
