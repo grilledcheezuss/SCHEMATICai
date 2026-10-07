@@ -70,6 +70,8 @@ runTest('All four types and Quadraplex aliases', () => {
     assertEqual(sysOf('PANEL TYPE QUADRUPLEX NO OF MOTORS 4'), { sys: 'Quadraplex', sysV: false }, 'quadruplex alias');
     assertEqual(sysOf('Panel Type Triplex'), { sys: 'Triplex', sysV: false }, 'explicit type without count stays clean');
     assertEqual(InfoTableParser.normalizeSystemType('Duplex or Triplex'), null, 'ambiguous panel type cell is not evidence');
+    const uiTypes = appJsContent.match(/static SYSTEM_TYPES = (\[[^\]]*\]);/);
+    assertEqual(uiTypes && JSON.parse(uiTypes[1].replace(/'/g, '"')), InfoTableParser.SYSTEM_TYPES, 'UI.SYSTEM_TYPES mirrors the parser list');
     assertEqual(sysOf('Panel Type Duplex or Triplex No. Motors 2'), { sys: 'Duplex', sysV: true }, 'ambiguous panel type falls back to an uncertain plain count');
     assertEqual(sysOf('Panel Type Duplex/Triplex'), { sys: null, sysV: false }, 'slashed panel type is not evidence');
 });
@@ -132,6 +134,8 @@ runTest('Pump Manufacturer normalization uses the canonical aliases', () => {
     Object.entries(extract.EXACT_MFGS).forEach(([canonical, aliases]) => {
         aliases.forEach(alias => assertEqual(InfoTableParser.normalizeManufacturer(alias), canonical, `worker alias ${alias}`));
     });
+    const withCanonical = table => Object.fromEntries(Object.entries(table).map(([k, v]) => [k, [...new Set([k, ...v])].sort()]));
+    assertEqual(withCanonical(InfoTableParser.MFG_ALIASES), withCanonical(extract.EXACT_MFGS), 'browser alias table mirrors worker EXACT_MFGS');
     assertEqual(derive('Pump Manufacturer Barnes Pump Manufacturer Flygt').pumpMfg, null, 'conflicting rows are ignored');
     assertEqual(derive('Pump Manufacturer Barnes Pump Manufacturer Crane').pumpMfg, 'BARNES', 'aliases of one manufacturer agree');
 });
