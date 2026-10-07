@@ -3,7 +3,6 @@
 // Importable for testing without the full Worker environment
 
 // --- CONSTANTS ---
-const InfoTableHelper = require('../../info-table-helper.js');
 
 const EXACT_MFGS = {
     'GORMAN RUPP': ['GORMAN', 'GR', 'GRSP'],
@@ -244,8 +243,7 @@ function parseEnclosure(t) {
 function extractSpecsStrict(t) {
     const s = {
         mfg: null, hp: null, volt: null, phase: null, enc: null,
-        mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false,
-        ...InfoTableHelper.extractSystemType(t)
+        mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false
     };
     if (!t || typeof t !== 'string') return s;
 
