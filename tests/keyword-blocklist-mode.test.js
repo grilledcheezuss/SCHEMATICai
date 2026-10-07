@@ -5,6 +5,7 @@ console.log('🧪 Testing Allowed/Blocked Keyword State and Dominance\n');
 
 const appJsPath = path.join(__dirname, '..', 'app.js');
 const appJsContent = fs.readFileSync(appJsPath, 'utf8');
+global.InfoTableParser = require('../info-table-parser.js');
 
 function extractClass(className, content) {
     const startIdx = content.indexOf(`class ${className} {`);

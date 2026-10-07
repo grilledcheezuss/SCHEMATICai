@@ -1,10 +1,26 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.96)
+CLOUDFLARE WORKER SCRIPT (v2.5.97)
 
-Release-alignment note: v2.5.96 is frontend-only, like v2.5.95. The Worker API is unchanged (worker/worker.js, worker/lib/extract.js, and wrangler.toml keep v2.5.94 behavior byte-for-byte; the Worker banner intentionally still reads v2.5.94 because that is the deployed implementation) and does NOT need redeploying; publish the frontend only.
+Release note: v2.5.97 adds only Sulzer canonical manufacturer aliases and whole-token normalization to the Worker; it does not add info-table parsing, ranking, extra requests, or MAIN-loop work. Unlike v2.5.95/2.5.96, this release requires a separate Worker deployment as well as publishing the frontend. A GitHub merge does not prove the Worker was deployed. Allow normal MAIN edge-cache/data refresh after deployment; do not force-reset the browser cache.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.96):
+RECENT UPDATES (v2.5.97):
+
+- Manufacturer menu is Any plus at most 12 canonical choices, ordered by eligible bounded Pump Manufacturer row frequency (each record id counted once; ties alphabetical). Sulzer is guaranteed: if absent from the natural top 12, it reserves a slot among the highest 11 others; it has no fabricated frequency when no row occurrence exists
+- With no eligible row evidence, fallback candidates are alphabetized; include Sulzer, then the first 11 other supported names. This fallback makes no frequency claim. A currently selected supported manufacturer outside the base list is kept as one temporary choice, so up to 13 manufacturer choices (plus Any) can appear until the selection changes
+- Sulzer / Sulzer Pumps is canonical SULZER across bounded browser row normalization, Worker extraction, search, confidence badges, and feedback. Clean single backend extraction uses mfg=SULZER and mfgV=false; multiple recognized brands retain the existing varied/orange confidence behavior. ABS stays independent
+- Browser evidence is re-derived with DERIVED_REV 3 on normal snapshot apply/restore; derived properties remain non-enumerable and are not persisted. Existing cached MAIN records are safe: until the separately deployed Worker and ordinary data/edge-cache refresh return mfg=SULZER, whole-token Sulzer description fallback can find them but shows orange, not a false verified-green badge. Existing backend/healed mfg values are never overwritten from row evidence
+- v2.5.96 material-based Fiberglass / Stainless Steel / Painted Steel filtering, exclusions, feedback ordering/encodings, and POLY compatibility remain unchanged. System Type, reset/live-state, and background-refresh behavior are unchanged
+
+MANUAL ACCEPTANCE CHECKS (v2.5.97, not automated):
+
+- Deploy the Worker separately, publish the frontend, and confirm normal sync/edge-cache refresh; verify existing cached records remain available before refreshed Worker mfg fields arrive
+- Search Sulzer: clean Worker mfg=SULZER results are green; mixed recognized manufacturers are orange; old cached description-only matches (SULZER, Sulzer Pumps, punctuation) are orange; NOTSULZER and SULZERISH do not match
+- Confirm Any plus at most 12 base manufacturer choices, Sulzer remains present below the natural cutoff, ties are alphabetical, and an out-of-list selection survives refresh (the temporary selection can show 13 choices)
+- Verify feedback offers all supported manufacturers, including canonical SULZER, and submits mfg=SULZER
+- Automated Node tests and a synthetic 100-record Worker-helper comparison do not establish Cloudflare production CPU safety; verify deployed Worker runtime logs after the separate deployment. No Cloudflare deployment was performed for this PR
+
+PREVIOUS UPDATES (v2.5.96):
 
 - Enclosure search is material-based: Any / Fiberglass / Stainless Steel / Painted Steel (half-width cell beside System Type). NEMA rating plays no role, and a material never implies a rating
 - Primary evidence is ONLY the bounded ENCLOSURE MATERIAL info-table value, read by the browser-only info-table-parser.js once per record (DERIVED_REV 2 re-derives v2.5.95 in-memory records). Neighboring enclosure rows (Enclosure NEMA Rating, Enclosure Size/Type, Inner Swing Panel, Inner Door, Control Sensor, Control Voltage, ...) are value boundaries, so blank cells never borrow a neighbor's value. Recognized values: FIBERGLASS / FIBER GLASS / FIBREGLASS / FRP; STAINLESS, (304) STAINLESS STEEL, 304/316(L) SS, SS, S/S; PAINTED (CARBON/MILD) STEEL. Bare STEEL, CARBON STEEL, POLYCARBONATE, etc. are none of the three
@@ -18,7 +34,7 @@ RECENT UPDATES (v2.5.96):
 - Fixed: rejected-keyword collection no longer picks up the selected Low Voltage button (it is scoped to the keyword cluster)
 - Known limitations: MAIN does not expose correction provenance, so a healed enc value is indistinguishable from a parsed one and a clear material row still wins over it. System Type feedback remains stored-only (not applied by the Worker)
 
-MANUAL ACCEPTANCE CHECKS (v2.5.96, not automated):
+PREVIOUS MANUAL ACCEPTANCE CHECKS (v2.5.96, not automated):
 
 - Search Enclosure = Fiberglass on a panel whose info table reads Enclosure Material: Fiberglass but mentions stainless hardware: green Fiberglass badge; the same panel is absent from Stainless Steel and Painted Steel searches
 - Search Painted Steel: only row-verified painted panels (or panels corrected to Painted Steel by feedback) appear

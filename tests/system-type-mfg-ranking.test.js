@@ -1,5 +1,4 @@
-// v2.5.95 frontend-only System Type + manufacturer ranking tests
-// (v2.5.96: ranking is cumulative 90% coverage instead of top eight).
+// v2.5.97 frontend System Type + top-12 manufacturer ranking tests.
 // Run: node tests/system-type-mfg-ranking.test.js
 const fs = require('fs');
 const path = require('path');
@@ -9,7 +8,7 @@ const root = path.join(__dirname, '..');
 const appJsContent = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-console.log('🧪 Testing v2.5.95 System Type + Manufacturer ranking (browser-only)\n');
+console.log('🧪 Testing v2.5.97 System Type + Manufacturer ranking (browser-only)\n');
 
 let passed = 0;
 let failed = 0;
@@ -128,6 +127,7 @@ runTest('Pump Manufacturer normalization uses the canonical aliases', () => {
     const cases = {
         'Gorman-Rupp': 'GORMAN RUPP', 'GORMAN RUPP': 'GORMAN RUPP', 'Gorman': 'GORMAN RUPP', 'GRSP': 'GORMAN RUPP',
         'Crane': 'BARNES', 'Sithe': 'BARNES', 'Barnes': 'BARNES', 'Godwin SP': 'GODWIN', 'Flygt (Xylem)': 'FLYGT',
+        'Sulzer': 'SULZER', 'Sulzer Pumps': 'SULZER', '(Sulzer),': 'SULZER', 'NOTSULZER': null, 'SULZERISH': null,
         'Grundfos': null, 'N/A': null, 'By Others': null, '': null
     };
     Object.entries(cases).forEach(([value, expected]) => assertEqual(InfoTableParser.normalizeManufacturer(value), expected, value));
@@ -139,6 +139,11 @@ runTest('Pump Manufacturer normalization uses the canonical aliases', () => {
     assertEqual(withCanonical(InfoTableParser.MFG_ALIASES), withCanonical(extract.EXACT_MFGS), 'browser alias table mirrors worker EXACT_MFGS');
     assertEqual(derive('Pump Manufacturer Barnes Pump Manufacturer Flygt').pumpMfg, null, 'conflicting rows are ignored');
     assertEqual(derive('Pump Manufacturer Barnes Pump Manufacturer Crane').pumpMfg, 'BARNES', 'aliases of one manufacturer agree');
+    assertEqual(derive('Pump Manufacturer Sulzer Pump Manufacturer Sulzer Pumps').pumpMfg, 'SULZER', 'Sulzer aliases agree across bounded rows');
+    assertEqual(derive('Pump Manufacturer Sulzer Pump Manufacturer Unknown').pumpMfg, null, 'unknown row evidence still invalidates canonical evidence');
+    assert(!InfoTableParser.matchesManufacturer('NOTSULZER', 'SULZER'), 'embedded prefix is not a search match');
+    assert(!InfoTableParser.matchesManufacturer('SULZERISH', 'SULZER'), 'embedded suffix is not a search match');
+    assert(InfoTableParser.matchesManufacturer('(Sulzer Pumps),', 'SULZER'), 'description fallback accepts punctuation-bounded Sulzer Pumps');
 });
 
 // ---------------------------------------------------------------- Ranking
@@ -150,7 +155,7 @@ function rankOf(records) {
     return InfoTableParser.rankManufacturers(records);
 }
 
-runTest('Ranking: counts once per unique record, aliases, ties alphabetical, 90% coverage prefix', () => {
+runTest('Ranking: counts each unique record once, keeps frequency ordering, and reserves Sulzer', () => {
     const records = [];
     const add = (mfg, n) => { for (let i = 0; i < n; i++) records.push(makeRecord(`${mfg}-${i}`, `Pump Manufacturer ${mfg} Type of Pump Submersible`)); };
     add('Barnes', 5); add('Crane', 4); // 9 BARNES via alias
@@ -159,17 +164,16 @@ runTest('Ranking: counts once per unique record, aliases, ties alphabetical, 90%
     records.push(makeRecord('Barnes-0', 'Pump Manufacturer Barnes')); // duplicate id counted once
     records.push(makeRecord('none', 'No info table here'));
     const ranking = rankOf(records);
-    // 31 eligible: 9+7+3+3+3+2 = 27 (87%) < 90%, + WILO 2 = 29 (93.5%) crosses -> seven options.
-    assertEqual(ranking.options, ['BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO'], 'ordered coverage prefix');
+    assertEqual(ranking.options, [...ranking.ranked, 'SULZER'], 'all fewer-than-12 names plus zero-count Sulzer');
     assertEqual(ranking.ranked, ['BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS', 'LIBERTY'], 'full ranking kept');
     assertEqual(ranking.counts.BARNES, 9, 'alias counting + id dedupe');
     assert(!('GRUNDFOS' in ranking.counts), 'unknown values ignored');
     assertEqual(ranking.eligibleRecords, 31, 'eligible records');
 });
 
-runTest('Ranking: few manufacturers and no evidence', () => {
+runTest('Ranking: fewer than 12 names and no row evidence', () => {
     const few = rankOf([makeRecord('a', 'Pump Manufacturer Myers'), makeRecord('b', 'Pump Manufacturer Ebara'), makeRecord('c', 'Pump Manufacturer Myers')]);
-    assertEqual(few.options, ['MYERS', 'EBARA'], 'MYERS 2/3 < 90%, EBARA crosses');
+    assertEqual(few.options, ['MYERS', 'EBARA', 'SULZER'], 'frequency order plus reserved zero-count Sulzer');
     const none = rankOf([makeRecord('x', 'BARNES pump mentioned in prose'), makeRecord('y', '')]);
     assertEqual(none.options, [], 'no row evidence');
     assertEqual(none.eligibleRecords, 0, 'no eligible records');
@@ -195,7 +199,7 @@ runTest('applySnapshot derives once per record, stores non-enumerable fields, an
     assertEqual([records[0]._sys, records[0]._sysV, records[0]._pumpMfg], ['Duplex', false, 'BARNES'], 'record 1 derived');
     assertEqual([records[1]._sys, records[1]._sysV], ['Triplex', true], 'record 2 inferred');
     assert(!JSON.stringify(records).includes('_sys') && !Object.keys(records[0]).includes('_pumpMfg'), 'derived fields must not be persisted/enumerated');
-    assertEqual(windowState.MFG_RANKING.options, ['BARNES', 'FLYGT'], 'ranking computed on apply');
+    assertEqual(windowState.MFG_RANKING.options, ['BARNES', 'FLYGT', 'SULZER'], 'ranking computed on apply');
     assertEqual(InfoTableParser.deriveRecord(records[0]), false, 'already-derived records are not re-parsed');
 });
 
@@ -239,7 +243,7 @@ runTest('Old cached snapshots derive on restore without schema bump or cache wip
     const restored = await CacheService.loadAllWithProgress(() => {});
     assert(restored === true, 'restore succeeds');
     assertEqual(windowState.LOCAL_DB.map(r => r._sys), ['Triplex', null], 'restored records derived');
-    assertEqual(windowState.MFG_RANKING.options, ['GOULDS'], 'ranking computed on restore');
+    assertEqual(windowState.MFG_RANKING.options, ['GOULDS', 'SULZER'], 'ranking computed on restore');
     assertEqual(deleted, 0, 'no cache wipe');
 });
 
@@ -249,7 +253,7 @@ global.PDF_STATUS = { MISSING: 'missing' };
 global.KeywordMatcher = new Function(`return ${extractClassSource('KeywordMatcher')}`)();
 global.AI_TRAINING_DATA = {
     ALIASES: {},
-    MANUFACTURERS: ['GORMAN RUPP', 'BARNES', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 'ZOELLER', 'LIBERTY', 'WILO', 'PENTAIR', 'ABS', 'GODWIN', 'FRANKLIN', 'EBARA', 'HIDROSTAL'],
+    MANUFACTURERS: ['GORMAN RUPP', 'BARNES', 'SULZER', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 'ZOELLER', 'LIBERTY', 'WILO', 'PENTAIR', 'ABS', 'GODWIN', 'FRANKLIN', 'EBARA', 'HIDROSTAL'],
     DATA: { HP: [5, 10], VOLT: [208, 480], PHASE: [1, 3] }
 };
 global.PdfController = { stopPreloading() {}, preloadSearchResults() {} };
@@ -257,6 +261,7 @@ global.FeedbackService = { resetLockout() {}, lockout: new Set() };
 global.PRELOAD_START_DELAY_MS = 0;
 const SearchEngine = new Function(`return ${extractClassSource('SearchEngine')}`)();
 const UI = new Function(`return ${extractClassSource('UI')}`)();
+global.InfoTableParser = InfoTableParser;
 global.SearchEngine = SearchEngine;
 global.UI = UI;
 
@@ -328,6 +333,25 @@ runTest('System Type search compares only derived sys; clean sorts before varied
     assert(!UI._generateBadges(records[1], anyRes.crit).join(' ').includes('DUPLEX'), 'no system badge when unfiltered');
 });
 
+runTest('Sulzer search uses strict backend confidence and safe orange description fallback', () => {
+    const records = [
+        makeRecord('s1', 'Pump Manufacturer Sulzer Pumps', { mfg: 'SULZER', mfgV: false, pdfUrl: 'x' }),
+        makeRecord('s2', 'SULZER / BARNES', { mfg: 'SULZER', mfgV: true, pdfUrl: 'x' }),
+        makeRecord('s3', 'Sulzer Pumps', { mfg: null, mfgV: false, pdfUrl: 'x' }),
+        makeRecord('s4', 'NOTSULZER SULZERISH', { mfg: null, mfgV: false, pdfUrl: 'x' })
+    ];
+    const result = searchWith(records, { mfg: 'SULZER', cat: 'Any' });
+    assertEqual([result.total, result.page.map(r => r.id)], [3, ['s1', 's2', 's3']], 'strict and whole-token fallback match; embedded tokens do not');
+    const strictBadge = UI._generateBadges(records[0], result.crit).join(' ');
+    const variedBadge = UI._generateBadges(records[1], result.crit).join(' ');
+    const oldCacheBadge = UI._generateBadges(records[2], result.crit).join(' ');
+    assert(strictBadge.includes('match-green">SULZER'), 'clean backend Sulzer is green');
+    assert(variedBadge.includes('match-orange">SULZER'), 'backend varied Sulzer stays orange');
+    assert(oldCacheBadge.includes('match-orange">SULZER'), 'description-only old-cache Sulzer is orange, never green');
+    assert(records[0].w > records[2].w, 'strict backend match scores above description fallback');
+    assertEqual([records[0].mfg, records[2].mfg], ['SULZER', null], 'search does not overwrite backend manufacturer fields');
+});
+
 runTest('System Type branch is isolated from keywords, enclosure, and never re-parses', () => {
     const records = systemRecords();
     const plain = [makeRecord('20', 'Panel Type Duplex No. Motors 2', { enc: '4XFG', pdfUrl: 'x' })]; // not derived
@@ -342,7 +366,7 @@ runTest('System Type branch is isolated from keywords, enclosure, and never re-p
     assertEqual([paged.page.length, paged.total, DOM_CACHE.get('page-info').textContent], [25, 30, 'Page 1 of 2'], 'pagination');
 });
 
-runTest('pop() keeps an out-of-coverage manufacturer and System Type; coverage list ordered by frequency', () => {
+runTest('pop() keeps an out-of-list manufacturer and System Type; top-12 ranking survives refresh', () => {
     const inputs = setupInputs({ sys: 'Triplex', mfg: 'HIDROSTAL', hp: '10', volt: '480', phase: '3', enc: 'Fiberglass', cat: 'LowVoltage', keyword: 'pump' });
     UI.keywordBlocklistMode = false;
     UI.keywordAllowedTermsInput = 'pump';
@@ -350,7 +374,7 @@ runTest('pop() keeps an out-of-coverage manufacturer and System Type; coverage l
     window.FOUND_MFGS = new Set(['BARNES']);
     window.MFG_RANKING = { options: ['BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS'], counts: {}, eligibleRecords: 40 };
     for (let i = 0; i < 3; i++) UI.pop();
-    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS', 'HIDROSTAL'], 'coverage list plus kept selection');
+    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS', 'SULZER', 'HIDROSTAL'], 'top-12 list plus retained temporary selection');
     assertEqual(inputs.mfgInput.value, 'HIDROSTAL', 'out-of-coverage selection survives');
     assertEqual(inputs.sysInput.options.map(o => o.value), ['Any', 'Simplex', 'Duplex', 'Triplex', 'Quadraplex'], 'system type options');
     assertEqual([inputs.sysInput.value, inputs.hpInput.value, inputs.voltInput.value, inputs.phaseInput.value, inputs.encInput.value, inputs.catInput.value],
@@ -358,10 +382,10 @@ runTest('pop() keeps an out-of-coverage manufacturer and System Type; coverage l
     assertEqual([UI.getAllowedKeywordTermsInput(), UI.getBlockedKeywordTermsInput()], ['pump', 'float'], 'keyword sets survive');
     inputs.mfgInput.value = 'FLYGT';
     UI.pop();
-    assertEqual(inputs.mfgInput.options.length, 9, 'in-list selection adds no extra option');
+    assertEqual(inputs.mfgInput.options.length, 10, 'in-list selection adds no extra option');
     window.MFG_RANKING = { options: [], counts: {}, eligibleRecords: 0 };
     UI.pop();
-    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT'], 'no evidence falls back to existing list (+ kept selection)');
+    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'SULZER', 'FLYGT'], 'capped no-evidence fallback includes Sulzer and keeps selection');
     assertEqual(inputs.mfgInput.value, 'FLYGT', 'selection kept in fallback list');
     window.MFG_RANKING = null;
 });
@@ -449,7 +473,7 @@ runTest('Performance: ~8,000 records derive well under 1s and scale linearly', (
         InfoTableParser.deriveRecordsSync(records);
         const ranking = InfoTableParser.rankManufacturers(records);
         const ms = Number(process.hrtime.bigint() - start) / 1e6;
-        assert(ranking.options.length === 8, 'ranking produced');
+        assert(ranking.options.length <= InfoTableParser.MFG_MENU_LIMIT && ranking.options.includes('SULZER'), 'ranking produced capped menu with Sulzer');
         return ms;
     };
     const ms8k = time(8000);
@@ -471,5 +495,5 @@ runTest('Performance: ~8,000 records derive well under 1s and scale linearly', (
         console.log('⚠️  Some tests failed.');
         process.exit(1);
     }
-    console.log('✨ All v2.5.95 System Type / manufacturer ranking tests passed!');
+    console.log('✨ All v2.5.97 System Type / manufacturer ranking tests passed!');
 })();

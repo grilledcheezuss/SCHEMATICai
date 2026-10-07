@@ -1,5 +1,5 @@
-// v2.5.96 frontend-only tests: material-based Enclosure search, cumulative 90% manufacturer
-// coverage, and feedback dropdown order/encoding. Exercises the real InfoTableParser and the
+// v2.5.97 tests: material-based Enclosure search, top-12 manufacturer ranking, and feedback
+// dropdown order/encoding. Exercises the real InfoTableParser and the
 // SearchEngine / UI / FeedbackService / DataLoader classes extracted from app.js.
 // Run: node tests/enclosure-material-mfg-coverage.test.js
 const fs = require('fs');
@@ -10,7 +10,7 @@ const root = path.join(__dirname, '..');
 const appJsContent = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-console.log('🧪 Testing v2.5.96 enclosure material / manufacturer coverage / feedback order\n');
+console.log('🧪 Testing v2.5.97 enclosure material / top-12 manufacturers / feedback order\n');
 
 let passed = 0;
 let failed = 0;
@@ -161,7 +161,7 @@ global.PDF_STATUS = { MISSING: 'missing' };
 global.KeywordMatcher = new Function(`return ${extractClassSource('KeywordMatcher')}`)();
 global.AI_TRAINING_DATA = {
     ALIASES: {},
-    MANUFACTURERS: ['GORMAN RUPP', 'BARNES', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 'ZOELLER', 'LIBERTY', 'WILO', 'PENTAIR', 'ABS', 'GODWIN', 'FRANKLIN', 'EBARA', 'HIDROSTAL'],
+    MANUFACTURERS: ['GORMAN RUPP', 'BARNES', 'SULZER', 'HYDROMATIC', 'FLYGT', 'MYERS', 'GOULDS', 'ZOELLER', 'LIBERTY', 'WILO', 'PENTAIR', 'ABS', 'GODWIN', 'FRANKLIN', 'EBARA', 'HIDROSTAL'],
     DATA: { HP: [5, 10], VOLT: [208, 480], PHASE: [1, 3] }
 };
 global.PdfController = { stopPreloading() {}, preloadSearchResults() {} };
@@ -170,6 +170,7 @@ global.PRELOAD_START_DELAY_MS = 0;
 global.Option = function (text, value) { this.text = String(text); this.value = String(value); };
 const SearchEngine = new Function(`return ${extractClassSource('SearchEngine')}`)();
 const UI = new Function(`return ${extractClassSource('UI')}`)();
+global.InfoTableParser = InfoTableParser;
 global.SearchEngine = SearchEngine;
 global.UI = UI;
 
@@ -271,7 +272,7 @@ runTest('pop() offers Any + three materials, keeps live material value; reset re
     assertEqual([inputs.encInput.value, inputs.catInput.value], ['Any', 'Standard'], 'reset');
 });
 
-// ---------------------------------------------------------------- Manufacturer coverage
+// ---------------------------------------------------------------- Manufacturer menu ranking
 function rankCounts(entries, opts) {
     const records = [];
     entries.forEach(([mfg, n]) => { for (let i = 0; i < n; i++) records.push({ id: `${mfg}-${i}`, desc: `Pump Manufacturer ${mfg}` }); });
@@ -279,46 +280,55 @@ function rankCounts(entries, opts) {
     return InfoTableParser.rankManufacturers(records, opts);
 }
 
-runTest('Coverage: exact 90%, crossing, single, ties, more than eight', () => {
-    const exact = rankCounts([['Barnes', 60], ['Flygt', 20], ['Myers', 10], ['Goulds', 5], ['Ebara', 5]]);
-    assertEqual([exact.options, exact.coveredRecords, exact.eligibleRecords], [['BARNES', 'FLYGT', 'MYERS'], 90, 100], '60/20/10/5/5 -> exactly 90%');
-    assertEqual(rankCounts([['Barnes', 70], ['Flygt', 25], ['Myers', 5]]).options, ['BARNES', 'FLYGT'], '70/25/5 -> 95%');
-    assertEqual(rankCounts([['Myers', 3]]).options, ['MYERS'], 'single manufacturer');
-    assertEqual(rankCounts([['Barnes', 9], ['Flygt', 1]]).options, ['BARNES'], '9/10 is exactly 90% (integer-safe)');
-    assertEqual(rankCounts([['Wilo', 5], ['Abs', 5], ['Ebara', 5], ['Myers', 5]]).options, ['ABS', 'EBARA', 'MYERS', 'WILO'], 'ties alphabetical');
-    assertEqual(rankCounts([['Barnes', 50], ['Wilo', 25], ['Abs', 25]]).options, ['BARNES', 'ABS', 'WILO'], 'crossing tie is alphabetical, minimal prefix');
-    assertEqual(rankCounts([['Barnes', 80], ['Wilo', 10], ['Abs', 10]]).options, ['BARNES', 'ABS'], 'tie not extended past threshold');
-    const ten = ['Barnes', 'Flygt', 'Myers', 'Goulds', 'Ebara', 'Zoeller', 'Wilo', 'Abs', 'Liberty', 'Pentair'].map(m => [m, 10]);
-    assertEqual(rankCounts(ten).options.length, 9, 'uniform ten needs nine (no eight cap)');
+runTest('Top 12 uses frequency order and alphabetical ties, with Sulzer reserved below cutoff', () => {
+    const tied = rankCounts([['Barnes', 5], ['Abs', 5], ['Flygt', 2]]);
+    assertEqual(tied.options, ['ABS', 'BARNES', 'FLYGT', 'SULZER'], 'ties sort alphabetically and include zero-count Sulzer');
+    assert(!Object.hasOwn(tied.counts, 'SULZER'), 'reserved Sulzer does not invent a frequency');
+    const names = Object.keys(InfoTableParser.MFG_ALIASES);
+    const entries = names.filter(name => name !== 'SULZER').map((name, i) => [name, 16 - i]);
+    entries.push(['SULZER', 1]);
+    const top = rankCounts(entries);
+    const expected = top.ranked.filter(name => name !== 'SULZER').slice(0, 11).concat('SULZER');
+    assertEqual(top.options, expected, 'top 11 natural manufacturers plus low-frequency Sulzer, sorted by real frequency');
+    assertEqual(top.options.length, 12, 'menu cap is exactly twelve');
+    assertEqual(top.options[0], top.ranked[0], 'highest frequency stays first');
+    assertEqual(InfoTableParser.MFG_MENU_LIMIT, 12, 'published menu cap');
 });
 
-runTest('Coverage: aliases, dedup, allowed eligibility, unknowns and zero evidence', () => {
+runTest('Fewer than 12 and unique ids retain accurate evidence; no evidence stays unranked', () => {
     const records = [
         { id: '1', desc: 'Pump Manufacturer Crane' }, { id: '2', desc: 'Pump Manufacturer Barnes' },
         { id: '2', desc: 'Pump Manufacturer Barnes' }, { id: '3', desc: 'Pump Manufacturer Grundfos' },
-        { id: '4', desc: 'Pump Manufacturer Flygt' }, { id: '5', desc: 'no table BARNES' }
+        { id: '4', desc: 'Pump Manufacturer Flygt' }, { id: '5', desc: 'no table BARNES' },
+        { id: '6', desc: 'Pump Manufacturer Sulzer' }, { id: '7', desc: 'Pump Manufacturer Sulzer Pumps' },
+        { id: '7', desc: 'Pump Manufacturer Barnes' }
     ];
     InfoTableParser.deriveRecordsSync(records);
     const all = InfoTableParser.rankManufacturers(records);
-    assertEqual([all.counts, all.eligibleRecords], [{ BARNES: 2, FLYGT: 1 }, 3], 'aliases + dedup, unknown excluded from denominator');
-    assertEqual(all.options, ['BARNES', 'FLYGT'], '2/3 < 90% -> includes FLYGT');
+    assertEqual([all.counts, all.eligibleRecords], [{ BARNES: 2, FLYGT: 1, SULZER: 2 }, 5], 'aliases + unique-id dedupe; unknown excluded');
+    assertEqual(all.options, ['BARNES', 'SULZER', 'FLYGT'], 'fewer eligible names retain all plus Sulzer');
     const allowed = InfoTableParser.rankManufacturers(records, { allowed: ['BARNES'] });
-    assertEqual([allowed.options, allowed.eligibleRecords], [['BARNES'], 2], 'denominator after allowed filter');
+    assertEqual([allowed.options, allowed.eligibleRecords], [['BARNES'], 2], 'explicit allowlist still constrains menu values');
     const none = InfoTableParser.rankManufacturers([{ id: 'x', desc: 'nothing' }]);
-    assertEqual([none.options, none.eligibleRecords, none.coveredRecords], [[], 0, 0], 'zero denominator -> no claim');
+    assertEqual([none.options, none.eligibleRecords], [[], 0], 'no row evidence makes no frequency claim');
+    assert(!/90%|coveragePercent|MFG_COVERAGE_PERCENT/.test(fs.readFileSync(path.join(root, 'info-table-parser.js'), 'utf8')), 'active ranking has no coverage cutoff');
 });
 
-runTest('pop(): coverage list with Any first; excluded selection survives; zero evidence falls back', () => {
+runTest('pop(): reserved Sulzer, selected manufacturer retention, and deterministic capped fallback', () => {
     const inputs = setupInputs({ mfg: 'HIDROSTAL' });
     window.FOUND_MFGS = new Set(['FLYGT', 'BARNES']);
     window.MFG_RANKING = rankCounts([['Barnes', 60], ['Flygt', 20], ['Myers', 10], ['Goulds', 5], ['Hidrostal', 5]]);
     UI.pop();
-    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT', 'MYERS', 'HIDROSTAL'], 'coverage + retained selection');
+    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT', 'MYERS', 'GOULDS', 'HIDROSTAL', 'SULZER'], 'frequency order + reserved Sulzer');
     assertEqual(inputs.mfgInput.value, 'HIDROSTAL', 'selection retained');
     window.MFG_RANKING = rankCounts([]);
     inputs.mfgInput.value = 'Any';
+    window.FOUND_MFGS = new Set(Object.keys(InfoTableParser.MFG_ALIASES));
     UI.pop();
-    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT'], 'existing safe fallback list');
+    const fallbackOthers = Object.keys(InfoTableParser.MFG_ALIASES).filter(mfg => mfg !== 'SULZER').sort().slice(0, 11);
+    const fallback = [...fallbackOthers, 'SULZER'].sort();
+    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', ...fallback], 'zero-evidence fallback is alphabetical, capped, and includes Sulzer');
+    assertEqual(inputs.mfgInput.options.length, 13, 'Any plus at most twelve base choices');
     window.MFG_RANKING = null;
 });
 
@@ -329,9 +339,9 @@ runTest('DataLoader ranks once per applied dataset with allowed list; DERIVED_RE
     const old = { id: 'o', desc: 'Enclosure Material Fiberglass Pump Manufacturer Myers', enc: '4XSS' };
     Object.defineProperty(old, '_derivedRev', { value: 1, writable: true, configurable: true, enumerable: false });
     DataLoader.applySnapshot({ records: [old] });
-    assertEqual(InfoTableParser.DERIVED_REV, 2, 'revision bumped');
-    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [2, 'row', '4XSS'], 'v2.5.95-derived record recomputed, raw enc kept');
-    assertEqual(windowState.MFG_RANKING.options, ['MYERS'], 'ranking on apply');
+    assertEqual(InfoTableParser.DERIVED_REV, 3, 'revision bumped');
+    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [3, 'row', '4XSS'], 'v2.5.96-derived record recomputed, raw enc kept');
+    assertEqual(windowState.MFG_RANKING.options, ['MYERS', 'SULZER'], 'ranking on apply includes reserved Sulzer');
     assert(/const SNAPSHOT_SCHEMA_VERSION = '1';/.test(appJsContent), 'snapshot schema unchanged');
 });
 
@@ -367,16 +377,17 @@ runTest('Feedback enclosure shows material labels with compatible encodings; bla
     assertEqual(Object.values(InfoTableParser.MATERIAL_FEEDBACK_CODES).map(InfoTableParser.materialFromEncCode), [FG, SS, PS], 'codes round-trip to materials');
 });
 
-runTest('Feedback payload, per-parameter lockouts, and keyword iteration excludes category button', async () => {
+runTest('Feedback payload canonicalizes Sulzer and keeps per-parameter lockouts', async () => {
     const { Feedback, elements, selectedButtons, queries, getPosted } = buildFeedback();
     Feedback.down('CP-2');
+    assert(elements['fb-mfg'].options.some(o => o.value === 'SULZER'), 'feedback offers canonical Sulzer independent of menu ranking');
     elements['fb-enc'].value = 'PAINTED STEEL';
     elements['fb-sys'].value = 'Duplex';
-    elements['fb-mfg'].value = 'BARNES';
+    elements['fb-mfg'].value = 'SULZER';
     selectedButtons.push({ dataset: { kw: 'FLOAT' } }, { dataset: {} });
     await Feedback.submit();
     const fields = getPosted().records[0].fields;
-    assertEqual(JSON.parse(fields.Corrections), { mfg: 'BARNES', enc: 'PAINTED STEEL', sys: 'Duplex', reject_keywords: ['FLOAT'] }, 'payload');
+    assertEqual(JSON.parse(fields.Corrections), { mfg: 'SULZER', enc: 'PAINTED STEEL', sys: 'Duplex', reject_keywords: ['FLOAT'] }, 'payload');
     assertEqual([fields['Panel ID'], fields.Vote, fields.User, typeof fields.Date], ['CP-2', 'Down', 'user', 'string'], 'payload envelope');
     assert(queries.every(q => q.startsWith('#keyword-cluster')), 'keyword query scoped to keyword cluster');
     ['p_enc', 'p_sys', 'p_mfg'].forEach(k => assert(Feedback.lockout.has(`CP-2:${k}`), `${k} locked`));
@@ -447,5 +458,5 @@ runTest('Performance: ~8,000 records with material rows stay bounded/linear; no 
         console.log('⚠️  Some tests failed.');
         process.exit(1);
     }
-    console.log('✨ All v2.5.96 enclosure material / manufacturer coverage / feedback tests passed!');
+    console.log('✨ All v2.5.97 enclosure material / top-12 / feedback tests passed!');
 })();

@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.94
+// 🧠 SCHEMATICA ai WORKER v2.5.97
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -53,6 +53,7 @@ const VOTE_THRESHOLD = 3;
 const EXACT_MFGS = {
     'GORMAN RUPP': ['GORMAN', 'GR', 'GRSP'],
     'BARNES': ['BARNES', 'SITHE', 'CRANE'],
+    'SULZER': ['SULZER', 'SULZER PUMPS'],
     'HYDROMATIC': ['HYDROMATIC'],
     'FLYGT': ['FLYGT'],
     'MYERS': ['MYERS'],
@@ -276,7 +277,8 @@ function normalizeLegacyMfg(raw) {
     if (u.includes('VFD') || u.includes('AERATOR') || u.includes('BLOWER') || u.includes('TESTSITE') || u.includes('VALVE') || u.includes('DRIP') || u === 'SP') return null;
 
     for (const [canon, aliases] of Object.entries(EXACT_MFGS)) {
-        if (u.includes(canon)) return canon;
+        const canonicalPattern = canon.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`(^|[^A-Z0-9])${canonicalPattern}(?=$|[^A-Z0-9])`).test(u)) return canon;
         for (const alias of aliases) {
             if (new RegExp(`\\b${alias}\\b`).test(u)) return canon;
         }

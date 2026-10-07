@@ -7,6 +7,7 @@
 const EXACT_MFGS = {
     'GORMAN RUPP': ['GORMAN', 'GR', 'GRSP'],
     'BARNES': ['BARNES', 'SITHE', 'CRANE'],
+    'SULZER': ['SULZER', 'SULZER PUMPS'],
     'HYDROMATIC': ['HYDROMATIC'],
     'FLYGT': ['FLYGT'],
     'MYERS': ['MYERS'],

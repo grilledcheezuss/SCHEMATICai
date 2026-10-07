@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.96
+## Version: v2.5.97
 
-_Release-alignment note: v2.5.96 (like v2.5.95) is frontend-only and mirrored here for app/Worker bookkeeping. The Worker API is unchanged (the deployed Worker keeps v2.5.94 behavior and its banner intentionally still reads v2.5.94; `worker/worker.js`, `worker/lib/extract.js`, and `wrangler.toml` are byte-identical) and does **not** need redeploying._
+_Release note: v2.5.97 adds Sulzer canonical aliases and whole-token manufacturer normalization in the Worker and pure extraction helper. Deploy the Worker separately from the frontend; merging this PR does not confirm a Cloudflare deployment. The Worker API response shape, authentication, token routing, MAIN cache keys/TTLs, retries, and request-time ML behavior are unchanged. No info-table parsing, ranking, or extra network requests were added to MAIN. Existing cached MAIN records remain usable through uncertain description fallback until normal data/edge-cache refresh returns the new canonical `mfg` value; no cache wipe is needed._
 
 ## Overview
 
@@ -12,6 +12,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.97**: Fixed top-12 canonical manufacturer menu using unique bounded Pump Manufacturer row evidence, frequency-descending/alphabetical order, and one reserved Sulzer slot when outside the natural cutoff. Zero-evidence fallback is capped deterministically and includes Sulzer without claiming frequencies; a currently selected supported out-of-list manufacturer remains as a temporary choice (up to 13 manufacturer choices plus Any). Sulzer is supported by the browser and Worker using existing clean/varied confidence semantics and canonical feedback value `SULZER`; ABS remains independent. Browser derived revision is 3 and old cached snapshots safely re-derive. Requires separate Worker deployment plus frontend publication and normal data/edge-cache refresh; automated Node tests do not prove Cloudflare CPU headroom.
 - **v2.5.96**: Frontend-only material-based Enclosure search (Any / Fiberglass / Stainless Steel / Painted Steel) driven by the bounded Enclosure Material info-table value parsed in the browser; a clear row excludes the other two materials regardless of `enc` or narrative text, and NEMA rating is ignored. Without a usable row, legacy `enc` codes are a conservative fallback (4XFG → Fiberglass, 4XSS → Stainless Steel, usually uncertain); POLY is no longer a search option but POLY records are untouched. The browser no longer rewrites `enc`/`encV`. Manufacturer menu uses cumulative 90% coverage of eligible Pump Manufacturer row occurrences instead of a top-eight cap. Feedback dropdowns mirror the search grid; enclosure corrections keep `enc` = `4XFG`/`4XSS` for vote-tally compatibility and add `enc` = `PAINTED STEEL`, which the unchanged healer stores and applies like any other value. MAIN response shape, cache keys, auth, and token routing are unchanged.
 - **v2.5.95**: Frontend-only retry of System Type filtering, top-eight Pump Manufacturer ranking, and the reordered parameter grid. The first attempt (PR #188) parsed info tables per record inside the Worker MAIN loop and was reverted (#189) after production MAIN requests hit the Cloudflare "Worker exceeded CPU time limit" error. This release leaves the Worker, `worker/lib/extract.js`, `wrangler.toml`, the MAIN response shape, and cache keys unchanged; the browser derives System Type / Pump Manufacturer evidence once per record from the existing `desc` field. Feedback may now include a `sys` correction param; the healer tallies/stores it like any other param but does not apply it to MAIN records in this release.
 - **v2.5.94**: Frontend-only search-state fixes: reset clears both Allowed/Blocked keyword lists and warning/mode state; live filters, Panel Type, keywords, and mode survive caching/sync/snapshot/background refresh while results and PDF viewer state remain intact. No keyword persistence added; Worker API/backend behavior is unchanged
@@ -358,6 +359,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.97**: Sulzer aliases were added to strict Worker extraction and canonical normalization only; MAIN/auth/cache/ML execution paths and response shape are unchanged. Separate Worker deployment is required.
 - **v2.5.85**: Viewer/header polish follow-up: mobile replacement transitions keep the PDF toolbar session-mounted, iOS Safari Save PDF detection/guidance is more reliable, and desktop branding chrome is simplified without Worker changes
 - **v2.5.81**: PDF viewer stability patch: hidden replacement staging now lives outside the scroll container, first/new-document loads initialize at page-start, same-document anchor restores are generation-guarded, and swap/viewport scroll positions clamp safely without scrollbar churn
 - **v2.5.79**: Client interaction patch: PDF gesture finalize now preserves release-anchor position through live-transform to crisp-render swap, and mobile Results/PDF scrolling stays origin-locked for each touch gesture

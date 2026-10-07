@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+global.InfoTableParser = require('../info-table-parser.js');
 
 const appJsPath = path.join(__dirname, '..', 'app.js');
 const appJsContent = fs.readFileSync(appJsPath, 'utf8');
