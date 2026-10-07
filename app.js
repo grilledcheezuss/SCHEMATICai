@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.102 ---
-const APP_VERSION = "v2.5.102";
+// --- SCHEMATICA ai v2.5.103 ---
+const APP_VERSION = "v2.5.103";
 const VERSION_HISTORY = {
+    "v2.5.103": "Update/sync-lock reliability: sync locks carry owner tab, app version and heartbeat; a lock from another release or without a heartbeat for 30s is taken over, a lock won while waiting is reused instead of reported as a peer, and peer waiting ends within 60s with an own sync. Locks are released on pagehide/beforeunload and before release navigation. A mixed HTML/app.js release triggers one guarded cache-bypassing reload; a missing release-update.js or stalled navigation no longer blocks startup/login. Every waiting state ends in synced/restored/retry and a recovered Search button searches again. Snapshot schema 1, DERIVED_REV, encrypted generations and Worker v2.5.97 unchanged; no Worker redeploy",
     "v2.5.102": "Redirect-safe release revalidation: login/startup revalidates the loaded entry document path and follows only same-origin redirects (for example /index.html -> /), so hosts that canonicalize index.html no longer abort the check with ERR_FAILED. Versioned assets must stay on their same-origin path with JS/CSS MIME types, no HTML fallback body and an app.js declaring the deployed version before navigation; failures keep the installed app and cached data. Waiting-for-update indicator no longer restarts a per-poll percentage and the search button ellipsizes instead of clipping. Worker v2.5.97, search/parser/sync/cache behavior unchanged; no Worker redeploy",
     "v2.5.101": "First-card hover clipping fixed with scroll-content inset; obsolete CSV/cache/reset menu buttons removed. Login/startup revalidates deployed frontend assets and release-stale data refreshes through atomic encrypted generations, retaining working cache on failure. Worker v2.5.97, schema 1 and DERIVED_REV 5 unchanged",
     "v2.5.100": "UI housekeeping: Submittal Generator unavailable only on small phones (short side <= 430 px in the < 768 px layout, one media query shared by JS matchMedia and CSS); eligible 431-767 px viewports get a compact floating Control Panel with restore/minimize controls; resize into/out of small-phone mode preserves zones/context/minimized state. Light-mode result cards keep purple brand borders on normal/hover/active, while no-PDF cards keep their neutral disabled treatment. First desktop/tablet search now shows the total count immediately (results-ready synced on completion; explicit 0 kept). UI.isSmallMobile breakpoint, search/parser/DERIVED_REV, Worker v2.5.97, auth/cache/network unchanged; no Worker redeploy",
@@ -411,7 +412,8 @@ class DB {
     static async getChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").get(k); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async getChunkKeys() { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readonly"); const q = t.objectStore("chunks").getAllKeys(); q.onsuccess = () => r(q.result); q.onerror = j; }); }
     static async deleteChunk(k) { const d = await this.open(); return new Promise((r, j) => { const t = d.transaction("chunks", "readwrite"); t.objectStore("chunks").delete(k); t.oncomplete = r; t.onerror = j; }); }
-    static async claimLock(k, token, ttlMs) {
+    // Grants the lock when it is free, already ours, judged stale by the caller's policy, or forced.
+    static async claimLock(k, token, { isStale = () => false, force = false, meta = {} } = {}) {
         const d = await this.open();
         return new Promise((resolve, reject) => {
             const t = d.transaction("chunks", "readwrite");
@@ -422,16 +424,13 @@ class DB {
                 const existing = q.result;
                 const now = Date.now();
                 const lockAt = Number(existing?.at);
-                const heartbeatAt = Number(existing?.heartbeatAt);
-                const ttl = Number(existing?.ttlMs) || ttlMs;
-                const lockTimestamp = Number.isFinite(heartbeatAt) && heartbeatAt > 0 ? heartbeatAt : lockAt;
-                const isLocked = Number.isFinite(lockTimestamp) && lockTimestamp > 0 && (now - lockTimestamp) < ttl;
-                if (isLocked && existing?.token !== token) return;
+                const ours = !!existing && existing.token === token;
+                if (existing && !ours && !force && !isStale(existing, now)) return;
                 store.put({
+                    ...meta,
                     token,
-                    at: (existing?.token === token && Number.isFinite(lockAt) && lockAt > 0) ? lockAt : now,
-                    heartbeatAt: now,
-                    ttlMs: ttlMs
+                    at: (ours && Number.isFinite(lockAt) && lockAt > 0) ? lockAt : now,
+                    heartbeatAt: now
                 }, k);
                 granted = true;
             };
@@ -723,8 +722,18 @@ class CacheService {
 }
 
 class AuthService {
+    // release-update.js can be missing (host HTML fallback) or a release navigation can stall; neither may block the app.
+    static RELEASE_NAVIGATION_FALLBACK_MS = 10000;
+    static releaseCheck() {
+        if (typeof ReleaseUpdate === 'undefined' || typeof ReleaseUpdate.check !== 'function') {
+            console.warn('[ReleaseUpdate] release-update.js unavailable; continuing with installed app and cached data.');
+            return Promise.resolve({ status: 'unavailable', navigating: false });
+        }
+        return Promise.resolve().then(() => ReleaseUpdate.check(APP_VERSION))
+            .catch(() => ({ status: 'unavailable', navigating: false }));
+    }
     static init() { const u = localStorage.getItem('cox_user'); const p = localStorage.getItem('cox_pass'); if (u && p) { document.documentElement.classList.add('logged-in'); document.getElementById('auth-overlay').classList.remove('active-modal'); UI.pop(); return true; } return false; }
-    static async login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); const update = await ReleaseUpdate.check(APP_VERSION); if (!update.navigating) location.reload(); }
+    static async login() { const u = document.getElementById('auth-user').value.trim(); const p = document.getElementById('auth-pass').value.trim(); if (!u || !p) return alert("Missing Credentials"); localStorage.setItem('cox_user', u); localStorage.setItem('cox_pass', p); const update = await this.releaseCheck(); if (!update.navigating) location.reload(); else setTimeout(() => location.reload(), this.RELEASE_NAVIGATION_FALLBACK_MS); }
     static logout() { localStorage.clear(); sessionStorage.clear(); location.reload(); }
     static headers() { return { 'X-Cox-User': localStorage.getItem('cox_user'), 'X-Cox-Pass': localStorage.getItem('cox_pass') }; }
 }
@@ -759,13 +768,21 @@ class DataLoader {
     static DATA_RELEASE_VERSION_KEY = 'cox_data_release_version';
     static SNAPSHOT_SCHEMA_VERSION_KEY = 'cox_cache_schema_version';
     static SYNC_DB_LOCK_KEY = '__cox_db_sync_lock';
-    static SYNC_LOCK_TTL_MS = 10 * 60 * 1000;
-    static SYNC_LOCK_HEARTBEAT_MS = 15000;
-    static SYNC_LOCK_WAIT_TIMEOUT_MS = 120000;
+    // A live owner renews its lock every heartbeat and on every fetched page; a lock without a heartbeat for
+    // SYNC_LOCK_STALE_MS (dead/closed/navigated tab) or written by another frontend release is taken over.
+    static SYNC_LOCK_STALE_MS = 30000;
+    static SYNC_LOCK_HEARTBEAT_MS = 5000;
+    static SYNC_LOCK_WAIT_TIMEOUT_MS = 60000;
     static SYNC_LOCK_WAIT_BASE_DELAY_MS = 1200;
     static STARTUP_WATCHDOG_MS = 180000;
+    static STARTUP_WATCHDOG_RESUME_MS = 30000;
+    static MAX_PRELOAD_SYNC_ROUNDS = 6;
+    static TAB_ID = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     static _inFlightSync = false;
     static _lockToken = null;
+    static _lockAcquiredAt = 0;
+    static _lockReservedForSync = false;
+    static _lockExitHooksInstalled = false;
     static _lockHeartbeatTimer = null;
     static _lifecycleRefreshHookInstalled = false;
     static _backgroundRefreshPromise = null;
@@ -873,15 +890,33 @@ class DataLoader {
         }
         return { kind: 'terminal', recoverable: false, message: '⚠️ SYNC INTERRUPTED' };
     }
+    static isSyncLockStale(lockMeta, now = Date.now()) {
+        if (!lockMeta || typeof lockMeta !== 'object') return true;
+        // Locks from another frontend release (including pre-v2.5.103 locks without appVersion) are never waited on.
+        if (lockMeta.appVersion !== APP_VERSION) return true;
+        const heartbeatAt = Number(lockMeta.heartbeatAt) > 0 ? Number(lockMeta.heartbeatAt) : Number(lockMeta.at);
+        if (!Number.isFinite(heartbeatAt) || heartbeatAt <= 0) return true;
+        // The stored ttlMs is ignored: pre-v2.5.103 locks stored a ten-minute TTL that outlived dead tabs.
+        const age = now - heartbeatAt;
+        return age >= this.SYNC_LOCK_STALE_MS || age < -this.SYNC_LOCK_STALE_MS;
+    }
+    static claimSyncLock(token, { force = false } = {}) {
+        return DB.claimLock(this.SYNC_DB_LOCK_KEY, token, {
+            force,
+            isStale: (existing, now) => this.isSyncLockStale(existing, now),
+            meta: { owner: this.TAB_ID, appVersion: APP_VERSION, ttlMs: this.SYNC_LOCK_STALE_MS }
+        });
+    }
+    static mirrorSyncLock(token, at = this._lockAcquiredAt || Date.now()) {
+        localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at, heartbeatAt: Date.now(), token, owner: this.TAB_ID, appVersion: APP_VERSION, ttlMs: this.SYNC_LOCK_STALE_MS }));
+    }
+    // Renews this tab's own lock; fails only when a peer has taken it over.
     static async ensureActiveLockOwnership() {
         if (!this._lockToken) return false;
-        const lockMeta = await DB.getChunk(this.SYNC_DB_LOCK_KEY).catch(() => null);
-        const heartbeatAt = Number(lockMeta?.heartbeatAt || lockMeta?.at);
-        const ttlMs = Number(lockMeta?.ttlMs) || this.SYNC_LOCK_TTL_MS;
-        const lockAlive = Number.isFinite(heartbeatAt) && heartbeatAt > 0 && (Date.now() - heartbeatAt) < ttlMs;
-        const owned = lockAlive && lockMeta?.token === this._lockToken;
+        const owned = await this.claimSyncLock(this._lockToken).catch(() => false);
         if (!owned) return false;
-        localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: Number(lockMeta?.at) || heartbeatAt, heartbeatAt, token: this._lockToken, ttlMs }));
+        this._lockHeartbeatLost = false;
+        this.mirrorSyncLock(this._lockToken);
         return true;
     }
     static async waitForResumeReady(btn, message = '⏳ WAITING TO RESUME SYNC...', timeoutMs = this.RESUME_WAIT_TIMEOUT_MS) {
@@ -932,6 +967,8 @@ class DataLoader {
         btn.classList.remove('warning', 'error');
         btn.disabled = false;
         btn.innerText = "SEARCH";
+        // Waiting/retry states replace the inline Search handler; a recovered button must search again.
+        btn.onclick = () => SearchEngine.perform();
     }
     static showSyncInterrupted(btn) {
         if (!btn) return;
@@ -960,16 +997,17 @@ class DataLoader {
         if (!this._lockToken) return;
         this._lockHeartbeatTimer = setInterval(() => {
             if (!this._lockToken) return;
-            DB.claimLock(this.SYNC_DB_LOCK_KEY, this._lockToken, this.SYNC_LOCK_TTL_MS)
+            const token = this._lockToken;
+            this.claimSyncLock(token)
                 .then((retained) => {
+                    if (token !== this._lockToken) return;
                     if (!retained) {
                         this._lockHeartbeatLost = true;
                         console.warn('[SyncLock] heartbeat status=lost');
                         return;
                     }
                     this._lockHeartbeatLost = false;
-                    const now = Date.now();
-                    localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: now, heartbeatAt: now, token: this._lockToken, ttlMs: this.SYNC_LOCK_TTL_MS }));
+                    this.mirrorSyncLock(token);
                 })
                 .catch(() => {});
         }, this.SYNC_LOCK_HEARTBEAT_MS);
@@ -992,15 +1030,17 @@ class DataLoader {
                 .catch(err => console.warn('Background refresh bootstrap failed; keeping existing cache intact', err));
         }, jitterMs);
     }
-    static async acquireSyncLock(now = Date.now()) {
+    static async acquireSyncLock(now = Date.now(), { force = false } = {}) {
         if (this._inFlightSync) return false;
         const token = `${now}_${Math.random().toString(36).slice(2, 10)}`;
-        const won = await DB.claimLock(this.SYNC_DB_LOCK_KEY, token, this.SYNC_LOCK_TTL_MS);
+        const won = await this.claimSyncLock(token, { force });
         if (won) {
             this._inFlightSync = true;
             this._lockToken = token;
+            this._lockAcquiredAt = now;
             this._lockHeartbeatLost = false;
-            localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at: now, heartbeatAt: now, token, ttlMs: this.SYNC_LOCK_TTL_MS }));
+            this.mirrorSyncLock(token, now);
+            this.installLockExitHooks();
             this.startSyncLockHeartbeat();
         }
         return won;
@@ -1012,8 +1052,28 @@ class DataLoader {
         }
         this._inFlightSync = false;
         this._lockToken = null;
+        this._lockAcquiredAt = 0;
+        this._lockReservedForSync = false;
         this._lockHeartbeatLost = false;
         localStorage.removeItem(this.SYNC_LOCK_KEY);
+    }
+    static installLockExitHooks() {
+        if (this._lockExitHooksInstalled || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+        const release = () => this.releaseSyncLockForExit();
+        window.addEventListener('pagehide', release);
+        window.addEventListener('beforeunload', release);
+        window.addEventListener('pageshow', (event) => {
+            if (event?.persisted && this._lockToken) this.startSyncLockHeartbeat();
+        });
+        this._lockExitHooksInstalled = true;
+    }
+    // Best effort while leaving: peers must not wait on this tab. A bfcache-restored sync renews the lock on its
+    // next page (or fails as SYNC_LOCK_LOST if a peer took over); an unfinished release is caught by staleness.
+    static releaseSyncLockForExit() {
+        this.stopSyncLockHeartbeat();
+        if (!this._lockToken) return;
+        localStorage.removeItem(this.SYNC_LOCK_KEY);
+        DB.releaseLock(this.SYNC_DB_LOCK_KEY, this._lockToken).catch(() => {});
     }
     static async waitForPeerSyncAndRestore(btn, timeoutMs = this.SYNC_LOCK_WAIT_TIMEOUT_MS) {
         const start = Date.now();
@@ -1032,16 +1092,27 @@ class DataLoader {
                 return { success: true, restoredFromPeer: true };
             }
             const lockMeta = await DB.getChunk(this.SYNC_DB_LOCK_KEY).catch(() => null);
-            const heartbeatAt = Number(lockMeta?.heartbeatAt || lockMeta?.at);
-            const lockIsAlive = Number.isFinite(heartbeatAt) && heartbeatAt > 0 && (Date.now() - heartbeatAt) < this.SYNC_LOCK_TTL_MS;
-            if (!lockIsAlive) {
+            if (this.isSyncLockStale(lockMeta)) {
                 const won = await this.acquireSyncLock();
-                if (won) return { success: false, shouldSync: true };
+                if (won) {
+                    // fetchPartition reuses this lock; re-acquiring it would report the tab's own lock as a peer.
+                    this._lockReservedForSync = true;
+                    return { success: false, shouldSync: true, reason: 'stale-lock-takeover' };
+                }
             }
             const delayMs = Math.min(5000, this.SYNC_LOCK_WAIT_BASE_DELAY_MS + (poll * 250) + Math.round(Math.random() * 500));
             await this.sleep(delayMs);
         }
         const recoverable = this.isDocumentSuspended() || (typeof navigator !== 'undefined' && navigator.onLine === false);
+        if (!recoverable) {
+            // Bounded wait: a peer still heartbeating past the bound cannot strand this tab; sync for ourselves.
+            const won = await this.acquireSyncLock(Date.now(), { force: true });
+            if (won) {
+                this._lockReservedForSync = true;
+                console.warn('[SyncLock] status=peer-wait-timeout action=own-sync');
+                return { success: false, shouldSync: true, timedOut: true, reason: 'lock-wait-timeout' };
+            }
+        }
         return { success: false, timedOut: true, recoverable, reason: recoverable ? 'lock-wait-interrupted' : 'lock-wait-timeout' };
     }
     static async ensureCacheCompatibility() {
@@ -1143,17 +1214,21 @@ class DataLoader {
         btn.disabled = true;
         btn.classList.remove('warning', 'error');
         btn.innerText = "⏳ INITIALIZING...";
-        const startupWatchdog = setTimeout(() => {
+        // Every startup waiting state ends: a sync that still completes restores SEARCH, otherwise Retry is offered.
+        const armStartupWatchdog = delayMs => setTimeout(() => {
             if (!btn.classList.contains('error') && !btn.classList.contains('warning') && btn.disabled) {
                 if (this.isDocumentSuspended()) {
                     console.warn('[SyncWatchdog] status=suspended; preserving resumable startup state');
                     this.showWaitingForUpdate(btn, "⏳ APP RESUMING...");
-                    return;
+                } else {
+                    console.warn('[SyncWatchdog] Startup sync exceeded watchdog window; surfacing retry state');
+                    this.showSyncInterrupted(btn);
                 }
-                console.warn('[SyncWatchdog] Startup sync exceeded watchdog window; surfacing recoverable retry state');
-                this.showWaitingForUpdate(btn, "⏳ RETRYING SYNC...");
             }
-        }, this.STARTUP_WATCHDOG_MS);
+            // Keep watching until preload settles: a later waiting state must also end in Retry.
+            startupWatchdog = armStartupWatchdog(this.STARTUP_WATCHDOG_RESUME_MS);
+        }, delayMs);
+        let startupWatchdog = armStartupWatchdog(this.STARTUP_WATCHDOG_MS);
 
         try {
             btn.innerText = "🔒 PREPARING...";
@@ -1197,7 +1272,9 @@ class DataLoader {
 
             let syncResult = null;
             let recoverableRestarts = 0;
+            let syncRounds = 0;
             while (true) {
+                if (++syncRounds > this.MAX_PRELOAD_SYNC_ROUNDS) break;
                 syncResult = await this.fetchPartition('desc', btn, { background: false, allowWaitingState: true });
                 if (syncResult?.skipped) {
                     const waitResult = await this.waitForPeerSyncAndRestore(btn);
@@ -1253,6 +1330,8 @@ class DataLoader {
             }
         } finally {
             clearTimeout(startupWatchdog);
+            // A lock won while waiting must never outlive preload unused (it would block peers and new releases).
+            if (this._lockReservedForSync) await this.releaseSyncLock();
             if (restoredFromCache || blockingSyncSucceeded) {
                 this.clearBlockingSyncAttempts();
                 this.restoreSearchReadyState(btn);
@@ -1347,7 +1426,11 @@ class DataLoader {
 
     static async fetchPartition(dir, btn, { background = false, reason = 'sync', allowWaitingState = false } = {}) {
         if (!background) {
-            if (!await this.acquireSyncLock()) return { success: false, skipped: true };
+            if (this._lockReservedForSync && this._lockToken) {
+                this._lockReservedForSync = false;
+            } else if (!await this.acquireSyncLock()) {
+                return { success: false, skipped: true };
+            }
         }
         let offset = null, loop = 0;
         let fetchedCount = 0; let retryCount = 0;
@@ -1363,12 +1446,12 @@ class DataLoader {
                 loop++;
                 if (loop > 300) throw new Error('Sync aborted: pagination loop limit exceeded');
                 console.group(`📥 Sync Batch ${loop}`); 
-                if (!background && this._lockHeartbeatLost) {
+                if (this._lockToken && this._lockHeartbeatLost) {
                     const lockErr = new Error('Sync lock heartbeat lost');
                     lockErr.code = 'SYNC_LOCK_LOST';
                     throw lockErr;
                 }
-                if (!background && this._lockToken) {
+                if (this._lockToken) {
                     const hasLock = await this.ensureActiveLockOwnership();
                     if (!hasLock) {
                         const lockErr = new Error('Sync lock ownership lost');
@@ -7946,9 +8029,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 MobileScrollCoordinator.teardown();
             }
         }, { once: true });
+        if (typeof ReleaseUpdate !== 'undefined') {
+            ReleaseUpdate.beforeNavigate = () => DataLoader.releaseSyncLock();
+        }
         if(AuthService.init()) { 
-            ReleaseUpdate.check(APP_VERSION).then(update => {
+            AuthService.releaseCheck().then(update => {
                 if (!update.navigating) DataLoader.preload();
+                else setTimeout(() => DataLoader.preload(), AuthService.RELEASE_NAVIGATION_FALLBACK_MS);
             });
         }
     } catch(e) {

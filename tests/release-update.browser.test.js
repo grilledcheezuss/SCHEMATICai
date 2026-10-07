@@ -26,7 +26,7 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
                 const state = { fetches: 0, navigations: [], reloads: 0 };
                 const location = {
                     href: `${window.location.origin}/index.html?keep=1#test`,
-                    replace: url => state.navigations.push(url),
+                    replace: url => { state.navigations.push(url); state.events = [...(state.events || []), 'navigate']; },
                     reload: () => state.reloads++
                 };
                 const sessionStorage = {
@@ -42,6 +42,7 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
                     const requested = new URL(url);
                     const isAsset = /\.(js|css)$/.test(requested.pathname);
                     if (options.assetFailure && requested.pathname.endsWith('.js')) throw new Error('asset unavailable');
+                    if (options.entryOffline && !isAsset) throw new Error('entry unavailable');
                     if (options.timeout) return new Promise((_, reject) =>
                         init.signal.addEventListener('abort', () => reject(new Error('aborted'))));
                     if (!isAsset) {
@@ -62,6 +63,10 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
                 const Release = new Function('location', 'sessionStorage', 'fetch',
                     `${source}; return ReleaseUpdate;`)(location, sessionStorage, fetch);
                 Release.TIMEOUT_MS = 20;
+                // The test page's own meta is the repo version; by default model HTML matching the executing app.js.
+                const realDocumentVersion = Release.documentVersion.bind(Release);
+                Release.documentVersion = () => 'documentVersion' in options
+                    ? (options.documentVersion === 'real' ? realDocumentVersion() : options.documentVersion) : current;
                 return { Release, state, storage, location, run: () => Release.check(current) };
             }
             let h = harness(version);
@@ -141,6 +146,60 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
             h.storage.set(h.Release.ATTEMPT_KEY, JSON.stringify({ version, at: Date.now() - h.Release.RETRY_AFTER_MS - 1 }));
             check((await h.run()).navigating, 'future login can retry failed asset navigation after cooldown');
 
+            // v2.5.103 mixed-release handshake: HTML and executing app.js from different releases.
+            check(harness(version, html, { documentVersion: 'real' }).Release.documentVersion() === version, 'document version read from entry meta');
+            h = harness(version, html, { documentVersion: 'v2.5.100' });
+            let mixed = await h.run();
+            check(mixed.navigating && h.state.navigations.length === 1
+                && new URL(h.state.navigations[0]).searchParams.get('cox_release') === version, 'stale HTML around current app.js reloads entry once');
+            reentry = harness(version, html, { storage: h.storage, documentVersion: 'v2.5.100' });
+            check((await reentry.run()).status === 'pending' && !reentry.state.navigations.length, 'still-mixed HTML after the guarded reload continues without looping');
+            reentry = harness(version, html, { storage: h.storage });
+            check((await reentry.run()).status === 'current' && !h.storage.size, 'matching HTML after the guarded reload clears the guard');
+            h = harness('v2.5.100', html, { documentVersion: version, entryOffline: true });
+            mixed = await h.run();
+            check(mixed.navigating && new URL(h.state.navigations[0]).searchParams.get('cox_release') === version,
+                'newer HTML around old app.js reloads once even when entry revalidation fails');
+            check(h.state.requests.slice(1).every(r => r.cache === 'reload') && h.state.requests.length === 1 + h.Release.ASSETS.length,
+                'mixed reload is cache-bypassing: every asset is re-downloaded first');
+            reentry = harness('v2.5.100', html, { storage: h.storage, documentVersion: version, entryOffline: true });
+            check((await reentry.run()).status === 'pending' && !reentry.state.navigations.length, 'still-stale app.js after the guarded reload keeps the loaded app');
+            h = harness('v2.5.100', html, { documentVersion: version, assetResponse: url => url.pathname.endsWith('/app.js') && { body: 'const APP_VERSION = "v2.5.100";' } });
+            check((await h.run()).status === 'unavailable' && !h.state.navigations.length && !h.storage.size,
+                'mixed release whose app.js is still stale on the CDN does not navigate or poison the guard');
+            h = harness('v2.5.100', html, { documentVersion: version, entryOffline: true,
+                assetResponse: url => url.pathname.endsWith('/release-update.js') && { type: 'text/html', body: '<!doctype html><html></html>' } });
+            check((await h.run()).status === 'unavailable' && !h.state.navigations.length && !h.storage.size,
+                'deploy-window HTML fallback for an asset leaves the installed app usable');
+            h = harness('v99.0.0', html, { documentVersion: version });
+            check((await h.run()).status === 'current' && !h.state.navigations.length, 'mixed release never downgrades executing app.js');
+            const meta = document.querySelector('meta[name="app-version"]');
+            meta.content = 'latest';
+            h = harness(version, html, { documentVersion: 'real' });
+            check(h.Release.documentVersion() === null && (await h.run()).status === 'current' && !h.state.navigations.length,
+                'malformed document meta is not treated as mixed');
+            meta.content = version;
+
+            // Sync lock is released before leaving; a failing or hung release hook cannot block navigation.
+            h = harness('v2.5.100');
+            h.Release.beforeNavigate = async () => {
+                h.state.events = [...(h.state.events || []), 'release-lock'];
+                check(h.storage.size === 1, 'navigation guard stored before releasing the lock');
+            };
+            await h.run();
+            check(JSON.stringify(h.state.events) === '["release-lock","navigate"]', 'sync lock released before release navigation');
+            h = harness('v2.5.100');
+            h.Release.beforeNavigate = () => { throw new Error('release failed'); };
+            check((await h.run()).navigating && h.state.navigations.length === 1, 'throwing lock release does not block navigation');
+            h = harness('v2.5.100');
+            h.Release.NAVIGATION_RELEASE_TIMEOUT_MS = 10;
+            h.Release.beforeNavigate = () => new Promise(() => {});
+            check((await h.run()).navigating && h.state.navigations.length === 1, 'hung lock release is bounded before navigation');
+            h = harness(version);
+            h.Release.beforeNavigate = () => { h.state.events = ['release-lock']; };
+            await h.run();
+            check(!h.state.events, 'no lock release without a release navigation');
+
             // Exercise the actual manual login implementation without navigating the test page.
             const authSource = app.slice(app.indexOf('class AuthService {'), app.indexOf('class NetworkService {'));
             for (const current of [version, 'v2.5.100']) {
@@ -156,7 +215,7 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
                 check(current === version ? h.state.reloads === 1 : h.state.navigations.length === 1 && h.state.reloads === 0,
                     'manual login chooses ordinary reload or newer release navigation, not both');
             }
-            check(/if\(AuthService\.init\(\)\) \{\s*ReleaseUpdate\.check\(APP_VERSION\)\.then\(update => \{\s*if \(!update\.navigating\) DataLoader\.preload\(\);/.test(app),
+            check(/if\(AuthService\.init\(\)\) \{\s*AuthService\.releaseCheck\(\)\.then\(update => \{\s*if \(!update\.navigating\) DataLoader\.preload\(\);/.test(app),
                 'auto-login checks deployed assets before data preload');
             return checks;
         }, source, html, version, app);
@@ -189,9 +248,28 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
         assert.equal(realRedirect.older, 'updating', 'real redirected entry warms assets and navigates to newer release');
         assert(new URL(realRedirect.navigations[0]).searchParams.get('cox_release') === version, 'redirected navigation targets deployed release');
         assert.deepEqual(realRedirect.warnings, [], 'no Entry revalidation unavailable warning for redirected entry');
+        // A sync lock owned by this tab is released by the real ReleaseUpdate -> DataLoader hook before navigating.
+        const owned = await browser.evaluate(async () => {
+            sessionStorage.removeItem('test_lock_after_release');
+            const won = await DataLoader.acquireSyncLock();
+            const lock = await DB.getChunk(DataLoader.SYNC_DB_LOCK_KEY);
+            const release = ReleaseUpdate.beforeNavigate;
+            ReleaseUpdate.beforeNavigate = async () => {
+                await release();
+                sessionStorage.setItem('test_lock_after_release', JSON.stringify((await DB.getChunk(DataLoader.SYNC_DB_LOCK_KEY)) ?? null));
+            };
+            return { won, owner: lock?.owner === DataLoader.TAB_ID, version: lock?.appVersion, heartbeat: lock?.heartbeatAt > 0 };
+        });
+        assert(owned.won && owned.owner && owned.version === version && owned.heartbeat, 'real IndexedDB lock carries owner, app version and heartbeat');
         const navigated = browser.waitForEvent('Page.loadEventFired');
         await browser.evaluate(() => { ReleaseUpdate.check('v2.5.100'); return true; });
         await navigated;
+        const lockAfter = await browser.evaluate(async () => ({
+            atNavigation: sessionStorage.getItem('test_lock_after_release'),
+            now: (await DB.getChunk(DataLoader.SYNC_DB_LOCK_KEY)) ?? null
+        }));
+        assert.equal(lockAfter.atNavigation, 'null', 'sync lock already released when release navigation starts');
+        assert.equal(lockAfter.now, null, 'new page does not inherit a sync lock from the navigated page');
         const installed = await browser.evaluate(() => ({
             release: new URL(location.href).searchParams.get('cox_release'),
             version: document.getElementById('menu-version').textContent,
@@ -215,6 +293,25 @@ const version = app.match(/const APP_VERSION = "(v[^"]+)"/)[1];
         });
         assert(automatic.loggedIn && automatic.status === 'current' && automatic.preloads === 1,
             'actual saved-credential startup checks release then preloads once');
+        // Deploy window: release-update.js missing/refused (host HTML fallback) must not block startup.
+        await browser.send('Page.addScriptToEvaluateOnNewDocument', { source:
+            "window.alert = message => { window.__alerts = [...(window.__alerts || []), String(message)]; };"
+        });
+        const blocked = ['*fonts.googleapis.com*', '*fonts.gstatic.com*', '*coxpanelfinder.app*', '*workers.dev*', '*airtable*'];
+        await browser.send('Network.setBlockedURLs', { urls: [...blocked, '*release-update.js*'] });
+        try {
+            await browser.open(1280, 800);
+            const missing = await browser.evaluate(async () => {
+                await new Promise(resolve => setTimeout(resolve, 50));
+                return { checker: typeof ReleaseUpdate, preloads: window.__preloads, alerts: window.__alerts || [],
+                    loggedIn: document.documentElement.classList.contains('logged-in') };
+            });
+            assert(missing.checker === 'undefined' && missing.loggedIn && missing.preloads === 1 && missing.alerts.length === 0,
+                'missing release-update.js still preloads the installed app once without a fatal init alert');
+            assert(!browser.pageErrors.some(error => /ReleaseUpdate/.test(error)), 'missing release checker raises no page error');
+        } finally {
+            await browser.send('Network.setBlockedURLs', { urls: blocked });
+        }
         console.log(`✅ ${results.length} release/login browser checks plus asset/header consistency passed`);
     } finally {
         await browser.close();

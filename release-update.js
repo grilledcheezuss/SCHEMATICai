@@ -4,6 +4,9 @@ class ReleaseUpdate {
     static ATTEMPT_KEY = 'cox_release_navigation';
     static RETRY_AFTER_MS = 10 * 60 * 1000;
     static TIMEOUT_MS = 5000;
+    static NAVIGATION_RELEASE_TIMEOUT_MS = 1000;
+    // Set by app.js: releases this tab's data-sync lock so peers never wait on a page that is navigating away.
+    static beforeNavigate = null;
     static ASSETS = ['style.css', 'release-update.js', 'pdf-render-helper.js',
         'pdf-ui-state.js', 'info-table-parser.js', 'app.js'];
 
@@ -41,6 +44,43 @@ class ReleaseUpdate {
         return { response, finalUrl };
     }
 
+    static isVersion(version) {
+        return this.compare(version, version) !== null;
+    }
+
+    // Version the loaded entry HTML declares; differs from APP_VERSION when HTML and app.js come from different releases.
+    static documentVersion() {
+        const version = typeof document !== 'undefined'
+            ? document.querySelector('meta[name="app-version"]')?.content : null;
+        return this.isVersion(version) ? version : null;
+    }
+
+    // Newer deployment, or a mixed release: HTML that disagrees with the executing app.js. Never downgrades.
+    static target(deployed, documentVersion, currentVersion) {
+        if (this.compare(deployed, currentVersion) > 0) return deployed;
+        const mixed = documentVersion !== null && documentVersion !== currentVersion;
+        if (!mixed) return null;
+        // Stale entry HTML around the deployed app.js: reload the entry once.
+        if (this.compare(deployed, currentVersion) === 0) return deployed;
+        // Entry unverifiable, but the loaded HTML already declares a newer release than the executing app.js.
+        if (deployed === null && this.compare(documentVersion, currentVersion) > 0) return documentVersion;
+        return null;
+    }
+
+    static async releaseBeforeNavigate() {
+        if (typeof this.beforeNavigate !== 'function') return;
+        let timer = null;
+        try {
+            await Promise.race([
+                Promise.resolve().then(() => this.beforeNavigate()),
+                new Promise(resolve => { timer = setTimeout(resolve, this.NAVIGATION_RELEASE_TIMEOUT_MS); })
+            ]);
+        } catch (_) {
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
     static check(currentVersion) {
         if (!this._check) this._check = this.checkOnce(currentVersion);
         return this._check;
@@ -50,27 +90,38 @@ class ReleaseUpdate {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
         try {
-            // Revalidate the document path actually loaded; hosts may redirect /index.html to /.
-            const requested = new URL(location.href);
-            requested.search = '';
-            requested.hash = '';
-            const { response, finalUrl: entryUrl } = await this.fetchSameOrigin(requested, {
-                cache: 'no-store', signal: controller.signal
-            });
-            if (!response.ok) throw new Error('Entry revalidation failed');
-            const version = this.deployedVersion(await response.text(), entryUrl);
-            const comparison = this.compare(version, currentVersion);
-            if (comparison === null) return { status: 'unavailable', navigating: false };
-            if (comparison <= 0) {
+            let deployed = null;
+            let entryUrl = null;
+            let entryError = null;
+            try {
+                // Revalidate the document path actually loaded; hosts may redirect /index.html to /.
+                const requested = new URL(location.href);
+                requested.search = '';
+                requested.hash = '';
+                const entry = await this.fetchSameOrigin(requested, { cache: 'no-store', signal: controller.signal });
+                if (!entry.response.ok) throw new Error('Entry revalidation failed');
+                entryUrl = entry.finalUrl;
+                deployed = this.deployedVersion(await entry.response.text(), entryUrl);
+            } catch (error) {
+                entryError = error;
+            }
+            const documentVersion = this.documentVersion();
+            const version = this.target(deployed, documentVersion, currentVersion);
+            if (!version) {
+                if (deployed === null) {
+                    if (entryError) throw entryError;
+                    return { status: 'unavailable', navigating: false };
+                }
                 sessionStorage.removeItem(this.ATTEMPT_KEY);
                 return { status: 'current', navigating: false };
             }
+            if (!entryUrl) entryUrl = new URL(location.href);
             let attempt = null;
             try { attempt = JSON.parse(sessionStorage.getItem(this.ATTEMPT_KEY)); } catch (_) {}
             if (attempt?.version === version && Date.now() - attempt.at < this.RETRY_AFTER_MS) {
                 return { status: 'pending', navigating: false };
             }
-            // Warm only the newer release's assets before leaving the working page.
+            // Warm only the target release's assets before leaving the working page.
             await Promise.all(this.ASSETS.map(async asset => {
                 const url = new URL(`${asset}?v=${version.slice(1)}`, entryUrl);
                 const { response, finalUrl } = await this.fetchSameOrigin(url, {
@@ -93,6 +144,7 @@ class ReleaseUpdate {
             }));
             // Store the guard before navigation. If storage is unavailable, stay usable rather than loop.
             sessionStorage.setItem(this.ATTEMPT_KEY, JSON.stringify({ version, at: Date.now() }));
+            await this.releaseBeforeNavigate();
             const destination = new URL(location.href);
             destination.searchParams.set('cox_release', version);
             location.replace(destination.href);

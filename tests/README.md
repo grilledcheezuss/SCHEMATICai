@@ -81,3 +81,10 @@ Currently using minimal test infrastructure with:
 - Console-based test runner
 
 Future consideration: Migrate to a formal test framework (Jest, Vitest, or Mocha).
+
+v2.5.103 adds sync-lock regressions (previous-release, pre-v2.5.103 and dead-heartbeat locks taken over;
+live peer waited then restored; peer-wait timeout and failed takeover reach a terminal state; capped preload
+rounds; watchdog retry; pagehide/beforeunload release; real IndexedDB lock records in
+release-snapshot.browser.test.js), mixed HTML/app.js handshake checks (one guarded reload, no loop, no
+downgrade, deploy-window HTML fallback), lock release before real release navigation, and a real Chrome
+startup with release-update.js blocked that still preloads without an init alert.

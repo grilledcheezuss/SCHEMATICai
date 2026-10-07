@@ -48,6 +48,28 @@ const { HeadlessBrowser } = require('./helpers/headless-browser');
             await CacheService.loadAllWithProgress();
             check(window.LOCAL_DB[0].id === 'old' && CacheService.loadedReleaseVersion === null,
                 'legacy manifest loads without schema change and remains release-pending');
+            // Real IndexedDB sync-lock records (v2.5.103): owner/version/heartbeat and takeover policy.
+            const key = DataLoader.SYNC_DB_LOCK_KEY;
+            const now = Date.now();
+            await DB.putChunk(key, { token: 'legacy', at: now, heartbeatAt: now, ttlMs: 10 * 60 * 1000 });
+            check(await DataLoader.acquireSyncLock(), 'pre-v2.5.103 lock with ten-minute TTL is taken over');
+            const ownLock = await DB.getChunk(key);
+            check(ownLock.token === DataLoader._lockToken && ownLock.owner === DataLoader.TAB_ID && ownLock.appVersion === APP_VERSION,
+                'stored lock carries owner tab and app version');
+            await DataLoader.releaseSyncLock();
+            check(await DB.getChunk(key) === undefined, 'released lock is removed');
+            await DB.putChunk(key, { token: 'peer', owner: 'peer-tab', appVersion: APP_VERSION, at: now, heartbeatAt: Date.now() });
+            check(!(await DataLoader.acquireSyncLock()) && (await DB.getChunk(key)).token === 'peer', 'live same-release peer lock is respected');
+            await DB.putChunk(key, { token: 'peer', owner: 'peer-tab', appVersion: 'v2.5.102', at: now, heartbeatAt: Date.now() });
+            check(await DataLoader.acquireSyncLock(), 'previous-release peer lock is taken over');
+            await DataLoader.releaseSyncLock();
+            await DB.putChunk(key, { token: 'dead', owner: 'dead-tab', appVersion: APP_VERSION, at: now - 60000, heartbeatAt: Date.now() - DataLoader.SYNC_LOCK_STALE_MS - 1 });
+            check(await DataLoader.acquireSyncLock(), 'lock without a heartbeat for the stale bound is taken over');
+            check(await DataLoader.ensureActiveLockOwnership(), 'owner renews its own lock');
+            await DB.putChunk(key, { token: 'thief', owner: 'other-tab', appVersion: APP_VERSION, at: Date.now(), heartbeatAt: Date.now() });
+            check(!(await DataLoader.ensureActiveLockOwnership()), 'owner detects a peer takeover instead of renewing over it');
+            await DataLoader.releaseSyncLock();
+            check((await DB.getChunk(key)).token === 'thief', 'releasing never deletes a peer lock');
             await DB.deleteDatabase();
             return checks;
         });
