@@ -51,12 +51,16 @@ for (const [type, count] of [['Simplex', 1], ['Duplex', 2], ['Triplex', 3], ['Qu
                 expect(title.replace('24', '99'), [type, true]);
                 expect(`BILL OF MATERIALS | C3SS110B-20 | CONTROL DIAGRAM | ${title}`, [type, true]);
                 expect(`${title} | No. Motors ${count} | Voltage 480`, [type, false]);
+                expect(`No. Motors ${count} | ${title}`, [type, false]);
                 expect(`${title} | Panel Type Duplex | Voltage 480`, ['Duplex', false]);
             }
         }
     }
     for (const gap of ['ARBITRARY', 'VOLTAGE 480', '24', 'CP-1234', 'NOTES', 'BILL OF MATERIALS', 'POWER DIAGRAM | CONTROL DIAGRAM']) {
         expect(`%%U${type} PUMP | ${gap} | %%UCONTROL PANEL`, [null, false]);
+    }
+    for (const prefix of ['', '%%U']) {
+        expect(`PANEL DESCRIPTION | ${prefix}${type} PUMP | ${'ARBITRARY '.repeat(8)}| CONTROL PANEL`, [null, false]);
     }
     for (const prefix of ['NOT ', 'OTHER ', 'FOR OTHER PANEL ', 'SEE ', 'REFERENCE ', 'NON-']) {
         expect(`${prefix}${type} PUMP | POWER DIAGRAM | CONTROL PANEL`, [null, false]);
@@ -95,6 +99,7 @@ for (const count of ['FIVE', 'SIX', '5', '6']) {
         expect(`TRIPLEX ALTERNATOR | ${cells.join(' | ')} | No. Motors 2`, [null, false]);
         for (const motors of [1, 2, 3, 4]) {
             expect(`${cells.join(' | ')} | TRIPLEX ALTERNATOR | No. Motors ${motors}`, [null, false]);
+            expect(`No. Motors ${motors} | PANEL DESCRIPTION | ${cells.join(' | ')}`, [null, false]);
         }
     }
 }

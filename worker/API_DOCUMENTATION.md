@@ -15,18 +15,20 @@ _Release note: v2.5.109 adds browser-only complete-cell title assembly, not a wi
 
 `validated-caption-title` evidence and `title-caption-separated` orange cause distinguish recovery from badge recoloring. `unsupported-primary-pump-title` is an internal abstention/absent reason, not a new dropdown type. The opt-in, read-only audit uses the same normalized System Type view as derivation and preserves sanitized output. See `tests/system-type-caption.test.js` for negative/mutation, frozen-baseline and 8k refresh checks. No production catalog or reviewed labels are available locally; synthetic rule coverage is not recall/precision, nor preservation of all 4,093 live Duplex results. User post-publication audit remains pending; reverting the frontend release is the iterative rollback path. This PR does not merge or deploy.
 
-The extended deterministic comparison (28 frozen fixtures plus 596 synthetic checks, including repeated metamorphic variants) against the v2.5.108 parser reports every changed fixture and its evidence reasons when `SYSTEM_TYPE_BASELINE` is supplied:
+The extended deterministic comparison (28 frozen fixtures plus 684 synthetic checks, including repeated metamorphic variants) against the v2.5.108 parser reports every changed fixture and its evidence reasons when `SYSTEM_TYPE_BASELINE` is supplied:
 
 | Classification transition | Checks | Reason |
 | --- | ---: | --- |
 | NULL → orange | 123 | Complete caption title (includes CP1245 excerpt and 24 paired transfers) |
 | NULL → green | 6 | Complete Quadraplex title plus independently associated agreeing plain count |
 | Orange → green | 18 | Existing plain-count corroboration policy, not badge recoloring |
-| Orange → NULL | 8 | Rejected arbitrary/invalid title-cell associations |
-| Orange → NULL | 40 | Unsupported primary pump title; no count fallback, including adjacent alternator components |
-| Unchanged | 429 | Includes CP1409 abstention, CRLF/inline-title preservation and both green baseline fixtures |
+| Orange → NULL | 12 | Rejected arbitrary/invalid title-cell associations; long cells cannot bypass structural bounds via proximity fallback |
+| Orange → NULL | 64 | Unsupported primary pump title; no count fallback, including adjacent alternator components and preceding count rows |
+| Unchanged | 489 | Includes CP1409 abstention, CRLF/inline-title preservation and both green baseline fixtures |
 
 These are bounded fixture outcomes, not unique live records or catalog gains. Eight-thousand-record refresh tests retain yielding, once-only derivation and unchanged raw serialization.
+
+Validation: System Type suites, parser-repair, material/manufacturer/ranking, data-loader refresh, keywords, UI/PDF/version regressions and 85 Worker unit checks pass. Browser checks pass: 19 snapshot, 56 release/login and 1,572 UI assertions. `enclosure-parsing.test.js` test 18 still fails (22 pass / 1 fail), reproduced independently at default HEAD against the unchanged Worker parser; it is not fixed in this frontend PR. Live Worker integration is skipped without supplied credentials. CodeQL reports zero alerts; secret scanning is clean.
 
 _Previous release note: v2.5.107 is a browser-only System Type parser fix for flattened CAD descriptions. Panel/System Type/Type of Panel accept the adjacent leading (forward) or immediately preceding (reverse) system token while ignoring neighboring BOM/wiring/checklist columns; disagreeing sides abstain and only an adjacent NOT/NON/NO negates. No. Motors/Number of Pumps accept a plain leading 1-4; combinations stay non-plain and are never summed. TAG-prefixed bounded titles and repeated title blocks are title evidence (orange unless a bounded title agrees with a plain count). DERIVED_REV 8 re-derives cached records; snapshot schema 1, manufacturer/material parsing, search/badge semantics and Worker v2.5.97 unchanged. No cache reset or Worker redeploy._
 

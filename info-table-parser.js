@@ -791,6 +791,7 @@
         const caption = /^(?:POWER|CONTROL) DIAGRAM$/;
         const primary = /^(?:PANEL DESCRIPTION|DRAWING TITLE)$/;
         const boundary = /\b(?:NOT|NO|NON|WITHOUT|OTHER|ANOTHER|EXISTING|SEE|REF(?:ERENCE)?|NOTES?|BOM|BILL OF MATERIALS)\b/;
+        const boundaryValue = value => value.replace(/\bNO\.?\s*(?:OF\s+)?(?:MOTORS|PUMPS)\b/g, '');
         const matches = [];
         let labelIndex = 0;
         for (let i = 0; i < cells.length; i++) {
@@ -813,9 +814,9 @@
             const trailingAnchor = cells[lastIndex + 1] && primary.test(cells[lastIndex + 1].value);
             const before = cells[anchored ? anchorIndex - 1 : i - 1];
             const after = cells[lastIndex + (trailingAnchor ? 2 : 1)];
-            if ((before && (boundary.test(before.value) || (!outOfRange && SYSTEM_HARDWARE_RE.test(before.value))))
+            if ((before && (boundary.test(boundaryValue(before.value)) || (!outOfRange && SYSTEM_HARDWARE_RE.test(before.value))))
                 || (after && ((!outOfRange && SYSTEM_HARDWARE_RE.test(after.value))
-                    || boundary.test(after.value.replace(/\bNO\.?\s*(?:OF\s+)?(?:MOTORS|PUMPS)\b/g, ''))
+                    || boundary.test(boundaryValue(after.value))
                     || /^(?:OR|AND|FOR|ON|IN|OF|WITH|PART|MOUNTED|ATTACHED)\b/.test(after.value)))) continue;
             while (labelIndex < labels.length && labels[labelIndex].start < first.start) labelIndex++;
             const previous = labels[labelIndex - 1];
@@ -852,9 +853,11 @@
             const afterWindow = text.slice(end, Math.min(text.length, end + 42));
             // Delimited CONTROL PANEL associations use the complete-cell grammar,
             // not the free-text proximity path (which could bridge arbitrary values).
-            const inlinePanel = /\bCONTROL\s+PANEL\b[^|\n\r]*$/.test(beforeWindow)
-                || /^[^|\n\r]*\bCONTROL\s+PANEL\b/.test(afterWindow);
-            if (!inlinePanel && /\bCONTROL\s+PANEL\b/.test(beforeWindow + afterWindow)
+            const beforePanel = text.slice(Math.max(0, start - REVERSE_WINDOW), start);
+            const afterPanel = text.slice(end, Math.min(text.length, end + REVERSE_WINDOW));
+            const inlinePanel = /\bCONTROL\s+PANEL\b[^|\n\r]*$/.test(beforePanel)
+                || /^[^|\n\r]*\bCONTROL\s+PANEL\b/.test(afterPanel);
+            if (!inlinePanel && /\bCONTROL\s+PANEL\b/.test(beforePanel + afterPanel)
                 && /^(?:PUMPS?|BLOWERS?|GRINDERS?|ALTERNATORS?)$/.test(match[2])) continue;
             if (!hasEquipmentPanelContext(beforeWindow) && !hasEquipmentPanelContext(afterWindow)) continue;
             if (/^ALTERNATORS?$/.test(match[2]) && !/\bCONTROL\s+PANEL\b/.test(afterWindow)) continue;
