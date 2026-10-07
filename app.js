@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.93 ---
-const APP_VERSION = "v2.5.93";
+// --- SCHEMATICA ai v2.5.94 ---
+const APP_VERSION = "v2.5.94";
 const VERSION_HISTORY = {
+    "v2.5.94": "Frontend-only search state fix: reset clears both Allowed/Blocked keyword editors, and live criteria survive startup, sync, snapshot swaps, and background refresh option rebuilds without changing results/PDF state or Worker/backend behavior",
     "v2.5.93": "Mobile PDF viewer geometry fix: stop flex-centered negative left overflow from recentering zoomed documents on mobile by giving wide stages a true scrollable left origin while preserving centered narrow layouts and existing gesture/render guards",
     "v2.5.92": "PDF zoom/pan stability refinement: replaced symmetric pan clamping with scroll-aware directional bounds, cancel stale viewport-restoration sequences during active gestures, and block delayed restore callbacks from overriding newer touch/wheel zoom interactions",
     "v2.5.91": "Keyword dominance refinement (frontend-only): mixed Allowed/Blocked keyword searches now compare occurrence counts in a single explicit branch while preserving contradiction validation, pagination/results consistency, and unchanged Worker/backend behavior",
@@ -7262,7 +7263,7 @@ class UI {
         }); 
 
         this.handleViewportChange();
-        this.setKeywordBlocklistMode(false);
+        this.setKeywordBlocklistMode(this.isKeywordBlocklistMode());
     }
     
     static isSmallMobile() { return window.innerWidth < 768; }
@@ -7286,7 +7287,12 @@ class UI {
     }
     
     static resetSearch() { 
-        document.querySelectorAll('select').forEach(s=>s.value="Any"); 
+        ['mfg', 'hp', 'volt', 'phase', 'enc', 'cat'].forEach(k => {
+            const input = DOM_CACHE.get(k + 'Input');
+            if (input) input.value = k === 'cat' ? 'Standard' : 'Any';
+        });
+        const keywordInput = DOM_CACHE.get('keywordInput');
+        if (keywordInput) keywordInput.value = '';
         this.keywordAllowedTermsInput = '';
         this.keywordBlockedTermsInput = '';
         this.setKeywordContradictionWarning([]);
@@ -7688,7 +7694,7 @@ static pop() {
         s.innerHTML = '';
         s.add(new Option('Any', 'Any'));
         data.forEach(v => s.add(new Option(v, v)));
-        s.value = (savedValues[k] && data.includes(savedValues[k])) ? savedValues[k] : 'Any';
+        s.value = (savedValues[k] && data.some(v => String(v) === savedValues[k])) ? savedValues[k] : 'Any';
     });
 
     // Restore category and keywords (if present)
