@@ -85,6 +85,10 @@ const cases = [
     ['SYSTEM TYPE: duplex pumps', null, true],
     ['SYSTEM TYPE | DUPLEX | TRIPLEX', null, true],
     ['SYSTEM TYPE: DUPLEX\nTRIPLEX', null, true],
+    ['Panel Type:\nDuplex\nTriplex\nSimplex\nHP: 15', null, true],
+    ['System Type:\nDuplex\nTriplex\nSimplex\nHP: 15', null, true],
+    ['Panel Type | Duplex | Triplex | Simplex | HP | 15', null, true],
+    ['Panel Type:\nDuplex\nTriplex\nUnrelated text\nHP: 15', null, true],
     ['Please refer to System Type: Duplex for details', null, false],
     ['System Type should be Duplex', null, false],
     ['Notes mention Number of Motors: 3 as an example', null, false],
@@ -130,6 +134,9 @@ function run() {
         { id: '11', desc: 'Pump Manufacturer: GOULDS' },
         { id: '12', desc: 'Pump Manufacturer | BARNES | UNKNOWN' },
         { id: '13', desc: 'Pump Manufacturer: BARNES\nFLYGT' },
+        { id: '20', desc: 'Pump Manufacturer:\nBarnes\nFlygt\nMyers\nHP:15' },
+        { id: '21', desc: 'Pump Manufacturer | Barnes | Flygt | Myers | HP | 15' },
+        { id: '22', desc: 'Pump Manufacturer:\nBarnes\nFlygt\nUnrelated text\nHP:15' },
         { desc: 'Pump Manufacturer: FLYGT' }
     ];
     assert.deepStrictEqual(helper.rankManufacturers(records), {

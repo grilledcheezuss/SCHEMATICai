@@ -142,9 +142,11 @@
                 const parts = stripped.split(/[|\n]/);
                 let value = (parts.shift() || '').trim();
                 const tail = parts.join(' ').trim();
+                const hasWrappedAlternative = parts.some(part =>
+                    normalizeSystemType(part.trim()) || normalizeManufacturer(part.trim()));
                 // Pipe columns and numeric/operator continuations cannot hide conflicting values.
                 const continuation = tail && (isCountLabel(row.label) || stripped.includes('|') || /^[+\-/.±×÷\d]/.test(tail) ||
-                    normalizeSystemType(tail) || normalizeManufacturer(tail));
+                    hasWrappedAlternative || normalizeSystemType(tail) || normalizeManufacturer(tail));
                 if (continuation) value += ' ' + tail;
                 groups[groups.length - 1].push({ ...row, value, bounded: value.length <= 240 });
                 // Unlabelled intervening text ends the contiguous information block.

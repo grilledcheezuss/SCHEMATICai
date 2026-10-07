@@ -224,6 +224,7 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
 - A same-block No. Motors integer 1..4 cross-checks the explicit type. Agreement is clean; disagreement retains the explicit type with `sysV=true`. Missing count alone permits clean explicit evidence.
 - Only a complete unambiguous plain integer motor count 1..4 can infer a missing Panel Type, always with `sysV=true`. Combination-only evidence (including `2+2`, `2 + 1`, `4+2`, `1+1`) produces `sys=null`; expressions are neither summed nor prefix-matched. Decimals, ranges, slash alternatives, negatives, values above four and incomplete values cannot infer a system.
 - Explicit single Panel Type with an invalid/combination count remains searchable but uncertain. Conflicting explicit types yield no single type (`sys=null`, `sysV=true`), rather than silently choosing a green winner.
+- Numeric/operator continuations across blank lines cannot create a plain-integer prefix match. Recognized alternative values wrapped over multiple lines/columns remain ambiguous, including manufacturer rows used for ranking.
 - Valid System Type feedback uses the existing three-vote threshold and can override extraction with verified confidence. System Type is never guessed/trained by Naive Bayes.
 - Multiple different System Type corrections reaching that threshold remain ambiguous (`sys=null`, `sysV=true`); vote iteration order cannot select a clean winner.
 - The isolated frontend branch preserves uncertainty on exact matches, counts/paginates the filtered results, includes active System Type variance in sorting, and shows its badge only when filtered. Any does not change keyword/category/manufacturer/enclosure matching.
@@ -371,7 +372,7 @@ node tests/feedback-lockout.test.js
 node tests/sorting-priority.test.js
 ```
 
-The new frontend integration suite passed all 11 tests. The existing offline frontend regression run passed 22 of 23 scripts; the sole failure was the baseline enclosure expectation noted above. Local screenshot-derived fixture searches also rendered explicit Duplex green and inferred Duplex orange with correct counts/pagination, and ranking/state rebuilds kept manufacturer semantics and live criteria intact. Live Worker integration tests are not used to claim local implementation coverage.
+Worker validation passed 59 existing assertions and 102 parser cases with Worker parity, plus MAIN/healer/correction/cache/default-import and credential-routing mocks. The new frontend integration suite passed all 11 tests. The existing offline frontend regression run passed 22 of 23 scripts; the sole failure was the baseline enclosure expectation noted above. Local screenshot-derived fixture searches also rendered explicit Duplex green and inferred Duplex orange with correct counts/pagination, and ranking/state rebuilds kept manufacturer semantics and live criteria intact. Live Worker integration tests are not used to claim local implementation coverage.
 
 No real Airtable descriptions or rankings were evaluated, and no production deployment, authenticated refresh or physical touch-device/PDF acceptance is claimed. Use the manual checks in README.txt before production sign-off.
 
