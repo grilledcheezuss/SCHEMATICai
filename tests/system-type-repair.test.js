@@ -100,6 +100,13 @@ for (const label of ['No. Motors', 'Number of Motors', 'No of Pumps', 'Number of
 expect('Panel Type Duplex No. Motors 2 H A Flasher', ['Duplex', false]);
 // v2.5.107 rule 2: "2 A" is a plain leading count followed by a wiring token.
 expect('Panel Type Duplex No. Motors 2 A Flasher', ['Duplex', false]);
+for (const combination of ['2+1+1', '2 + 1 + 1', '2+2', '4+2']) {
+    const record = { desc: `Panel Type ${combination} No. Motors 2` };
+    parser.deriveRecord(record);
+    assert.deepStrictEqual([record._sys, record._sysV, record._sysEvidence.source, record._sysEvidence.reasons],
+        [null, false, 'conflict', ['mixed-panel-type-combination']], combination);
+}
+expect('Panel Type Duplex No. Motors 2+2', ['Duplex', true], 'motor combinations remain separate from panel-type combinations');
 
 for (const title of [
     'Duplex Panel', 'Duplex Pump Control Panel', 'Duplex Blower Control Panel', 'Two Pump Control Panel',
@@ -269,7 +276,7 @@ for (const desc of [rtf('Panel Type Duplex\\par Pump Manufacturer Sulzer\\par'),
 }
 
 // Existing derived revisions must be replaced without changing snapshot serialization.
-assert.strictEqual(parser.DERIVED_REV, 8);
+assert.strictEqual(parser.DERIVED_REV, 9);
 for (const desc of ['No. Motors 4', 'Duplex Control Panel', 'Panel Type Duplex']) {
     for (const previousRevision of [5, 6, 7]) {
         const record = { id: desc, desc, sys: 'legacy' };
