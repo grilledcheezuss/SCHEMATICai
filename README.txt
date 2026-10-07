@@ -1,6 +1,32 @@
-CLOUDFLARE WORKER SCRIPT (frontend release v2.5.104; Worker remains v2.5.97)
+CLOUDFLARE WORKER SCRIPT (frontend release v2.5.105; Worker remains v2.5.97)
 
-Release note: v2.5.104 repairs browser-only System Type evidence and makes the selected result card more visible. Worker v2.5.97, API fields, auth, search scoring, PDF selection and snapshot schema 1 remain unchanged. No Worker redeploy or cache reset is required.
+Release note: v2.5.105 is DIAGNOSTIC-ONLY for System Type. It adds an opt-in, local SystemTypeAudit console report that explains where Simplex/Duplex/Triplex/Quadraplex results and orange badges come from, plus a subtle hover outline thickening on result cards. It does NOT change parser behavior, System Type classification rules, search results, badge semantics, DERIVED_REV 6, snapshot schema 1, release-update, auth/cache or the Worker (v2.5.97, no redeploy). The follow-up fix will be based on the report output.
+
+SYSTEM TYPE DIAGNOSTIC (v2.5.105):
+
+- When to run: after login, once the sync/refresh has finished (Search is enabled). Open the browser DevTools console on the app page. Nothing runs automatically; the report only exists while you call it.
+- Commands:
+    SystemTypeAudit.text()                      // bounded plain-text summary of all loaded records (window.LOCAL_DB)
+    copy(SystemTypeAudit.text())                // Chrome/Edge/Firefox console helper: copies the summary to the clipboard
+    SystemTypeAudit.text({ snippets: true })    // adds the top recurring failure patterns as short sanitized snippets
+    SystemTypeAudit.text({ scope: 'results' })  // only the current search results
+    SystemTypeAudit.report()                    // same data as a structured object (expand it in the console)
+    SystemTypeAudit.inspect('CP-8270')          // one record: bounded evidence, derived sys/sysV and why each type matched or failed
+  Options: samples (sample IDs per bucket, default 5, max 20), patterns (default 30, max 50), snippets (default false).
+- What it means:
+    States: green = clear explicit Panel/System Type row (green badge); orange = matched but uncertain (orange badge); absent = no System Type at all (never returned for any of the four values); conflicting = explicit rows or panel phrases disagree, or an ambiguous "X or Y" row was not resolved.
+    Sources: explicitRow, titlePhrase (panel title/narrative phrase), countInference (No. Motors/Pumps), conflict, unknown.
+    Type table: per type total/green/orange, how many came from row/title/count, the badge actually drawn by UI._generateBadges (rendered g/o/missing), how often the type was a conflict candidate, mentionedButUnclassified (the word appears but the record has no type) and lostToOtherType.
+    Orange causes: title-narrative-only, count-inference, row-count-disagreement (the row and No. Motors disagree, are blank or are a combination such as 2+2), row-reverse-cell, row-gap-association (wiring/terminal gap), row-uncertain-association, row-plus-ambiguous-row. Row/count disagreements break the count cases down further.
+    Absent reasons: no-description, panel-type-label-unreadable, panel-type-value-unrecognized, count-cell-incomplete, count-not-plain, count-disagreement, four-count-without-row-or-title, type-word-without-accepted-evidence, pump-count-or-label-without-value, no-system-type-evidence (likely legitimately untyped).
+    Stale: notDerived/storedMismatch should be 0 after a completed sync; non-zero means the stored _sys/_sysV differ from the current parser. Badge mismatches should be 0; non-zero means the UI badge does not follow parser confidence (propagation bug) rather than the parser being uncertain.
+    Keywords in orange/absent/conflicting: which labels and type words appear in failing records (labels only, no free text).
+- Safety: read-only and local. No network requests, no storage/persistence, no record mutation, no automatic execution on startup or search. Output never contains pdfUrl, credentials, full descriptions or JSON dumps; snippets are opt-in, at most 60 characters, upper-cased, with URLs/e-mail addresses removed and 3+ digit numbers masked as #. Records are counted once per unique ID; overlaps are reported separately.
+- Sharing: paste the copy(SystemTypeAudit.text()) output into the follow-up PR discussion. Add the { snippets: true } version if you are comfortable sharing short label fragments, and SystemTypeAudit.inspect('<id>') for one or two orange or missing examples. Redact anything you consider sensitive before posting.
+- Card hover: result cards regain a subtle outline thickening on hover through a 1px inset ring (box-shadow), so card size/layout and the top-of-list clearance are unchanged. The approved selected-card purple glow is unchanged and both coexist on a hovered selected card. No-PDF cards keep their neutral disabled styling; reduced motion keeps the ring without the lift/transition.
+- Regression commands: node tests/system-type-audit.test.js; node tests/ui-housekeeping-static.test.js; REQUIRE_BROWSER=1 node tests/ui-housekeeping.browser.test.js (plus the v2.5.104 System Type commands below, which are unchanged).
+
+Previous release note: v2.5.104 repairs browser-only System Type evidence and makes the selected result card more visible. Worker v2.5.97, API fields, auth, search scoring, PDF selection and snapshot schema 1 remain unchanged. No Worker redeploy or cache reset is required.
 
 SYSTEM TYPE POLICY (v2.5.104):
 
