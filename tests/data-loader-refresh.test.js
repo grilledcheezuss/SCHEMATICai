@@ -143,7 +143,7 @@ const originalMethods = {
 };
 
 function resetHarness() {
-    ['cox_db_complete', 'cox_db_synced_at', 'cox_db_sync_lock_at', 'cox_sync_attempts', 'cox_user', 'cox_pass', 'cox_version', 'cox_cache_schema_version'].forEach(key => localStorage.removeItem(key));
+    ['cox_db_complete', 'cox_db_synced_at', 'cox_db_sync_lock_at', 'cox_sync_attempts', 'cox_user', 'cox_pass', 'cox_version', 'cox_cache_schema_version', 'cox_data_release_version'].forEach(key => localStorage.removeItem(key));
     windowState.LOCAL_DB.length = 0;
     windowState.ID_MAP = new Map();
     windowState.FOUND_MFGS = new Set();
@@ -167,6 +167,7 @@ function resetHarness() {
         deleteDatabase: async () => {}
     });
     Object.assign(cacheState, {
+        loadedReleaseVersion: undefined,
         prepareKey: async () => {},
         loadAllWithProgress: async () => null,
         saveSnapshot: async () => {},
@@ -244,8 +245,10 @@ async function flushAsync() {
 
     localStorage.setItem('cox_db_complete', 'true');
     localStorage.setItem('cox_db_synced_at', String(Date.now()));
+    localStorage.setItem(DataLoader.DATA_RELEASE_VERSION_KEY, APP_VERSION);
     DataLoader.acquireSyncLock = async () => { throw new Error('should not lock on fresh cache'); };
-    await DataLoader.maybeRefreshStaleCache({ reason: 'test-fresh-skip' });
+    const freshResult = await DataLoader.maybeRefreshStaleCache({ reason: 'test-fresh-skip' });
+    assert(freshResult.skipped && !freshResult.error, 'same-release fresh cache must not acquire a lock');
 
     // stale + lock denied => skip
     localStorage.setItem('cox_db_synced_at', String(Date.now() - (2 * 60 * 60 * 1000)));
@@ -441,6 +444,108 @@ async function flushAsync() {
     assert(syncProgressUpdates.includes('💾 SAVING 98%'), 'saving phase should report completion without claiming 100%');
     assert(syncProgressUpdates.includes('✅ APPLYING 99%'), 'apply phase should remain below 100% until sync fully completes');
     assertEqual(localStorage.getItem('cox_db_complete'), 'true', 'successful sync should still mark cache complete');
+    assertEqual(localStorage.getItem(DataLoader.DATA_RELEASE_VERSION_KEY), APP_VERSION, 'only successful sync marks release data fresh');
+
+    console.log('🧪 Testing release-triggered atomic refresh and failure retry');
+    for (const failure of ['network', 'credentials', 'quota', 'interruption']) {
+        resetHarness();
+        localStorage.setItem('cox_db_complete', 'true');
+        localStorage.setItem('cox_db_synced_at', String(Date.now()));
+        localStorage.setItem('cox_version', APP_VERSION);
+        localStorage.setItem(DataLoader.DATA_RELEASE_VERSION_KEY, 'v2.5.100');
+        localStorage.setItem('profiles', 'saved-profile');
+        localStorage.setItem('theme', 'dark');
+        localStorage.setItem('cox_user', 'user');
+        localStorage.setItem('cox_pass', 'pass');
+        const old = { id: 'old', desc: 'OLD SIMPLEX PANEL' };
+        windowState.LOCAL_DB.push(old);
+        let saved = 0;
+        let requested = 0;
+        let fail = true;
+        DataLoader.acquireSyncLock = async () => true;
+        DataLoader.releaseSyncLock = async () => {};
+        DataLoader.MAX_PAGE_RETRIES = 0;
+        networkState.fetch = async () => {
+            requested++;
+            if (fail && failure === 'network') throw new Error('offline');
+            if (fail && failure === 'interruption') { const e = new Error('suspended'); e.name = 'AbortError'; throw e; }
+            return { status: fail && failure === 'credentials' ? 401 : 200,
+                json: async () => ({ records: [{ id: 'new', desc: 'NEW SIMPLEX PANEL' }] }) };
+        };
+        cacheState.saveSnapshot = async (records, options) => {
+            assert(windowState.LOCAL_DB[0] === old, 'old data stays live until full persistence succeeds');
+            assertEqual(localStorage.getItem(DataLoader.DATA_RELEASE_VERSION_KEY), 'v2.5.100', 'marker remains pending during persistence');
+            assertEqual(options.releaseVersion, APP_VERSION, 'generation manifest receives release version');
+            if (fail && failure === 'quota') { const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e; }
+            saved++;
+        };
+        const failed = await DataLoader.maybeRefreshStaleCache({ reason: 'startup' });
+        assert(!failed.success && requested === 1 && saved === 0, `${failure}: failure handled without duplicate requests`);
+        assert(windowState.LOCAL_DB[0] === old, `${failure}: previous snapshot still live`);
+        assertEqual(localStorage.getItem(DataLoader.DATA_RELEASE_VERSION_KEY), 'v2.5.100', `${failure}: release remains pending`);
+        assertEqual(localStorage.getItem('cox_sync_attempts'), null, `${failure}: background work never poisons startup attempts`);
+        const cooldown = await DataLoader.maybeRefreshStaleCache({ reason: 'startup' });
+        assert(cooldown.skipped && requested === 1, `${failure}: cooldown respected`);
+        fail = false;
+        DataLoader._lastBackgroundRefreshAt = 0;
+        DataLoader._backgroundRefreshCooldownUntil = 0;
+        const succeeded = await DataLoader.maybeRefreshStaleCache({ reason: 'startup' });
+        assert(succeeded.success && saved === 1 && requested === 2, `${failure}: later login retry commits exactly once`);
+        assertEqual(windowState.LOCAL_DB[0].id, 'new', `${failure}: full successful generation applied`);
+        assertEqual(localStorage.getItem(DataLoader.DATA_RELEASE_VERSION_KEY), APP_VERSION, `${failure}: commit marks release fresh`);
+        assertEqual(localStorage.getItem('profiles'), 'saved-profile', 'profiles preserved');
+        assertEqual(localStorage.getItem('theme'), 'dark', 'theme preserved');
+        assertEqual(localStorage.getItem('cox_user'), 'user', 'user preserved');
+        assertEqual(localStorage.getItem('cox_pass'), 'pass', 'credentials preserved');
+    }
+    DataLoader.MAX_PAGE_RETRIES = 5;
+
+    resetHarness();
+    localStorage.setItem('cox_db_complete', 'true');
+    localStorage.setItem('cox_db_synced_at', String(Date.now()));
+    localStorage.setItem(DataLoader.DATA_RELEASE_VERSION_KEY, 'v2.5.100');
+    let peerCalls = 0;
+    DataLoader.acquireSyncLock = async () => {
+        localStorage.setItem(DataLoader.DATA_RELEASE_VERSION_KEY, APP_VERSION);
+        return true;
+    };
+    DataLoader.releaseSyncLock = async () => {};
+    DataLoader.fetchPartition = async () => { peerCalls++; return { success: true }; };
+    await DataLoader.maybeRefreshStaleCache();
+    assertEqual(peerCalls, 0, 'peer commit while waiting for lock coalesces release refresh');
+
+    resetHarness();
+    localStorage.setItem('cox_db_complete', 'true');
+    localStorage.setItem('cox_db_synced_at', String(Date.now()));
+    localStorage.setItem(DataLoader.DATA_RELEASE_VERSION_KEY, 'v2.5.100');
+    let finishRefresh;
+    let singleFlightCalls = 0;
+    DataLoader.acquireSyncLock = async () => true;
+    DataLoader.releaseSyncLock = async () => {};
+    DataLoader.fetchPartition = async () => {
+        singleFlightCalls++;
+        await new Promise(resolve => { finishRefresh = resolve; });
+        return { success: true };
+    };
+    const firstRefresh = DataLoader.maybeRefreshStaleCache();
+    const secondRefresh = DataLoader.maybeRefreshStaleCache();
+    await flushAsync();
+    assertEqual(singleFlightCalls, 1, 'concurrent same-tab release refreshes share one flight');
+    finishRefresh();
+    await Promise.all([firstRefresh, secondRefresh]);
+
+    resetHarness();
+    localStorage.setItem('cox_db_complete', 'true');
+    localStorage.setItem('cox_db_synced_at', String(Date.now()));
+    localStorage.setItem('cox_user', 'user');
+    localStorage.setItem('cox_pass', 'pass');
+    localStorage.setItem(DataLoader.DATA_RELEASE_VERSION_KEY, APP_VERSION);
+    cacheState.loadedReleaseVersion = 'v2.5.100';
+    cacheState.loadAllWithProgress = async () => true;
+    DataLoader.maybeRefreshStaleCache = async () => ({ skipped: true });
+    await DataLoader.preload();
+    await flushAsync();
+    assertEqual(localStorage.getItem(DataLoader.DATA_RELEASE_VERSION_KEY), 'v2.5.100', 'fallback generation cannot inherit newer release freshness');
 
     resetHarness();
     console.log('🧪 Testing recoverable mobile interruption resumes without terminal sync state');

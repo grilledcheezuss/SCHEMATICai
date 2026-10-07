@@ -42,6 +42,21 @@ node tests/ui-housekeeping.browser.test.js            # CHROME_PATH=/path/to/chr
 REQUIRE_BROWSER=1 node tests/ui-housekeeping.browser.test.js   # fail instead of skip without Chrome
 ```
 
+### Deployment and snapshot update regressions (v2.5.101)
+
+The same local Chrome harness exercises production release discovery/asset navigation, manual and
+saved-credential login, encrypted IndexedDB generation replacement and previous-generation recovery.
+Network/navigation failures are injected locally; no live Worker credentials are needed.
+
+```bash
+REQUIRE_BROWSER=1 node tests/release-update.browser.test.js
+REQUIRE_BROWSER=1 node tests/release-snapshot.browser.test.js
+node tests/data-loader-refresh.test.js
+```
+
+UI housekeeping tests also cover first-card hover clipping and cleaned-up menu keyboard order.
+Live hosting/cache headers and physical-device acceptance remain separate deployment checks.
+
 ## Future Tests
 
 Additional test coverage planned for v2.5.4+:

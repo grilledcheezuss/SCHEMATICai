@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.100 (frontend; Worker remains v2.5.97)
+## Version: v2.5.101 (frontend; Worker remains v2.5.97)
 
-_Release note: v2.5.100 is frontend-only UI housekeeping (Submittal Generator available everywhere except small phones, light-mode purple result-card borders, first-search result count visible immediately). The Worker implementation remains byte-identical to v2.5.97; no backend redeployment is needed. MAIN/API/auth/cache/network behavior, parser DERIVED_REV 5 and snapshot schema 1 are unchanged._
+_Release note: v2.5.101 is frontend-only: hover clipping inset, obsolete menu command removal, entry/asset revalidation at login and safe release-triggered data refresh. The Worker implementation remains byte-identical to v2.5.97; no backend redeployment is needed. MAIN/API/auth/edge TTL/cache keys, parser DERIVED_REV 5 and snapshot schema 1 are unchanged. Frontend revalidation does not bypass the Worker's cached Airtable pages. See README.txt for static-host cache-header publication and old-client limitations._
 
 ## Overview
 
@@ -11,6 +11,8 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 ---
 
 ## Version History
+
+- **v2.5.101**: Frontend-only card/menu housekeeping and deployment-aware login update. Compatible encrypted generations remain available until a full successful replacement; failed updates retain cached data, profiles and preferences. No Worker/API changes.
 
 - **v2.5.100**: Frontend-only UI housekeeping. The Submittal Generator is unavailable only when the short side is <= 430 CSS px in the < 768 px layout (one media query shared by JS and CSS); 431-767 px viewports get a compact floating Control Panel and >= 768 keeps the docked layout. Light-mode result cards keep purple brand borders while no-PDF cards stay neutral. The first desktop/tablet search now syncs `body.results-ready`, so the full total count is visible immediately. No Worker/API changes
 - **v2.5.99**: Symmetric bounded Fiberglass/Stainless Steel/Painted Steel association: reverse split names, recognized short wiring noise after labels, WAGO terminal/end-block gaps, adjacent enclosure labels, and short forward wiring prefixes. Gap evidence stays uncertain, explicit alternatives remain conflicts, and unsupported/bare steel stays excluded. Original 40/120-character bounds, row precedence, legacy fallback, raw records, feedback, search/filter/badge resolver, sorting/pagination, and live criteria are preserved. Synthetic record-like search regressions supplement the exact supplied excerpts; no deployed accuracy or result-count claim. Browser derived revision 5 refreshes existing cached descriptions without changing schema 1 or clearing caches.

@@ -453,7 +453,7 @@ body.results-ready #results-header { display: flex; }
 #results-count { font-size: 9px; font-weight: 800; color: var(--app-primary); letter-spacing: 0.5px; text-transform: uppercase; order: 2; margin-left: auto; text-align: right; }
 body.dark-mode #results-count { color: #c4b5fd; }
 #results-list { flex: 1; min-height: 0; overflow-y: auto; }
-#results-area { display: flex; flex-direction: column; gap: 4px; padding-bottom: 10px; transition: opacity 0.2s ease; }
+#results-area { display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 10px; transition: opacity 0.2s ease; }
 .results-toggle-btn {
     display: none;
     align-items: center;
@@ -1270,7 +1270,6 @@ input[type="date"].demo-input { text-align: left; }
     }
     #results-area {
         gap: 3px;
-        padding-bottom: 6px;
     }
     #pagination-footer {
         order: 4;
