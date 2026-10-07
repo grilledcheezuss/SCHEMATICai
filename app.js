@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.94 ---
-const APP_VERSION = "v2.5.94";
+// --- SCHEMATICA ai v2.5.95 ---
+const APP_VERSION = "v2.5.95";
 const VERSION_HISTORY = {
+    "v2.5.95": "System Type search and correction feedback using shared strict extraction, uncertainty-aware badges and sorting, frequency-ranked top-eight manufacturers from complete local snapshots, and reordered accessible search controls with live criteria preserved",
     "v2.5.94": "Frontend-only search state fix: reset clears both Allowed/Blocked keyword editors, and live criteria survive startup, sync, snapshot swaps, and background refresh option rebuilds without changing results/PDF state or Worker/backend behavior",
     "v2.5.93": "Mobile PDF viewer geometry fix: stop flex-centered negative left overflow from recentering zoomed documents on mobile by giving wide stages a true scrollable left origin while preserving centered narrow layouts and existing gesture/render guards",
     "v2.5.92": "PDF zoom/pan stability refinement: replaced symmetric pan clamping with scroll-aware directional bounds, cancel stale viewport-restoration sequences during active gestures, and block delayed restore callbacks from overriding newer touch/wheel zoom interactions",
@@ -3381,6 +3382,7 @@ class FeedbackService {
         this.setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt'); 
         this.setupInput('fb-phase', AI_TRAINING_DATA.DATA.PHASE, 'phase'); 
         this.setupInput('fb-enc', ['4XSS', '4XFG', 'POLY'], 'enc');
+        this.setupInput('fb-sys', InfoTableHelper.SYSTEM_TYPES, 'sys');
 
         const lvBtn = document.getElementById('fb-low-volt-btn'); 
         if (this.lockout.has(`${id}:cat_low`)) { lvBtn.className = 'keyword-toggle disabled-overlay'; lvBtn.innerText = "✓ Reported as Low Voltage"; lvBtn.onclick = null; } 
@@ -3395,7 +3397,7 @@ class FeedbackService {
         // Clear existing options safely
         while (el.firstChild) el.removeChild(el.firstChild);
         el.add(new Option('Select Correct...', '')); 
-        el.add(new Option('Varied / Multiple', 'Varied / Multiple')); 
+        if (paramKey !== 'sys') el.add(new Option('Varied / Multiple', 'Varied / Multiple'));
         data.forEach(d => el.add(new Option(d, d))); 
         el.value = ''; // Ensure empty option is selected by default
         if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } 
@@ -3428,6 +3430,14 @@ class FeedbackService {
 
     static async submit() { 
         const corrections = {}; 
+        const sysInput = document.getElementById('fb-sys');
+        const rawSys = sysInput?.value || '';
+        if (rawSys && !sysInput.disabled && !this.lockout.has(`${this.currentId}:p_sys`)) {
+            const sys = InfoTableHelper.normalizeSystemType(rawSys);
+            if (!sys) return alert("Please select a valid System Type correction.");
+            corrections.sys = sys;
+            this.lockout.add(`${this.currentId}:p_sys`);
+        }
         const mfg = document.getElementById('fb-mfg').value; if(mfg) { corrections.mfg = mfg; this.lockout.add(`${this.currentId}:p_mfg`); } 
         const hp = document.getElementById('fb-hp').value; if(hp) { corrections.hp = hp; this.lockout.add(`${this.currentId}:p_hp`); } 
         const volt = document.getElementById('fb-volt').value; if(volt) { corrections.volt = volt; this.lockout.add(`${this.currentId}:p_volt`); } 
@@ -3936,6 +3946,7 @@ class SearchEngine {
             volt: DOM_CACHE.get('voltInput')?.value || 'Any', 
             phase: DOM_CACHE.get('phaseInput')?.value || 'Any', 
             enc: DOM_CACHE.get('encInput')?.value || 'Any',
+            sys: DOM_CACHE.get('sysInput')?.value || 'Any',
             blocklistMode: UI.isKeywordBlocklistMode()
         };
         
@@ -3955,6 +3966,14 @@ class SearchEngine {
             let voltV = r.voltV || false;
             let phaseV = r.phaseV || false;
             let encV = r.encV || false;
+            // Any leaves legacy records untouched; active filtering resolves older snapshots.
+            if (crit.sys !== 'Any') {
+                const systemType = InfoTableHelper.resolveSystemType(r);
+                r.sys = systemType.sys;
+                r.sysV = systemType.sysV;
+                if (systemType.sys !== crit.sys) return;
+                w += 500;
+            }
 
             // A: Client-side enclosure reclassification — "Varied / Multiple" when both FG+SS present (v2.5.44)
             // NOTE: intentionally mutates r.enc/r.encV (consistent with existing w/mfgV/hpV mutations below)
@@ -4088,13 +4107,15 @@ class SearchEngine {
                 (crit.hp !== 'Any' && a.hpV ? 1 : 0) +
                 (crit.volt !== 'Any' && a.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && a.phaseV ? 1 : 0) +
-                (crit.enc !== 'Any' && a.encV ? 1 : 0);
+                (crit.enc !== 'Any' && a.encV ? 1 : 0) +
+                (crit.sys !== 'Any' && a.sysV ? 1 : 0);
             const bVariedCount = 
                 (crit.mfg !== 'Any' && b.mfgV ? 1 : 0) +
                 (crit.hp !== 'Any' && b.hpV ? 1 : 0) +
                 (crit.volt !== 'Any' && b.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && b.phaseV ? 1 : 0) +
-                (crit.enc !== 'Any' && b.encV ? 1 : 0);
+                (crit.enc !== 'Any' && b.encV ? 1 : 0) +
+                (crit.sys !== 'Any' && b.sysV ? 1 : 0);
             
             if(aVariedCount !== bVariedCount) return aVariedCount - bVariedCount; // Fewer varied flags = better
             
@@ -4105,6 +4126,7 @@ class SearchEngine {
                     if (crit.volt !== 'Any' && r.voltV) return 3;
                     if (crit.phase !== 'Any' && r.phaseV) return 3;
                     if (crit.enc !== 'Any' && r.encV) return 2;
+                    if (crit.sys !== 'Any' && r.sysV) return 2;
                     if (crit.mfg !== 'Any' && r.mfgV) return 1;  // worst
                     return 0;
                 };
@@ -7287,7 +7309,7 @@ class UI {
     }
     
     static resetSearch() { 
-        ['mfg', 'hp', 'volt', 'phase', 'enc', 'cat'].forEach(k => {
+        ['sys', 'mfg', 'hp', 'volt', 'phase', 'enc', 'cat'].forEach(k => {
             const input = DOM_CACHE.get(k + 'Input');
             if (input) input.value = k === 'cat' ? 'Standard' : 'Any';
         });
@@ -7667,6 +7689,7 @@ static pop() {
         volt: DOM_CACHE.get('voltInput')?.value,
         phase: DOM_CACHE.get('phaseInput')?.value,
         enc: DOM_CACHE.get('encInput')?.value,
+        sys: DOM_CACHE.get('sysInput')?.value,
         cat: DOM_CACHE.get('catInput')?.value,
         keywordAllowed: this.getAllowedKeywordTermsInput(),
         keywordBlocked: this.getBlockedKeywordTermsInput(),
@@ -7676,14 +7699,33 @@ static pop() {
     // === MANUFACTURER LIST ===
     const m = DOM_CACHE.get('mfgInput');
     if (m) {
-        const cleanList = window.FOUND_MFGS.size > 0
+        const fallbackList = window.FOUND_MFGS.size > 0
             ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
             : [...AI_TRAINING_DATA.MANUFACTURERS].sort();
+        // Fetch pages are staged separately. Only the committed complete cache is evidence.
+        const ranking = typeof DataLoader !== 'undefined' && DataLoader.isCacheComplete()
+            ? InfoTableHelper.rankManufacturers(window.LOCAL_DB, AI_TRAINING_DATA.MANUFACTURERS)
+            : null;
+        const hasEvidence = ranking?.eligibleRecords > 0;
+        const cleanList = hasEvidence ? ranking.options : fallbackList;
 
         m.innerHTML = '';
         m.add(new Option('Any', 'Any'));
-        cleanList.forEach(v => m.add(new Option(v, v)));
-        m.value = savedValues.mfg && cleanList.includes(savedValues.mfg) ? savedValues.mfg : 'Any';
+        cleanList.forEach(v => m.add(new Option(hasEvidence ? `${v} (${ranking.counts[v]})` : v, v)));
+        const selected = savedValues.mfg;
+        const validSelection = selected && AI_TRAINING_DATA.MANUFACTURERS.includes(selected);
+        if (validSelection && !cleanList.includes(selected)) {
+            m.add(new Option(`${selected} (selected)`, selected));
+        }
+        m.value = validSelection ? selected : 'Any';
+    }
+
+    const sysInput = DOM_CACHE.get('sysInput');
+    if (sysInput) {
+        sysInput.innerHTML = '';
+        sysInput.add(new Option('Any', 'Any'));
+        InfoTableHelper.SYSTEM_TYPES.forEach(v => sysInput.add(new Option(v, v)));
+        sysInput.value = InfoTableHelper.SYSTEM_TYPES.includes(savedValues.sys) ? savedValues.sys : 'Any';
     }
 
     // === HP / VOLT / PHASE / ENCLOSURE ===
@@ -7752,6 +7794,11 @@ static _generateBadges(record, criteria) {
     if (criteria.enc !== "Any" && record.enc) {
         const badgeClass = record.encV ? 'match-orange' : 'match-green';
         badges.push(`<span class="hud-badge ${badgeClass}">${record.enc}</span>`);
+    }
+
+    if (criteria.sys && criteria.sys !== "Any" && record.sys) {
+        const badgeClass = record.sysV ? 'match-orange' : 'match-green';
+        badges.push(`<span class="hud-badge ${badgeClass}">${record.sys}</span>`);
     }
 
     // Keyword badges (avoid duplicating mfg badge)

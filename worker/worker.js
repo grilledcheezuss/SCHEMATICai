@@ -1,7 +1,8 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.94
+// 🧠 SCHEMATICA ai WORKER v2.5.95
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
+import InfoTableHelper from '../info-table-helper.js';
 
 // Security: Keys are now read from Worker environment secrets
 // Set these in your Cloudflare Worker dashboard:
@@ -130,6 +131,7 @@ function buildMainCacheKey(requestUrl, { pageSize, direction, offset, feedbackVe
     cacheUrl.searchParams.set('sortDirection', direction);
     cacheUrl.searchParams.set('offset', offset || '');
     cacheUrl.searchParams.set('feedbackVersion', String(feedbackVersion || 0));
+    cacheUrl.searchParams.set('payloadRevision', '2.5.95');
     return cacheUrl.toString();
 }
 
@@ -348,6 +350,12 @@ async function ensureHealedCache(env) {
                     const c = JSON.parse(rawJson);
                     if (c && typeof c === 'object') {
                         Object.entries(c).forEach(([param, value]) => {
+                            if (param === 'sys') {
+                                const sys = InfoTableHelper.normalizeSystemType(value);
+                                if (sys) tallies[`${id}|sys|${sys}`] = (tallies[`${id}|sys|${sys}`] || 0) + 1;
+                                return;
+                            }
+                            if (param === 'sysV') return;
                             if (param === 'reject_keywords' && Array.isArray(value)) {
                                 value.forEach(kw => { tallies[`${id}|reject_keyword|${kw}`] = (tallies[`${id}|reject_keyword|${kw}`] || 0) + 1; });
                             } else {
@@ -367,6 +375,14 @@ async function ensureHealedCache(env) {
                 if (param === 'reject_keyword') {
                     if (!nextHealed[id].reject_keywords) nextHealed[id].reject_keywords = [];
                     nextHealed[id].reject_keywords.push(value);
+                } else if (param === 'sys') {
+                    if (Object.prototype.hasOwnProperty.call(nextHealed[id], 'sys')) {
+                        nextHealed[id].sys = null;
+                        nextHealed[id].sysV = true;
+                    } else {
+                        nextHealed[id].sys = value;
+                        nextHealed[id].sysV = false;
+                    }
                 } else {
                     nextHealed[id][param] = value;
                 }
@@ -655,7 +671,8 @@ function extractSpecsStrict(t) {
     // Return object: parameter values with variance flags (suffix 'V' indicates varied/ambiguous)
     const s = { 
         mfg: null, hp: null, volt: null, phase: null, enc: null,
-        mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false
+        mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false,
+        ...InfoTableHelper.extractSystemType(t)
     };
     if (!t || typeof t !== 'string') return s;
     
@@ -1027,12 +1044,15 @@ export default {
 
                         const textToParse = fullDesc + " " + cleanId;
                         const explicit = extractSpecsStrict(textToParse);
+                        const system = InfoTableHelper.extractSystemType(fullDesc);
 
                         let finalMfg = explicit.mfg;
                         let finalEnc = explicit.enc;
                         let finalHp = explicit.hp;
                         let finalVolt = explicit.volt;
                         let finalPhase = explicit.phase;
+                        let finalSys = system.sys;
+                        let finalSysV = system.sysV;
 
                         if (CACHE_NB_MODEL) {
                             const bayesText = textToParse.slice(0, 1500);
@@ -1061,6 +1081,10 @@ export default {
                             if (overrides.phase) finalPhase = overrides.phase;
                             if (overrides.enc) finalEnc = overrides.enc;
                             if (overrides.category) finalCategory = overrides.category;
+                            if (Object.prototype.hasOwnProperty.call(overrides, 'sys')) {
+                                finalSys = overrides.sys;
+                                finalSysV = overrides.sysV;
+                            }
                         }
 
                         const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
@@ -1077,6 +1101,8 @@ export default {
                             volt: finalVolt,
                             phase: finalPhase,
                             enc: finalEnc,
+                            sys: finalSys,
+                            sysV: finalSysV,
                             category: finalCategory,
                             reject_keywords: overrides ? (overrides.reject_keywords || []) : [],
                             mfgV: explicit.mfgV || false,
@@ -1167,6 +1193,22 @@ export default {
             if (target === 'FEEDBACK') {
                 const fbUrl = `https://api.airtable.com/v0/${BASE_USERS_ID}/${TABLE_FEEDBACK}`;
                 const body = await request.json();
+                const submissions = Array.isArray(body.records) ? body.records : [body];
+                for (const submission of submissions) {
+                    const raw = submission && submission.fields && submission.fields.Corrections;
+                    if (raw === undefined) continue;
+                    let corrections;
+                    try { corrections = JSON.parse(raw); } catch (_error) {
+                        return new Response(JSON.stringify({ error: 'Invalid Corrections JSON' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                    }
+                    if (corrections && Object.prototype.hasOwnProperty.call(corrections, 'sys')) {
+                        const sys = InfoTableHelper.normalizeSystemType(corrections.sys);
+                        if (!sys) return new Response(JSON.stringify({ error: 'Invalid system type' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+                        corrections.sys = sys;
+                        delete corrections.sysV;
+                        submission.fields.Corrections = JSON.stringify(corrections);
+                    }
+                }
                 const resp = await fetch(fbUrl, {
                     method: 'POST',
                     headers: usersBaseHeaders(env, { json: true }),

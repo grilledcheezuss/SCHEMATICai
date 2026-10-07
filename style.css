@@ -322,7 +322,8 @@ body.dark-mode .panel-toggle-btn {
 }
 .refine-btn { width: auto; }
 
-.filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .input-group.full-width { grid-column: span 2; } .input-group { display: flex; flex-direction: column; gap: 1px; } .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--app-primary); margin-left: 2px; letter-spacing: 0.5px; } body.dark-mode .input-label { color: var(--text-secondary); }
+.filter-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px; } .input-group.full-width { grid-column: 1 / -1; } .input-group { display: flex; flex-direction: column; gap: 1px; min-width: 0; } .input-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: var(--app-primary); margin-left: 2px; letter-spacing: 0.5px; } body.dark-mode .input-label { color: var(--text-secondary); }
+#search-main-fields, #search-controls .cox-input { min-width: 0; }
 .input-label-row {
     display: flex;
     align-items: center;

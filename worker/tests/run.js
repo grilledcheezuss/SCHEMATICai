@@ -223,6 +223,7 @@ console.log('\n=== parseVoltageContextAware: 208V boundary guards ===');
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
+require('./info-table-helper.test.js').run();
 console.log('\n' + '='.repeat(60));
 console.log(`Results: ${passed} passed, ${failed} failed out of ${passed + failed} tests`);
 console.log('='.repeat(60));
