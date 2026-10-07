@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.98: re-associate flattened cells on cache restore, without changing raw records.
-    const DERIVED_REV = 4;
+    // v2.5.99: re-associate split/interleaved material cells in existing snapshots.
+    const DERIVED_REV = 5;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -94,6 +94,10 @@
     const UNSUPPORTED_SOURCE = '(?:POLY(?:CARBONATE|ESTER)?|ALUMIN(?:I)?UM|(?:BARE\\s+|CARBON\\s+|MILD\\s+)?STEEL|PVC|PLASTIC|WOOD)';
     const UNSUPPORTED_MATERIAL_RE = new RegExp(`^${UNSUPPORTED_SOURCE}(?=$|[\\s.,;])`);
     const MATERIAL_PREFIX_RE = /^\(?(?:(?:304|316)L?\)?\s*)?$/;
+    const WIRING_PREFIX_RE = /^(?:\d+[A-Z]?\s+|[A-Z]{1,3}\s+|[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?\s+|W\/OR\s+|AUTOMATIC\s+MODE\s+|ALL\s+PUMPS\s+OFF\s+)*$/;
+    const WIRING_ANCHOR_RE = /\b(?:[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?|AUTOMATIC\s+MODE|ALL\s+PUMPS\s+OFF)\b/;
+    const TERMINAL_CELL_RE = /^\d{1,3}\s+\d{1,3}\s+WAGO\s+\d{3}-\d{3}\s+(?:(?:GROUND\s+)?TERMINAL(?:\s+OPERATOR)?|END\s+BLOCK)$/;
+    const MATERIAL_BOUNDARY_RE = new RegExp(`^(?:${FEATURE_SOURCE}|ENCLOSURE (?:SIZE|TYPE|DIMENSIONS?)|INNER (?:SWING )?PANEL|INNER DOOR|CONTROL SENSOR)$`);
     // Whole-description strong signals, consulted ONLY by the legacy r.enc fallback to
     // mark uncertainty (never to override a material row). Bare SS / S/S are excluded.
     const ENC_SIGNAL_RE = /\b(4XFG|4XSS|FIB(?:ER|RE)\s*GLASS|FRP|STAINLESS)\b/g;
@@ -112,11 +116,46 @@
         // A minus sign on a motor count is a value, not a label separator.
         raw = raw.replace(kind === 'motorCounts' ? /^[\s:|=]+/ : LEADING_SEPARATORS_RE, '');
         if (kind === 'encMaterials') {
-            raw = raw.replace(/\b(PAINTED|STAINLESS|FIBER|FIBRE)[ \t]*\r?\n[ \t]*(?=STEEL\b|GLASS\b)/g, '$1 ');
+            raw = joinMaterialLines(raw);
         }
         const cut = raw.search(/[\n\r|]/);
         if (cut >= 0) raw = raw.slice(0, cut);
         return raw.trim();
+    }
+
+    function joinMaterialLines(value) {
+        return value.replace(/\b(PAINTED|STAINLESS|FIBER|FIBRE)[ \t]*\r?\n[ \t]*(?=STEEL\b|GLASS\b)/g, '$1 ');
+    }
+
+    function isWiringNoise(value) {
+        const wiring = value.replace(/^W\s*=\s*/, '').trim();
+        return TERMINAL_CELL_RE.test(value)
+            || (WIRING_ANCHOR_RE.test(wiring) && WIRING_PREFIX_RE.test(wiring + ' '));
+    }
+
+    function interleavedMaterial(value, featureAnchored) {
+        const matcher = new RegExp(MATERIAL_RE.source, 'g');
+        const candidates = [];
+        let match;
+        while ((match = matcher.exec(value))) {
+            const prefix = value.slice(0, match.index);
+            // Rating text alone is never evidence of a separate material cell.
+            if (!featureAnchored && !WIRING_ANCHOR_RE.test(prefix)) continue;
+            if (!WIRING_PREFIX_RE.test(prefix)) continue;
+            if (/\b(?:HARDWARE|TERMINAL|BOM|FIBERGLASS|STAINLESS|PAINTED|STEEL)\b/.test(prefix)) continue;
+            let end = match.index + match[0].length;
+            for (let guard = 0; guard < ENCLOSURE_MATERIALS.length; guard++) {
+                const alt = MATERIAL_ALT_RE.exec(value.slice(end));
+                if (!alt) break;
+                const alternative = MATERIAL_RE.exec(value.slice(end + alt[0].length));
+                if (!alternative || alternative.index !== 0) break;
+                end += alt[0].length + alternative[0].length;
+            }
+            const tail = value.slice(end).trim();
+            const bom = TERMINAL_CELL_RE.test(tail);
+            if (!tail || bom) candidates.push({ value: value.slice(match.index, end), varied: bom, direction: bom ? 'reverse-terminal-gap' : 'reverse' });
+        }
+        return candidates.length === 1 ? candidates[0] : null;
     }
 
     function normalizeSystemType(value) {
@@ -212,11 +251,12 @@
     }
 
     // Reverse cells must end at their label. The only non-adjacent suffix accepted is
-    // the terminal BOM row actually present in CP-8328, with neighboring feature anchors.
+    // a bounded WAGO terminal/end-block cell, with neighboring info-table anchors.
     // These are textual association rules, not page/spatial isolation.
     function reverseValue(text, label, previous, next, kind) {
         if (previous && (previous.kind || /^(?:TAGS?|NOTES?|PANEL NAME)$/.test(previous.label))) return null;
         let value = text.slice(Math.max(previous ? previous.end : 0, label.start - REVERSE_WINDOW), label.start);
+        if (kind === 'encMaterials') value = joinMaterialLines(value);
         value = value.replace(/[\s:|=\-\u2013]+$/, '');
         const delimiter = Math.max(value.lastIndexOf('\n'), value.lastIndexOf('\r'), value.lastIndexOf('|'));
         if (delimiter >= 0) value = value.slice(delimiter + 1);
@@ -227,7 +267,7 @@
         }
         if (kind !== 'encMaterials') return null;
         const anchored = previous && (/^ENCLOSURE (?:NEMA )?RATING$/.test(previous.label) || FEATURE_RE.test(previous.label))
-            && next && FEATURE_RE.test(next.label);
+            && next && MATERIAL_BOUNDARY_RE.test(next.label);
         const featureAnchored = anchored && FEATURE_RE.test(previous.label);
         if (new RegExp(`^${UNSUPPORTED_SOURCE}$`).test(value) && (!previous || featureAnchored)) {
             return { value, varied: false, direction: 'reverse' };
@@ -242,21 +282,7 @@
             }
         }
         if (!anchored || /\b(?:HARDWARE|BOM|NOTES?|FIBERGLASS|STAINLESS)\b.*\b(?:HARDWARE|BOM)\b/.test(value)) return null;
-        const matcher = new RegExp(MATERIAL_RE.source, 'g');
-        const candidates = [];
-        let match;
-        while ((match = matcher.exec(value))) {
-            const prefix = value.slice(0, match.index);
-            // A rating such as "4X Fiberglass" is not a separate material cell.
-            if (!featureAnchored && !/\b(?:[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?|AUTOMATIC\s+MODE|ALL\s+PUMPS\s+OFF)\b/.test(prefix)) continue;
-            // Wiring identifiers/numbers and the observed operating-mode text only.
-            if (!/^(?:\d+[A-Z]?[\s]+|[A-Z]{1,3}[\s]+|[A-Z]{1,3}\d+[A-Z]?(?:-\d+)?[\s]+|W\/OR[\s]+|AUTOMATIC\s+MODE\s+|ALL\s+PUMPS\s+OFF\s+)*$/.test(prefix)) continue;
-            if (/\b(?:HARDWARE|TERMINAL|BOM|FIBERGLASS|STAINLESS|PAINTED|STEEL)\b/.test(prefix)) continue;
-            const tail = value.slice(match.index + match[0].length).trim();
-            const bom = /^\d{1,3}\s+\d{1,3}\s+WAGO\s+\d{3}-\d{3}\s+(?:GROUND\s+)?TERMINAL$/.test(tail);
-            if (!tail || bom) candidates.push({ value: match[0], varied: bom, direction: bom ? 'reverse-terminal-gap' : 'reverse' });
-        }
-        return candidates.length === 1 ? candidates[0] : null;
+        return interleavedMaterial(value, featureAnchored);
     }
 
     // One linear label scan; all forward/reverse work is bounded per info cell.
@@ -277,6 +303,15 @@
             const next = labels[i + 1];
             let value = readValue(text, label.end, next ? next.start : text.length, label.kind);
             let association = { value, varied: false, direction: 'forward' };
+            if (label.kind === 'encMaterials' && value && !identifiedMaterials(value).length
+                && !UNSUPPORTED_MATERIAL_RE.test(value) && next && MATERIAL_BOUNDARY_RE.test(next.label)) {
+                const forward = interleavedMaterial(value, false);
+                if (forward) association = { ...forward, varied: true, direction: 'forward-wiring-gap' };
+                else if (isWiringNoise(value)) {
+                    const reverse = reverseValue(text, label, labels[i - 1], next, label.kind);
+                    if (reverse) association = { ...reverse, varied: true };
+                }
+            }
             if (!value && (label.kind === 'encMaterials' || label.kind === 'panelTypes')) {
                 association = reverseValue(text, label, labels[i - 1], next, label.kind) || association;
             }

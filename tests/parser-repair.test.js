@@ -15,6 +15,35 @@ const sys = desc => {
 };
 
 async function main() {
+    const association = require('./fixtures/enclosure-association.js');
+    for (const wanted of parser.ENCLOSURE_MATERIALS) {
+        for (const cell of association.cells(wanted)) {
+            const desc = association.description(cell);
+            const r = record(desc, 'Varied / Multiple');
+            assert.deepStrictEqual([...r._encEvidence.materials], [wanted], cell);
+            assert.strictEqual(r._encEvidence.status, 'row', cell);
+            assert.strictEqual(parser.matchEnclosureMaterial(r, wanted).matches, true, cell);
+            for (const other of parser.ENCLOSURE_MATERIALS.filter(m => m !== wanted)) {
+                assert.strictEqual(parser.matchEnclosureMaterial(r, other).matches, false, cell);
+            }
+            assert.deepStrictEqual(sys(desc), ['Duplex', false], 'System Type unchanged');
+            assert.strictEqual(r._pumpMfg, 'SULZER', 'manufacturer unchanged');
+        }
+        for (const noise of ['N/A', 'Hardware', 'Stainless Steel screws', '28 2 OTHER 285-137 GROUND TERMINAL']) {
+            const desc = `Phase Monitor ${wanted} Enclosure Material ${noise} Panel Heater / Thermostat W`;
+            assert.notStrictEqual(material(desc).status, 'row', desc);
+        }
+        assert.strictEqual(material(`Phase Monitor ${wanted} Enclosure Material Steel Panel Heater / Thermostat W`).status, 'other');
+        assert.strictEqual(material(`Enclosure Material CR1 5 ${wanted} HARDWARE Inner Swing Panel Yes`).status, 'unreadable');
+    }
+    for (const desc of [
+        'Enclosure Material CR1 5 Stainless Steel or Painted Steel Inner Swing Panel Yes',
+        'Phase Monitor CR1 5 Stainless Steel or Painted Steel Enclosure Material Enclosure Size'
+    ]) {
+        assert.deepStrictEqual([...material(desc).materials], ['Stainless Steel', 'Painted Steel'], desc);
+        assert.strictEqual(material(desc).status, 'conflict', desc);
+        assert.strictEqual(material(desc).varied, true, desc);
+    }
     for (const [name, fixture] of Object.entries(fixtures)) {
         const wanted = name === 'cp8370' ? 'Fiberglass' : 'Stainless Steel';
         const opposite = wanted === 'Fiberglass' ? 'Stainless Steel' : 'Fiberglass';
