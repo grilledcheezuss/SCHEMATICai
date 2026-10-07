@@ -44,11 +44,15 @@ class ReleaseUpdate {
         return { response, finalUrl };
     }
 
+    static isVersion(version) {
+        return this.compare(version, version) !== null;
+    }
+
     // Version the loaded entry HTML declares; differs from APP_VERSION when HTML and app.js come from different releases.
     static documentVersion() {
         const version = typeof document !== 'undefined'
             ? document.querySelector('meta[name="app-version"]')?.content : null;
-        return this.compare(version, version) === 0 ? version : null;
+        return this.isVersion(version) ? version : null;
     }
 
     // Newer deployment, or a mixed release: HTML that disagrees with the executing app.js. Never downgrades.

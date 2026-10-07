@@ -780,6 +780,7 @@ class DataLoader {
     static TAB_ID = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     static _inFlightSync = false;
     static _lockToken = null;
+    static _lockAcquiredAt = 0;
     static _lockReservedForSync = false;
     static _lockExitHooksInstalled = false;
     static _lockHeartbeatTimer = null;
@@ -906,7 +907,7 @@ class DataLoader {
             meta: { owner: this.TAB_ID, appVersion: APP_VERSION, ttlMs: this.SYNC_LOCK_STALE_MS }
         });
     }
-    static mirrorSyncLock(token, at = Date.now()) {
+    static mirrorSyncLock(token, at = this._lockAcquiredAt || Date.now()) {
         localStorage.setItem(this.SYNC_LOCK_KEY, JSON.stringify({ at, heartbeatAt: Date.now(), token, owner: this.TAB_ID, appVersion: APP_VERSION, ttlMs: this.SYNC_LOCK_STALE_MS }));
     }
     // Renews this tab's own lock; fails only when a peer has taken it over.
@@ -1036,6 +1037,7 @@ class DataLoader {
         if (won) {
             this._inFlightSync = true;
             this._lockToken = token;
+            this._lockAcquiredAt = now;
             this._lockHeartbeatLost = false;
             this.mirrorSyncLock(token, now);
             this.installLockExitHooks();
@@ -1050,6 +1052,7 @@ class DataLoader {
         }
         this._inFlightSync = false;
         this._lockToken = null;
+        this._lockAcquiredAt = 0;
         this._lockReservedForSync = false;
         this._lockHeartbeatLost = false;
         localStorage.removeItem(this.SYNC_LOCK_KEY);
