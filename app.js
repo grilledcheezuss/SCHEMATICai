@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.94 ---
-const APP_VERSION = "v2.5.94";
+// --- SCHEMATICA ai v2.5.95 ---
+const APP_VERSION = "v2.5.95";
 const VERSION_HISTORY = {
+    "v2.5.95": "Frontend-only retry of the reverted #188 attempt (Worker CPU limit): System Type dropdown/search branch, top-eight Pump Manufacturer ranking, and reordered parameter grid. Info-table evidence is derived once per record in the browser (info-table-parser.js) when a snapshot is applied; the Worker API is unchanged and does not need redeploying",
     "v2.5.94": "Frontend-only search state fix: reset clears both Allowed/Blocked keyword editors, and live criteria survive startup, sync, snapshot swaps, and background refresh option rebuilds without changing results/PDF state or Worker/backend behavior",
     "v2.5.93": "Mobile PDF viewer geometry fix: stop flex-centered negative left overflow from recentering zoomed documents on mobile by giving wide stages a true scrollable left origin while preserving centered narrow layouts and existing gesture/render guards",
     "v2.5.92": "PDF zoom/pan stability refinement: replaced symmetric pan clamping with scroll-aware directional bounds, cancel stale viewport-restoration sequences during active gestures, and block delayed restore callbacks from overriding newer touch/wheel zoom interactions",
@@ -690,8 +691,10 @@ class CacheService {
         }
 
         if (!stageMap || stageMap.size === 0) return null;
+        const stageRecords = Array.from(stageMap.values());
+        await DataLoader.deriveRecordFields(stageRecords);
         window.LOCAL_DB.length = 0;
-        stageMap.forEach(rec => window.LOCAL_DB.push(rec));
+        stageRecords.forEach(rec => window.LOCAL_DB.push(rec));
         if (!(window.ID_MAP instanceof Map)) window.ID_MAP = new Map();
         if (!(window.FOUND_MFGS instanceof Set)) window.FOUND_MFGS = new Set();
         if (!(window.FOUND_ENCS instanceof Set)) window.FOUND_ENCS = new Set();
@@ -701,6 +704,7 @@ class CacheService {
         stageMap.forEach((rec, id) => window.ID_MAP.set(id, rec));
         stageMfgs.forEach(v => window.FOUND_MFGS.add(v));
         stageEncs.forEach(v => window.FOUND_ENCS.add(v));
+        DataLoader.refreshDerivedIndexes(window.LOCAL_DB);
         return true; 
     }
     static async enc(t) { const iv = crypto.getRandomValues(new Uint8Array(12)); const e = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, this.activeKey, new TextEncoder().encode(t)); return Array.from(iv).map(b=>b.toString(16).padStart(2,'0')).join('') + ":" + Array.from(new Uint8Array(e)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
@@ -1043,6 +1047,7 @@ class DataLoader {
             if (window.ID_MAP instanceof Map) window.ID_MAP.clear();
             if (window.FOUND_MFGS instanceof Set) window.FOUND_MFGS.clear();
             if (window.FOUND_ENCS instanceof Set) window.FOUND_ENCS.clear();
+            window.MFG_RANKING = null;
             localStorage.removeItem('cox_db_complete');
             localStorage.removeItem(this.SYNC_TIMESTAMP_KEY);
             localStorage.removeItem(this.SYNC_LOCK_KEY);
@@ -1067,6 +1072,26 @@ class DataLoader {
         idMap.forEach((rec, id) => window.ID_MAP.set(id, rec));
         foundMfgs.forEach(v => window.FOUND_MFGS.add(v));
         foundEncs.forEach(v => window.FOUND_ENCS.add(v));
+        this.refreshDerivedIndexes(window.LOCAL_DB);
+    }
+    // v2.5.95: info-table evidence (System Type / Pump Manufacturer) is derived once per
+    // record in the browser, never per search and never in the Worker MAIN loop.
+    static DERIVE_CHUNK_SIZE = 250;
+    static async deriveRecordFields(records) {
+        if (typeof InfoTableParser === 'undefined') return null;
+        return InfoTableParser.deriveRecords(records, {
+            chunkSize: this.DERIVE_CHUNK_SIZE,
+            yieldFn: () => this.yieldMainThread()
+        });
+    }
+    static refreshDerivedIndexes(records) {
+        if (typeof InfoTableParser === 'undefined') {
+            window.MFG_RANKING = null;
+            return;
+        }
+        // No-op for records already derived (async path); covers direct snapshot applies.
+        InfoTableParser.deriveRecordsSync(records);
+        window.MFG_RANKING = InfoTableParser.rankManufacturers(records);
     }
     static installLifecycleRefreshHooks() {
         if (this._lifecycleRefreshHookInstalled) return;
@@ -1461,6 +1486,7 @@ class DataLoader {
             const applyStart = this.now();
             await this.yieldMainThread();
             this.setSyncProgress(btn, '✅ APPLYING', 99);
+            await this.deriveRecordFields(snapshot.records);
             this.applySnapshot(snapshot);
             const applyMs = Math.round(this.now() - applyStart);
             localStorage.setItem('cox_db_complete', 'true');
@@ -3381,6 +3407,7 @@ class FeedbackService {
         this.setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt'); 
         this.setupInput('fb-phase', AI_TRAINING_DATA.DATA.PHASE, 'phase'); 
         this.setupInput('fb-enc', ['4XSS', '4XFG', 'POLY'], 'enc');
+        this.setupInput('fb-sys', UI.SYSTEM_TYPES, 'sys');
 
         const lvBtn = document.getElementById('fb-low-volt-btn'); 
         if (this.lockout.has(`${id}:cat_low`)) { lvBtn.className = 'keyword-toggle disabled-overlay'; lvBtn.innerText = "✓ Reported as Low Voltage"; lvBtn.onclick = null; } 
@@ -3395,7 +3422,7 @@ class FeedbackService {
         // Clear existing options safely
         while (el.firstChild) el.removeChild(el.firstChild);
         el.add(new Option('Select Correct...', '')); 
-        el.add(new Option('Varied / Multiple', 'Varied / Multiple')); 
+        if (paramKey !== 'sys') el.add(new Option('Varied / Multiple', 'Varied / Multiple')); 
         data.forEach(d => el.add(new Option(d, d))); 
         el.value = ''; // Ensure empty option is selected by default
         if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } 
@@ -3433,6 +3460,7 @@ class FeedbackService {
         const volt = document.getElementById('fb-volt').value; if(volt) { corrections.volt = volt; this.lockout.add(`${this.currentId}:p_volt`); } 
         const phase = document.getElementById('fb-phase').value; if(phase) { corrections.phase = phase; this.lockout.add(`${this.currentId}:p_phase`); } 
         const enc = document.getElementById('fb-enc').value; if(enc) { corrections.enc = enc; this.lockout.add(`${this.currentId}:p_enc`); } 
+        const sys = document.getElementById('fb-sys')?.value; if(sys && UI.SYSTEM_TYPES.includes(sys)) { corrections.sys = sys; this.lockout.add(`${this.currentId}:p_sys`); } 
 
         if(document.getElementById('fb-low-volt-btn').classList.contains('selected')) { corrections.category = 'low_voltage'; this.lockout.add(`${this.currentId}:cat_low`); } 
         
@@ -3936,6 +3964,7 @@ class SearchEngine {
             volt: DOM_CACHE.get('voltInput')?.value || 'Any', 
             phase: DOM_CACHE.get('phaseInput')?.value || 'Any', 
             enc: DOM_CACHE.get('encInput')?.value || 'Any',
+            sys: DOM_CACHE.get('sysInput')?.value || 'Any',
             blocklistMode: UI.isKeywordBlocklistMode()
         };
         
@@ -4062,6 +4091,14 @@ class SearchEngine {
                 }
             }
             
+            // System Type filter (v2.5.95): compares only the pre-derived info-table value
+            // (r._sys, derived once per record when the snapshot was applied). Independent of
+            // keywords, category, and enclosure; never re-parses the description here.
+            if(crit.sys !== "Any") {
+                if (r._sys !== crit.sys) return;
+                w += 500;
+            }
+            
             // Keyword filter using helper
             if(!SearchEngine.shouldIncludeRecordForKeywordSets(
                 r,
@@ -4088,13 +4125,15 @@ class SearchEngine {
                 (crit.hp !== 'Any' && a.hpV ? 1 : 0) +
                 (crit.volt !== 'Any' && a.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && a.phaseV ? 1 : 0) +
-                (crit.enc !== 'Any' && a.encV ? 1 : 0);
+                (crit.enc !== 'Any' && a.encV ? 1 : 0) +
+                (crit.sys !== 'Any' && a._sysV === true ? 1 : 0);
             const bVariedCount = 
                 (crit.mfg !== 'Any' && b.mfgV ? 1 : 0) +
                 (crit.hp !== 'Any' && b.hpV ? 1 : 0) +
                 (crit.volt !== 'Any' && b.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && b.phaseV ? 1 : 0) +
-                (crit.enc !== 'Any' && b.encV ? 1 : 0);
+                (crit.enc !== 'Any' && b.encV ? 1 : 0) +
+                (crit.sys !== 'Any' && b._sysV === true ? 1 : 0);
             
             if(aVariedCount !== bVariedCount) return aVariedCount - bVariedCount; // Fewer varied flags = better
             
@@ -4105,6 +4144,7 @@ class SearchEngine {
                     if (crit.volt !== 'Any' && r.voltV) return 3;
                     if (crit.phase !== 'Any' && r.phaseV) return 3;
                     if (crit.enc !== 'Any' && r.encV) return 2;
+                    if (crit.sys !== 'Any' && r._sysV === true) return 2;
                     if (crit.mfg !== 'Any' && r.mfgV) return 1;  // worst
                     return 0;
                 };
@@ -7227,6 +7267,8 @@ class PdfController {
 }
 
 class UI {
+    static SYSTEM_TYPES = ['Simplex', 'Duplex', 'Triplex', 'Quadraplex'];
+    static MFG_TOP_LIMIT = 8;
     static mobilePanels = { searchVisible: true, resultsVisible: false };
     static mobilePdfFocus = false;
     static mobileManualPanelState = { search: false, results: false };
@@ -7287,7 +7329,7 @@ class UI {
     }
     
     static resetSearch() { 
-        ['mfg', 'hp', 'volt', 'phase', 'enc', 'cat'].forEach(k => {
+        ['sys', 'mfg', 'hp', 'volt', 'phase', 'enc', 'cat'].forEach(k => {
             const input = DOM_CACHE.get(k + 'Input');
             if (input) input.value = k === 'cat' ? 'Standard' : 'Any';
         });
@@ -7667,6 +7709,7 @@ static pop() {
         volt: DOM_CACHE.get('voltInput')?.value,
         phase: DOM_CACHE.get('phaseInput')?.value,
         enc: DOM_CACHE.get('encInput')?.value,
+        sys: DOM_CACHE.get('sysInput')?.value,
         cat: DOM_CACHE.get('catInput')?.value,
         keywordAllowed: this.getAllowedKeywordTermsInput(),
         keywordBlocked: this.getBlockedKeywordTermsInput(),
@@ -7674,16 +7717,38 @@ static pop() {
     };
 
     // === MANUFACTURER LIST ===
+    // v2.5.95: top eight by Pump Manufacturer row frequency. The ranking is computed once per
+    // applied dataset (DataLoader.refreshDerivedIndexes); this only reads it. Matching on r.mfg
+    // is unchanged. Falls back to the existing list when no row evidence exists.
     const m = DOM_CACHE.get('mfgInput');
     if (m) {
-        const cleanList = window.FOUND_MFGS.size > 0
-            ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
-            : [...AI_TRAINING_DATA.MANUFACTURERS].sort();
+        const ranking = window.MFG_RANKING;
+        const rankedList = ranking && ranking.eligibleRecords > 0 && Array.isArray(ranking.options)
+            ? ranking.options.filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).slice(0, this.MFG_TOP_LIMIT)
+            : [];
+        const cleanList = rankedList.length > 0
+            ? rankedList
+            : (window.FOUND_MFGS.size > 0
+                ? Array.from(window.FOUND_MFGS).filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).sort()
+                : [...AI_TRAINING_DATA.MANUFACTURERS].sort());
 
         m.innerHTML = '';
         m.add(new Option('Any', 'Any'));
         cleanList.forEach(v => m.add(new Option(v, v)));
-        m.value = savedValues.mfg && cleanList.includes(savedValues.mfg) ? savedValues.mfg : 'Any';
+        // Keep a live selection that fell outside the current list instead of clearing it.
+        const keepSelection = !!savedValues.mfg && savedValues.mfg !== 'Any' &&
+            (cleanList.includes(savedValues.mfg) || AI_TRAINING_DATA.MANUFACTURERS.includes(savedValues.mfg));
+        if (keepSelection && !cleanList.includes(savedValues.mfg)) m.add(new Option(savedValues.mfg, savedValues.mfg));
+        m.value = keepSelection ? savedValues.mfg : 'Any';
+    }
+
+    // === SYSTEM TYPE ===
+    const sysInput = DOM_CACHE.get('sysInput');
+    if (sysInput) {
+        sysInput.innerHTML = '';
+        sysInput.add(new Option('Any', 'Any'));
+        this.SYSTEM_TYPES.forEach(v => sysInput.add(new Option(v, v)));
+        sysInput.value = this.SYSTEM_TYPES.includes(savedValues.sys) ? savedValues.sys : 'Any';
     }
 
     // === HP / VOLT / PHASE / ENCLOSURE ===
@@ -7752,6 +7817,12 @@ static _generateBadges(record, criteria) {
     if (criteria.enc !== "Any" && record.enc) {
         const badgeClass = record.encV ? 'match-orange' : 'match-green';
         badges.push(`<span class="hud-badge ${badgeClass}">${record.enc}</span>`);
+    }
+
+    // System Type badge - only when filtering (orange when Panel Type / No. Motors disagree or are inferred)
+    if (criteria.sys && criteria.sys !== "Any" && record._sys) {
+        const badgeClass = record._sysV === true ? 'match-orange' : 'match-green';
+        badges.push(`<span class="hud-badge ${badgeClass}">${record._sys.toUpperCase()}</span>`);
     }
 
     // Keyword badges (avoid duplicating mfg badge)
