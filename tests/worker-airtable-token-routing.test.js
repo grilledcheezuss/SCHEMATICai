@@ -16,10 +16,12 @@ function jsonResponse(data, status = 200) {
 function loadWorker(fetchImpl) {
     const workerPath = path.join(__dirname, '..', 'worker', 'worker.js');
     let source = fs.readFileSync(workerPath, 'utf8');
+    source = source.replace("import InfoTableHelper from '../info-table-helper.js';", '');
     source = source.replace(/export\s+default\s*\{/, 'const __worker_default = {');
     source += '\nmodule.exports = __worker_default;\n';
 
     const sandbox = {
+        InfoTableHelper: require('../info-table-helper.js'),
         module: { exports: {} },
         exports: {},
         console,
