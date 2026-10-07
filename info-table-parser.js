@@ -802,7 +802,7 @@
             const typed = reverse ? last : first;
             if (!last || (!singleUnsupported && !reverse && last.value !== 'CONTROL PANEL')) continue;
             if (last.end - first.start > REVERSE_WINDOW
-                || /[|\n\r]\s*[|\n\r]/.test(text.slice(first.start, last.end))) continue;
+                || /[|\n\r]\s*[|\n\r]/.test(text.slice(first.start, last.end).replace(/\r\n/g, '\n'))) continue;
             const token = equipment.exec(typed.value);
             const outOfRange = singleUnsupported || unsupported.test(typed.value);
             if (!outOfRange && (!token || !/\b(?:PUMPS?|BLOWERS?|GRINDERS?)$/.test(typed.value))) continue;
@@ -813,8 +813,8 @@
             const trailingAnchor = cells[lastIndex + 1] && primary.test(cells[lastIndex + 1].value);
             const before = cells[anchored ? anchorIndex - 1 : i - 1];
             const after = cells[lastIndex + (trailingAnchor ? 2 : 1)];
-            if ((before && (boundary.test(before.value) || SYSTEM_HARDWARE_RE.test(before.value)))
-                || (after && (SYSTEM_HARDWARE_RE.test(after.value)
+            if ((before && (boundary.test(before.value) || (!outOfRange && SYSTEM_HARDWARE_RE.test(before.value))))
+                || (after && ((!outOfRange && SYSTEM_HARDWARE_RE.test(after.value))
                     || boundary.test(after.value.replace(/\bNO\.?\s*(?:OF\s+)?(?:MOTORS|PUMPS)\b/g, ''))
                     || /^(?:OR|AND|FOR|ON|IN|OF|WITH|PART|MOUNTED|ATTACHED)\b/.test(after.value)))) continue;
             while (labelIndex < labels.length && labels[labelIndex].start < first.start) labelIndex++;
@@ -852,10 +852,10 @@
             const afterWindow = text.slice(end, Math.min(text.length, end + 42));
             // Delimited CONTROL PANEL associations use the complete-cell grammar,
             // not the free-text proximity path (which could bridge arbitrary values).
-            if (/[\n\r|]/.test(beforeWindow + afterWindow)
-                && /\bCONTROL\s+PANEL\b/.test(beforeWindow + afterWindow)
-                && /^(?:PUMPS?|BLOWERS?|GRINDERS?|ALTERNATORS?)$/.test(match[2])
-                && !/\bCONTROL\s+PANEL\b/.test(match[0])) continue;
+            const inlinePanel = /\bCONTROL\s+PANEL\b[^|\n\r]*$/.test(beforeWindow)
+                || /^[^|\n\r]*\bCONTROL\s+PANEL\b/.test(afterWindow);
+            if (!inlinePanel && /\bCONTROL\s+PANEL\b/.test(beforeWindow + afterWindow)
+                && /^(?:PUMPS?|BLOWERS?|GRINDERS?|ALTERNATORS?)$/.test(match[2])) continue;
             if (!hasEquipmentPanelContext(beforeWindow) && !hasEquipmentPanelContext(afterWindow)) continue;
             if (/^ALTERNATORS?$/.test(match[2]) && !/\bCONTROL\s+PANEL\b/.test(afterWindow)) continue;
 

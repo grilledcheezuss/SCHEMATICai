@@ -15,7 +15,7 @@ _Release note: v2.5.109 adds browser-only complete-cell title assembly, not a wi
 
 `validated-caption-title` evidence and `title-caption-separated` orange cause distinguish recovery from badge recoloring. `unsupported-primary-pump-title` is an internal abstention/absent reason, not a new dropdown type. The opt-in, read-only audit uses the same normalized System Type view as derivation and preserves sanitized output. See `tests/system-type-caption.test.js` for negative/mutation, frozen-baseline and 8k refresh checks. No production catalog or reviewed labels are available locally; synthetic rule coverage is not recall/precision, nor preservation of all 4,093 live Duplex results. User post-publication audit remains pending; reverting the frontend release is the iterative rollback path. This PR does not merge or deploy.
 
-The extended deterministic comparison (28 frozen fixtures plus 436 synthetic checks, including repeated metamorphic variants) against the v2.5.108 parser reports every changed fixture and its evidence reasons when `SYSTEM_TYPE_BASELINE` is supplied:
+The extended deterministic comparison (28 frozen fixtures plus 596 synthetic checks, including repeated metamorphic variants) against the v2.5.108 parser reports every changed fixture and its evidence reasons when `SYSTEM_TYPE_BASELINE` is supplied:
 
 | Classification transition | Checks | Reason |
 | --- | ---: | --- |
@@ -23,8 +23,8 @@ The extended deterministic comparison (28 frozen fixtures plus 436 synthetic che
 | NULL → green | 6 | Complete Quadraplex title plus independently associated agreeing plain count |
 | Orange → green | 18 | Existing plain-count corroboration policy, not badge recoloring |
 | Orange → NULL | 8 | Rejected arbitrary/invalid title-cell associations |
-| Orange → NULL | 8 | Unsupported primary pump title; no count fallback |
-| Unchanged | 301 | Includes CP1409 abstention and both green baseline fixtures |
+| Orange → NULL | 40 | Unsupported primary pump title; no count fallback, including adjacent alternator components |
+| Unchanged | 429 | Includes CP1409 abstention, CRLF/inline-title preservation and both green baseline fixtures |
 
 These are bounded fixture outcomes, not unique live records or catalog gains. Eight-thousand-record refresh tests retain yielding, once-only derivation and unchanged raw serialization.
 

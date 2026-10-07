@@ -45,6 +45,8 @@ for (const [type, count] of [['Simplex', 1], ['Duplex', 2], ['Triplex', 3], ['Qu
                 if (reverse) cells.reverse();
                 const title = `PANEL DESCRIPTION | 24 | ${cells.join(' | ')}`;
                 expect(title, [type, true]);
+                expect(title.replace(/ \| /g, '\n'), [type, true]);
+                expect(title.replace(/ \| /g, '\r\n'), [type, true]);
                 expect(title.toLowerCase().replace(type.toLowerCase(), `%%u${type.toLowerCase()}`), [type, true]);
                 expect(title.replace('24', '99'), [type, true]);
                 expect(`BILL OF MATERIALS | C3SS110B-20 | CONTROL DIAGRAM | ${title}`, [type, true]);
@@ -62,6 +64,10 @@ for (const [type, count] of [['Simplex', 1], ['Duplex', 2], ['Triplex', 3], ['Qu
     }
     for (const suffix of ['-123', ' CP-1234', ' RECEPTACLE', ' OUTLET', ' ALTERNATOR']) {
         expect(`${type} PUMP${suffix} | POWER DIAGRAM | CONTROL PANEL`, [null, false]);
+    }
+    for (const equipment of ['PUMPS', 'BLOWERS', 'GRINDERS']) {
+        expect(`${type} ${equipment} CONTROL PANEL`, [type, true]);
+        expect(`${type} ${equipment} CONTROL PANEL | Voltage 480`, [type, true]);
     }
     expect(`${type} ALTERNATOR | POWER DIAGRAM | CONTROL PANEL`, [null, false]);
     expect(`NOTES | PANEL DESCRIPTION | ${type} PUMP | POWER DIAGRAM | CONTROL PANEL`, [null, false]);
@@ -83,6 +89,14 @@ for (const count of ['FIVE', 'SIX', '5', '6']) {
     expect(`${count} PUMP | POWER DIAGRAM | CONTROL PANEL | TRIPLEX ALTERNATOR | DUPLEX ALTERNATOR`, [null, false]);
     expect(`${count} PUMP CONTROL PANEL | No. Motors 2`, [null, false]);
     expect(`${count} PUMP CONTROL PANEL | Panel Type Duplex | Voltage 480`, ['Duplex', false]);
+    for (const reverse of [false, true]) {
+        const cells = [`${count} PUMP`, 'POWER DIAGRAM', 'CONTROL PANEL'];
+        if (reverse) cells.reverse();
+        expect(`TRIPLEX ALTERNATOR | ${cells.join(' | ')} | No. Motors 2`, [null, false]);
+        for (const motors of [1, 2, 3, 4]) {
+            expect(`${cells.join(' | ')} | TRIPLEX ALTERNATOR | No. Motors ${motors}`, [null, false]);
+        }
+    }
 }
 const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
