@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.107: adjacent-token System Type association; refresh existing snapshots.
-    const DERIVED_REV = 8;
+    // v2.5.108: bounded equipment-title evidence; refresh existing snapshots.
+    const DERIVED_REV = 9;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -82,7 +82,7 @@
     const SYSTEM_TOKEN_SOURCE = '(?:SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX|QUAD|DUP|(?:SINGLE|ONE|TWO|THREE|FOUR|[1-4])[\\s-]+PUMPS?|\\([1-4]\\)[\\s-]*PUMPS?)';
     const SYSTEM_CELL_RE = new RegExp(`^(${SYSTEM_TOKEN_SOURCE})(?:\\s+(?:GRINDER|ALTERNATING))?(?:\\s+PUMPS?)?(?:\\s+(?:CONTROL\\s+)?PANEL)?$`);
     const SYSTEM_ALTERNATIVE_RE = /\s*(?:AND\s*\/\s*OR|OR|AND|\/|&)\s*/;
-    const SYSTEM_HARDWARE_RE = /\b(?:RECEPTACLES?|OUTLETS?|ALTERNATORS?|ALTERNATING\s+RELAY|RELAYS?|SOCKETS?|PARTS?|COMPONENTS?|SWITCH(?:ES)?|LIGHTS?|FUSES?|BREAKERS?|CONTACTORS?|INDICATORS?|HARDWARE|TERMINALS?|SCREWS?|BRACKETS?|BOLTS?|BOM|BILL\s+OF\s+MATERIALS)\b/;
+    const SYSTEM_HARDWARE_RE = /\b(?:RECEPTACLES?|OUTLETS?|ALTERNATORS?|ALTERNATING\s+RELAY|RELAYS?|SOCKETS?|PARTS?|COMPONENTS?|SWITCH(?:ES)?|LIGHTS?|FUSES?|BREAKERS?|CONTACTORS?|INDICATORS?|HARDWARE|TERMINALS?|SCREWS?|BRACKETS?|BOLTS?|BOM|BILL\s+OF\s+MATERIALS|GFC?I|CONVENIENCE|PLUGS?|WIRES?|CABLES?|CONDUCTORS?|CORDS?)\b/;
     const PLAIN_COUNT_RE = /^([1-4])(?:\s+(?:PUMPS|MOTORS))?$/;
     // v2.5.107 adjacent-token association for flattened CAD dumps, where info-table
     // label/value columns are interleaved with BOM, wiring and checklist columns without
@@ -90,6 +90,12 @@
     // runs are collapsed inside a bounded window. QUAD/DUP stay complete-cell only.
     const ADJACENT_WINDOW = 400;
     const ADJACENT_TYPE_SOURCE = '(?:SIMPLEX|DUPLEX|TRIPLEX|QUADRAPLEX|QUADRUPLEX|QUADPLEX|(?:SINGLE|ONE|TWO|THREE|FOUR|[1-4])[\\s-]+PUMPS?|\\([1-4]\\)[\\s-]*PUMPS?)';
+    const EQUIPMENT_TYPE_SOURCE = SYSTEM_TOKEN_SOURCE.replace('|DUP|', '|');
+    const EQUIPMENT_SOURCE = '(?:PUMPS?|BLOWERS?|GRINDERS?|AERATORS?|ALTERNATORS?|ALTERNATION|ALTERNATING|VFDS?|(?:LIFT|PUMP)\\s+STATIONS?|STATIONS?|SEWAGE|EFFLUENT|SUBMERSIBLES?|BOOSTERS?|WET\\s+WELLS?|WELLS?|SYSTEMS?)';
+    const EQUIPMENT_TYPE_RE = new RegExp(`(?:^|[^A-Z0-9-])(${EQUIPMENT_TYPE_SOURCE})[\\s|]{1,8}(${EQUIPMENT_SOURCE})(?=$|[^A-Z0-9-])`, 'g');
+    const EQUIPMENT_PANEL_CONTEXT_RE = /\b(?:CONTROL\s+PANEL|PANEL(?:\s+(?:DESCRIPTION|NAME))?|(?:PROJECT|DRAWING)\s+TITLE)\b/;
+    const EQUIPMENT_REFERENCE_RE = /\b(?:NOT|NO|NON|WITHOUT|OTHER|ANOTHER|SEE|REF(?:ERENCE)?|FOR|REPLACE(?:MENT)?|EXISTING)\b/;
+    const EQUIPMENT_UNPAIRED_ALT_RE = new RegExp(`\\b(?:OR|AND|\\/|&)\\s*${SYSTEM_TOKEN_SOURCE}(?![\\s|]+${EQUIPMENT_SOURCE})\\b`);
     const FORWARD_ADJACENT_RE = new RegExp(`^(${ADJACENT_TYPE_SOURCE}(?:\\s+(?:GRINDER|ALTERNATING))?(?:\\s+PUMPS?)?(?:\\s+(?:CONTROL\\s+)?PANEL)?)(?=$|[\\s|,;])`);
     const REVERSE_ADJACENT_RE = new RegExp(`(?:^|[\\s|])(${ADJACENT_TYPE_SOURCE})$`);
     const ADJACENT_ALTERNATIVE_RE = /^(?:AND\s*\/\s*OR|OR|AND|\/|&)(?=$|[\s|])/;
@@ -98,11 +104,12 @@
     // Only nouns that turn the type word into a device name (DUPLEX RECEPTACLE, DUPLEX
     // ALTERNATOR) reject a forward value; other trailing BOM words are neighboring columns.
     const SYSTEM_HARDWARE_START_RE = new RegExp(`^${SYSTEM_HARDWARE_RE.source.slice(2)}`);
-    const ADJACENT_HARDWARE_RE = /^(?:RECEPTACLES?|OUTLETS?|SOCKETS?|PLUGS?|PARTS?|COMPONENTS?|ALTERNATORS?|ALTERNATING\s+RELAYS?)\b/;
+    const ADJACENT_HARDWARE_RE = /^(?:RECEPTACLES?|OUTLETS?|SOCKETS?|PLUGS?|PARTS?|COMPONENTS?|ALTERNATORS?|ALTERNATING\s+RELAYS?|GFC?I|CONVENIENCE|WIRES?|CABLES?|CONDUCTORS?|CORDS?)\b/;
     // Leading count: "2 OR Elapsed" -> 2; "2+2", "2 + 1", "2/3", "2-3", "1.5", "2 & 1", "2 X 2",
     // "2 OR 3", "2 AND AUX" and "2 FAN" stay non-plain (never summed); a following digit is unavailable.
     const LEADING_COUNT_RE = /^([1-4])(?=$|\s)/;
     const COMBINATION_COUNT_RE = /^[+-]?\d+(?:\.\d+)?\s*(?:[+&\/.-]|X(?=\s*\d)|(?:OR|TO)(?=\s+\d)|(?:AND|FANS?|AUX\w*)\b)/;
+    const PANEL_TYPE_COMBINATION_RE = /^[1-4](?:\s*[+&/]\s*[1-4])+$/;
     // Material value patterns, applied only to the bounded Enclosure Material cell.
     // Groups: 1 Fiberglass, 2 Stainless Steel (incl. grade notation), 3 Painted Steel.
     // Bare STEEL / CARBON STEEL match nothing (never stainless).
@@ -528,7 +535,7 @@
                 && REVERSE_ADJACENT_RE.exec(earlier.slice(0, -1).join(' '));
             // Only the immediately preceding token can negate a reverse value; a value right
             // after PANEL is a title phrase ("CONTROL PANEL: DUPLEX"), not a table cell.
-            if (ADJACENT_NEGATION_RE.test(adjacent)) negated = true;
+            if (ADJACENT_NEGATION_RE.test(adjacent) || ADJACENT_HARDWARE_RE.test(adjacent)) negated = true;
             else if (!/^PANEL[:=\-\u2013]?$/.test(adjacent)) reverse = alternative ? `${alternative[1]} OR ${tail[1]}` : tail[1];
         }
         if (!forward && !reverse) return negated ? { value: '', varied: true, direction: 'unreadable' } : null;
@@ -596,6 +603,7 @@
     function extractInfoRows(desc) {
         const rows = { panelTypes: [], motorCounts: [], pumpMfgs: [], encMaterials: [] };
         Object.defineProperty(rows, 'associations', { value: [] });
+        Object.defineProperty(rows, 'panelTypeCombinations', { value: [] });
         if (typeof desc !== 'string' || !desc) return rows;
         const text = desc.toUpperCase();
         if (!QUICK_CHECK_RE.test(text)) return rows;
@@ -637,6 +645,10 @@
             if (!label.kind) return;
             const next = labels[i + 1];
             let value = readValue(text, label.end, next ? next.start : text.length, label.kind);
+            if (label.kind === 'panelTypes' && !contextBlock && completeCell(text, label, next)
+                && !invalidContinuation(text, label, next) && PANEL_TYPE_COMBINATION_RE.test(value.trim())) {
+                rows.panelTypeCombinations.push(value.trim());
+            }
             let association = { value, varied: false, direction: 'forward' };
             const adjacent = label.kind === 'panelTypes' ? adjacentSystemCell(text, label, labels[i - 1], next) : null;
             if (adjacent) {
@@ -745,15 +757,70 @@
                 || /^\s*(?:OR|AND|\/|&|FOR|ON|IN|OF|WITH|PART|MOUNTED|ATTACHED)\b/.test(after)) continue;
             const sys = normalizeSystemType(match[1] || match[2]);
             if (sys) {
-                matches.push({ type: sys, start: match.index, end, bounded });
+                matches.push({ type: sys, start: match.index, end, bounded, source: 'panel-title' });
                 matcher.lastIndex = end;
             }
         }
         return matches;
     }
 
+    function hasEquipmentPanelContext(value) {
+        return EQUIPMENT_PANEL_CONTEXT_RE.test(value.replace(/\bPANEL\s+TYPE\b|\bTYPE\s+OF\s+PANEL\b/g, ''));
+    }
+
+    // A type directly attached to equipment can support an orange classification only
+    // when a panel/title marker is within 42 characters. Component, hardware and
+    // other-panel references are rejected; this never creates verified evidence alone.
+    function equipmentTitleMatches(desc, labels) {
+        if (typeof desc !== 'string' || !desc) return [];
+        const text = desc.toUpperCase();
+        const matches = [];
+        let labelIndex = 0;
+        EQUIPMENT_TYPE_RE.lastIndex = 0;
+        let match;
+        while ((match = EQUIPMENT_TYPE_RE.exec(text))) {
+            const start = match.index + match[0].indexOf(match[1]);
+            const end = EQUIPMENT_TYPE_RE.lastIndex;
+            const beforeWindow = text.slice(Math.max(0, start - 42), start);
+            const afterWindow = text.slice(end, Math.min(text.length, end + 42));
+            if (!hasEquipmentPanelContext(beforeWindow) && !hasEquipmentPanelContext(afterWindow)) continue;
+            if (/^ALTERNATORS?$/.test(match[2]) && !/\bCONTROL\s+PANEL\b/.test(afterWindow)) continue;
+
+            const before = beforeWindow.trim().split(/[\s|]+/).slice(-5).join(' ');
+            const after = afterWindow.trim().split(/[\s|]+/).slice(0, 5).join(' ');
+            if (SYSTEM_HARDWARE_RE.test(before) || SYSTEM_HARDWARE_RE.test(after)
+                || EQUIPMENT_REFERENCE_RE.test(before) || EQUIPMENT_REFERENCE_RE.test(after)
+                || EQUIPMENT_UNPAIRED_ALT_RE.test(afterWindow)
+                || /\b(?:OTHER|ANOTHER|EXISTING)\s+(?:CONTROL\s+)?PANEL\b/.test(beforeWindow + afterWindow)) continue;
+
+            while (labelIndex < labels.length && labels[labelIndex].start < start) labelIndex++;
+            const previous = labels[labelIndex - 1];
+            let blockedNearbyLabel = false;
+            for (let i = labelIndex; i < labels.length && labels[i].start < end + 42; i++) {
+                if (/^(?:TAGS?|NOTES?|BOM|BILL OF MATERIALS|PANEL NAME)$/.test(labels[i].label)) {
+                    blockedNearbyLabel = true;
+                    break;
+                }
+            }
+            const blockedByPrevious = previous && (previous.systemBlocked
+                || /^(?:TAGS?|NOTES?|BOM|BILL OF MATERIALS|PANEL NAME)$/.test(previous.label)
+                || (previous.kind === 'panelTypes'
+                    && !/[\n\r|]/.test(text.slice(Math.max(previous.end, start - REVERSE_WINDOW), start))));
+            if ((labels[labelIndex] && labels[labelIndex].start < end) || blockedByPrevious || blockedNearbyLabel) continue;
+
+            const type = normalizeSystemType(match[1]);
+            if (type) matches.push({ type, start, end, bounded: false, source: 'equipment-title' });
+        }
+        EQUIPMENT_TYPE_RE.lastIndex = 0;
+        return matches;
+    }
+
+    function titleEvidenceMatches(desc, labels) {
+        return titleMatches(desc, labels).concat(equipmentTitleMatches(desc, labels));
+    }
+
     function titleCandidates(desc, labels) {
-        const matches = titleMatches(desc, labels);
+        const matches = titleEvidenceMatches(desc, labels);
         return SYSTEM_TYPES.filter(sys => matches.some(match => match.type === sys));
     }
 
@@ -779,7 +846,7 @@
     }
 
     function titleHasNearbyCount(desc, rows, title, count) {
-        const matches = titleMatches(desc, rows.labels || []).filter(match => match.type === title);
+        const matches = titleEvidenceMatches(desc, rows.labels || []).filter(match => match.type === title);
         if (!matches.length) return false;
         // Rule 3 (v2.5.107): a bounded <type> PUMP|BLOWER|GRINDER|LIFT STATION CONTROL PANEL
         // phrase plus an agreeing plain count corroborates regardless of distance.
@@ -821,7 +888,10 @@
         let candidates = SYSTEM_TYPES.filter(sys => explicit.has(sys));
         const reasons = [];
         const allows = candidate => ambiguous.every(set => set.includes(candidate));
-        if (explicit.size === 1) {
+        if ((systemRows.panelTypeCombinations || []).length) {
+            source = 'conflict';
+            reasons.push('mixed-panel-type-combination');
+        } else if (explicit.size === 1) {
             sys = [...explicit][0];
             source = 'row';
             const associations = systemRows.associations.filter(a => a.kind === 'panelTypes');
@@ -848,21 +918,28 @@
             candidates = SYSTEM_TYPES.filter(type => ambiguous.some(set => set.includes(type)));
             reasons.push('conflicting-adjacent-values');
         } else {
-            const phrases = titleCandidates(systemDesc, systemRows.labels || []);
+            const phraseMatches = titleEvidenceMatches(systemDesc, systemRows.labels || []);
+            const phrases = SYSTEM_TYPES.filter(type => phraseMatches.some(match => match.type === type));
             const block = titleBlockCandidates(systemDesc);
             const titles = SYSTEM_TYPES.filter(type => phrases.includes(type) || block.includes(type));
             candidates = ambiguous.length ? SYSTEM_TYPES.filter(allows) : titles;
             if (titles.length === 1 && allows(titles[0])) {
                 sys = titles[0];
                 source = 'title';
-                direction = phrases.length ? 'narrative' : 'title-block';
+                direction = phrases.length
+                    ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title') ? 'narrative' : 'equipment-title'
+                    : 'title-block';
                 const count = counts.size === 1 ? [...counts][0] : null;
                 const corroborated = phrases.length > 0 && count !== null && !hasNonPlainCount
                     && SYSTEM_TYPES[count - 1] === sys
                     && !ambiguous.length
                     && titleHasNearbyCount(systemDesc, systemRows, sys, count);
                 sysV = !corroborated;
-                reasons.push(phrases.length ? 'validated-panel-phrase' : 'repeated-title-block');
+                reasons.push(phrases.length
+                    ? phraseMatches.some(match => match.type === sys && match.source === 'panel-title')
+                        ? 'validated-panel-phrase'
+                        : 'validated-equipment-phrase'
+                    : 'repeated-title-block');
                 if (corroborated) reasons.push('corroborated-panel-phrase-count');
             } else if (titles.length > 1) {
                 source = 'conflict';

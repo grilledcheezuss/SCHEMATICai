@@ -128,6 +128,44 @@ expect(blockB.replace('No. Motors TX1', 'No. Motors 1 TX1'), ['Simplex', true], 
 expect(blockB.replace('SIMPLEX PUMP DRAWING', 'DUPLEX PUMP DUPLEX PUMP DRAWING'), [null, false], 'two block types abstain');
 expect(neutralB.replace('NEMA 4X', 'DUPLEX RECEPTACLE CONTROL PANEL NEMA 4X'), [null, false], 'hardware title rejected');
 
+// --- Rule 5: bounded equipment-title evidence ------------------------------------------------
+for (const [phrase, type] of [
+    ['DUPLEX PUMP', 'Duplex'], ['SIMPLEX BLOWER', 'Simplex'], ['TRIPLEX GRINDER', 'Triplex'],
+    ['QUAD AERATOR', 'Quadraplex'], ['TRIPLEX ALTERNATING', 'Triplex'],
+    ['QUAD VFD', 'Quadraplex'], ['SIMPLEX LIFT STATION', 'Simplex'], ['DUPLEX PUMP STATION', 'Duplex'],
+    ['TRIPLEX STATION', 'Triplex'], ['QUAD SEWAGE', 'Quadraplex'], ['SIMPLEX EFFLUENT', 'Simplex'],
+    ['DUPLEX SUBMERSIBLE', 'Duplex'], ['TRIPLEX BOOSTER', 'Triplex'], ['QUAD WET WELL', 'Quadraplex'],
+    ['SIMPLEX WELL', 'Simplex'], ['DUPLEX SYSTEM', 'Duplex']
+]) {
+    const r = derive(`PANEL DESCRIPTION | ${phrase}`);
+    assert.deepStrictEqual([r._sys, r._sysV, r._sysEvidence.source, r._sysEvidence.direction, r._sysEvidence.reasons],
+        [type, true, 'title', 'equipment-title', ['validated-equipment-phrase']], phrase);
+}
+expect('TITLE | DUPLEX PUMP | CONTROL PANEL', ['Duplex', true], 'bounded title equipment phrase');
+expect('PANEL DESCRIPTION | SIMPLEX BLOWER', ['Simplex', true], 'panel-description equipment phrase');
+expect('TRIPLEX ALTERNATOR CONTROL PANEL', ['Triplex', true], 'alternator with explicit panel context');
+expect('PANEL DESCRIPTION | DUPLEX ALTERNATOR', [null, false], 'alternator requires control-panel context after the component');
+expect('QUAD VFD BLOWER PANEL', ['Quadraplex', true], 'VFD equipment with explicit panel context');
+expect('DUPLEX PUMP', [null, false], 'equipment phrase without panel/title context abstains');
+expect('DUPLEX SYSTEM PANEL', ['Duplex', true], 'system noun needs adjacent panel context');
+for (const desc of [
+    'TRIPLEX ALTERNATOR RELAY | CONTROL PANEL',
+    'DUPLEX GFCI PUMP | CONTROL PANEL',
+    'DUPLEX PUMP FOR OTHER PANEL | CONTROL PANEL',
+    'OTHER PANEL | DUPLEX PUMP | PANEL DESCRIPTION',
+    'DUPLEX PUMP | NOTES | PANEL DESCRIPTION',
+    'DUPLEX RECEPTACLE | CONTROL PANEL',
+    'DUPLEX OUTLET | CONTROL PANEL',
+    'TRIPLEX ALTERNATOR RELAY',
+    'QUAD-RELAY VFD PANEL'
+]) expect(desc, [null, false], `equipment/reference exclusion: ${desc}`);
+expect('SIMPLEX BLOWER CONTROL PANEL | DUPLEX PUMP PANEL', [null, false], 'two equipment configurations abstain');
+expect('Panel Type Simplex Voltage 480 | DUPLEX PUMP PANEL', ['Simplex', false], 'clear row outranks narrative equipment mention');
+for (const suffix of ['RECEPTACLE', 'OUTLET', 'GFI', 'GFCI', 'CONVENIENCE', 'PLUG', 'WIRE', 'CABLE', 'CONDUCTOR', 'CORD']) {
+    expect(`Panel Type Duplex ${suffix}`, [null, false], `${suffix} after type is device evidence`);
+    expect(`${suffix} Duplex Panel Type Voltage 480`, [null, false], `${suffix} before reverse type is device evidence`);
+}
+
 // --- Metamorphic: neighboring-column noise and layout swaps ---------------------------------
 const noise = ['CR1', '28', '2', 'WAGO', '285-137', 'GROUND', 'TERMINAL', 'SWITCH', 'RELAY', 'ABB', 'OT63F3', 'DISCONNECT',
     'FUSE', '5', 'X', 'STARTER', 'LIGHT', 'BREAKER', 'HARDWARE', 'TB1', 'OL', 'FLA', 'M1', 'NP-4', '0000011', 'SQUARE', 'D'];
