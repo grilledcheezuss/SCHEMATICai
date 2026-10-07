@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.95 ---
-const APP_VERSION = "v2.5.95";
+// --- SCHEMATICA ai v2.5.96 ---
+const APP_VERSION = "v2.5.96";
 const VERSION_HISTORY = {
+    "v2.5.96": "Frontend-only: Enclosure search becomes material-based (Any / Fiberglass / Stainless Steel / Painted Steel) using only the bounded Enclosure Material info-table row, which excludes the other two materials regardless of r.enc or narrative mentions; NEMA rating plays no role. Without a usable row, legacy 4XFG/4XSS codes are a conservative (usually uncertain) fallback; POLY records stay reachable via Any/keywords. Manufacturer menu now shows the shortest frequency-ordered set covering 90% of eligible Pump Manufacturer row occurrences (no top-eight cap). Feedback dropdowns mirror the search grid. Worker unchanged; no redeploy",
     "v2.5.95": "Frontend-only retry of the reverted #188 attempt (Worker CPU limit): System Type dropdown/search branch, top-eight Pump Manufacturer ranking, and reordered parameter grid. Info-table evidence is derived once per record in the browser (info-table-parser.js) when a snapshot is applied; the Worker API is unchanged and does not need redeploying",
     "v2.5.94": "Frontend-only search state fix: reset clears both Allowed/Blocked keyword editors, and live criteria survive startup, sync, snapshot swaps, and background refresh option rebuilds without changing results/PDF state or Worker/backend behavior",
     "v2.5.93": "Mobile PDF viewer geometry fix: stop flex-centered negative left overflow from recentering zoomed documents on mobile by giving wide stages a true scrollable left origin while preserving centered narrow layouts and existing gesture/render guards",
@@ -1074,7 +1075,7 @@ class DataLoader {
         foundEncs.forEach(v => window.FOUND_ENCS.add(v));
         this.refreshDerivedIndexes(window.LOCAL_DB);
     }
-    // v2.5.95: info-table evidence (System Type / Pump Manufacturer) is derived once per
+    // v2.5.95/96: info-table evidence (System Type / Pump Manufacturer / Enclosure Material) is derived once per
     // record in the browser, never per search and never in the Worker MAIN loop.
     static DERIVE_CHUNK_SIZE = 250;
     static async deriveRecordFields(records) {
@@ -1091,7 +1092,9 @@ class DataLoader {
         }
         // No-op for records already derived (async path); covers direct snapshot applies.
         InfoTableParser.deriveRecordsSync(records);
-        window.MFG_RANKING = InfoTableParser.rankManufacturers(records);
+        window.MFG_RANKING = InfoTableParser.rankManufacturers(records, {
+            allowed: typeof AI_TRAINING_DATA !== 'undefined' ? AI_TRAINING_DATA.MANUFACTURERS : null
+        });
     }
     static installLifecycleRefreshHooks() {
         if (this._lifecycleRefreshHookInstalled) return;
@@ -3402,12 +3405,13 @@ class FeedbackService {
         this.currentId = id; 
         if(btn) this.currentDownBtn = btn;
         
-        this.setupInput('fb-mfg', [...AI_TRAINING_DATA.MANUFACTURERS].sort(), 'mfg'); 
-        this.setupInput('fb-hp', AI_TRAINING_DATA.DATA.HP, 'hp'); 
+        // v2.5.96: same order as the search grid (sys|enc, volt|phase, mfg|hp).
+        this.setupInput('fb-sys', UI.SYSTEM_TYPES, 'sys');
+        this.setupInput('fb-enc', this.encCorrectionOptions(), 'enc');
         this.setupInput('fb-volt', AI_TRAINING_DATA.DATA.VOLT, 'volt'); 
         this.setupInput('fb-phase', AI_TRAINING_DATA.DATA.PHASE, 'phase'); 
-        this.setupInput('fb-enc', ['4XSS', '4XFG', 'POLY'], 'enc');
-        this.setupInput('fb-sys', UI.SYSTEM_TYPES, 'sys');
+        this.setupInput('fb-mfg', [...AI_TRAINING_DATA.MANUFACTURERS].sort(), 'mfg'); 
+        this.setupInput('fb-hp', AI_TRAINING_DATA.DATA.HP, 'hp'); 
 
         const lvBtn = document.getElementById('fb-low-volt-btn'); 
         if (this.lockout.has(`${id}:cat_low`)) { lvBtn.className = 'keyword-toggle disabled-overlay'; lvBtn.innerText = "✓ Reported as Low Voltage"; lvBtn.onclick = null; } 
@@ -3417,13 +3421,22 @@ class FeedbackService {
         document.getElementById('feedback-modal').classList.add('active-modal'); 
     }
 
+    // Enclosure corrections display material labels but submit backward-compatible codes:
+    // Fiberglass -> 4XFG, Stainless Steel -> 4XSS (tally with older stored votes in the
+    // unchanged Worker healer), Painted Steel -> 'PAINTED STEEL'. No NEMA metadata implied.
+    static encCorrectionOptions() {
+        const codes = (typeof InfoTableParser !== 'undefined' && InfoTableParser.MATERIAL_FEEDBACK_CODES)
+            || { 'Fiberglass': '4XFG', 'Stainless Steel': '4XSS', 'Painted Steel': 'PAINTED STEEL' };
+        return UI.ENCLOSURE_MATERIALS.map(label => ({ label, value: codes[label] }));
+    }
+
     static setupInput(elId, data, paramKey) { 
         const el = document.getElementById(elId); 
         // Clear existing options safely
         while (el.firstChild) el.removeChild(el.firstChild);
         el.add(new Option('Select Correct...', '')); 
         if (paramKey !== 'sys') el.add(new Option('Varied / Multiple', 'Varied / Multiple')); 
-        data.forEach(d => el.add(new Option(d, d))); 
+        data.forEach(d => (d && typeof d === 'object') ? el.add(new Option(d.label, d.value)) : el.add(new Option(d, d))); 
         el.value = ''; // Ensure empty option is selected by default
         if (this.lockout.has(`${this.currentId}:p_${paramKey}`)) { el.disabled = true; el.title = "Feedback already submitted"; } else { el.disabled = false; el.title = ""; } 
     }
@@ -3465,7 +3478,7 @@ class FeedbackService {
         if(document.getElementById('fb-low-volt-btn').classList.contains('selected')) { corrections.category = 'low_voltage'; this.lockout.add(`${this.currentId}:cat_low`); } 
         
         const badKeywords = []; 
-        document.querySelectorAll('.keyword-toggle.selected').forEach(btn => { badKeywords.push(btn.dataset.kw); this.lockout.add(`${this.currentId}:kw_${btn.dataset.kw}`); }); 
+        document.querySelectorAll('#keyword-cluster .keyword-toggle.selected').forEach(btn => { if (!btn.dataset || !btn.dataset.kw) return; badKeywords.push(btn.dataset.kw); this.lockout.add(`${this.currentId}:kw_${btn.dataset.kw}`); }); 
         if (badKeywords.length > 0) corrections.reject_keywords = badKeywords; 
         
         if (Object.keys(corrections).length === 0) return alert("Please select a correction."); 
@@ -3969,11 +3982,13 @@ class SearchEngine {
         };
         
         // === FILTER AND SCORE RESULTS ===
-        // Client-side enclosure signal regexes for "Varied / Multiple" classification (v2.5.44)
-        // FRP and FIBERGLASS/FIBREGLASS are strong FG signals; bare FG excluded (too many false matches)
-        const ENC_FG_RE = /\b(?:FIBERGLASS|FIBREGLASS|FRP)\b/i;
-        const ENC_SS_RE = /\b(?:4XSS|4X\s+SS|STAINLESS|S\/S|SS)\b/i;
-        const ENC_POLY_RE = /\bPOLY(?:CARBONATE)?\b/i;
+        // v2.5.96: enclosure is material-based and resolved by the shared
+        // InfoTableParser.matchEnclosureMaterial (Enclosure Material row first, conservative
+        // legacy r.enc fallback). The old full-description reclassification that mutated
+        // r.enc/r.encV was removed so it can no longer undo a material-row decision.
+        const encMatcher = typeof InfoTableParser !== 'undefined' ? InfoTableParser.matchEnclosureMaterial : null;
+        if (!encMatcher && crit.enc !== 'Any') console.warn('[Search] InfoTableParser unavailable; enclosure material filter cannot match any record');
+        const encVariedByRecord = new Map();
 
         let res = [];
         window.LOCAL_DB.forEach(r => {
@@ -3983,40 +3998,8 @@ class SearchEngine {
             let hpV = r.hpV || false;
             let voltV = r.voltV || false;
             let phaseV = r.phaseV || false;
-            let encV = r.encV || false;
+            let encV = false;
 
-            // A: Client-side enclosure reclassification — "Varied / Multiple" when both FG+SS present (v2.5.44)
-            // NOTE: intentionally mutates r.enc/r.encV (consistent with existing w/mfgV/hpV mutations below)
-            if (r.enc === '4XSS' || r.enc === '4XFG' || !r.enc) {
-                const desc = r.desc || '';
-                const hasFGSignal = ENC_FG_RE.test(desc);
-                const hasSSSignal = ENC_SS_RE.test(desc);
-                const isEncFG = r.enc === '4XFG';
-                const isEncSS = r.enc === '4XSS';
-                // Reclassify when enc field contradicts description or desc has both signals
-                if ((isEncFG && hasSSSignal) || (isEncSS && hasFGSignal) || (hasFGSignal && hasSSSignal)) {
-                    // Apply explicit compound token preference before Varied / Multiple (v2.5.47)
-                    const hasExplicit4XSS = /\b4XSS\b/i.test(desc);
-                    const hasExplicit4XFG = /\b4XFG\b/i.test(desc);
-                    if (hasExplicit4XSS && !hasExplicit4XFG) {
-                        r.enc = '4XSS';
-                        r.encV = false;
-                        encV = false;
-                    } else if (hasExplicit4XFG && !hasExplicit4XSS) {
-                        r.enc = '4XFG';
-                        r.encV = false;
-                        encV = false;
-                    } else {
-                        r.enc = 'Varied / Multiple';
-                        r.encV = true;
-                        encV = true;
-                    }
-                } else if (!r.enc) {
-                    if (hasFGSignal) r.enc = '4XFG';
-                    else if (hasSSSignal) r.enc = '4XSS';
-                }
-            }
-            
             // Category filter
             if (cat === 'Standard' && r.category === 'low_voltage') return;
             if (cat === 'LowVoltage' && r.category !== 'low_voltage') return;
@@ -4069,26 +4052,10 @@ class SearchEngine {
                 }
             }
             if(crit.enc!=="Any") { 
-                if(r.enc===crit.enc) {
-                    // Strict field match - override worker variance flag
-                    encV = false;
-                    w += 500;
-                } else if (r.enc === 'Varied / Multiple') {
-                    // B: Varied/Multiple enclosure — include if desc contains the searched signal (v2.5.44)
-                    const desc = r.desc || '';
-                    const isMatch =
-                        (crit.enc === '4XSS' && ENC_SS_RE.test(desc)) ||
-                        (crit.enc === '4XFG' && ENC_FG_RE.test(desc)) ||
-                        (crit.enc === 'POLY' && ENC_POLY_RE.test(desc));
-                    if (isMatch) {
-                        encV = true;
-                        w += 100; // Lower weight than strict match (500) — sorts behind strict results
-                    } else {
-                        return;
-                    }
-                } else {
-                    return;
-                }
+                const encMatch = encMatcher ? encMatcher(r, crit.enc) : null;
+                if (!encMatch || !encMatch.matches) return;
+                encV = encMatch.varied;
+                w += encV ? 100 : 500; // Uncertain material sorts behind clean material evidence
             }
             
             // System Type filter (v2.5.95): compares only the pre-derived info-table value
@@ -4109,7 +4076,8 @@ class SearchEngine {
             )) return;
             if(allowedExpandedKeywords.length) w += 10;
 
-            r.w=w; r.p=p; r.mfgV=mfgV; r.hpV=hpV; r.voltV=voltV; r.phaseV=phaseV; r.encV=encV; res.push(r);
+            // Backend r.enc/r.encV are never rewritten; material variance lives per search only.
+            r.w=w; r.p=p; r.mfgV=mfgV; r.hpV=hpV; r.voltV=voltV; r.phaseV=phaseV; encVariedByRecord.set(r, encV); res.push(r);
         });
         
         // === SORT AND PARTITION RESULTS ===
@@ -4125,14 +4093,14 @@ class SearchEngine {
                 (crit.hp !== 'Any' && a.hpV ? 1 : 0) +
                 (crit.volt !== 'Any' && a.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && a.phaseV ? 1 : 0) +
-                (crit.enc !== 'Any' && a.encV ? 1 : 0) +
+                (crit.enc !== 'Any' && encVariedByRecord.get(a) ? 1 : 0) +
                 (crit.sys !== 'Any' && a._sysV === true ? 1 : 0);
             const bVariedCount = 
                 (crit.mfg !== 'Any' && b.mfgV ? 1 : 0) +
                 (crit.hp !== 'Any' && b.hpV ? 1 : 0) +
                 (crit.volt !== 'Any' && b.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && b.phaseV ? 1 : 0) +
-                (crit.enc !== 'Any' && b.encV ? 1 : 0) +
+                (crit.enc !== 'Any' && encVariedByRecord.get(b) ? 1 : 0) +
                 (crit.sys !== 'Any' && b._sysV === true ? 1 : 0);
             
             if(aVariedCount !== bVariedCount) return aVariedCount - bVariedCount; // Fewer varied flags = better
@@ -4143,7 +4111,7 @@ class SearchEngine {
                     if (crit.hp !== 'Any' && r.hpV) return 4;    // best (HP-varied ranks highest)
                     if (crit.volt !== 'Any' && r.voltV) return 3;
                     if (crit.phase !== 'Any' && r.phaseV) return 3;
-                    if (crit.enc !== 'Any' && r.encV) return 2;
+                    if (crit.enc !== 'Any' && encVariedByRecord.get(r)) return 2;
                     if (crit.sys !== 'Any' && r._sysV === true) return 2;
                     if (crit.mfg !== 'Any' && r.mfgV) return 1;  // worst
                     return 0;
@@ -7268,7 +7236,7 @@ class PdfController {
 
 class UI {
     static SYSTEM_TYPES = ['Simplex', 'Duplex', 'Triplex', 'Quadraplex'];
-    static MFG_TOP_LIMIT = 8;
+    static ENCLOSURE_MATERIALS = ['Fiberglass', 'Stainless Steel', 'Painted Steel'];
     static mobilePanels = { searchVisible: true, resultsVisible: false };
     static mobilePdfFocus = false;
     static mobileManualPanelState = { search: false, results: false };
@@ -7717,14 +7685,15 @@ static pop() {
     };
 
     // === MANUFACTURER LIST ===
-    // v2.5.95: top eight by Pump Manufacturer row frequency. The ranking is computed once per
-    // applied dataset (DataLoader.refreshDerivedIndexes); this only reads it. Matching on r.mfg
-    // is unchanged. Falls back to the existing list when no row evidence exists.
+    // v2.5.96: shortest frequency-ordered set covering 90% of eligible Pump Manufacturer row
+    // occurrences (no fixed cap). The ranking is computed once per applied dataset
+    // (DataLoader.refreshDerivedIndexes); this only reads it. Matching on r.mfg is unchanged.
+    // Falls back to the existing list when no row evidence exists.
     const m = DOM_CACHE.get('mfgInput');
     if (m) {
         const ranking = window.MFG_RANKING;
         const rankedList = ranking && ranking.eligibleRecords > 0 && Array.isArray(ranking.options)
-            ? ranking.options.filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf)).slice(0, this.MFG_TOP_LIMIT)
+            ? ranking.options.filter(mf => AI_TRAINING_DATA.MANUFACTURERS.includes(mf))
             : [];
         const cleanList = rankedList.length > 0
             ? rankedList
@@ -7751,11 +7720,11 @@ static pop() {
         sysInput.value = this.SYSTEM_TYPES.includes(savedValues.sys) ? savedValues.sys : 'Any';
     }
 
-    // === HP / VOLT / PHASE / ENCLOSURE ===
+    // === HP / VOLT / PHASE / ENCLOSURE MATERIAL ===
     ['hp', 'volt', 'phase', 'enc'].forEach(k => {
         const s = DOM_CACHE.get(k + 'Input');
         if (!s) return;
-        const data = (k === 'enc') ? ['4XSS', '4XFG', 'POLY'] : AI_TRAINING_DATA.DATA[k.toUpperCase()];
+        const data = (k === 'enc') ? this.ENCLOSURE_MATERIALS : AI_TRAINING_DATA.DATA[k.toUpperCase()];
         s.innerHTML = '';
         s.add(new Option('Any', 'Any'));
         data.forEach(v => s.add(new Option(v, v)));
@@ -7813,10 +7782,13 @@ static _generateBadges(record, criteria) {
         badges.push(`<span class="hud-badge ${hpBadgeClass}">${record.hp ? record.hp + ' HP' : '? HP'}</span>`);
     }
     
-    // Enclosure badge
-    if (criteria.enc !== "Any" && record.enc) {
-        const badgeClass = record.encV ? 'match-orange' : 'match-green';
-        badges.push(`<span class="hud-badge ${badgeClass}">${record.enc}</span>`);
+    // Enclosure material badge - only when filtering; shows the material label, never a 4X code
+    if (criteria.enc && criteria.enc !== "Any" && typeof InfoTableParser !== 'undefined') {
+        const encMatch = InfoTableParser.matchEnclosureMaterial(record, criteria.enc);
+        if (encMatch.matches) {
+            const badgeClass = encMatch.varied ? 'match-orange' : 'match-green';
+            badges.push(`<span class="hud-badge ${badgeClass}">${encMatch.material}</span>`);
+        }
     }
 
     // System Type badge - only when filtering (orange when Panel Type / No. Motors disagree or are inferred)

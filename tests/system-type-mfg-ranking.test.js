@@ -1,4 +1,5 @@
-// v2.5.95 frontend-only System Type + top-eight manufacturer tests.
+// v2.5.95 frontend-only System Type + manufacturer ranking tests
+// (v2.5.96: ranking is cumulative 90% coverage instead of top eight).
 // Run: node tests/system-type-mfg-ranking.test.js
 const fs = require('fs');
 const path = require('path');
@@ -149,7 +150,7 @@ function rankOf(records) {
     return InfoTableParser.rankManufacturers(records);
 }
 
-runTest('Ranking: counts once per unique record, aliases, ties alphabetical, top eight', () => {
+runTest('Ranking: counts once per unique record, aliases, ties alphabetical, 90% coverage prefix', () => {
     const records = [];
     const add = (mfg, n) => { for (let i = 0; i < n; i++) records.push(makeRecord(`${mfg}-${i}`, `Pump Manufacturer ${mfg} Type of Pump Submersible`)); };
     add('Barnes', 5); add('Crane', 4); // 9 BARNES via alias
@@ -158,15 +159,17 @@ runTest('Ranking: counts once per unique record, aliases, ties alphabetical, top
     records.push(makeRecord('Barnes-0', 'Pump Manufacturer Barnes')); // duplicate id counted once
     records.push(makeRecord('none', 'No info table here'));
     const ranking = rankOf(records);
-    assertEqual(ranking.options, ['BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS'], 'ordered top eight');
+    // 31 eligible: 9+7+3+3+3+2 = 27 (87%) < 90%, + WILO 2 = 29 (93.5%) crosses -> seven options.
+    assertEqual(ranking.options, ['BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO'], 'ordered coverage prefix');
+    assertEqual(ranking.ranked, ['BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS', 'LIBERTY'], 'full ranking kept');
     assertEqual(ranking.counts.BARNES, 9, 'alias counting + id dedupe');
     assert(!('GRUNDFOS' in ranking.counts), 'unknown values ignored');
     assertEqual(ranking.eligibleRecords, 31, 'eligible records');
 });
 
-runTest('Ranking: fewer than eight and no evidence', () => {
+runTest('Ranking: few manufacturers and no evidence', () => {
     const few = rankOf([makeRecord('a', 'Pump Manufacturer Myers'), makeRecord('b', 'Pump Manufacturer Ebara'), makeRecord('c', 'Pump Manufacturer Myers')]);
-    assertEqual(few.options, ['MYERS', 'EBARA'], 'fewer than eight');
+    assertEqual(few.options, ['MYERS', 'EBARA'], 'MYERS 2/3 < 90%, EBARA crosses');
     const none = rankOf([makeRecord('x', 'BARNES pump mentioned in prose'), makeRecord('y', '')]);
     assertEqual(none.options, [], 'no row evidence');
     assertEqual(none.eligibleRecords, 0, 'no eligible records');
@@ -339,19 +342,19 @@ runTest('System Type branch is isolated from keywords, enclosure, and never re-p
     assertEqual([paged.page.length, paged.total, DOM_CACHE.get('page-info').textContent], [25, 30, 'Page 1 of 2'], 'pagination');
 });
 
-runTest('pop() keeps an out-of-top-eight manufacturer and System Type; top eight ordered by frequency', () => {
-    const inputs = setupInputs({ sys: 'Triplex', mfg: 'HIDROSTAL', hp: '10', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage', keyword: 'pump' });
+runTest('pop() keeps an out-of-coverage manufacturer and System Type; coverage list ordered by frequency', () => {
+    const inputs = setupInputs({ sys: 'Triplex', mfg: 'HIDROSTAL', hp: '10', volt: '480', phase: '3', enc: 'Fiberglass', cat: 'LowVoltage', keyword: 'pump' });
     UI.keywordBlocklistMode = false;
     UI.keywordAllowedTermsInput = 'pump';
     UI.keywordBlockedTermsInput = 'float';
     window.FOUND_MFGS = new Set(['BARNES']);
     window.MFG_RANKING = { options: ['BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS'], counts: {}, eligibleRecords: 40 };
     for (let i = 0; i < 3; i++) UI.pop();
-    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS', 'HIDROSTAL'], 'top eight plus kept selection');
-    assertEqual(inputs.mfgInput.value, 'HIDROSTAL', 'out-of-top-eight selection survives');
+    assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS', 'HIDROSTAL'], 'coverage list plus kept selection');
+    assertEqual(inputs.mfgInput.value, 'HIDROSTAL', 'out-of-coverage selection survives');
     assertEqual(inputs.sysInput.options.map(o => o.value), ['Any', 'Simplex', 'Duplex', 'Triplex', 'Quadraplex'], 'system type options');
     assertEqual([inputs.sysInput.value, inputs.hpInput.value, inputs.voltInput.value, inputs.phaseInput.value, inputs.encInput.value, inputs.catInput.value],
-        ['Triplex', '10', '480', '3', '4XFG', 'LowVoltage'], 'live criteria survive');
+        ['Triplex', '10', '480', '3', 'Fiberglass', 'LowVoltage'], 'live criteria survive');
     assertEqual([UI.getAllowedKeywordTermsInput(), UI.getBlockedKeywordTermsInput()], ['pump', 'float'], 'keyword sets survive');
     inputs.mfgInput.value = 'FLYGT';
     UI.pop();
@@ -364,7 +367,7 @@ runTest('pop() keeps an out-of-top-eight manufacturer and System Type; top eight
 });
 
 runTest('Reset returns System Type and all filters to defaults', () => {
-    const inputs = setupInputs({ sys: 'Quadraplex', mfg: 'BARNES', hp: '10', volt: '480', phase: '3', enc: '4XSS', cat: 'Any', keyword: 'x' });
+    const inputs = setupInputs({ sys: 'Quadraplex', mfg: 'BARNES', hp: '10', volt: '480', phase: '3', enc: 'Painted Steel', cat: 'Any', keyword: 'x' });
     const originalToggle = UI.toggleSearch;
     UI.toggleSearch = () => {};
     UI.keywordAllowedTermsInput = 'x';
