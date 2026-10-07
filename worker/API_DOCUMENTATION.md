@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.95
+## Version: v2.5.94
 
-_v2.5.95 changes Worker MAIN extraction/response fields and System Type feedback healing. Worker redeployment is required; no deployment is performed by this PR._
+_Release-alignment note: v2.5.94 is frontend-only and mirrored here for app/Worker bookkeeping; Worker API/backend behavior is unchanged._
 
 ## Overview
 
@@ -12,7 +12,6 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
-- **v2.5.95**: Shared bounded info-table parsing adds MAIN `sys`/`sysV`, conservative motor-count cross-checks and System Type healing; revised MAIN cache payload key prevents old edge shapes from shadowing new fields. Frontend adds the approved parameter order, isolated System Type filtering and complete-dataset Pump Manufacturer row ranking, preserving live criteria and legacy snapshots.
 - **v2.5.94**: Frontend-only search-state fixes: reset clears both Allowed/Blocked keyword lists and warning/mode state; live filters, Panel Type, keywords, and mode survive caching/sync/snapshot/background refresh while results and PDF viewer state remain intact. No keyword persistence added; Worker API/backend behavior is unchanged
 - **v2.5.93**: Frontend-only mobile PDF geometry fix: the viewer no longer relies on flex-centered negative horizontal overflow when a zoomed stage becomes wider than the viewport, so left-edge mobile pan/commit restores use real scrollable extents while preserving the existing gesture/render guardrails; Worker API/backend behavior is unchanged
 - **v2.5.92**: Frontend-only PDF zoom/pan stability follow-up: pan clamping now derives directional movement bounds from live viewer scroll geometry (avoiding inconsistent lockouts near edges), viewport restore sequences are invalidated when touch gestures take ownership, and stale restore callbacks no longer overwrite newer touch/wheel zoom interactions; Worker API/backend behavior is unchanged
@@ -189,23 +188,21 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
     {
       "id": "1234",
       "displayId": "CP-1234",
-      "desc": "PANEL TYPE DUPLEX VOLTAGE 480 PHASE/HZ 3/60 NO. MOTORS 2 HP 15 FLA 28.5 PUMP MANUFACTURER BARNES TYPE OF PUMP SUBMERSIBLE",
+      "desc": "CONTROL PANEL DESCRIPTION",
       "pdfUrl": "https://...",
       "pdfStatus": "present",
-      "mfg": "BARNES",
-      "hp": "15",
+      "mfg": "GORMAN RUPP",
+      "hp": "7.5",
       "volt": "480",
       "phase": "3",
-      "enc": null,
-      "sys": "Duplex",
+      "enc": "NEMA4X",
       "category": null,
       "reject_keywords": [],
       "mfgV": false,
       "hpV": false,
       "voltV": false,
       "phaseV": false,
-      "encV": false,
-      "sysV": false
+      "encV": false
     }
   ],
   "offset": "next_page_offset_or_null"
@@ -216,24 +213,6 @@ GET /?target=PDF_BY_ID&id=CP-1234.dwg
 - `mfgV`, `hpV`, `voltV`, `phaseV`, `encV`: Boolean flags indicating if multiple/ambiguous values were detected for a parameter
 - When `true`, UI displays orange badges to indicate uncertainty
 - When `false`, UI displays green badges for strict, clean matches
-
-**System Type (`sys` / `sysV`, v2.5.95)**:
-
-- `sys` is `null`, `Simplex`, `Duplex`, `Triplex` or `Quadraplex`. Whole-value aliases Quadplex/Quadruplex normalize to Quadraplex.
-- Bounded Panel Type rows are primary evidence, not arbitrary system words in titles, TAG, notes, BOM or wiring text. Airtable Items strings/arrays are flattened description text: this is conservative row/block parsing, **not page isolation**.
-- A same-block No. Motors integer 1..4 cross-checks the explicit type. Agreement is clean; disagreement retains the explicit type with `sysV=true`. Missing count alone permits clean explicit evidence.
-- Only a complete unambiguous plain integer motor count 1..4 can infer a missing Panel Type, always with `sysV=true`. Combination-only evidence (including `2+2`, `2 + 1`, `4+2`, `1+1`) produces `sys=null`; expressions are neither summed nor prefix-matched. Decimals, ranges, slash alternatives, negatives, values above four and incomplete values cannot infer a system.
-- Explicit single Panel Type with an invalid/combination count remains searchable but uncertain. Conflicting explicit types yield no single type (`sys=null`, `sysV=true`), rather than silently choosing a green winner.
-- Numeric/operator continuations across blank lines cannot create a plain-integer prefix match. Recognized alternative values wrapped over multiple lines/columns remain ambiguous, including manufacturer rows used for ranking.
-- Valid System Type feedback uses the existing three-vote threshold and can override extraction with verified confidence. System Type is never guessed/trained by Naive Bayes.
-- Multiple different System Type corrections reaching that threshold remain ambiguous (`sys=null`, `sysV=true`); vote iteration order cannot select a clean winner.
-- The isolated frontend branch preserves uncertainty on exact matches, counts/paginates the filtered results, includes active System Type variance in sorting, and shows its badge only when filtered. Any does not change keyword/category/manufacturer/enclosure matching.
-
-**Manufacturer dropdown ranking (frontend only)**:
-
-Ranking uses bounded Pump Manufacturer row values from the **complete loaded deduplicated dataset**, independently of `mfg`, heuristic/ML/healed manufacturer values and current search results. Existing known aliases normalize to the supported dropdown values. Unknown, conflicting or unparseable row evidence is excluded; each unique panel contributes at most once per canonical manufacturer. Any stays first, followed by up to eight manufacturers by descending eligible-panel count with alphabetical tie-breaking. Fewer than eight valid entries are not padded. With no usable row evidence, existing alphabetical options remain and ranking is unavailable. Partial sync data is never ranked. A selected manufacturer outside a refreshed top eight remains as an explicit temporary selected option, while feedback continues offering the full supported list.
-
-This requires no extra Airtable endpoints, PDF requests or OCR. Synthetic tests establish parser/counting behavior, not real Airtable coverage or real top-eight names/counts.
 
 **Processing Pipeline**:
 1. **Regex Extraction**: Strict keyword-based extraction (35+ manufacturer patterns)
@@ -270,7 +249,7 @@ Headers:
     {
       "fields": {
         "Panel ID": "1234",
-        "Corrections": "{\"mfg\":\"BARNES\",\"hp\":\"10\",\"volt\":\"575\",\"phase\":\"3\",\"sys\":\"Duplex\"}"
+        "Corrections": "{\"mfg\":\"BARNES\",\"hp\":\"10\",\"volt\":\"575\",\"phase\":\"3\"}"
       }
     }
   ]
@@ -280,7 +259,6 @@ Headers:
 **Security**:
 - Requires valid authentication (401 if invalid)
 - Invalidates cache after submission
-- System Type corrections accept only whole supported values (including normalized spelling aliases), not counts/combinations; invalid corrections are rejected. The frontend applies its existing per-parameter per-search lockout to System Type.
 
 **Response**:
 - Success (200): Airtable response JSON
@@ -344,39 +322,6 @@ All errors return JSON with CORS headers:
 ---
 
 ## Deployment
-
-### v2.5.95 rollout and cache compatibility
-
-1. Publish the frontend assets together, including the new shared `info-table-helper.js` before `app.js`. The helper is shared with Worker extraction and CommonJS tests; do not substitute a separate browser parser.
-2. Redeploy the Worker using the repository's `wrangler.toml` entry point with the shared helper bundled. This release changes MAIN and healing, unlike v2.5.94. Existing secrets/routes/settings remain unchanged; no infrastructure or deployment actions are part of this session.
-3. The intentional MAIN payload revision changes only cache-key shape, so old edge response payloads cannot shadow `sys`/`sysV`. Authentication, fresh/stale lifetimes, refresh coalescing and feedback invalidation behavior remain intact.
-4. Keep valid client snapshots: snapshot schema remains 1 and app-version changes do not purge caches. Missing System Type fields backfill deterministically from descriptions on demand. Authoritative new `sys` values (including null) take precedence; missing uncertainty on an existing type remains conservative. Manufacturer ranking recomputes from complete descriptions on restore/apply, without accumulating counts.
-5. Deployment skew is safe: old clients ignore additive response fields; new clients derive missing fields from old responses/snapshots. Normal complete refresh receives current Worker healer corrections. No Force Reset is required. Background refresh never automatically reruns searches or disturbs existing results/PDF zoom/position.
-
-The approved control order is System Type/Enclosure Type, Voltage/Phase, Manufacturer/Horsepower, full-width Keywords + Allowed/Blocked editor, then full-width Panel Type above the action buttons. Live criteria are captured at application time so INITIALIZING, resume and background refresh preserve the latest selections/terms/mode; manual reset retains the existing session boundaries.
-
-### Validation scope
-
-Offline fixtures/mocks cover shared parser and Worker parity, MAIN fields/cache revision, healer thresholds/conflicts, invalid corrections, legacy response fields, ranking eligibility/deduplication and frontend state/filter integration. Local Chromium checks at 375/768/1280 px confirmed the requested DOM order, paired/full-width rows, associated search labels, reset defaults and reachable desktop/tablet collapse actions. Existing enclosure-parsing test 18 fails on the unchanged baseline as well and is not modified here.
-
-Reproduce focused offline checks from the repository root:
-
-```sh
-node worker/tests/run.js
-node worker/tests/system-type-worker.test.js
-node tests/worker-airtable-token-routing.test.js
-node tests/frontend-v2.5.95.test.js
-node tests/data-loader-refresh.test.js
-node tests/keyword-blocklist-mode.test.js
-node tests/feedback-lockout.test.js
-node tests/sorting-priority.test.js
-```
-
-Worker validation passed 59 existing assertions and 102 parser cases with Worker parity, plus MAIN/healer/correction/cache/default-import and credential-routing mocks. The new frontend integration suite passed all 11 tests. The existing offline frontend regression run passed 22 of 23 scripts; the sole failure was the baseline enclosure expectation noted above. Local screenshot-derived fixture searches also rendered explicit Duplex green and inferred Duplex orange with correct counts/pagination, and ranking/state rebuilds kept manufacturer semantics and live criteria intact. Live Worker integration tests are not used to claim local implementation coverage.
-
-No real Airtable descriptions or rankings were evaluated, and no production deployment, authenticated refresh or physical touch-device/PDF acceptance is claimed. Use the manual checks in README.txt before production sign-off.
-
-Final read-only code review found no remaining significant issues after the wrapped-alternative fix, and secret scanning passed. Earlier CodeQL runs reported zero alerts; the final automated validation request was blocked by the service time limit, so this release does not claim a final automated validation pass.
 
 ### Environment Variables
 Configure these secrets in your Cloudflare Worker dashboard:

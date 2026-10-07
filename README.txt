@@ -1,51 +1,10 @@
-CLOUDFLARE WORKER SCRIPT (v2.5.95)
+CLOUDFLARE WORKER SCRIPT (v2.5.94)
 
-Release note: v2.5.95 changes Worker MAIN extraction/response fields and feedback healing as well as the frontend. Redeploy the Worker and publish the shared info-table-helper.js with the frontend; this is not a frontend-only release.
+Release-alignment note: v2.5.94 is frontend-only; Worker-facing version strings are mirrored for release tracking, but Worker/API behavior is unchanged.
 
 The purpose of this script is to allow pristine program functionality while providing the maximum level of security to the sensitive data handling. We aim to use the worker to fully process and output results to the user. We will reference our main airtable base which is listed in the code to pull raw data in through a filter comprised of our robust regex search logic first then onto our Naive Bayes AI filter. This AI model will be trained from a separate database instantly and apply said training to clean up the results pulled from the main DB. They will then pass through our final filter, the healer which is pulling from another independent airtable DB populated with manual user feedback. The healer will be the final check for results before passing to the user, any results that have been manually verified enough times to meet the confidence threshold will be overridden in the last step of processing before the final set of results are delivered to the user.
 
-RECENT UPDATES (v2.5.95):
-
-- Actual control/tab order on every viewport: System Type | Enclosure Type; Voltage | Phase; Manufacturer | Horsepower; full-width Keywords with existing Allowed/Blocked toggle; full-width Panel Type immediately above SHOW/HIDE, Search and reset
-- System Type uses bounded Panel Type label/value evidence, with No. Motors cross-checks from the same bounded table block. Any does not alter existing search semantics. Quadplex/Quadruplex normalize to Quadraplex
-- A complete plain integer No. Motors value 1..4 can infer System Type only when Panel Type is absent; inference is orange. Never sum combinations or read their first number: 2+2, 2 + 1, 4+2 and 1+1 are not single systems. Decimals, ranges, alternatives, negatives and incomplete values do not infer a type
-- Explicit Panel Type survives a disagreeing or invalid motor count with orange uncertainty; missing count alone does not disqualify an explicit type. Conflicting explicit types have no single searchable type and retain uncertainty
-- Numeric/operator continuations across blank lines cannot turn a combination into a plain count. Recognized wrapped alternative System Type/manufacturer values remain ambiguous rather than verifying/counting the first line
-- Manufacturer ranking is separate from manufacturer search/healing: count bounded Pump Manufacturer rows once per unique panel/canonical supported manufacturer across the complete loaded dataset, then show Any plus up to eight entries by descending count (alphabetical ties). Known aliases map to existing canonical options; unknown/ambiguous/unparseable rows are excluded
-- No usable ranking evidence means existing safe alphabetical options remain, with ranking unavailable. Partial syncs are not ranked. An out-of-top-eight live manufacturer selection remains as a temporary selected option. Feedback retains the full supported manufacturer list
-- Legacy snapshots remain valid (schema unchanged): missing System Type fields are derived deterministically from description text without a cache wipe. Authoritative new fields and valid healer overrides take precedence. Ranking recomputes from loaded descriptions, never accumulates counts across restores/refreshes
-- System Type corrections use the existing three-vote threshold and per-parameter lockout; a single valid threshold winner is verified, while conflicting threshold winners remain ambiguous (no single type, orange uncertainty). Invalid/combinations cannot heal a single system
-- System Type and all existing live filters/Allowed and Blocked sets/mode survive cache apply, resume sync and background refresh. No automatic search or viewer state change is added. Reset clears terms and restores System Type/other filters to Any and Panel Type to Standard
-- Airtable Items can be flattened text: bounded labels/rows and neighboring spec labels are evidence, not actual page isolation. No new Airtable requests, bulk PDF fetching, OCR or System Type ML guessing/training is added. Real Airtable extraction coverage and actual top-eight names/counts are not established by synthetic fixtures
-
-DEPLOYMENT / MIGRATION (operator steps; not performed in this session):
-
-- Publish index.html, app.js, style.css and info-table-helper.js together. Redeploy the Worker from this repository with its shared helper bundled (see worker/API_DOCUMENTATION.md)
-- Worker MAIN uses a new payload revision in edge cache keys; old edge shapes cannot shadow additive sys/sysV fields. Existing authentication, fresh/stale cache lifetimes and coalescing are unchanged
-- Do not Force Reset or purge valid v2.5.94 client snapshots for this release. Legacy records backfill on demand; the next normal complete refresh receives new Worker fields/healer corrections. Older clients ignore additive fields, and newer clients derive missing fields from older responses
-
-MANUAL ACCEPTANCE CHECKS (v2.5.95):
-
-- Desktop/tablet/mobile: confirm visual and keyboard order, readable unshortened enclosure options, no clipping, and reachable SHOW/HIDE/Search/reset controls
-- Filter each System Type; confirm counts/pages and green explicit vs orange inferred/conflicting-count badges. Any must leave prior keyword/category/manufacturer/enclosure behavior unchanged
-- During INITIALIZING/resume/background refresh, edit System Type, all other filters and both keyword sets/mode immediately before apply. Confirm live values persist, including a manufacturer outside the refreshed top eight
-- With results and a zoomed PDF open, refresh: results, counts, page, badges and PDF zoom/position must stay unchanged until an explicit search
-- Report a System Type correction and confirm per-parameter lockout; manufacturer feedback must still offer every supported option
-- Compare bounded-row eligibility against representative real Airtable Items before claiming ranking coverage. No real data-derived ranking names or counts are asserted here
-
-VALIDATION SCOPE (v2.5.95):
-
-- Local Chromium manual checks at 375, 768 and 1280 px confirmed DOM order, paired/full-width geometry, associated search labels, no control overflow, and reset clearing both keyword sets plus System Type. Desktop/tablet collapse retained a visible action row
-- Local screenshot-derived fixture search rendered clean explicit Duplex green and motor-only inferred Duplex orange, with correct count/pagination; fixture ranking merged Barnes/Crane without changing record manufacturer fields, and option rebuild preserved live criteria
-- New frontend integration suite: 11 tests passed (node tests/frontend-v2.5.95.test.js)
-- Worker validation: 59 existing assertions plus 102 bounded-parser cases passed, with Worker parity, MAIN response/healer/correction/cache-revision/default-import mocks and existing credential-routing mocks passing
-- Synthetic parser, Worker mocks and frontend state tests cover extraction/parity, uncertainty, combinations, ranking and cache/live-criteria behavior. These are not live Airtable coverage or deployment tests
-- Existing offline frontend regression run: 22 of 23 scripts passed, covering cache/refresh, keywords, feedback, sorting, voltage/HP/enclosure, page classification, mobile scrolling and PDF rendering/state/preload/print/zoom/scroll behavior
-- Existing enclosure-parsing test 18 also fails on the unchanged baseline; this unrelated pre-existing expectation is not changed by this release
-- Final read-only code review found no remaining significant issues after resolving wrapped-value ambiguity; secret scans passed. Earlier CodeQL runs reported zero alerts, but the final automated validation request was blocked by the service time limit, so a final automated pass is not claimed
-- Real authenticated extraction/ranking coverage, production refresh, physical touch-device/PDF workflows and Worker deployment remain operator acceptance checks
-
-PREVIOUS UPDATES (v2.5.94):
+RECENT UPDATES (v2.5.94):
 
 - Reset (↺) explicitly clears the keyword input and both Allowed/Blocked term lists, restores inactive blocklist mode and Allowed Terms guidance, and hides the contradiction warning
 - Numeric filter selections survive option rebuilds during initial/resume sync, cache restore, snapshot apply/swap, and hourly stale-cache refresh; live keyword edits, both lists, mode, and Panel Type remain unchanged

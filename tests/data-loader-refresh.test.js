@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const InfoTableHelper = require('../info-table-helper.js');
 
 const appJsPath = path.join(__dirname, '..', 'app.js');
 const appJsContent = fs.readFileSync(appJsPath, 'utf8');
@@ -494,15 +493,15 @@ async function flushAsync() {
         DATA: { HP: [0.5, 7.5], VOLT: [208, 480], PHASE: [1, 3] }
     };
     const Option = function(text, value) { this.text = String(text); this.value = String(value); };
-    const RealUI = new Function('DOM_CACHE', 'window', 'AI_TRAINING_DATA', 'SearchEngine', 'Option', 'DataLoader', 'InfoTableHelper',
+    const RealUI = new Function('DOM_CACHE', 'window', 'AI_TRAINING_DATA', 'SearchEngine', 'Option',
         `${extractClass('UI', appJsContent)}; return UI;`
-    )(domCache, windowState, trainingData, SearchEngine, Option, DataLoader, InfoTableHelper);
+    )(domCache, windowState, trainingData, SearchEngine, Option);
 
     for (const flow of ['initial', 'resume', 'cache', 'peer', 'background']) {
         resetHarness();
         localStorage.setItem('cox_user', 'user');
         localStorage.setItem('cox_pass', 'pass');
-        for (const k of ['sys', 'mfg', 'hp', 'volt', 'phase', 'enc', 'cat']) {
+        for (const k of ['mfg', 'hp', 'volt', 'phase', 'enc', 'cat']) {
             inputs[k + 'Input'] = {
                 value: k === 'cat' ? 'Standard' : 'Any',
                 options: [],
@@ -530,17 +529,14 @@ async function flushAsync() {
         let edited = false;
         const editAndApply = async () => {
             await flushAsync();
-            Object.entries({ sys: 'Duplex', mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
+            Object.entries({ mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
                 .forEach(([k, value]) => { inputs[k + 'Input'].value = value; });
             inputs.keywordInput.value = 'allowed during sync';
             RealUI.toggleKeywordBlocklistMode();
             // Leave the latest edit only in the DOM until the completion-time UI restore.
             inputs.keywordInput.value = 'blocked during apply';
             DataLoader.applySnapshot({
-                records: [{
-                    id: 'new-record', mfg: 'COX', enc: '4XFG',
-                    desc: 'Panel Type Duplex Voltage 480 Phase/HZ 3/60 No. Motors 2 HP 15 FLA 28.5 Pump Manufacturer Barnes Type of Pump Submersible'
-                }]
+                records: [{ id: 'new-record', mfg: 'COX', enc: '4XFG' }]
             });
             edited = true;
             return { success: true };
@@ -567,7 +563,7 @@ async function flushAsync() {
             await DataLoader.preload();
         }
         assert(edited && popCount === 1, `${flow}: must exercise async edit, snapshot apply, and real UI restore`);
-        Object.entries({ sys: 'Duplex', mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
+        Object.entries({ mfg: 'COX', hp: '7.5', volt: '480', phase: '3', enc: '4XFG', cat: 'LowVoltage' })
             .forEach(([k, value]) => assertEqual(inputs[k + 'Input'].value, value, `${flow}: ${k} must survive`));
         assertEqual(inputs.keywordInput.value, 'blocked during apply', `${flow}: latest visible edit must survive`);
         assertEqual(RealUI.getAllowedKeywordTermsInput(), 'allowed during sync', `${flow}: inactive allowed list must survive`);
