@@ -127,10 +127,16 @@ function evaluate(inputRows) {
     if (!inputRows.length) throw new Error('Input contains no data rows');
     const rows = inputRows.map((raw, index) => {
         const row = Object.fromEntries(Object.entries(raw || {}).map(([key, value]) => [key.toLowerCase(), value]));
+        for (const required of ['ground_truth', 'app_result']) {
+            if (!Object.prototype.hasOwnProperty.call(row, required)) {
+                throw new Error(`row ${index + 2}: missing required ${required} column`);
+            }
+        }
         const truthValue = getValue(row, ['ground_truth']);
         const truth = normalizeLabel(truthValue, index + 2, 'ground_truth');
         const supplied = normalizeLabel(getValue(row, ['app_result']), index + 2, 'app_result');
-        const descriptionField = fullDescriptionFields.find(name => Object.prototype.hasOwnProperty.call(row, name));
+        const descriptionField = fullDescriptionFields.find(name => Object.prototype.hasOwnProperty.call(row, name)
+            && row[name] != null && String(row[name]).trim());
         const snippetField = Object.prototype.hasOwnProperty.call(row, 'evidence_snippet') ? 'evidence_snippet' : null;
         const field = descriptionField || snippetField;
         if (!field || row[field] == null) throw new Error(`row ${index + 2}: expected a description or evidence_snippet column`);
@@ -170,6 +176,11 @@ function evaluate(inputRows) {
     console.log(`root_cause=${counts(causeCounts)}`);
     printScores('supplied app_result', supplied);
     printScores('current parser', derived);
+    console.log('current parser by gt_confidence:');
+    for (const confidence of Object.keys(confidenceCounts).sort()) {
+        const group = rows.filter(row => row.confidence === confidence);
+        printScores(`  ${confidence}`, score(group, row => row.derived));
+    }
     console.log(`Unclassified current-parser rows=${rows.length - derived.classified}`);
 }
 

@@ -1,5 +1,5 @@
 // Run: node tests/system-type-adjacent.test.js
-// v2.5.107 adjacent-token System Type rules for flattened CAD `desc` dumps.
+// v2.5.107 adjacent-token rules and v2.5.108 bounded equipment-title evidence.
 const assert = require('assert');
 const parser = require('../info-table-parser.js');
 const { cp8025, cp8374 } = require('./fixtures/system-type-adjacent.js');
@@ -156,6 +156,8 @@ for (const desc of [
     'DUPLEX PUMP | NOTES | PANEL DESCRIPTION',
     'DUPLEX RECEPTACLE | CONTROL PANEL',
     'DUPLEX OUTLET | CONTROL PANEL',
+    'DUPLEX PUMP-123 | PANEL DESCRIPTION',
+    'QUAD BLOWER #3 PANEL',
     'TRIPLEX ALTERNATOR RELAY',
     'QUAD-RELAY VFD PANEL'
 ]) expect(desc, [null, false], `equipment/reference exclusion: ${desc}`);

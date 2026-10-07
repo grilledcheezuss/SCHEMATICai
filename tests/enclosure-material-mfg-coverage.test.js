@@ -382,7 +382,7 @@ runTest('DataLoader ranks once per applied dataset with allowed list; DERIVED_RE
     Object.defineProperty(old, '_derivedRev', { value: 5, writable: true, configurable: true, enumerable: false });
     DataLoader.applySnapshot({ records: [old] });
     assertEqual(InfoTableParser.DERIVED_REV, 9, 'System Type revision re-derives old snapshots');
-    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [8, 'row', '4XSS'], 'older derived record recomputed, raw enc kept');
+    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [9, 'row', '4XSS'], 'older derived record recomputed, raw enc kept');
     assertEqual(old._encEvidence.materials, [PS], 'revision 4 descriptions gain the new association on snapshot apply');
     assertEqual(windowState.MFG_RANKING.options, ['MYERS', 'SULZER'], 'ranking on apply includes reserved Sulzer');
     assert(/const SNAPSHOT_SCHEMA_VERSION = '1';/.test(appJsContent), 'snapshot schema unchanged');

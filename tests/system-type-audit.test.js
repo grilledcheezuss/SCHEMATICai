@@ -85,6 +85,15 @@ assert.strictEqual(report.patterns, null, 'snippets are opt-in');
 assert.strictEqual(report.rowCountValues, null, 'count cell values are opt-in');
 assert(report.keywordHits.absent.QUADRAPLEX === 1 && report.keywordHits.orange['NO MOTORS'] === 4, 'label-only keyword hits');
 
+const equipmentReport = SystemTypeAudit.report({
+    records: derived([{ id: 'CP-EQUIPMENT', desc: 'PANEL DESCRIPTION | SIMPLEX BLOWER' }])
+});
+assert.deepStrictEqual(equipmentReport.sources,
+    { explicitRow: 0, titlePhrase: 1, countInference: 0, conflict: 0, unknown: 0 },
+    'equipment evidence remains within the compatible titlePhrase source bucket');
+assert.deepStrictEqual(equipmentReport.orangeCauses, { 'title-equipment-phrase': 1 },
+    'equipment-title evidence is visible as a distinct diagnostic cause');
+
 const reversed = derived(fixtures().reverse());
 assert.strictEqual(JSON.stringify(SystemTypeAudit.report({ records: reversed })), JSON.stringify(report), 'deterministic regardless of record order');
 assert.strictEqual(JSON.stringify(SystemTypeAudit.report({ records })), JSON.stringify(report), 'deterministic across runs');

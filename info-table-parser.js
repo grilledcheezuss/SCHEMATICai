@@ -96,6 +96,7 @@
     const EQUIPMENT_PANEL_CONTEXT_RE = /\b(?:CONTROL\s+PANEL|PANEL(?:\s+(?:DESCRIPTION|NAME))?|(?:PROJECT|DRAWING)\s+TITLE)\b/;
     const EQUIPMENT_REFERENCE_RE = /\b(?:NOT|NO|NON|WITHOUT|OTHER|ANOTHER|SEE|REF(?:ERENCE)?|FOR|REPLACE(?:MENT)?|EXISTING)\b/;
     const EQUIPMENT_UNPAIRED_ALT_RE = new RegExp(`\\b(?:OR|AND|\\/|&)\\s*${SYSTEM_TOKEN_SOURCE}(?![\\s|]+${EQUIPMENT_SOURCE})\\b`);
+    const EQUIPMENT_PART_NUMBER_RE = /^(?:[-_/#\\+&]|\d|CP[-/#]?\d)/i;
     const FORWARD_ADJACENT_RE = new RegExp(`^(${ADJACENT_TYPE_SOURCE}(?:\\s+(?:GRINDER|ALTERNATING))?(?:\\s+PUMPS?)?(?:\\s+(?:CONTROL\\s+)?PANEL)?)(?=$|[\\s|,;])`);
     const REVERSE_ADJACENT_RE = new RegExp(`(?:^|[\\s|])(${ADJACENT_TYPE_SOURCE})$`);
     const ADJACENT_ALTERNATIVE_RE = /^(?:AND\s*\/\s*OR|OR|AND|\/|&)(?=$|[\s|])/;
@@ -505,8 +506,8 @@
     }
 
     // Rule 1 (v2.5.107): the forward leading token(s), else the immediately preceding
-    // token(s), form the Panel Type value. Trailing/earlier column noise is ignored; only an
-    // adjacent hardware noun, reference word, negation or alternative changes the outcome.
+    // token(s), form the Panel Type value. Trailing/earlier column noise is ignored; an
+    // adjacent hardware noun, reference word, negation or alternative makes it unreadable.
     // Returns null when neither adjacent side is a system value (legacy cell rules apply).
     function adjacentSystemCell(text, label, previous, next) {
         let forward = null;
@@ -791,6 +792,7 @@
             if (SYSTEM_HARDWARE_RE.test(before) || SYSTEM_HARDWARE_RE.test(after)
                 || EQUIPMENT_REFERENCE_RE.test(before) || EQUIPMENT_REFERENCE_RE.test(after)
                 || EQUIPMENT_UNPAIRED_ALT_RE.test(afterWindow)
+                || EQUIPMENT_PART_NUMBER_RE.test(afterWindow.replace(/^[\s|]+/, ''))
                 || /\b(?:OTHER|ANOTHER|EXISTING)\s+(?:CONTROL\s+)?PANEL\b/.test(beforeWindow + afterWindow)) continue;
 
             while (labelIndex < labels.length && labels[labelIndex].start < start) labelIndex++;
@@ -1266,8 +1268,9 @@
         let cause = null;
         if (state === 'orange') {
             const reasons = evidence.reasons;
-            if (evidence.source === 'title') cause = 'title-narrative-only';
-            else if (evidence.source === 'count') cause = 'count-inference';
+            if (evidence.source === 'title') {
+                cause = reasons.includes('validated-equipment-phrase') ? 'title-equipment-phrase' : 'title-narrative-only';
+            } else if (evidence.source === 'count') cause = 'count-inference';
             else if (reasons.includes('ambiguous-additional-row')) cause = 'row-plus-ambiguous-row';
             else if (reasons.includes('unresolved-or-conflicting-count')) cause = 'row-count-disagreement';
             else if (reasons.includes('wiring-gap') || reasons.includes('terminal-gap')) cause = 'row-gap-association';

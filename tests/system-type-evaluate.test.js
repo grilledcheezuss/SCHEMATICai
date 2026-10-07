@@ -18,6 +18,7 @@ try {
     assert(snippet.stdout.includes('scope=SNIPPET_BENCHMARK; rows=2'));
     assert(snippet.stdout.includes('gt_confidence=HIGH=1, MEDIUM=1'));
     assert(snippet.stdout.includes('current parser: classified=1/2'));
+    assert(snippet.stdout.includes('current parser by gt_confidence:'));
     assert(snippet.stdout.includes('Duplex       1     0     0'));
     assert(!snippet.stdout.includes('PRIVATE-PANEL-ID'));
     assert(!snippet.stdout.includes('PRIVATE-CAD-DETAIL'));
