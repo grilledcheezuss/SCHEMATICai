@@ -9,7 +9,7 @@ const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
 
-const REPO_ROOT = path.join(__dirname, '..', '..');
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const MIME = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'application/javascript; charset=utf-8',
@@ -32,7 +32,7 @@ function findChrome() {
 function startServer() {
     const server = http.createServer((req, res) => {
         const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
-        const filePath = path.normalize(path.join(REPO_ROOT, urlPath === '/' ? 'index.html' : urlPath));
+        const filePath = path.resolve(REPO_ROOT, '.' + (urlPath === '/' ? '/index.html' : urlPath));
         if (!filePath.startsWith(REPO_ROOT + path.sep)) { res.writeHead(403); res.end(); return; }
         fs.readFile(filePath, (err, data) => {
             if (err) { res.writeHead(404); res.end(); return; }
@@ -62,15 +62,36 @@ class HeadlessBrowser {
         if (!chromePath || typeof WebSocket === 'undefined') return null;
         const server = await startServer();
         const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'schematica-ui-'));
-        const proc = spawn(chromePath, [
-            '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
-            '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
-            `--user-data-dir=${userDataDir}`, '--remote-debugging-port=0', 'about:blank'
-        ], { stdio: ['ignore', 'ignore', 'pipe'] });
-        const wsUrl = await waitForDevtoolsUrl(proc);
-        const ws = new WebSocket(wsUrl);
-        await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
-        const browser = new HeadlessBrowser(proc, ws, server, userDataDir);
+        let proc = null;
+        let ws = null;
+        let browser = null;
+        try {
+            proc = spawn(chromePath, [
+                '--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+                '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
+                `--user-data-dir=${userDataDir}`, '--remote-debugging-port=0', 'about:blank'
+            ], { stdio: ['ignore', 'ignore', 'pipe'] });
+            const wsUrl = await waitForDevtoolsUrl(proc);
+            ws = new WebSocket(wsUrl);
+            await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject; });
+            browser = new HeadlessBrowser(proc, ws, server, userDataDir);
+            await browser._attach();
+            return browser;
+        } catch (err) {
+            if (browser) {
+                await browser.close();
+            } else {
+                try { ws?.close(); } catch (_) { /* ignore */ }
+                proc?.kill('SIGKILL');
+                await new Promise(resolve => server.close(resolve));
+                try { fs.rmSync(userDataDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+            }
+            throw err;
+        }
+    }
+
+    async _attach() {
+        const browser = this;
         const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' }, null);
         const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true }, null);
         browser.sessionId = sessionId;
@@ -80,7 +101,6 @@ class HeadlessBrowser {
         await browser.send('Network.setBlockedURLs', {
             urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*', '*coxpanelfinder.app*', '*workers.dev*', '*airtable*']
         });
-        return browser;
     }
 
     constructor(proc, ws, server, userDataDir) {
@@ -107,6 +127,12 @@ class HeadlessBrowser {
             }
             this.listeners.slice().forEach(fn => fn(msg));
         };
+        const rejectPending = reason => {
+            this.pending.forEach(({ reject }) => reject(new Error(reason)));
+            this.pending.clear();
+        };
+        ws.onclose = () => rejectPending('DevTools connection closed');
+        proc.on('exit', code => rejectPending(`Chrome exited (${code})`));
     }
 
     get baseUrl() {
