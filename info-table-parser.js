@@ -821,9 +821,79 @@
         return titleMatches(desc, labels).concat(equipmentTitleMatches(desc, labels));
     }
 
+    function captionTitleMatches(desc) {
+        if (typeof desc !== 'string' || !desc) return [];
+        const text = desc.toUpperCase().replace(/%%(?:[A-Z]|\d{3})/g, '');
+        const cells = [];
+        const cellRe = /[^|\r\n]+/g;
+        let cell;
+        while ((cell = cellRe.exec(text))) {
+            const value = cell[0].trim();
+            if (value) cells.push({ value, start: cell.index + cell[0].indexOf(value), end: cellRe.lastIndex });
+        }
+
+        const equipment = new RegExp(`^(${SYSTEM_TOKEN_SOURCE})(?:\\s+(?:PUMPS?|BLOWERS?|GRINDERS?))?$`);
+        const caption = /^(?:POWER|CONTROL) DIAGRAM$/;
+        const primary = /^(?:PANEL DESCRIPTION|DRAWING TITLE)$/;
+        const unsupported = /^(?:FIVE|SIX|[5-9]) PUMPS?$/;
+        const matches = [];
+        const anchorIndex = (start, end) => {
+            const before = cells[start - 1]?.value || '';
+            const beforeNumber = cells[start - 2]?.value || '';
+            const after = cells[end + 1]?.value || '';
+            const afterNumber = cells[end + 2]?.value || '';
+            if (primary.test(before)) return start - 1;
+            if (primary.test(beforeNumber) && /^\d{1,3}$/.test(before)) return start - 2;
+            if (primary.test(after)) return end + 1;
+            if (primary.test(afterNumber) && /^\d{1,3}$/.test(after)) return end + 2;
+            return -1;
+        };
+        const boundary = (start, end) => {
+            const before = cells[start - 1]?.value || '';
+            const after = cells[end + 1]?.value || '';
+            return /\b(?:NOT|NO|NON|WITHOUT|OTHER|ANOTHER|EXISTING|SEE|REF(?:ERENCE)?|NOTES?|BOM|BILL OF MATERIALS)\b/i.test(before + ' ' + after)
+                || SYSTEM_HARDWARE_RE.test(before) || SYSTEM_HARDWARE_RE.test(after);
+        };
+
+        for (let i = 0; i + 2 < cells.length; i++) {
+            for (const reverse of [false, true]) {
+                const typeIndex = i + (reverse ? 2 : 0);
+                const panelIndex = i + (reverse ? 0 : 2);
+                if (!caption.test(cells[i + 1].value)) continue;
+                const typed = cells[typeIndex];
+                const panel = cells[panelIndex];
+                const anchor = anchorIndex(i, i + 2);
+                if (panel.value !== 'CONTROL PANEL' || anchor < 0
+                    || panel.end - cells[i].start > REVERSE_WINDOW || boundary(i, i + 2)) continue;
+                const beforeAnchor = cells[anchor - 1]?.value || '';
+                if (/^(?:NOTES?|BOM|BILL OF MATERIALS|PANEL NAME)$/.test(beforeAnchor)
+                    || SYSTEM_HARDWARE_RE.test(beforeAnchor)) continue;
+                const match = equipment.exec(typed.value);
+                if (match) {
+                    const type = normalizeSystemType(match[1]);
+                    if (type) matches.push({ type, start: cells[i].start, end: panel.end, bounded: true, source: 'caption-title' });
+                }
+            }
+        }
+        return matches;
+    }
+
+    function unsupportedPrimaryPumpTitle(desc) {
+        if (typeof desc !== 'string' || !desc) return false;
+        const cells = desc.toUpperCase().replace(/%%(?:[A-Z]|\d{3})/g, '').split(/[|\r\n]+/).map(value => value.trim());
+        const primary = /^(?:PANEL DESCRIPTION|DRAWING TITLE)$/;
+        const unsupported = /^(?:FIVE|SIX|[5-9]) PUMPS?$/;
+        for (let i = 0; i + 2 < cells.length; i++) {
+            if (cells[i] === 'CONTROL PANEL' && unsupported.test(cells[i + 1]) && primary.test(cells[i + 2])) return true;
+            if (unsupported.test(cells[i]) && primary.test(cells[i + 1]) && cells[i + 2] === 'CONTROL PANEL') return true;
+        }
+        return false;
+    }
+
     function titleCandidates(desc, labels) {
         const matches = titleEvidenceMatches(desc, labels);
-        return SYSTEM_TYPES.filter(sys => matches.some(match => match.type === sys));
+        const evidence = matches.length ? matches : captionTitleMatches(desc);
+        return SYSTEM_TYPES.filter(sys => evidence.some(match => match.type === sys));
     }
 
     // Rule 4 (v2.5.107): a repeated title block ("SIMPLEX PUMP SIMPLEX PUMP ... CONTROL PANEL
@@ -847,8 +917,8 @@
         return types.length === 1 && seen[types[0]] >= 2 ? types : [];
     }
 
-    function titleHasNearbyCount(desc, rows, title, count) {
-        const matches = titleEvidenceMatches(desc, rows.labels || []).filter(match => match.type === title);
+    function titleHasNearbyCount(desc, rows, title, count, evidence) {
+        const matches = (evidence || titleEvidenceMatches(desc, rows.labels || [])).filter(match => match.type === title);
         if (!matches.length) return false;
         // Rule 3 (v2.5.107): a bounded <type> PUMP|BLOWER|GRINDER|LIFT STATION CONTROL PANEL
         // phrase plus an agreeing plain count corroborates regardless of distance.
@@ -925,7 +995,10 @@
             const block = titleBlockCandidates(systemDesc);
             const titles = SYSTEM_TYPES.filter(type => phrases.includes(type) || block.includes(type));
             candidates = ambiguous.length ? SYSTEM_TYPES.filter(allows) : titles;
-            if (titles.length === 1 && allows(titles[0])) {
+            if (unsupportedPrimaryPumpTitle(systemDesc)) {
+                candidates = [];
+                reasons.push('unsupported-primary-pump-title');
+            } else if (titles.length === 1 && allows(titles[0])) {
                 sys = titles[0];
                 source = 'title';
                 direction = phrases.length
@@ -960,6 +1033,24 @@
                     candidates = ambiguous.length ? candidates : [inferred];
                     reasons.push('complete-specific-count-cell');
                 }
+            }
+        }
+        if (!sys && source === 'none' && !reasons.includes('unsupported-primary-pump-title')) {
+            const captions = captionTitleMatches(systemDesc);
+            const captionTypes = SYSTEM_TYPES.filter(type => captions.some(match => match.type === type));
+            if (captionTypes.length === 1 && allows(captionTypes[0])) {
+                sys = captionTypes[0];
+                source = 'title';
+                direction = 'caption-title';
+                const count = counts.size === 1 ? [...counts][0] : null;
+                const corroborated = count !== null && !hasNonPlainCount
+                    && SYSTEM_TYPES[count - 1] === sys
+                    && !ambiguous.length
+                    && titleHasNearbyCount(systemDesc, systemRows, sys, count, captions);
+                sysV = !corroborated;
+                candidates = [sys];
+                reasons.push('validated-caption-title');
+                if (corroborated) reasons.push('corroborated-panel-phrase-count');
             }
         }
         if (!sys && source === 'none') reasons.push('insufficient-associated-evidence');
