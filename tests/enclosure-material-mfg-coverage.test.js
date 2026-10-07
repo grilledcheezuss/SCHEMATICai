@@ -378,11 +378,12 @@ runTest('DataLoader ranks once per applied dataset with allowed list; DERIVED_RE
     const windowState = { LOCAL_DB: [], ID_MAP: new Map(), FOUND_MFGS: new Set(), FOUND_ENCS: new Set() };
     const DataLoader = new Function('window', 'localStorage', 'InfoTableParser', `${extractClassSource('DataLoader')}; return DataLoader;`)(
         windowState, { getItem: () => null, setItem() {}, removeItem() {} }, InfoTableParser);
-    const old = { id: 'o', desc: 'Enclosure Material Fiberglass Pump Manufacturer Myers', enc: '4XSS' };
-    Object.defineProperty(old, '_derivedRev', { value: 1, writable: true, configurable: true, enumerable: false });
+    const old = { id: 'o', desc: 'Phase Monitor Painted Steel Enclosure Material W = M2 23 Panel Heater / Thermostat W Pump Manufacturer Myers', enc: '4XSS' };
+    Object.defineProperty(old, '_derivedRev', { value: 4, writable: true, configurable: true, enumerable: false });
     DataLoader.applySnapshot({ records: [old] });
     assertEqual(InfoTableParser.DERIVED_REV, 5, 'association revision re-derives old snapshots');
     assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [5, 'row', '4XSS'], 'older derived record recomputed, raw enc kept');
+    assertEqual(old._encEvidence.materials, [PS], 'revision 4 descriptions gain the new association on snapshot apply');
     assertEqual(windowState.MFG_RANKING.options, ['MYERS', 'SULZER'], 'ranking on apply includes reserved Sulzer');
     assert(/const SNAPSHOT_SCHEMA_VERSION = '1';/.test(appJsContent), 'snapshot schema unchanged');
 });

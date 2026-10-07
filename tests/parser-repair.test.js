@@ -44,6 +44,12 @@ async function main() {
         assert.strictEqual(material(desc).status, 'conflict', desc);
         assert.strictEqual(material(desc).varied, true, desc);
     }
+    for (const desc of [
+        'Enclosure Material CR1 5 AUTOMATIC MODE 12 Stainless Steel screws Inner Swing Panel Yes',
+        'Enclosure Material CR1 5 AUTOMATIC MODE 12 Stainless Steel or Painted Steel Inner Swing Panel Yes',
+        'Enclosure Material CR1 5 AUTOMATIC MODE 12 Painted Steel brackets Inner Swing Panel Yes'
+    ]) assert.strictEqual(material(desc).status, 'unreadable', 'truncated cells cannot hide qualifiers');
+    assert.deepStrictEqual([...material('Enclosure Material CR1 5 Painted Steel\n          Inner Swing Panel Yes').materials], ['Painted Steel'], 'real newline boundary within window');
     for (const [name, fixture] of Object.entries(fixtures)) {
         const wanted = name === 'cp8370' ? 'Fiberglass' : 'Stainless Steel';
         const opposite = wanted === 'Fiberglass' ? 'Stainless Steel' : 'Fiberglass';

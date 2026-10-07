@@ -304,7 +304,10 @@
             let value = readValue(text, label.end, next ? next.start : text.length, label.kind);
             let association = { value, varied: false, direction: 'forward' };
             if (label.kind === 'encMaterials' && value && !identifiedMaterials(value).length
-                && !UNSUPPORTED_MATERIAL_RE.test(value) && next && MATERIAL_BOUNDARY_RE.test(next.label)) {
+                && !UNSUPPORTED_MATERIAL_RE.test(value) && next && MATERIAL_BOUNDARY_RE.test(next.label)
+                // A window cutoff is not a cell boundary: it may hide hardware or alternatives.
+                && (next.start <= label.end + VALUE_WINDOW
+                    || /[\n\r|]/.test(joinMaterialLines(text.slice(label.end, label.end + VALUE_WINDOW)).replace(LEADING_SEPARATORS_RE, '')))) {
                 const forward = interleavedMaterial(value, false);
                 if (forward) association = { ...forward, varied: true, direction: 'forward-wiring-gap' };
                 else if (isWiringNoise(value)) {

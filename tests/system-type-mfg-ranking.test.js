@@ -441,7 +441,9 @@ runTest('index.html: DOM order matches the visual grid and the parser loads befo
     positions.slice(1).forEach((pos, i) => assert(pos > positions[i], `${order[i + 1]} must follow ${order[i]}`));
     const encLine = indexHtml.split('\n').find(line => line.includes('id="encInput"'));
     assert(!encLine.includes('full-width'), 'enclosure is a half-row cell');
-    assert(indexHtml.indexOf('src="info-table-parser.js?v=2.5.98"') > 0 && indexHtml.indexOf('src="info-table-parser.js?v=2.5.98"') < indexHtml.indexOf('src="app.js?v=2.5.98"'), 'cache-busted parser script loads before matching app.js');
+    const version = appJsContent.match(/const APP_VERSION = "v([^"]+)"/)[1];
+    const parserScript = indexHtml.indexOf(`src="info-table-parser.js?v=${version}"`);
+    assert(parserScript > 0 && parserScript < indexHtml.indexOf(`src="app.js?v=${version}"`), 'cache-busted parser script loads before matching app.js');
     assert(indexHtml.includes('id="fb-sys"'), 'feedback System Type select present');
 });
 
