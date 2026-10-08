@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.97
+// 🧠 SCHEMATICA ai WORKER v2.5.110
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -46,6 +46,219 @@ const MAIN_PAGE_CACHE_FRESH_MS = MAIN_PAGE_CACHE_FRESH_SECONDS * 1000;
 const MAIN_PAGE_CACHE_STALE_MS = MAIN_PAGE_CACHE_STALE_SECONDS * 1000;
 let FEEDBACK_CACHE_VERSION = 0;
 const MAIN_PAGE_INFLIGHT = new Map();
+const SHEETS_CACHE_MS = 5 * 60 * 1000;
+const SHEETS_MAX_BYTES = 8 * 1024 * 1024;
+let CACHE_SHEETS = null;
+
+function normalizeSheetPanelId(value) {
+    const id = String(value ?? '').replace(/[!?]/g, '').trim().replace(/^CP\s*-\s*/i, '')
+        .replace(/\.(?:dwg|pdf)$/i, '').trim().toUpperCase();
+    return /^\d+(?:R\d+)?$/.test(id) ? id : null;
+}
+
+const SHEET_FIELDS = {
+    panelid: 'id', id: 'id', controlpanelname: 'id', panel: 'id',
+    mfg: 'mfg', pumpmanufacturer: 'mfg', manufacturer: 'mfg', pumpmfg: 'mfg',
+    hp: 'hp', horsepower: 'hp', motorhp: 'hp', motorhorsepower: 'hp',
+    volt: 'volt', voltage: 'volt', servicevoltage: 'volt', panelvoltage: 'volt',
+    phase: 'phase', servicephase: 'phase',
+    enc: 'enc', enclosure: 'enc', nemarating: 'enc', enclosurerating: 'enc',
+    sys: 'sys', systemtype: 'sys', paneltype: 'sys',
+    encmaterial: 'encMaterial', enclosurematerial: 'encMaterial', material: 'encMaterial'
+};
+
+function normalizeSheetSpec(field, raw) {
+    if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+    let value = String(raw).trim().toUpperCase().replace(/\s+/g, ' ');
+    if (!value || value.length > 100 || /\b(?:N\/?A|VARIES|VARIED|MULTIPLE|PARTIAL|UNKNOWN|TBD|NONE|NOT APPLICABLE|NOT AVAILABLE)\b/.test(value)
+        || /^(?:[-–—?]+|NULL)$/.test(value)) return null;
+    if (field === 'hp') {
+        value = value.replace(/\s*(?:HP|HORSEPOWER)$/, '').trim();
+        if (/^\d+\/\d+$/.test(value)) {
+            const [a, b] = value.split('/').map(Number);
+            value = String(a / b);
+        }
+        return /^\d+(?:\.\d+)?$/.test(value) && isValidHP(value) ? String(Number(value)) : null;
+    }
+    if (field === 'volt') {
+        value = value.replace(/\s*(?:V|VAC|VOLTS?)$/, '').trim();
+        value = ({ '110': '120', '115': '120', '220': '240', '230': '240', '460': '480' })[value] || value;
+        return isValidVoltage(value) ? value : null;
+    }
+    if (field === 'phase') {
+        value = value.replace(/\s*(?:PH|PHASE|Ø)$/, '').trim();
+        value = ({ SINGLE: '1', THREE: '3' })[value] || value;
+        return isValidPhase(value) ? value : null;
+    }
+    if (field === 'sys') {
+        return ({ SIMPLEX: 'Simplex', DUPLEX: 'Duplex', TRIPLEX: 'Triplex',
+            QUADRAPLEX: 'Quadraplex', QUADRUPLEX: 'Quadraplex', QUADPLEX: 'Quadraplex' })[value] || null;
+    }
+    if (field === 'encMaterial') {
+        return ({ FIBERGLASS: 'Fiberglass', 'FIBREGLASS': 'Fiberglass', FG: 'Fiberglass',
+            'STAINLESS STEEL': 'Stainless Steel', SS: 'Stainless Steel',
+            'PAINTED STEEL': 'Painted Steel' })[value] || null;
+    }
+    if (field === 'enc') {
+        value = value.replace(/^NEMA\s*/, '').replace(/\s+/g, '');
+        return /^(?:1|3R|4|4X|4XFG|4XSS|12|POLY)$/.test(value) ? value : null;
+    }
+    if (field === 'mfg' && /^[A-Z][A-Z0-9 .&'-]*$/.test(value) && !/\b(?:OR|AND)\b/.test(value)) {
+        const canonical = Object.keys(EXACT_MFGS).find(key => key === value || EXACT_MFGS[key].includes(value));
+        return canonical || value;
+    }
+    return null;
+}
+
+function compileSheetSnapshot(payload, previous = null) {
+    if (!payload || payload.ok !== true || !['string', 'number'].includes(typeof payload.schema)
+        || !['string', 'number'].includes(typeof payload.revision)
+        || !String(payload.schema).trim() || !String(payload.revision).trim()
+        || String(payload.schema).length > 100 || String(payload.revision).length > 100
+        || typeof payload.hash !== 'string' || !payload.hash.trim() || payload.hash.length > 200
+        || !Array.isArray(payload.columns) || !payload.columns.length || payload.columns.length > 100
+        || !payload.columns.every(c => typeof c === 'string')
+        || !Array.isArray(payload.rows) || !payload.rows.length || payload.rows.length > 20000
+        || payload.rowCount !== payload.rows.length
+        || !payload.rows.every(row => Array.isArray(row) && row.length === payload.columns.length)) {
+        throw new Error('Invalid Sheets snapshot');
+    }
+    const fields = payload.columns.map(c => {
+        const key = c.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return Object.hasOwn(SHEET_FIELDS, key) ? SHEET_FIELDS[key] : null;
+    });
+    if (fields.filter(f => f === 'id').length !== 1
+        || fields.filter(Boolean).length !== new Set(fields.filter(Boolean)).size
+        || !fields.some(f => f && f !== 'id')) throw new Error('Invalid Sheets columns');
+    const version = JSON.stringify([payload.schema, payload.revision, payload.hash]);
+    if (previous?.version === version) return previous;
+    const index = new Map();
+    const duplicateIds = new Set();
+    if (payload.duplicates !== undefined) {
+        if (!Array.isArray(payload.duplicates)) throw new Error('Invalid Sheets duplicates');
+        for (const duplicate of payload.duplicates) {
+            const id = normalizeSheetPanelId(typeof duplicate === 'object' && duplicate !== null
+                ? (duplicate.panelId ?? duplicate.panel_id ?? duplicate.id) : duplicate);
+            if (id) duplicateIds.add(id);
+        }
+    }
+    const idColumn = fields.indexOf('id');
+    for (const row of payload.rows) {
+        const id = normalizeSheetPanelId(row[idColumn]);
+        if (!id) continue;
+        if (index.has(id)) { duplicateIds.add(id); continue; }
+        const specs = {};
+        fields.forEach((field, column) => {
+            if (!field || field === 'id') return;
+            const value = normalizeSheetSpec(field, row[column]);
+            if (value !== null) specs[field] = value;
+        });
+        index.set(id, specs);
+    }
+    for (const id of duplicateIds) index.delete(id);
+    if (!index.size) throw new Error('Sheets snapshot has no unambiguous panel IDs');
+    return { version, index, revision: payload.revision, hash: payload.hash, updatedAt: payload.updatedAt };
+}
+
+async function fetchSheetPayload(endpoint) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+        let url = new URL(endpoint);
+        if (url.protocol !== 'https:' || url.hostname !== 'script.google.com' || url.username || url.password
+            || !/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname)) throw new Error('Invalid Sheets endpoint');
+        let response;
+        for (let redirects = 0; redirects <= 3; redirects++) {
+            response = await fetch(url.toString(), { redirect: 'manual', signal: controller.signal });
+            if (![301, 302, 303, 307, 308].includes(response.status)) break;
+            const location = response.headers.get('Location');
+            if (!location) throw new Error('Invalid Sheets redirect');
+            url = new URL(location, url);
+            if (url.protocol !== 'https:' || !['script.google.com', 'script.googleusercontent.com'].includes(url.hostname)
+                || url.username || url.password) throw new Error('Invalid Sheets redirect');
+        }
+        if (!response.ok || Number(response.headers.get('Content-Length')) > SHEETS_MAX_BYTES) throw new Error('Sheets fetch failed');
+        const reader = response.body.getReader();
+        const chunks = [];
+        let size = 0;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > SHEETS_MAX_BYTES) {
+                await reader.cancel();
+                throw new Error('Sheets snapshot too large');
+            }
+            chunks.push(value);
+        }
+        return JSON.parse(await new Response(new Blob(chunks)).text());
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function getSheetSnapshot(env, requestUrl) {
+    const source = env.SHEETS_ENDPOINT;
+    if (!source) return null;
+    if (!CACHE_SHEETS || CACHE_SHEETS.source !== source) {
+        CACHE_SHEETS = { source, snapshot: null, nextCheck: 0, promise: null };
+    }
+    const state = CACHE_SHEETS;
+    if (state.promise) return state.promise;
+    if (Date.now() < state.nextCheck) return state.snapshot;
+    state.promise = (async () => {
+        state.nextCheck = Date.now() + SHEETS_CACHE_MS;
+        const cache = typeof caches !== 'undefined' ? caches.default : null;
+        const cacheUrl = new URL(requestUrl);
+        cacheUrl.pathname = '/__schematica_sheets_v1';
+        cacheUrl.search = '';
+        cacheUrl.searchParams.set('source', source);
+        const key = new Request(cacheUrl.toString());
+        try {
+            if (!state.snapshot && cache) {
+                try {
+                    const saved = await cache.match(key);
+                    if (saved) {
+                        state.snapshot = compileSheetSnapshot(await saved.json());
+                        const freshUntil = Number(saved.headers.get('X-SCHEMATICA-CACHED-AT')) + SHEETS_CACHE_MS;
+                        if (Date.now() < freshUntil) {
+                            state.nextCheck = freshUntil;
+                            return state.snapshot;
+                        }
+                    }
+                } catch { /* A bad cache entry must not prevent a live refresh. */ }
+            }
+            const payload = await fetchSheetPayload(source);
+            const snapshot = compileSheetSnapshot(payload, state.snapshot);
+            state.snapshot = snapshot;
+            if (cache) {
+                try {
+                    await cache.put(key, new Response(JSON.stringify(payload), { headers: {
+                        'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=604800',
+                        'X-SCHEMATICA-CACHED-AT': String(Date.now())
+                    } }));
+                } catch { /* Keep the validated in-memory snapshot if persistence fails. */ }
+            }
+        } catch {
+            console.warn('[Sheets] Refresh unavailable; retaining last good snapshot');
+        }
+        return state.snapshot;
+    })();
+    try { return await state.promise; } finally { state.promise = null; }
+}
+
+function applySheetSpecs(record, snapshot) {
+    const specs = snapshot?.index.get(normalizeSheetPanelId(record.id));
+    if (!specs || !Object.keys(specs).length) return record;
+    record.sheetSpecs = specs;
+    for (const field of ['mfg', 'hp', 'volt', 'phase', 'enc']) {
+        if (specs[field] !== undefined) {
+            record[field] = specs[field];
+            record[field + 'V'] = false;
+        }
+    }
+    return record;
+}
 
 const VOTE_THRESHOLD = 3;
 
@@ -123,7 +336,7 @@ function normalizeMainOffset(rawOffset) {
     return rawOffset.trim();
 }
 
-function buildMainCacheKey(requestUrl, { pageSize, direction, offset, feedbackVersion }) {
+function buildMainCacheKey(requestUrl, { pageSize, direction, offset, feedbackVersion, sheetVersion, sheetSource }) {
     const cacheUrl = new URL(requestUrl);
     cacheUrl.search = '';
     cacheUrl.searchParams.set('target', 'MAIN');
@@ -131,6 +344,9 @@ function buildMainCacheKey(requestUrl, { pageSize, direction, offset, feedbackVe
     cacheUrl.searchParams.set('sortDirection', direction);
     cacheUrl.searchParams.set('offset', offset || '');
     cacheUrl.searchParams.set('feedbackVersion', String(feedbackVersion || 0));
+    cacheUrl.searchParams.set('specOverlay', 'v2.5.110');
+    cacheUrl.searchParams.set('sheetVersion', sheetVersion || '');
+    cacheUrl.searchParams.set('sheetSource', sheetSource || '');
     return cacheUrl.toString();
 }
 
@@ -992,7 +1208,9 @@ export default {
                 const pageSizeParam = url.searchParams.get('pageSize');
                 const pageSize = validatePageSize(pageSizeParam);
                 const mainStart = Date.now();
-                const cacheKeyUrl = buildMainCacheKey(request.url, { pageSize, direction, offset, feedbackVersion: FEEDBACK_CACHE_VERSION });
+                const sheetSnapshot = await getSheetSnapshot(env, request.url);
+                const cacheKeyUrl = buildMainCacheKey(request.url, { pageSize, direction, offset, feedbackVersion: FEEDBACK_CACHE_VERSION,
+                    sheetVersion: sheetSnapshot?.version, sheetSource: env.SHEETS_ENDPOINT });
                 const cacheKeyRequest = new Request(cacheKeyUrl, { method: 'GET' });
                 const workerCache = (typeof caches !== 'undefined' && caches.default) ? caches.default : null;
 
@@ -1068,7 +1286,7 @@ export default {
                         const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
                         const pdfStatus = pdfUrl ? "present" : "missing";
 
-                        return {
+                        return applySheetSpecs({
                             id: cleanId,
                             displayId: "CP-" + cleanId,
                             desc: fullDesc,
@@ -1086,11 +1304,12 @@ export default {
                             voltV: explicit.voltV || false,
                             phaseV: explicit.phaseV || false,
                             encV: explicit.encV || false
-                        };
+                        }, sheetSnapshot);
                     });
                     const processMs = Date.now() - processStart;
                     const serializeStart = Date.now();
-                    const body = JSON.stringify({ records: activeRecords, offset: mainJson.offset });
+                    const body = JSON.stringify({ records: activeRecords, offset: mainJson.offset,
+                        sheets: sheetSnapshot ? { revision: sheetSnapshot.revision, hash: sheetSnapshot.hash, updatedAt: sheetSnapshot.updatedAt } : null });
                     const serializeMs = Date.now() - serializeStart;
                     return { body, upstreamMs, processMs, serializeMs };
                 };
@@ -1136,7 +1355,7 @@ export default {
                                 }));
                             }
                             const hitHeaders = new Headers(cached.headers);
-                            hitHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
+                            hitHeaders.set('Cache-Control', env.SHEETS_ENDPOINT ? 'private, no-store' : MAIN_PAGE_CACHE_CONTROL);
                             setMainTimingHeaders(hitHeaders, {
                                 cacheStatus: isFresh ? 'HIT' : 'STALE',
                                 authMs,
@@ -1154,7 +1373,7 @@ export default {
                 const mainResult = await refresh.promise;
                 const totalMs = Date.now() - mainStart;
                 const responseHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
-                responseHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
+                responseHeaders.set('Cache-Control', env.SHEETS_ENDPOINT ? 'private, no-store' : MAIN_PAGE_CACHE_CONTROL);
                 setMainTimingHeaders(responseHeaders, {
                     cacheStatus: refresh.coalesced ? 'COALESCED' : 'MISS',
                     authMs,

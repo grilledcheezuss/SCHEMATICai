@@ -294,6 +294,22 @@ runTest('Material filter combines with mfg, category, keywords and pagination', 
     assertEqual([paged.page.length, paged.total, DOM_CACHE.get('page-info').textContent], [25, 30, 'Page 1 of 2'], 'pagination');
 });
 
+runTest('Sheet specs override contradictory description filters and badges', () => {
+    const sheetSpecs = { mfg: 'SULZER', phase: '3', sys: 'Duplex', encMaterial: FG };
+    const record = rec('sheet', 'PUMP MANUFACTURER BARNES PANEL TYPE SIMPLEX ENCLOSURE MATERIAL STAINLESS STEEL 1 PHASE',
+        { mfg: 'SULZER', phase: '3', sheetSpecs });
+    assertEqual(searchWith([record], { mfg: 'BARNES', cat: 'Any' }).total, 0, 'no manufacturer description fallback');
+    assertEqual(searchWith([record], { phase: '1', cat: 'Any' }).total, 0, 'no phase description fallback');
+    assertEqual(searchWith([record], { sys: 'Simplex', cat: 'Any' }).total, 0, 'no system parser override');
+    assertEqual(searchWith([record], { enc: SS, cat: 'Any' }).total, 0, 'no material parser override');
+    const result = searchWith([record], { mfg: 'SULZER', phase: '3', sys: 'Duplex', enc: FG, cat: 'Any' });
+    assertEqual(result.total, 1, 'all authoritative specs searchable');
+    assert(UI._generateBadges(record, result.crit).join(' ').includes('match-green">Fiberglass'), 'sheet material verified badge');
+    assertEqual(InfoTableParser.rankManufacturers([record]).counts.SULZER, 1, 'ranking uses sheet manufacturer');
+    delete record.sheetSpecs;
+    assertEqual(searchWith([record], { mfg: 'BARNES', phase: '1', cat: 'Any' }).total, 1, 'without sheet existing fuzzy fallback remains');
+});
+
 runTest('pop() offers Any + three materials, keeps live material value; reset returns Any', () => {
     const inputs = setupInputs({ enc: SS, cat: 'LowVoltage' });
     window.FOUND_MFGS = new Set();
@@ -381,8 +397,8 @@ runTest('DataLoader ranks once per applied dataset with allowed list; DERIVED_RE
     const old = { id: 'o', desc: 'Phase Monitor Painted Steel Enclosure Material W = M2 23 Panel Heater / Thermostat W Pump Manufacturer Myers', enc: '4XSS' };
     Object.defineProperty(old, '_derivedRev', { value: 5, writable: true, configurable: true, enumerable: false });
     DataLoader.applySnapshot({ records: [old] });
-    assertEqual(InfoTableParser.DERIVED_REV, 10, 'System Type revision re-derives old snapshots');
-    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [10, 'row', '4XSS'], 'older derived record recomputed, raw enc kept');
+    assertEqual(InfoTableParser.DERIVED_REV, 11, 'System Type revision re-derives old snapshots');
+    assertEqual([old._derivedRev, old._encEvidence.status, old.enc], [11, 'row', '4XSS'], 'older derived record recomputed, raw enc kept');
     assertEqual(old._encEvidence.materials, [PS], 'revision 4 descriptions gain the new association on snapshot apply');
     assertEqual(windowState.MFG_RANKING.options, ['MYERS', 'SULZER'], 'ranking on apply includes reserved Sulzer');
     assert(/const SNAPSHOT_SCHEMA_VERSION = '1';/.test(appJsContent), 'snapshot schema unchanged');

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.109 ---
-const APP_VERSION = "v2.5.109";
+// --- SCHEMATICA ai v2.5.110 ---
+const APP_VERSION = "v2.5.110";
 const VERSION_HISTORY = {
+    "v2.5.110": "Google Sheets live canonical panel specs overlay: revision-aware Worker snapshot cache, field-level parsing/ML/healer fallback, conservative duplicate handling, and authoritative browser search/derived specs. Configure SHEETS_ENDPOINT and deploy Worker plus frontend. DERIVED_REV 11; encrypted snapshot schema 1 preserved.",
     "v2.5.109": "Browser-only System Type selection compares bounded title phrases with standalone system-line evidence after explicit rows. Matching primary signals agree; a plain motor count may select only between conflicting candidates and that tie-break stays orange. Bounded caption-separated titles recover CP-1245r1 as Simplex orange; CP-1409 remains absent. Representative v2.5.108 outcomes, explicit rows, count/conflict protections, raw descriptions, snapshot schema 1 and Worker v2.5.97 are preserved. DERIVED_REV 10 refreshes cached records; live catalog accuracy remains unmeasured.",
     "v2.5.108": "Browser-only System Type coverage: bounded adjective/equipment phrases near panel/title context are orange evidence only; hardware, reference and competing-type mentions abstain. Numeric combinations in a Panel Type cell are an internal mixed conflict; motor-count combinations retain prior behavior. DERIVED_REV 9 refreshes cached records; Worker v2.5.97, snapshot schema, search/badges and raw descriptions unchanged. Live accuracy remains unmeasured.",
     "v2.5.107": "Browser-only System Type adjacent-token parser fix for flattened CAD descriptions: Panel/System Type/Type of Panel read the leading forward token, else the immediately preceding token (disagreeing sides abstain; only an adjacent NOT/NON/NO negates); No. Motors/Number of Pumps read a plain leading 1-4 (or <n> No. Motors) while combinations stay non-plain and are never summed; TAG-prefixed bounded <type> PUMP CONTROL PANEL titles and repeated title blocks are orange title evidence. DERIVED_REV 8 re-derives cached records; manufacturer/material parsing, search/badge semantics and Worker v2.5.97 unchanged.",
@@ -166,7 +167,7 @@ async function loadTesseract() {
 
 // Preloading configuration
 const PRELOAD_START_DELAY_MS = 120; // Short delay before first-page preload starts after search completes
-const DATA_SYNC_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+const DATA_SYNC_MAX_AGE_MS = 5 * 60 * 1000; // Align foreground/reconnect freshness with the Sheets cache.
 
 // PDF status constants
 const PDF_STATUS = {
@@ -3779,7 +3780,7 @@ class VoltageMatcher {
         }
         
         // === STEP 2: If no field match, check description ===
-        if (!matched && record.desc) {
+        if (!matched && !record.sheetSpecs?.volt && record.desc) {
             for (const pattern of voltConfig.descPatterns) {
                 if (pattern.test(record.desc)) {
                     matched = true;
@@ -3843,7 +3844,7 @@ class HorsepowerMatcher {
         }
         
         // === FUZZY DESCRIPTION MATCH ===
-        if (!record.desc) {
+        if (record.sheetSpecs?.hp || !record.desc) {
             return { matches: false, isVariant: false, weight: 0 };
         }
         
@@ -4125,7 +4126,7 @@ class SearchEngine {
             if(crit.mfg !== "Any") { 
                 if (r.mfg === crit.mfg) { 
                     w += 10000; 
-                } else if (r.desc && (crit.mfg === 'SULZER'
+                } else if (!r.sheetSpecs?.mfg && r.desc && (crit.mfg === 'SULZER'
                     ? InfoTableParser.matchesManufacturer(r.desc, crit.mfg)
                     : r.desc.includes(crit.mfg))) {
                     w += 1000;
@@ -4162,7 +4163,7 @@ class SearchEngine {
                     // Strict field match - override worker variance flag for green badge
                     phaseV = false;
                     w += 500;
-                } else if(r.desc && r.desc.includes(crit.phase)) {
+                } else if(!r.sheetSpecs?.phase && r.desc && r.desc.includes(crit.phase)) {
                     // Fuzzy description match
                     phaseV = true;
                     w += 100;

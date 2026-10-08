@@ -6,7 +6,7 @@
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
     // v2.5.109: bounded caption-title and system-line arbitration; refresh existing snapshots.
-    const DERIVED_REV = 10;
+    const DERIVED_REV = 11;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -1145,6 +1145,10 @@
     function resolveEnclosureMaterial(record) {
         const none = { materials: [], varied: false, source: 'none' };
         if (!record || typeof record !== 'object') return none;
+        const sheetMaterial = record.sheetSpecs?.encMaterial;
+        if (ENCLOSURE_MATERIALS.includes(sheetMaterial)) {
+            return { materials: [sheetMaterial], varied: false, source: 'sheet' };
+        }
         const evidence = record._encEvidence;
         if (evidence && (evidence.status === 'row' || evidence.status === 'conflict')) {
             return { materials: evidence.materials, varied: evidence.varied, source: 'row' };
@@ -1184,6 +1188,14 @@
         Object.defineProperty(record, key, { value, writable: true, configurable: true, enumerable: false });
     }
 
+    function preferSheetSystem(record, derived) {
+        const sys = record?.sheetSpecs?.sys;
+        if (!['Simplex', 'Duplex', 'Triplex', 'Quadraplex'].includes(sys)) return derived;
+        return { ...derived, sys, sysV: false, sysEvidence: {
+            source: 'sheet', candidates: [sys], direction: null, confidence: 'verified', reasons: []
+        } };
+    }
+
     // Derived fields are non-enumerable so they never reach the encrypted snapshot
     // (JSON.stringify skips them) and old cached snapshots simply re-derive on restore.
     function deriveRecord(record) {
@@ -1192,11 +1204,12 @@
         const rows = extractInfoRows(record.desc);
         const systemDesc = systemTypeView(record.desc);
         const systemRows = systemDesc === record.desc ? rows : extractInfoRows(systemDesc);
-        const derived = deriveFromRows(rows, record.desc, systemRows, systemDesc);
+        const derived = preferSheetSystem(record, deriveFromRows(rows, record.desc, systemRows, systemDesc));
+        const sheet = record.sheetSpecs || {};
         defineDerived(record, '_sys', derived.sys);
         defineDerived(record, '_sysV', derived.sysV);
         defineDerived(record, '_sysEvidence', derived.sysEvidence);
-        defineDerived(record, '_pumpMfg', derived.pumpMfg);
+        defineDerived(record, '_pumpMfg', sheet.mfg || derived.pumpMfg);
         defineDerived(record, '_encEvidence', deriveMaterialFromRows(rows, record.desc));
         defineDerived(record, '_derivedRev', DERIVED_REV);
         return true;
@@ -1349,7 +1362,7 @@
         const systemDesc = systemTypeView(desc);
         const text = systemDesc.toUpperCase();
         const rows = extractInfoRows(systemDesc);
-        const derived = deriveFromRows(rows, systemDesc);
+        const derived = preferSheetSystem(record, deriveFromRows(rows, systemDesc));
         const evidence = derived.sysEvidence;
         const phraseTitles = titleCandidates(desc, rows.labels || []);
         const blockTitles = titleBlockCandidates(systemDesc);
