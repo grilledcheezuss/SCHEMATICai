@@ -1156,12 +1156,13 @@
         if (evidence && evidence.status === 'other') return { materials: [], varied: false, source: 'row' };
         const fg = !!(evidence && evidence.fgSignal);
         const ss = !!(evidence && evidence.ssSignal);
-        const legacyVaried = record.encV === true;
-        const legacy = materialFromEncCode(record.enc);
+        const fallback = record.sheetEnclosureFallback || record;
+        const legacyVaried = fallback.encV === true;
+        const legacy = materialFromEncCode(fallback.enc);
         if (legacy === 'Fiberglass') return { materials: ['Fiberglass'], varied: legacyVaried || !fg || ss, source: 'legacy' };
         if (legacy === 'Stainless Steel') return { materials: ['Stainless Steel'], varied: legacyVaried || !ss || fg, source: 'legacy' };
         if (legacy === 'Painted Steel') return { materials: ['Painted Steel'], varied: legacyVaried, source: 'legacy' };
-        if (!record.enc || record.enc === 'Varied / Multiple') {
+        if (!fallback.enc || fallback.enc === 'Varied / Multiple') {
             const materials = [];
             if (fg) materials.push('Fiberglass');
             if (ss) materials.push('Stainless Steel');

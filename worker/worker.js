@@ -103,7 +103,7 @@ function normalizeSheetSpec(field, raw) {
         value = value.replace(/^NEMA\s*/, '').replace(/\s+/g, '');
         return /^(?:1|3R|4|4X|4XFG|4XSS|12|POLY)$/.test(value) ? value : null;
     }
-    if (field === 'mfg' && /^[A-Z][A-Z0-9 .&'-]*$/.test(value) && !/\b(?:OR|AND)\b/.test(value)) {
+    if (field === 'mfg' && /^[A-Z][A-Z0-9 .'-]*$/.test(value) && !/\b(?:OR|AND)\b/.test(value)) {
         const canonical = Object.keys(EXACT_MFGS).find(key => key === value || EXACT_MFGS[key].includes(value));
         return canonical || value;
     }
@@ -251,6 +251,9 @@ function applySheetSpecs(record, snapshot) {
     const specs = snapshot?.index.get(normalizeSheetPanelId(record.id));
     if (!specs || !Object.keys(specs).length) return record;
     record.sheetSpecs = specs;
+    if (specs.enc !== undefined && specs.encMaterial === undefined) {
+        record.sheetEnclosureFallback = { enc: record.enc, encV: record.encV === true };
+    }
     for (const field of ['mfg', 'hp', 'volt', 'phase', 'enc']) {
         if (specs[field] !== undefined) {
             record[field] = specs[field];

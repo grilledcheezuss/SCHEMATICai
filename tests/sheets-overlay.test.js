@@ -85,6 +85,21 @@ async function run() {
     assert.strictEqual(helpers.normalizeSheetSpec('hp', '1/0'), null);
     assert.strictEqual(helpers.normalizeSheetSpec('volt', '480/240'), null);
     assert.strictEqual(helpers.normalizeSheetSpec('mfg', '<img src=x>'), null);
+    for (const value of ['Barnes & Sulzer', 'Barnes&SULZER', 'Barnes AND Sulzer', 'Barnes/Sulzer']) {
+        assert.strictEqual(helpers.normalizeSheetSpec('mfg', value), null, 'manufacturer choices fall back');
+    }
+    const ratingOnly = helpers.compileSheetSnapshot(payload([['1234', '', '', '', '', 'NEMA 4X', '', '']]));
+    const materialFallback = helpers.applySheetSpecs({
+        id: '1234', enc: '4XSS', encV: false, desc: 'NEMA 4X STAINLESS STEEL ENCLOSURE'
+    }, ratingOnly);
+    parser.deriveRecord(materialFallback);
+    assert.strictEqual(materialFallback.enc, '4X', 'sheet rating is canonical');
+    assert.strictEqual(parser.matchEnclosureMaterial(materialFallback, 'Stainless Steel').matches, true,
+        'rating-only overlay retains independent legacy material fallback');
+    const restoredFallback = JSON.parse(JSON.stringify(materialFallback));
+    parser.deriveRecord(restoredFallback);
+    assert.strictEqual(parser.matchEnclosureMaterial(restoredFallback, 'Stainless Steel').matches, true,
+        'independent material fallback survives snapshot restoration');
     const duplicates = helpers.compileSheetSnapshot(payload([
         ['CP-1234r1', 'Barnes', '', '', '', '', '', ''],
         ['1234R1', 'Sulzer', '', '', '', '', '', ''],
