@@ -353,6 +353,27 @@ runTest('Sulzer search uses strict backend confidence and safe orange descriptio
     assertEqual([records[0].mfg, records[2].mfg], ['SULZER', null], 'search does not overwrite backend manufacturer fields');
 });
 
+runTest('Mixed dropdown, real search and badges preserve the Worker feedback contract', () => {
+    const { cases } = require('./fixtures/system-type-alternator.js');
+    const records = cases.map(f => makeRecord(f.id, f.desc, { pdfUrl: 'x' }));
+    InfoTableParser.deriveRecordsSync(records);
+    const inputs = setupInputs({ sys: 'Mixed' });
+    window.FOUND_MFGS = new Set();
+    UI.pop();
+    assert(inputs.sysInput.options.some(o => o.value === 'Mixed'), 'Mixed dropdown option');
+    assertEqual(inputs.sysInput.value, 'Mixed', 'Mixed selection retained on refresh');
+    assert(!UI.SYSTEM_TYPES.includes('Mixed'), 'feedback retains the four Worker-supported types');
+    const filtered = searchWith(records, { sys: 'Mixed', cat: 'Any' });
+    assertEqual(filtered.page.map(r => r.id).sort(), ['CP-1409', 'mixed-alternators'], 'only positively mixed panels match');
+    filtered.page.forEach(record => {
+        assert(UI._generateBadges(record, filtered.crit).join(' ').includes('match-orange">MIXED'), 'Mixed remains orange');
+    });
+    for (const type of UI.SYSTEM_TYPES) {
+        assert(!searchWith(records, { sys: type, cat: 'Any' }).page.some(r => r.id === 'CP-1409'), 'CP-1409 never matches a single type');
+    }
+    assertEqual(searchWith(records, { sys: 'Any', cat: 'Any' }).total, records.length, 'Any includes mixed panels');
+});
+
 runTest('Repaired System Type evidence drives real search counts, sorting, and badge colors', () => {
     const records = [
         makeRecord('title', 'Duplex Blower Control Panel', { pdfUrl: 'x' }),
@@ -402,7 +423,7 @@ runTest('pop() keeps an out-of-list manufacturer and System Type; top-12 ranking
     for (let i = 0; i < 3; i++) UI.pop();
     assertEqual(inputs.mfgInput.options.map(o => o.value), ['Any', 'BARNES', 'FLYGT', 'GOULDS', 'MYERS', 'ZOELLER', 'EBARA', 'WILO', 'ABS', 'SULZER', 'HIDROSTAL'], 'top-12 list plus retained temporary selection');
     assertEqual(inputs.mfgInput.value, 'HIDROSTAL', 'out-of-coverage selection survives');
-    assertEqual(inputs.sysInput.options.map(o => o.value), ['Any', 'Simplex', 'Duplex', 'Triplex', 'Quadraplex'], 'system type options');
+    assertEqual(inputs.sysInput.options.map(o => o.value), ['Any', 'Simplex', 'Duplex', 'Triplex', 'Quadraplex', 'Mixed'], 'system type options');
     assertEqual([inputs.sysInput.value, inputs.hpInput.value, inputs.voltInput.value, inputs.phaseInput.value, inputs.encInput.value, inputs.catInput.value],
         ['Triplex', '10', '480', '3', 'Fiberglass', 'LowVoltage'], 'live criteria survive');
     assertEqual([UI.getAllowedKeywordTermsInput(), UI.getBlockedKeywordTermsInput()], ['pump', 'float'], 'keyword sets survive');

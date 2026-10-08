@@ -2,7 +2,7 @@ const assert = require('assert');
 const parser = require('../info-table-parser.js');
 const { baseline, cp1245, cp1409 } = require('./fixtures/system-type-hierarchy.js');
 
-assert.strictEqual(parser.DERIVED_REV, 10);
+assert.strictEqual(parser.DERIVED_REV, 11);
 
 const derive = desc => {
     const record = { id: 'fixture', desc };
@@ -18,7 +18,7 @@ for (const fixture of baseline) {
     assert.deepStrictEqual(result(fixture.desc), fixture.expected, fixture.id);
 }
 assert.deepStrictEqual(result(cp1245), ['Simplex', true], 'CP-1245r1 recovers as Simplex orange');
-assert.deepStrictEqual(result(cp1409), [null, false], 'CP-1409 remains abstained');
+assert.deepStrictEqual(result(cp1409), ['Mixed', true], 'CP-1409 remains excluded from single-type results');
 assert.deepStrictEqual(result(cp1245.replace(' | POWER DIAGRAM | ', ' | UNRELATED CELL | ')), [null, false],
     'caption recovery does not accept arbitrary intervening cells');
 assert.deepStrictEqual(result(cp1245.replace(' | PANEL DESCRIPTION | 24 | ', ' | NOTES | PANEL DESCRIPTION | 24 | ')), [null, false],

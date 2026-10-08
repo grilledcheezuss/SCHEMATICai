@@ -104,7 +104,7 @@ for (const combination of ['2+1+1', '2 + 1 + 1', '2+2', '4+2']) {
     const record = { desc: `Panel Type ${combination} No. Motors 2` };
     parser.deriveRecord(record);
     assert.deepStrictEqual([record._sys, record._sysV, record._sysEvidence.source, record._sysEvidence.reasons],
-        [null, false, 'conflict', ['mixed-panel-type-combination']], combination);
+        ['Mixed', true, 'mixed', ['mixed-panel-type-combination']], combination);
 }
 expect('Panel Type Duplex No. Motors 2+2', ['Duplex', true], 'motor combinations remain separate from panel-type combinations');
 
@@ -276,7 +276,7 @@ for (const desc of [rtf('Panel Type Duplex\\par Pump Manufacturer Sulzer\\par'),
 }
 
 // Existing derived revisions must be replaced without changing snapshot serialization.
-assert.strictEqual(parser.DERIVED_REV, 10);
+assert.strictEqual(parser.DERIVED_REV, 11);
 for (const desc of ['No. Motors 4', 'Duplex Control Panel', 'Panel Type Duplex']) {
     for (const previousRevision of [5, 6, 7, 8, 9]) {
         const record = { id: desc, desc, sys: 'legacy' };

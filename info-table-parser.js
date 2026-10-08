@@ -5,9 +5,10 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.109: bounded caption-title and system-line arbitration; refresh existing snapshots.
-    const DERIVED_REV = 10;
+    // v2.5.110: controlled alternator/BOM evidence and searchable Mixed panels.
+    const DERIVED_REV = 11;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
+    const SEARCH_SYSTEM_TYPES = Object.freeze([...SYSTEM_TYPES, 'Mixed']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
         DUPLEX: 'Duplex',
@@ -957,6 +958,46 @@
         return false;
     }
 
+    function alternatorEvidence(desc) {
+        const types = new Set();
+        let duplexPart = false;
+        let excluded = false;
+        let largePanel = false;
+        const cells = (typeof desc === 'string' ? desc : '').toUpperCase()
+            .replace(/\b(TRIPLEX|QUADRAPLEX|DUPLEX)\s+ALTERNATOR\b/g, '$1 ALTERNATOR')
+            .split(/[\r\n|]+/).map(cell => cell.replace(/\s+/g, ' ').trim());
+        cells.forEach((cell, index) => {
+            if (/^(?:BOM|BILL OF MATERIALS)$/.test(cell)) {
+                excluded = false;
+            } else if (/^(?:NOTES?|OPTIONAL(?: PARTS)?|REFERENCE(?: PANEL)?|SEE|OTHER PANEL|NOT (?:INSTALLED|PROVIDED))\b/.test(cell)
+                || /^(?:NOT|NO|NON)(?:$|[ -]+(?:TRIPLEX|QUADRAPLEX|DUPLEX|ARB-120-ADA)\b)/.test(cell)) {
+                excluded = true;
+            }
+            if (excluded) return;
+            if (/^(?:PANEL DESCRIPTION|DRAWING TITLE)$/.test(cell)) {
+                const title = (cells[index + 1] || '').replace(/^%%U/, '');
+                const next = (cells[index + 2] || '').replace(/^%%U/, '');
+                if (/^(?:FIVE|SIX|5|6)[ -]+PUMPS? CONTROL PANEL$/.test(title)
+                    || (/^(?:FIVE|SIX|5|6)[ -]+PUMPS?$/.test(title) && next === 'CONTROL PANEL')) largePanel = true;
+            }
+            // Complete description cells or quantity + optional model + description rows only.
+            // Do not interpret arbitrary prose, negations, options, or model capabilities.
+            const installed = cells[index - 1] !== '0' && cells[index + 1] !== '0'
+                && !/^(?:OPTIONAL|NOT INSTALLED|FOR (?:AN? )?OTHER PANEL|REFERENCE)\b/.test(cells[index + 1] || '');
+            const match = /^(?:[1-9]\d* (?:[A-Z0-9][A-Z0-9.-]* )?)?(TRIPLEX|QUADRAPLEX|DUPLEX) ALTERNATOR$/.exec(cell);
+            if (installed && match) types.add(SYSTEM_WORDS[match[1]]);
+            if (installed && /^(?:[1-9]\d* )?ARB-120-ADA(?: DUPLEX ALTERNATOR)?$/.test(cell)) duplexPart = true;
+        });
+        const applications = SYSTEM_TYPES.filter(type => types.has(type) || (type === 'Duplex' && duplexPart));
+        const mixed = applications.length > 1 || largePanel;
+        return {
+            candidates: applications.filter(type => type !== 'Duplex'),
+            excludesSimplex: types.has('Triplex') || types.has('Quadraplex') || duplexPart,
+            mixed,
+            reason: applications.length > 1 ? 'mixed-installed-alternators' : 'mixed-five-six-pump-panel'
+        };
+    }
+
     function deriveFromRows(rows, desc, systemRows = rows, systemDesc = desc) {
         const explicit = new Set();
         const ambiguous = [];
@@ -979,8 +1020,13 @@
         let candidates = SYSTEM_TYPES.filter(sys => explicit.has(sys));
         const reasons = [];
         const allows = candidate => ambiguous.every(set => set.includes(candidate));
+        const alternator = alternatorEvidence(systemDesc);
         if ((systemRows.panelTypeCombinations || []).length) {
-            source = 'conflict';
+            const grouped = systemRows.panelTypeCombinations.every(value => /^[1-4](?:\s*[+&]\s*[1-4])+$/.test(value));
+            sys = grouped ? 'Mixed' : null;
+            sysV = grouped;
+            source = grouped ? 'mixed' : 'conflict';
+            candidates = grouped ? ['Mixed'] : candidates;
             reasons.push('mixed-panel-type-combination');
         } else if (explicit.size === 1) {
             sys = [...explicit][0];
@@ -1065,6 +1111,35 @@
                     sysV = true;
                     candidates = ambiguous.length ? candidates : [inferred];
                     reasons.push('complete-specific-count-cell');
+                }
+            }
+            // Clear explicit rows/conflicts retain precedence. Component recovery never
+            // changes existing Duplex selection or promotes a lower-tier badge.
+            const rowConflict = explicit.size > 0 || (systemRows.panelTypeCombinations || []).length
+                || systemRows.associations.some(a => a.kind === 'panelTypes' && a.direction === 'adjacent-conflict');
+            if (!rowConflict) {
+                const largeCount = alternator.candidates.length > 0
+                    && systemRows.motorCounts.some(value => /^[56](?:\s+(?:PUMPS|MOTORS))?$/.test(value.trim()));
+                if (alternator.mixed || largeCount) {
+                    sys = 'Mixed';
+                    sysV = true;
+                    source = 'mixed';
+                    direction = 'component-configuration';
+                    candidates = ['Mixed'];
+                    reasons.push(largeCount ? 'mixed-alternator-five-six-motor-count' : alternator.reason);
+                } else if (source !== 'conflict' && (!sys || sys === 'Simplex')
+                    && alternator.candidates.length === 1 && allows(alternator.candidates[0])) {
+                    sys = alternator.candidates[0];
+                    sysV = true;
+                    source = 'alternator';
+                    direction = 'component-description';
+                    candidates = [...alternator.candidates];
+                    reasons.push('installed-alternator-description');
+                } else if (sys === 'Simplex' && alternator.excludesSimplex) {
+                    sys = null;
+                    sysV = false;
+                    source = 'conflict';
+                    reasons.push('simplex-excluded-by-installed-alternator');
                 }
             }
         }
@@ -1278,7 +1353,7 @@
         'PANEL[\\s-]+(?:TYPE|CONFIGURATION)|SYSTEM[\\s-]+TYPE|TYPE\\s+OF\\s+PANEL|CONFIGURATION|' +
         '(?:NO\\.?|NUMBER|QTY\\.?)\\s*(?:OF\\s+)?(?:MOTORS|PUMPS)|(?:SINGLE|ONE|TWO|THREE|FOUR|[1-4])[\\s-]+PUMPS?)\\b';
     const AUDIT_STATES = Object.freeze(['green', 'orange', 'absent', 'conflicting']);
-    const AUDIT_SOURCES = Object.freeze(['explicitRow', 'titlePhrase', 'countInference', 'conflict', 'unknown']);
+    const AUDIT_SOURCES = Object.freeze(['explicitRow', 'titlePhrase', 'countInference', 'alternatorDescription', 'mixedConfiguration', 'conflict', 'unknown']);
     const AUDIT_FAILING = Object.freeze(['orange', 'absent', 'conflicting']);
 
     function auditClean(value, max = AUDIT_TEXT_MAX) {
@@ -1364,7 +1439,8 @@
         let source;
         if (derived.sys) {
             state = derived.sysV ? 'orange' : 'green';
-            source = { row: 'explicitRow', title: 'titlePhrase', count: 'countInference' }[evidence.source] || 'unknown';
+            source = { row: 'explicitRow', title: 'titlePhrase', count: 'countInference',
+                alternator: 'alternatorDescription', mixed: 'mixedConfiguration' }[evidence.source] || 'unknown';
         } else if (evidence.source === 'conflict' || ambiguous.length) {
             state = 'conflicting';
             source = 'conflict';
@@ -1375,7 +1451,9 @@
         let cause = null;
         if (state === 'orange') {
             const reasons = evidence.reasons;
-            if (evidence.source === 'title') {
+            if (evidence.source === 'alternator' || evidence.source === 'mixed') {
+                cause = reasons[reasons.length - 1];
+            } else if (evidence.source === 'title') {
                 cause = reasons.includes('motor-count-selected-primary-candidate') ? 'motor-count-primary-tiebreak'
                     : reasons.includes('title-system-line-agree') ? 'title-system-line-agreement'
                         : reasons.includes('system-line-evidence') ? 'system-line-only'
@@ -1417,7 +1495,7 @@
     function auditTypeVerdicts(analysis) {
         const { derived, evidence, titles, ambiguous, explicit, counts, mentions } = analysis;
         const verdicts = {};
-        SYSTEM_TYPES.forEach((type, index) => {
+        SEARCH_SYSTEM_TYPES.forEach((type, index) => {
             const facts = {
                 explicitRow: explicit.has(type),
                 ambiguousRow: ambiguous.some(set => set.includes(type)),
@@ -1459,7 +1537,7 @@
     // The badge the results list would draw for the stored _sys/_sysV of this record.
     function auditRenderedBadge(renderer, record) {
         const sys = record && record._sys;
-        if (!SYSTEM_TYPES.includes(sys)) return null;
+        if (!SEARCH_SYSTEM_TYPES.includes(sys)) return null;
         if (!renderer) return record._sysV === true ? 'orange' : 'green';
         const criteria = { kw: [], blockedKw: [], mfg: 'Any', hp: 'Any', volt: 'Any', phase: 'Any', enc: 'Any', sys, blocklistMode: false };
         let badges;
@@ -1490,9 +1568,9 @@
         const sample = (key, id) => (samples[key] || (samples[key] = [])).push(id);
         const states = Object.fromEntries(AUDIT_STATES.map(s => [s, 0]));
         const sources = Object.fromEntries(AUDIT_SOURCES.map(s => [s, 0]));
-        const types = Object.fromEntries(SYSTEM_TYPES.map(type => [type, {
+        const types = Object.fromEntries(SEARCH_SYSTEM_TYPES.map(type => [type, {
             total: 0, green: 0, orange: 0,
-            bySource: { explicitRow: 0, titlePhrase: 0, countInference: 0 },
+            bySource: { explicitRow: 0, titlePhrase: 0, countInference: 0, alternatorDescription: 0, mixedConfiguration: 0 },
             orangeCauses: {}, rendered: { green: 0, orange: 0, missing: 0, other: 0 },
             conflictCandidate: 0, mentionedButUnclassified: 0, lostToOtherType: 0
         }]));
@@ -1715,11 +1793,11 @@
             auditLine('Sources', r.sources),
             'Type | total | green | orange | row/title/count | rendered g/o/missing | conflictCandidate | mentionedButUnclassified | lostToOtherType'
         ];
-        SYSTEM_TYPES.forEach(type => {
+        SEARCH_SYSTEM_TYPES.forEach(type => {
             const t = r.types[type];
             lines.push(`${type} | ${t.total} | ${t.green} | ${t.orange} | ${t.bySource.explicitRow}/${t.bySource.titlePhrase}/${t.bySource.countInference} | ${t.rendered.green}/${t.rendered.orange}/${t.rendered.missing} | ${t.conflictCandidate} | ${t.mentionedButUnclassified} | ${t.lostToOtherType}`);
         });
-        SYSTEM_TYPES.forEach(type => lines.push(auditLine(`Orange causes ${type}`, r.types[type].orangeCauses)));
+        SEARCH_SYSTEM_TYPES.forEach(type => lines.push(auditLine(`Orange causes ${type}`, r.types[type].orangeCauses)));
         lines.push(auditLine('Row/count disagreements', r.rowCountDisagreements));
         if (r.rowCountValues) lines.push(auditLine('Row/count values', r.rowCountValues));
         lines.push(auditLine('Absent reasons', r.absentReasons));
@@ -1749,6 +1827,7 @@
     const InfoTableParser = Object.freeze({
         DERIVED_REV,
         SYSTEM_TYPES,
+        SEARCH_SYSTEM_TYPES,
         MFG_ALIASES,
         ENCLOSURE_MATERIALS,
         MATERIAL_FEEDBACK_CODES,

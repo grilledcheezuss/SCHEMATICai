@@ -57,12 +57,12 @@ const report = SystemTypeAudit.report({ records });
 assert.deepStrictEqual(snapshot(records), before, 'report never mutates records or derived fields');
 assert.deepStrictEqual(report.records, { scanned: 16, unique: 15, duplicates: 1 }, 'unique record counting');
 assert.deepStrictEqual(report.states, { green: 4, orange: 5, absent: 4, conflicting: 2 }, 'state counts');
-assert.deepStrictEqual(report.sources, { explicitRow: 5, titlePhrase: 2, countInference: 2, conflict: 2, unknown: 4 }, 'evidence source buckets');
+assert.deepStrictEqual(report.sources, { explicitRow: 5, titlePhrase: 2, countInference: 2, alternatorDescription: 0, mixedConfiguration: 0, conflict: 2, unknown: 4 }, 'evidence source buckets');
 const typeCounts = Object.fromEntries(Object.entries(report.types).map(([k, t]) => [k, [t.total, t.green, t.orange]]));
 assert.deepStrictEqual(typeCounts, {
-    Simplex: [3, 1, 2],         Duplex: [2, 1, 1], Triplex: [2, 1, 1], Quadraplex: [2, 1, 1]
+    Simplex: [3, 1, 2],         Duplex: [2, 1, 1], Triplex: [2, 1, 1], Quadraplex: [2, 1, 1], Mixed: [0, 0, 0]
 }, 'per-type green/orange counts');
-assert.deepStrictEqual(report.types.Simplex.bySource, { explicitRow: 1, titlePhrase: 1, countInference: 1 });
+assert.deepStrictEqual(report.types.Simplex.bySource, { explicitRow: 1, titlePhrase: 1, countInference: 1, alternatorDescription: 0, mixedConfiguration: 0 });
 assert.deepStrictEqual(report.types.Simplex.orangeCauses, { 'count-inference': 1, 'title-narrative-only': 1 });
 assert.deepStrictEqual(report.types.Duplex.orangeCauses, { 'row-count-disagreement': 1 });
 assert.deepStrictEqual(report.types.Quadraplex.orangeCauses, { 'title-narrative-only': 1 });
@@ -89,7 +89,7 @@ const equipmentReport = SystemTypeAudit.report({
     records: derived([{ id: 'CP-EQUIPMENT', desc: 'PANEL DESCRIPTION | SIMPLEX BLOWER' }])
 });
 assert.deepStrictEqual(equipmentReport.sources,
-    { explicitRow: 0, titlePhrase: 1, countInference: 0, conflict: 0, unknown: 0 },
+    { explicitRow: 0, titlePhrase: 1, countInference: 0, alternatorDescription: 0, mixedConfiguration: 0, conflict: 0, unknown: 0 },
     'equipment evidence remains within the compatible titlePhrase source bucket');
 assert.deepStrictEqual(equipmentReport.orangeCauses, { 'title-equipment-phrase': 1 },
     'equipment-title evidence is visible as a distinct diagnostic cause');
@@ -139,7 +139,7 @@ assert.strictEqual(inspected.badge, 'orange');
 assert.deepStrictEqual(inspected.evidence.panelTypeRows.map(r => [r.value, r.direction, r.candidates]), [['DUPLEX', 'forward-adjacent', ['Duplex']]]);
 assert.deepStrictEqual(inspected.evidence.motorCountRows, [{ value: '2+2', plainCount: null }]);
 assert.deepStrictEqual(Object.fromEntries(Object.entries(inspected.types).map(([k, v]) => [k, v.verdict])), {
-    Simplex: 'not-mentioned', Duplex: 'matched-orange', Triplex: 'not-mentioned', Quadraplex: 'not-mentioned'
+    Simplex: 'not-mentioned', Duplex: 'matched-orange', Triplex: 'not-mentioned', Quadraplex: 'not-mentioned', Mixed: 'not-mentioned'
 });
 const conflict = SystemTypeAudit.inspect('CP-501', { records });
 assert.strictEqual(conflict.state, 'conflicting');
@@ -239,7 +239,7 @@ assert.deepStrictEqual([throwing.badge.errors, throwing.badge.mismatches], [9, 0
 delete globalThis.UI;
 
 // --- Classification is untouched by the audit -------------------------------------------
-assert.strictEqual(parser.DERIVED_REV, 10, 'parser repair refreshes cached derived fields');
+assert.strictEqual(parser.DERIVED_REV, 11, 'parser repair refreshes cached derived fields');
 const searchSrc = appJs.slice(appJs.indexOf('class SearchEngine {'), appJs.indexOf('class SearchEngine {') + 60000);
 assert(searchSrc.includes("if (r._sys !== crit.sys) return;"), 'System Type search filter unchanged');
 assert(appJs.includes("const badgeClass = record._sysV === true ? 'match-orange' : 'match-green';"), 'badge semantics unchanged');

@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const parser = require('../info-table-parser.js');
 
-const unknownLabels = new Set(['', 'UNKNOWN', 'UNCLASSIFIED', 'ABSENT', 'NONE', 'NULL', 'N/A', 'NA', 'MIXED']);
+const unknownLabels = new Set(['', 'UNKNOWN', 'UNCLASSIFIED', 'ABSENT', 'NONE', 'NULL', 'N/A', 'NA']);
 const fullDescriptionFields = ['full_description', 'description', 'raw_desc', 'desc'];
 
 function parseCsv(source) {
@@ -70,6 +70,7 @@ function getValue(row, names) {
 function normalizeLabel(value, rowNumber, field) {
     const label = value == null ? '' : String(value).trim();
     if (unknownLabels.has(label.toUpperCase())) return null;
+    if (label.toUpperCase() === 'MIXED') return 'Mixed';
     const canonical = parser.normalizeSystemType(label);
     if (canonical) return canonical;
     const found = parser.SYSTEM_TYPES.filter(type => new RegExp(`\\b${type.toUpperCase()}\\b`, 'i').test(label));
@@ -94,7 +95,7 @@ function score(rows, predicted) {
     rows.forEach((row, index) => {
         const guess = predicted(row, index);
         if (guess) classified++;
-        for (const type of parser.SYSTEM_TYPES) {
+        for (const type of parser.SEARCH_SYSTEM_TYPES) {
             const truth = row.truth === type;
             const match = guess === type;
             const counts = classes[type] || (classes[type] = { tp: 0, fp: 0, fn: 0 });
@@ -117,7 +118,7 @@ function printScores(name, result) {
     const { tp, fp, fn } = result.totals;
     console.log(`${name}: classified=${result.classified}/${result.totalRows} micro-precision=${rate(tp, tp + fp)} micro-recall=${rate(tp, tp + fn)}`);
     console.log('  type       TP    FP    FN  precision  recall');
-    for (const type of parser.SYSTEM_TYPES) {
+    for (const type of parser.SEARCH_SYSTEM_TYPES) {
         const item = result.classes[type];
         console.log(`  ${type.padEnd(10)} ${String(item.tp).padStart(3)}   ${String(item.fp).padStart(3)}   ${String(item.fn).padStart(3)}  ${rate(item.tp, item.tp + item.fp).padStart(9)}  ${rate(item.tp, item.tp + item.fn)}`);
     }

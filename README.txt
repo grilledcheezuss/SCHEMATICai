@@ -1,14 +1,30 @@
-CLOUDFLARE WORKER SCRIPT (frontend release v2.5.109; Worker remains v2.5.97)
+CLOUDFLARE WORKER SCRIPT (frontend release v2.5.110; Worker remains v2.5.97)
 
-Release note: v2.5.109 keeps explicit Panel/System Type rows primary, then compares bounded title phrases with a standalone system line. Agreement is stronger evidence; if they conflict, a plain motor-count line only selects between those candidates and the selected result stays orange. Bounded caption-separated recovery returns CP-1245r1 as Simplex orange; CP-1409 remains absent. Representative v2.5.108 outcomes and existing row/count/conflict protections are preserved. DERIVED_REV 10 refreshes cached records; raw JSON, schema 1 and Worker v2.5.97 remain unchanged. No cache wipe or Worker redeploy, and no live-catalog accuracy is claimed.
+Release note: v2.5.110 adds controlled browser-only alternator/BOM evidence and a Mixed System Type search option. Explicit readable rows remain primary; existing Duplex selection and title/system-line/motor-count behavior are unchanged. Recovered alternator and Mixed results stay orange. DERIVED_REV 11 refreshes cached records; raw JSON, schema 1, non-enumerable derivation, 250-record yielding and Worker v2.5.97 remain unchanged. No cache wipe or Worker redeploy; live catalog accuracy is unmeasured.
 
 SYSTEM TYPE COVERAGE DECISIONS:
 
 - Implemented: after explicit-row precedence, bounded title and standalone `SYSTEM | <type>` line evidence are compared as primary candidates. An agreeing pair is higher-confidence; a count selects only between conflicting candidates and cannot turn that selection green. Caption-separated `<type> PUMP/BLOWER/GRINDER | POWER/CONTROL DIAGRAM | CONTROL PANEL` titles are bounded to a panel-description/drawing-title anchor and remain orange alone.
 - Implemented: direct adjective/equipment pairs (pump, blower, grinder, aerator, alternator/alternating, VFD, station, sewage, effluent, submersible, booster, well and system forms) only with nearby panel/title context. This is title evidence and stays orange unless the existing title/count policy independently corroborates it. Competing types abstain.
-- Implemented: numeric combinations such as `2+1+1` in a Panel Type cell abstain; they do not become a system type. Adjacent GFI/GFCI, convenience, plug, wire, cable, conductor and cord tokens are hardware/noise, not types.
+- Implemented: exact case-insensitive `Triplex Alternator` / `Quadraplex Alternator` complete description cells (or positive quantity + optional model + description BOM rows), with whitespace/line-wrap normalization only. Notes, optional parts, negations, other-panel references, zero quantities, aliases and embedded/suffixed tokens are rejected. No broad alternator part-number dictionary or free-text title expansion.
+- Implemented: after explicit-row precedence, preserve supported title/system-line selection and existing Duplex behavior. A single controlled alternator description recovers missing or fallback Simplex results as Triplex/Quadraplex orange. A conflicting Triplex/Quadraplex primary application is retained, not overridden by quad-capable hardware.
+- Implemented: fallback Simplex is excluded by either controlled Triplex/Quadraplex description or exact case-insensitive `ARB-120-ADA` component cell/row. No punctuation/hyphen repair, model prefix or generic Duplex Alternator exclusion. ARB-120-ADA does not infer Duplex or raise confidence, and no component overrides a clear explicit row.
+- Implemented: positively identified competing installed alternator applications, bounded five/six-pump panel-description cells, five/six-motor counts with supported alternator evidence, and associated Panel Type groups joined by `+`/`&` surface as Mixed orange. Slash alternatives, unreadable rows and unresolved conflicts alone are not Mixed. Groups are never summed. Mixed is search-only; the feedback correction menu retains the four Worker-supported types.
 - Retained: clear explicit rows outrank incidental titles; only the existing bounded title grammar can corroborate counts; motor-count combinations are never summed, and a count alone never infers Quadraplex. RTF metadata filtering and validated DXF TEXT parsing remain unchanged.
 - Deferred: indexed-pump-number count inference, PLC/MCP multi-group inference, broader 40-character free-text associations and extra CAD escape normalization. No matched catalog labels or full descriptions are available here to validate their precision or conflicts.
+
+LOCAL FIXTURE OUTCOMES (v2.5.109 -> v2.5.110; not live-catalog measurements):
+
+- Exact Triplex Alternator: absent -> Triplex orange.
+- Case-insensitive Quadraplex Alternator: absent -> Quadraplex orange.
+- Wrapped quantity/model/Triplex Alternator BOM row: absent -> Triplex orange.
+- Simplex title + exact ARB-120-ADA: Simplex orange -> excluded (not forced Duplex).
+- Competing Triplex/Quadraplex alternators: absent -> Mixed orange.
+- CP-1409 five-pump / Triplex + Duplex alternators excerpt: absent -> Mixed orange; never a single-type result.
+- CP-8025: Duplex green -> Duplex green. CP-8374: Simplex green -> Simplex green.
+- CP-1245r1: Simplex orange -> Simplex orange. All 8 classified hierarchy fixtures retain type and badge rank.
+
+Selection and badge confidence are independent: a motor count only chooses between already conflicting title/system-line candidates; that tie-break stays orange. New lower-tier alternator recovery never promotes a badge to green. Run `node tests/system-type-alternator.test.js` and `node tests/system-type-mfg-ranking.test.js` for parser and real search/dropdown/badge regressions.
 
 SYSTEM TYPE MEASUREMENT (local, optional):
 
@@ -22,7 +38,7 @@ Previous release note: v2.5.107 is a browser-only System Type parser fix for fla
 
 Previous release note: v2.5.106 is a browser-only System Type parser repair. It filters RTF metadata and reads only validated DXF TEXT group-code 1 payloads for System Type; raw descriptions and adjacent manufacturer/material parsing remain unchanged. Blank/unreadable counts and unrelated cell noise no longer conflict with a complete explicit type row; contradictory plain counts, recognizable combinations, ambiguous rows, and uncertain row associations remain orange/abstain. Title-only matches remain orange unless a bounded matching plain count independently corroborates the primary panel title. DERIVED_REV 7 re-derives cached records without changing snapshot schema 1, search/badge semantics, auth/cache, release-update or Worker v2.5.97. No cache wipe or Worker redeploy.
 
-SYSTEM TYPE DIAGNOSTIC (v2.5.105 API; parser v2.5.109):
+SYSTEM TYPE DIAGNOSTIC (v2.5.105 API; parser v2.5.110):
 
 - When to run: after login, once the sync/refresh has finished (Search is enabled). Open the browser DevTools console on the app page. Nothing runs automatically; the report only exists while you call it.
 - Commands:

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.109 ---
-const APP_VERSION = "v2.5.109";
+// --- SCHEMATICA ai v2.5.110 ---
+const APP_VERSION = "v2.5.110";
 const VERSION_HISTORY = {
+    "v2.5.110": "Browser-only controlled Triplex/Quadraplex Alternator descriptions recover orange classifications; exact ARB-120-ADA excludes fallback Simplex. Explicit rows, Duplex selection, existing title/system/count confidence and Worker v2.5.97 are unchanged. Positively identified mixed configurations, including CP-1409, are searchable as Mixed orange. DERIVED_REV 11; schema 1 and raw JSON preserved. Fixture coverage is preserved; live catalog accuracy is unmeasured.",
     "v2.5.109": "Browser-only System Type selection compares bounded title phrases with standalone system-line evidence after explicit rows. Matching primary signals agree; a plain motor count may select only between conflicting candidates and that tie-break stays orange. Bounded caption-separated titles recover CP-1245r1 as Simplex orange; CP-1409 remains absent. Representative v2.5.108 outcomes, explicit rows, count/conflict protections, raw descriptions, snapshot schema 1 and Worker v2.5.97 are preserved. DERIVED_REV 10 refreshes cached records; live catalog accuracy remains unmeasured.",
     "v2.5.108": "Browser-only System Type coverage: bounded adjective/equipment phrases near panel/title context are orange evidence only; hardware, reference and competing-type mentions abstain. Numeric combinations in a Panel Type cell are an internal mixed conflict; motor-count combinations retain prior behavior. DERIVED_REV 9 refreshes cached records; Worker v2.5.97, snapshot schema, search/badges and raw descriptions unchanged. Live accuracy remains unmeasured.",
     "v2.5.107": "Browser-only System Type adjacent-token parser fix for flattened CAD descriptions: Panel/System Type/Type of Panel read the leading forward token, else the immediately preceding token (disagreeing sides abstain; only an adjacent NOT/NON/NO negates); No. Motors/Number of Pumps read a plain leading 1-4 (or <n> No. Motors) while combinations stay non-plain and are never summed; TAG-prefixed bounded <type> PUMP CONTROL PANEL titles and repeated title blocks are orange title evidence. DERIVED_REV 8 re-derives cached records; manufacturer/material parsing, search/badge semantics and Worker v2.5.97 unchanged.",
@@ -7355,6 +7356,7 @@ class PdfController {
 
 class UI {
     static SYSTEM_TYPES = ['Simplex', 'Duplex', 'Triplex', 'Quadraplex'];
+    static SEARCH_SYSTEM_TYPES = [...UI.SYSTEM_TYPES, 'Mixed'];
     static ENCLOSURE_MATERIALS = ['Fiberglass', 'Stainless Steel', 'Painted Steel'];
     static mobilePanels = { searchVisible: true, resultsVisible: false };
     static mobilePdfFocus = false;
@@ -7844,8 +7846,8 @@ static pop() {
     if (sysInput) {
         sysInput.innerHTML = '';
         sysInput.add(new Option('Any', 'Any'));
-        this.SYSTEM_TYPES.forEach(v => sysInput.add(new Option(v, v)));
-        sysInput.value = this.SYSTEM_TYPES.includes(savedValues.sys) ? savedValues.sys : 'Any';
+        this.SEARCH_SYSTEM_TYPES.forEach(v => sysInput.add(new Option(v, v)));
+        sysInput.value = this.SEARCH_SYSTEM_TYPES.includes(savedValues.sys) ? savedValues.sys : 'Any';
     }
 
     // === HP / VOLT / PHASE / ENCLOSURE MATERIAL ===
