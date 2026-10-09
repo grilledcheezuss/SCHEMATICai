@@ -1,6 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.109 (frontend; Worker remains v2.5.97)
+## Version: v2.5.110 (frontend and Worker)
+
+_Release note: v2.5.110 adds a cached, revision-aware Google Sheets canonical-spec overlay with per-field Airtable/parser/ML/healer fallback. Browser-derived System Type, manufacturer ranking and enclosure material prefer sheet values, and canonical sheet fields disable contradictory fuzzy description matching. Deploy Worker and frontend; DERIVED_REV 11, snapshot schema 1._
 
 _Release note: v2.5.109 keeps clear Panel/System Type rows primary, then compares bounded title phrases with a standalone system line. Agreement is higher-confidence evidence; when the two candidates conflict, a plain motor count only selects between them and the result stays orange. Caption-separated titles recover CP-1245r1 as Simplex orange; CP-1409 remains absent. Representative v2.5.108 outcomes, count/conflict protections, raw descriptions, schema 1 and Worker v2.5.97 remain unchanged. DERIVED_REV 10 refreshes cached records. No live catalog accuracy is claimed._
 
@@ -26,6 +28,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.110**: Google Sheets live source-of-truth overlay, validated last-good edge snapshot, five-minute fetch coalescing and revision/hash-keyed MAIN pages. Conservative duplicate and placeholder fallback. Sheet-first browser search/derivation; aligned five-minute foreground/reconnect freshness. Worker deployment required.
 - **v2.5.109**: Browser-only System Type evidence hierarchy and bounded caption-title recovery. Explicit rows remain primary; a motor-count tie-break cannot promote badge confidence. CP-1245r1 recovers as Simplex orange and CP-1409 remains abstained. DERIVED_REV 10; representative baseline fixtures and Worker v2.5.97 preserved. No live-catalog accuracy claim.
 - **v2.5.108**: Browser-only bounded adjective/equipment title evidence, orange absent existing corroboration; panel-type numeric combinations abstain and new outlet/electrical hardware terms are guarded. DERIVED_REV 9. Local `tests/system-type-evaluate.js` compares supplied labels to both app_result and current parser without exporting record identifiers/descriptions. No benchmark dataset is checked in; snippet metrics are not full-record accuracy. Worker unchanged.
 - **v2.5.107**: Browser-only adjacent-token System Type association (forward leading token, else immediately preceding token; conflicts abstain), plain leading-count association (combinations never summed), TAG-prefixed bounded titles and orange repeated title blocks. DERIVED_REV 8; Worker unchanged. Synthetic fixtures (including verbatim CP-8025/CP-8374) do not establish live accuracy.
@@ -319,6 +322,39 @@ All responses include the following CORS headers:
 
 ## Caching Strategy
 
+### Google Sheets canonical specs (v2.5.110)
+
+Set `SHEETS_ENDPOINT` in the Worker environment (a secret is appropriate if the URL has private query parameters). Use the existing deployed Apps Script `https://script.google.com/macros/s/<deployment>/exec` URL, accessible without an interactive Google login. Only HTTPS Google Apps Script endpoints and Google-hosted redirects are accepted; URLs are never logged or returned. Leaving it unset disables the integration and preserves Airtable-only behavior. Deploy this Worker alongside frontend v2.5.110; no Apps Script edits, Dropbox, new dependencies, bindings or browser-side credentials are needed.
+
+The compact response must have `ok: true`, nonempty string/number `schema` and `revision`, nonempty string `hash`, `columns` (strings), `rows` (same-width arrays), and `rowCount === rows.length`. `updatedAt` is informational. Limits: 10-second fetch/body deadline, 8 MiB response, 20,000 rows, 100 columns. Invalid/empty snapshots never replace a good one.
+
+Column names are case-insensitive; spaces, underscores and punctuation are ignored. Unknown columns are ignored. Recognized columns must not map twice to the same field:
+
+| Field | Accepted keys/headers |
+| --- | --- |
+| Panel ID (required) | `panel_id`, `id`, `control_panel_name`, `panel` |
+| Pump manufacturer | `mfg`, `pump_manufacturer`, `manufacturer`, `pump_mfg` |
+| Horsepower | `hp`, `horsepower`, `motor_hp`, `motor_horsepower` |
+| Service voltage | `volt`, `voltage`, `service_voltage`, `panel_voltage` |
+| Phase | `phase`, `service_phase` |
+| Enclosure rating/code | `enc`, `enclosure`, `nema_rating`, `enclosure_rating` |
+| System Type | `sys`, `system_type`, `panel_type` |
+| Enclosure Material | `enc_material`, `enclosure_material`, `material` |
+
+IDs normalize the CP prefix, case, `.pdf`/`.dwg` extensions and legacy `!?` punctuation. Revision suffixes are preserved: CP-1234R1 and CP-1234r1 match, but neither matches CP-1234. Duplicate normalized IDs in `rows` are excluded entirely, not first/last-wins. If `duplicates` is present it must be an array; string IDs and objects with `panelId`, `panel_id` or `id` also exclude those IDs. A snapshot with no remaining unambiguous IDs is rejected.
+
+Blank, N/A/NA, Varies/Varied, Multiple, Partial, Unknown, TBD, None, Not Applicable/Available, NULL and dash-only values are missing. Conflicting numeric choices/ranges and invalid values also fall back. HP accepts a clean decimal or fraction (0.1–500); voltages use existing 120/208/240/277/415/480/575 classes (110/115 → 120, 220/230 → 240, 460 → 480); phase is 1/3, Single/Three, optionally with a unit suffix. System Type is Simplex/Duplex/Triplex/Quadraplex (Quadplex/Quadruplex aliases). Materials are Fiberglass/FG, Stainless Steel/SS, Painted Steel. Enclosure codes are 1/3R/4/4X/4XFG/4XSS/12/POLY, optionally NEMA-prefixed. Manufacturer text is normalized to uppercase and existing aliases when known; conflicting choices or markup are unusable. Unsupported spec formats intentionally retain fallback rather than claim authority.
+
+The Worker coalesces concurrent fetches and checks once per five-minute window per isolate, including after failures. Each response is decoded/validated at refresh; the map is rebuilt only if schema/revision/hash changes. MAIN does only constant-time ID lookups and a handful of field assignments, with no new per-record description parsing or sheet fetches. Last-good payloads are persisted in the existing Cache API for up to seven days and restored once per cold isolate. Cache persistence/eviction is best-effort, not durable storage; an outage after eviction falls back to Airtable. Changing or removing the endpoint does not reuse another endpoint's snapshot.
+
+Clean sheet canonical specs win over parser, ML and healer outputs **per field**; missing fields retain the existing chain. `sheetSpecs` contains only accepted sheet values and is persisted with browser records. Existing canonical fields and confidence flags are overlaid (`*V: false`); System Type/material are applied in browser derivation/resolution. Healer category and rejection metadata, Airtable descriptions and PDF attachments are untouched. A rating such as NEMA 4X does not establish a material: material parsing remains fallback unless `enclosure_material` is populated. Rating-only overlays preserve the original `enc`/`encV` in `sheetEnclosureFallback` so legacy material evidence also survives snapshot restoration.
+
+MAIN cache keys include the endpoint and active schema/revision/hash, so a revision/hash change cannot serve old merged pages. MAIN responses add `sheets: { revision, hash, updatedAt }` (or `null` with no active snapshot); Sheets-enabled responses use `private, no-store` externally while internal page caching retains its existing TTL. Browser foreground/reconnect refresh eligibility is five minutes; manual refresh uses the current Worker snapshot. There is no continuous polling. Offline/failed frontend refresh keeps the existing encrypted generation; snapshot schema remains 1 and DERIVED_REV is 11.
+
+Deployment verification: set the URL, deploy Worker/frontend, request authenticated MAIN and inspect `sheets` plus a known record's `sheetSpecs`. Edit one sheet field and wait five minutes before refreshing; verify the revision/hash and field change. Confirm placeholders retain parsed/healed values and PDF/feedback still work. Unsetting the endpoint restores Airtable-only results. No endpoint or production dataset was supplied for this PR, so live header compatibility, catalog accuracy and Cloudflare CPU headroom require deployment verification.
+
+Local regressions: `node tests/sheets-overlay.test.js`, `node tests/worker-airtable-token-routing.test.js`, `node worker/tests/run.js`, `node tests/data-loader-refresh.test.js`, `node tests/system-type-audit.test.js`, and the existing parser/search/browser tests.
+
 ### In-Memory Edge Cache
 - **Duration**: 1 hour (3600 seconds)
 - **Cached Data**:
@@ -386,6 +422,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.110**: Worker adds validated revision-aware Sheets snapshot ingestion and field-level canonical overlays; failures retain the last-good snapshot and missing fields retain parser/ML/healer behavior. Configure `SHEETS_ENDPOINT` and redeploy.
 - **v2.5.97**: Sulzer aliases were added to strict Worker extraction and canonical normalization only; MAIN/auth/cache/ML execution paths and response shape are unchanged. Separate Worker deployment is required.
 - **v2.5.85**: Viewer/header polish follow-up: mobile replacement transitions keep the PDF toolbar session-mounted, iOS Safari Save PDF detection/guidance is more reliable, and desktop branding chrome is simplified without Worker changes
 - **v2.5.81**: PDF viewer stability patch: hidden replacement staging now lives outside the scroll container, first/new-document loads initialize at page-start, same-document anchor restores are generation-guarded, and swap/viewport scroll positions clamp safely without scrollbar churn

@@ -6,6 +6,10 @@ This directory contains tests for the SCHEMATICA ai application.
 
 ## Test Files
 
+### sheets-overlay.test.js (v2.5.110)
+
+`node tests/sheets-overlay.test.js` runs locally without credentials or dependencies. It exercises the actual Worker with mocked Apps Script/Airtable responses and Cache API: full/partial/missing/revision-specific matches, placeholder validation, normalized duplicate IDs, fetch coalescing, unchanged/revised hashes, MAIN cache invalidation, healer fallback, outage throttling, cold-isolate recovery, initial failure, Google redirects, browser derivation, JSON snapshot restoration and conflicting HP/voltage description matching.
+
 ### worker.integration.test.js
 
 Integration tests for the Cloudflare Worker API.
