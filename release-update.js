@@ -8,7 +8,7 @@ class ReleaseUpdate {
     // Set by app.js: releases this tab's data-sync lock so peers never wait on a page that is navigating away.
     static beforeNavigate = null;
     static ASSETS = ['style.css', 'release-update.js', 'pdf-render-helper.js',
-        'pdf-ui-state.js', 'info-table-parser.js', 'app.js'];
+        'pdf-ui-state.js', 'info-table-parser.js', 'generator-state.js', 'app.js'];
 
     static compare(a, b) {
         const parse = value => /^v\d+\.\d+\.\d+$/.test(value || '')

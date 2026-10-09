@@ -14,7 +14,9 @@
 
 ## Overview
 
-SCHEMATICA ai v2.5.5 features a comprehensive schematic redaction and profile system designed to automatically detect and redact sensitive information from electrical panel schematics, drawings, and documentation.
+SCHEMATICA ai v2.5.114 provides per-page profile assignment and visual masking/title-block replacement for electrical panel PDFs. It does **not** securely remove covered source content: text and images underneath an overlay can remain extractable. Do not use generated PDFs as an irreversible redaction tool.
+
+The generator owns source bytes and binds edits and exact mapping imports to their content digest and load generation. Profiles and normalized zones are maintained separately from disposable viewer DOM. Original PDF actions remain original/unmodified; generated preview actions share the generated artifact. See [REDACTION_SCHEMA.md](REDACTION_SCHEMA.md) for the current mapping contract, measured-asset provenance, limits, and reset/migration behavior.
 
 **Key Features:**
 - **Unique Layout Profiles**: 11+ built-in profiles covering all common schematic layouts

@@ -4,7 +4,6 @@
 // Node 22+ global WebSocket. Requests outside the local server (fonts, Worker, Airtable)
 // are blocked so these tests never touch the network or backend.
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
@@ -64,7 +63,7 @@ class HeadlessBrowser {
         const chromePath = findChrome();
         if (!chromePath || typeof WebSocket === 'undefined') return null;
         const server = await startServer();
-        const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'schematica-ui-'));
+        const userDataDir = fs.mkdtempSync(path.join(REPO_ROOT, '.schematica-ui-'));
         let proc = null;
         let ws = null;
         let browser = null;
@@ -88,9 +87,13 @@ class HeadlessBrowser {
                 await browser.close();
             } else {
                 try { ws?.close(); } catch (_) { /* ignore */ }
-                proc?.kill('SIGKILL');
+                if (proc && proc.exitCode === null && proc.signalCode === null) {
+                    const exited = new Promise(resolve => proc.once('exit', resolve));
+                    proc.kill('SIGKILL');
+                    await exited;
+                }
                 await new Promise(resolve => server.close(resolve));
-                try { fs.rmSync(userDataDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+                fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
             }
             throw err;
         }
@@ -107,6 +110,15 @@ class HeadlessBrowser {
         await browser.send('Network.setBlockedURLs', {
             urls: ['*fonts.googleapis.com*', '*fonts.gstatic.com*', '*coxpanelfinder.app*', '*workers.dev*', '*airtable*']
         });
+        browser.listeners.push(msg => {
+            if (msg.method !== 'Fetch.requestPaused') return;
+            const { requestId, request } = msg.params;
+            const local = request.url.startsWith(`${browser.baseUrl}/`)
+                || /^(blob:|data:|about:)/.test(request.url);
+            browser.send(local ? 'Fetch.continueRequest' : 'Fetch.failRequest',
+                local ? { requestId } : { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+        });
+        await browser.send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
     }
 
     constructor(proc, ws, server, userDataDir) {
@@ -204,10 +216,17 @@ class HeadlessBrowser {
     }
 
     async close() {
+        const exited = this.proc.exitCode !== null || this.proc.signalCode !== null
+            ? Promise.resolve()
+            : new Promise(resolve => {
+                const timer = setTimeout(() => this.proc.kill('SIGKILL'), 2000);
+                this.proc.once('exit', () => { clearTimeout(timer); resolve(); });
+            });
+        try { await this.send('Browser.close', {}, null); } catch (_) { /* closing disconnects CDP */ }
+        await exited;
         try { this.ws.close(); } catch (_) { /* ignore */ }
-        this.proc.kill('SIGKILL');
         await new Promise(resolve => this.server.close(resolve));
-        try { fs.rmSync(this.userDataDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+        fs.rmSync(this.userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
     }
 }
 

@@ -1,6 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.113 (Worker and frontend)
+## Version: v2.5.114 (frontend release; Worker implementation v2.5.113)
+
+_Release note: v2.5.114 changes only the frontend PDF Submittal Generator. Deploy frontend assets, including `generator-state.js` and the `PDFmapping` JSON assets, as one release. The Worker banner aligns the release label; executable Worker code, API/auth/Sheets behavior, SPEC_TRANSFORM_VERSION v2.5.113, DERIVED_REV 12, encrypted snapshot schema 1 and compatibility_date are unchanged. No Worker redeployment is required. Generated output is visual masking/title-block replacement, not irreversible content redaction; see [REDACTION_SCHEMA.md](../REDACTION_SCHEMA.md)._
 
 _Release note: v2.5.113 makes Google Sheets authority observable and more robust end to end (Worker and frontend, deploy both). MAIN keeps `sheets` (revision/hash or null) and adds a secret-free `sheetStatus`: state active/unavailable/pending/unconfigured, a classified reason (endpoint, redirect, http-<status>, timeout, too-large, json, payload, columns, no-ids, cached-*), the indexed row count and per-page matchedRows/withSpecs/withMetadata/withUncertainty; every MAIN response carries the live X-SCHEMATICA-SHEETS-STATUS header. Panel IDs also match `CP 1234`, `CP1234`, en-dash prefixes and `1234-R1`; rows may be objects keyed by column or omit trailing blank cells, `rowCount` may be omitted, numeric hashes and Workspace `/a/macros/<domain>/s/<id>/exec` URLs are accepted, blank panelType is not metadata, and redirect bodies are released. SPEC_TRANSFORM_VERSION v2.5.113 invalidates pre-fix MAIN pages and the frontend release refreshes browser snapshots. Successful syncs store the per-page status (counts and public revision/hash only) and the read-only console helper `SheetAuthorityAudit.report()/text()/inspect(id)` reports recordsWithSheetSpecs/metadata/uncertainty, trusted/uncertain field counts and a verdict (sheet-backed, no-sync-evidence, worker-did-not-report, worker-unconfigured, worker-sheet-unavailable, stale-snapshot, no-matching-rows) without network access. Fallback, full descriptions, lazy sheet compilation/caching, DERIVED_REV 12 and snapshot schema 1 are unchanged. Live sheet contents/endpoint were not available to this change; synthetic tests only._
 
@@ -32,6 +34,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.114**: Frontend-only generator integration. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.113**: Observable Sheets authority: MAIN `sheetStatus` + `X-SCHEMATICA-SHEETS-STATUS`, classified unavailable reasons, tolerant panel ID spellings and compatible payload shapes, transform-key MAIN invalidation, stored per-sync status and read-only `SheetAuthorityAudit`. Deploy Worker and frontend.
 - **v2.5.112**: Worker-only MAIN CPU fix: linear-time HP/voltage/phase regexes, prefiltered manufacturer detection, lazy Sheets row normalization, raw-body Sheets persistence with identity header, deterministic feedback-content MAIN cache keys and work-counter headers. Fallback semantics unchanged; frontend unchanged.
 - **v2.5.111**: Strict per-field authority, selective extraction, bounded normalization, sys/panelType separation, nema rating mapping, uncertainty metadata and transformation-aware MAIN cache migration. Worker deployment required.
@@ -455,6 +458,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.114**: Frontend-only generator integration; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.113**: Sheets authority status in MAIN responses and headers, tolerant ID/payload matching, SPEC_TRANSFORM_VERSION v2.5.113. Deploy the API Worker and frontend v2.5.113.
 - **v2.5.112**: Linear-time extraction regexes, lazy Sheets row normalization and Sheets-first MAIN caching remove measured CPU hotspots without changing fallback output. Deploy the API Worker only.
 - **v2.5.111**: Trusted specs bypass per-field regex/ML/healer work; missing/uncertain specs retain fallback. Compatible script columns and transformation-aware cache migration. Separate API Worker deployment required.

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.113 ---
-const APP_VERSION = "v2.5.113";
+// --- SCHEMATICA ai v2.5.114 ---
+const APP_VERSION = "v2.5.114";
 const VERSION_HISTORY = {
+    "v2.5.114": "Focused Submittal Generator integration: owned source-content SHA-256 identity, canonical displayed CropBox page state and stable profile IDs, 186 measured layouts with conservative exact geometric matching, atomic versioned source-bound mapping import/export, preserved manual edits across zoom/rerender, rotation-aware canonical PDF snapshots, stale async operation guards, and shared generated preview/print/download bytes with cleanup. Unresolved pages block generation without affecting original PDFs. Visual masking only; underlying PDF content is not removed. Worker, auth, parser and search logic unchanged.",
     "v2.5.113": "Sheets authority made observable end to end: the Worker reports a secret-free MAIN sheetStatus (active/unavailable/pending/unconfigured, classified reason, row/match/spec counts) plus X-SCHEMATICA-SHEETS-STATUS, tolerates CP/revision ID spellings, object or trailing-blank rows, omitted rowCount and Workspace Apps Script URLs, and a new transform key invalidates pre-fix MAIN pages. Successful syncs store the per-page sheet status; read-only SheetAuthorityAudit (report/text/inspect) reports recordsWithSheetSpecs/metadata/uncertainty and a verdict without network. This release refreshes browser snapshots; fallback, descriptions, DERIVED_REV 12 and snapshot schema 1 unchanged.",
     "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; Worker-parity bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
     "v2.5.110": "Google Sheets live canonical panel specs overlay: revision-aware Worker snapshot cache, field-level parsing/ML/healer fallback, conservative duplicate handling, and authoritative browser search/derived specs. Configure SHEETS_ENDPOINT and deploy Worker plus frontend. DERIVED_REV 11; encrypted snapshot schema 1 preserved.",
@@ -1792,6 +1793,7 @@ class DemoManager {
             console.log('[DemoManager] Generator not available on small mobile devices.');
             return;
         }
+        if (typeof Generator !== 'undefined') { Generator.capture(); Generator.state.touch(); }
         this.isGeneratorActive = !this.isGeneratorActive;
         const btn = document.getElementById('menu-demo');
         const indicator = document.getElementById('gen-status');
@@ -1957,6 +1959,7 @@ class PageContext {
     static currentPage = 1;
     
     static setActivePage(pageNum) {
+        if (typeof Generator !== 'undefined' && this.currentPage !== pageNum) Generator.state.touch();
         this.currentPage = pageNum;
         this.updateUI();
     }
@@ -2000,6 +2003,7 @@ class PageContext {
     }
     
     static getProfileDisplayName(profile) {
+        profile = profile.replace(/^BUILTIN:/, '');
         const names = {
             'AUTO': 'Auto-Detect',
             'COVER_TEMPLATE': 'Cover Template',
@@ -2042,6 +2046,8 @@ class ControlPanelManager {
     };
     
     static refreshForProfile(profile) {
+        if (profile.startsWith('MEASURED:') && typeof Generator !== 'undefined') profile = Generator.metadata[profile.slice(9)]?.base_profile || 'AUTO';
+        profile = profile.replace(/^BUILTIN:/, '');
         const relevantFields = this.PROFILE_FIELDS[profile] || this.PROFILE_FIELDS['AUTO'];
         
         // Update input field visibility
@@ -2085,14 +2091,22 @@ class ControlPanelManager {
 
 class ProfileManager {
     static getCustomProfiles() {
-        const stored = localStorage.getItem('cox_custom_profiles');
-        return stored ? JSON.parse(stored) : {};
+        try {
+            const stored = localStorage.getItem('cox_custom_profiles');
+            return stored ? GeneratorState.migrateProfiles(stored) : {};
+        } catch (error) {
+            console.warn('Invalid custom profiles ignored.');
+            return {};
+        }
     }
 
     static saveProfile(name, rules) {
         const profiles = this.getCustomProfiles();
-        profiles[name] = rules;
+        const validated = GeneratorState.migrateProfiles({ [name]: rules });
+        profiles[name] = validated[name];
+        GeneratorState.migrateProfiles(profiles);
         localStorage.setItem('cox_custom_profiles', JSON.stringify(profiles));
+        if (typeof Generator !== 'undefined') Generator.registerProfiles();
         LayoutScanner.refreshProfileOptions(); 
         alert(`Profile "${name}" saved!`);
     }
@@ -2102,6 +2116,7 @@ class ProfileManager {
         if (profiles[name]) {
             delete profiles[name];
             localStorage.setItem('cox_custom_profiles', JSON.stringify(profiles));
+            if (typeof Generator !== 'undefined') Generator.registerProfiles();
             LayoutScanner.refreshProfileOptions();
         }
     }
@@ -2109,43 +2124,10 @@ class ProfileManager {
     static saveCurrentPageAsProfile() {
         const name = document.getElementById('new-profile-name').value.trim();
         if (!name) return alert("Please enter a profile name.");
-        
-        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
-        let targetContainer = null;
-        
-        for(const w of wrappers) {
-             const rect = w.getBoundingClientRect();
-             if (rect.top >= -100 && rect.top < window.innerHeight) {
-                 targetContainer = w.querySelector('.pdf-content-container');
-                 break;
-             }
-        }
-
-        if (!targetContainer) return alert("No visible page found.");
-
-        const w = targetContainer.offsetWidth;
-        const h = targetContainer.offsetHeight;
-        const boxes = [];
-
-        targetContainer.querySelectorAll('.redaction-box').forEach(box => {
-            boxes.push({
-                map: box.dataset.map,
-                x: parseFloat((box.offsetLeft / w).toFixed(4)),
-                y: parseFloat((box.offsetTop / h).toFixed(4)),
-                w: parseFloat((box.offsetWidth / w).toFixed(4)),
-                h: parseFloat((box.offsetHeight / h).toFixed(4)),
-                text: box.dataset.customText || null,
-                fontSize: parseInt(box.style.fontSize),
-                fontFamily: box.style.fontFamily, 
-                rotation: parseFloat(box.dataset.rotation || 0),
-                textAlign: box.style.textAlign || 'center', 
-                transparent: box.dataset.transparent === "true"
-            });
-        });
-
-        if (boxes.length === 0) return alert("Add some boxes first!");
-        
-        this.saveProfile(name, boxes);
+        Generator.capture();
+        const page = Generator.state.pages[PageContext.currentPage];
+        if (!page?.zones.length) return alert("Add some boxes first!");
+        this.saveProfile(name, page.zones);
         document.getElementById('new-profile-name').value = '';
     }
 }
@@ -2316,46 +2298,17 @@ class ProfileUploader {
 
 class ConfigExporter {
     static export() {
-        const pages = [];
-        document.querySelectorAll('.pdf-page-wrapper').forEach((wrapper, index) => {
-            const pageNum = index + 1;
-            const select = wrapper.querySelector('.page-profile-select');
-            const profile = select ? select.value : 'UNKNOWN';
-            
-            const container = wrapper.querySelector('.pdf-content-container');
-            const w = container.offsetWidth;
-            const h = container.offsetHeight;
-
-            const boxes = [];
-            container.querySelectorAll('.redaction-box').forEach(box => {
-                boxes.push({
-                    map: box.dataset.map,
-                    x: parseFloat((box.offsetLeft / w).toFixed(3)),
-                    y: parseFloat((box.offsetTop / h).toFixed(3)),
-                    w: parseFloat((box.offsetWidth / w).toFixed(3)),
-                    h: parseFloat((box.offsetHeight / h).toFixed(3)),
-                    text: box.dataset.customText || null,
-                    fontSize: parseInt(box.style.fontSize),
-                    fontFamily: box.style.fontFamily, 
-                    rotation: parseFloat(box.dataset.rotation || 0),
-                    textAlign: box.style.textAlign || 'center', 
-                    transparent: box.dataset.transparent === "true"
-                });
-            });
-            pages.push({ page: pageNum, profile: profile, boxes: boxes });
-        });
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pages, null, 2));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `layout_config_${new Date().getTime()}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+        Generator.downloadJson(Generator.exportMapping(), 'generator-mapping.json');
     }
 }
 
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; static startX = 0; static startY = 0; static startLeft = 0; static startTop = 0;
+    static dimensions(container) {
+        const width = parseFloat(container?.style.width), height = parseFloat(container?.style.height);
+        return { width: Number.isFinite(width) && width > 0 ? width : container?.offsetWidth || 1,
+            height: Number.isFinite(height) && height > 0 ? height : container?.offsetHeight || 1 };
+    }
     
     static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14, text = null, decoration = null, type = null, fontWeight = 'normal', transparent = false, rotation = 0, fontFamily = null, textAlign = 'center') {
         let container = wrapper.querySelector('.pdf-content-container');
@@ -2375,16 +2328,16 @@ class RedactionManager {
         
         const box = document.createElement('div'); box.className = 'redaction-box';
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
+        box.style.minWidth = '0'; box.style.minHeight = '0'; box.style.lineHeight = '1.4';
         // Store relative geometry for zoom-scaling
-        const cw = container.offsetWidth || 1;
-        const ch = container.offsetHeight || 1;
-        box.dataset.relX = (x / cw).toFixed(6);
-        box.dataset.relY = (y / ch).toFixed(6);
-        box.dataset.relW = (w / cw).toFixed(6);
-        box.dataset.relH = (h / ch).toFixed(6);
-        box.dataset.relFont = (fontSize / ch).toFixed(6);
+        const { width: cw, height: ch } = this.dimensions(container);
+        box.dataset.relX = String(x / cw);
+        box.dataset.relY = String(y / ch);
+        box.dataset.relW = String(w / cw);
+        box.dataset.relH = String(h / ch);
+        box.dataset.relFont = String(fontSize / ch);
         box.dataset.map = mapKey || 'custom';
-        if(text) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration; 
+        if(text !== null && text !== undefined) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration;
         
         box.dataset.transparent = transparent.toString(); 
         
@@ -2410,6 +2363,9 @@ class RedactionManager {
         }
 
         const textSpan = document.createElement('span'); textSpan.className = 'redaction-text'; box.appendChild(textSpan);
+        textSpan.style.position = 'absolute'; textSpan.style.inset = '0'; textSpan.style.display = 'flex';
+        textSpan.style.alignItems = 'center'; textSpan.style.justifyContent = textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center';
+        textSpan.style.transformOrigin = '50% 50%'; textSpan.style.transform = rotation ? `rotate(${rotation}deg)` : 'none';
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
         box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box);
         
@@ -2418,32 +2374,24 @@ class RedactionManager {
         return box;
     }
 
-    static addManualZone() { const pages = document.querySelectorAll('.pdf-page-wrapper'); if(pages.length === 0) return; const wrapper = pages[0]; const container = wrapper.querySelector('.pdf-content-container'); const w = container.offsetWidth; const h = container.offsetHeight; this.createZoneOnWrapper(wrapper, w*0.3, h*0.4, w*0.4, h*0.1, 'custom', 16, null, null, 'blocker'); this.refreshContent(); }
+    static addManualZone() { return this.addZoneToCurrentView('blocker'); }
 
     static addZoneToCurrentView(type) {
         const wrappers = document.querySelectorAll('.pdf-page-wrapper');
         if (wrappers.length === 0) return;
         
-        let targetWrapper = wrappers[0];
-        
-        for(const w of wrappers) {
-             const rect = w.getBoundingClientRect();
-             if (rect.top >= -100 && rect.top < window.innerHeight) {
-                 targetWrapper = w;
-                 break;
-             }
-        }
+        const targetWrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${PageContext.currentPage}"]`);
+        if (!targetWrapper) return;
 
         const container = targetWrapper.querySelector('.pdf-content-container');
-        const w = container.offsetWidth;
-        const h = container.offsetHeight;
+        const { width: w, height: h } = this.dimensions(container);
         
         const fontSize = document.getElementById('redact-size').value;
         const currentFontFamily = document.getElementById('redact-font').value; 
         const isWhiteout = type === 'blocker';
         const transparent = false; // All new zones default to opaque (whiteout) per default styling rules
 
-        this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize, isWhiteout ? '' : 'New Text', null, null, 'bold', transparent, 0, currentFontFamily, 'center');
+        this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize, isWhiteout ? '' : 'New Text', null, type, 'bold', transparent, 0, currentFontFamily, 'center');
         this.refreshContent();
     }
     
@@ -2456,7 +2404,7 @@ class RedactionManager {
         }
     }
 
-    static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = box.offsetLeft; this.startTop = box.offsetTop; box.style.cursor = 'grabbing'; }
+    static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = parseFloat(box.style.left) || 0; this.startTop = parseFloat(box.style.top) || 0; box.style.cursor = 'grabbing'; }
     static handleDrag(e) { if(!this.isDragging || !this.activeBox) return; e.preventDefault(); const deltaX = e.clientX - this.startX; const deltaY = e.clientY - this.startY; this.activeBox.style.left = (this.startLeft + deltaX) + 'px'; this.activeBox.style.top = (this.startTop + deltaY) + 'px'; }
     static endDrag() {
         if(this.activeBox) {
@@ -2465,12 +2413,11 @@ class RedactionManager {
             const layer = this.activeBox.closest('.redaction-layer');
             const container = layer ? layer.parentElement : null;
             if (container) {
-                const cw = container.offsetWidth || 1;
-                const ch = container.offsetHeight || 1;
-                this.activeBox.dataset.relX = (this.activeBox.offsetLeft / cw).toFixed(6);
-                this.activeBox.dataset.relY = (this.activeBox.offsetTop / ch).toFixed(6);
-                this.activeBox.dataset.relW = (this.activeBox.offsetWidth / cw).toFixed(6);
-                this.activeBox.dataset.relH = (this.activeBox.offsetHeight / ch).toFixed(6);
+                const { width: cw, height: ch } = this.dimensions(container);
+                this.activeBox.dataset.relX = String(parseFloat(this.activeBox.style.left) / cw);
+                this.activeBox.dataset.relY = String(parseFloat(this.activeBox.style.top) / ch);
+                this.activeBox.dataset.relW = String(parseFloat(this.activeBox.style.width) / cw);
+                this.activeBox.dataset.relH = String(parseFloat(this.activeBox.style.height) / ch);
             }
         }
         this.isDragging = false;
@@ -2516,13 +2463,15 @@ class RedactionManager {
         this.activeBox.style.fontFamily = document.getElementById('redact-font').value; 
         this.activeBox.style.fontSize = fs + 'px';
         const container = this.activeBox.closest('.pdf-content-container');
-        const ch = container ? (container.offsetHeight || 1) : 1;
-        this.activeBox.dataset.relFont = (parseFloat(fs) / ch).toFixed(6);
+        const ch = this.dimensions(container).height;
+        this.activeBox.dataset.relFont = String(parseFloat(fs) / ch);
     }
     
     static updateActiveAlignment(align) {
         if(!this.activeBox) return;
         this.activeBox.style.textAlign = align;
+        const span = this.activeBox.querySelector('.redaction-text');
+        if (span) span.style.justifyContent = align === 'left' ? 'flex-start' : align === 'right' ? 'flex-end' : 'center';
     }
 
     static mapSelectedZone() { 
@@ -2570,7 +2519,7 @@ class RedactionManager {
             const map = box.dataset.map; 
             let text = ""; 
             
-            if(box.dataset.customText) {
+            if(box.dataset.customText !== undefined) {
                 text = box.dataset.customText;
             } else if(map === 'cust') {
                 text = ctx.cust;
@@ -2633,13 +2582,12 @@ class RedactionManager {
     static rescaleZones(wrapper) {
         const container = wrapper.querySelector('.pdf-content-container');
         if (!container) return;
-        const cw = container.offsetWidth || 1;
-        const ch = container.offsetHeight || 1;
+        const { width: cw, height: ch } = this.dimensions(container);
         const boxes = container.querySelectorAll('.redaction-box');
         // Debug log for editor mode (one active box)
         if (document.body.classList.contains('editor-active') && boxes.length > 0) {
             const b = this.activeBox || boxes[0];
-            const scale = (typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1;
+                const scale = (typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1;
             const rf = b.dataset.relFont;
             const computedFs = rf ? (parseFloat(rf) * ch).toFixed(1) : getComputedStyle(b).fontSize;
             console.log(`[rescaleZones] scale=${scale} ch=${ch} relFont=${rf} fontSize=${computedFs}px`);
@@ -2671,8 +2619,7 @@ class RedactionManager {
         // RAF double-tick: re-apply font sizes after layout settles to guard against
         // animation / paint timing that may alter container dimensions after first pass
         requestAnimationFrame(() => {
-            const cw2 = container.offsetWidth || 1;
-            const ch2 = container.offsetHeight || 1;
+            const { width: cw2, height: ch2 } = this.dimensions(container);
             boxes.forEach(box => {
                 const rf2 = parseFloat(box.dataset.relFont);
                 if (!isNaN(rf2)) {
@@ -2733,13 +2680,12 @@ class PageClassifier {
         // Typical PDF ordering: Page 1 = Title, Page 2 = Info, Pages 3/4 = Power/Control schematics,
         // Near end = Enclosure drawing, then BOM
         
-        // Door drawing detection (high confidence)
-        if(doorScore > 20) return 'DOOR_DRAWING';
-        
         // Page 1: Always use cover template
         if(pageNumber === 1) {
             return 'COVER_TEMPLATE';
         }
+        // Door drawing detection (high confidence)
+        if(doorScore > 20) return 'DOOR_DRAWING';
         
         // Page 2: Usually info/notes
         if(pageNumber === 2) {
@@ -2978,8 +2924,7 @@ class SmartScanner {
         const container = wrapper.querySelector('.pdf-content-container');
         if(!container) return null;
         
-        const width = container.offsetWidth;
-        const height = container.offsetHeight;
+        const { width, height } = RedactionManager.dimensions(container);
         const scaleX = width / viewport.width;
         const scaleY = height / viewport.height;
         
@@ -3429,33 +3374,23 @@ class LayoutScanner {
         selects.forEach((select, index) => {
             if (select.disabled) return; // Skip disabled dropdowns (e.g. page 1 cover template)
             const currentVal = select.value;
-            let html = `
-                <option value="AUTO">✨ Auto (Detected)</option>
-                <option value="COVER_TEMPLATE">📋 Cover Template</option>
-                <optgroup label="📝 Info Sheets">
-                    <option value="INFO">📝 Info / Notes (Standard)</option>
-                    <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
-                </optgroup>
-                <optgroup label="📐 Schematics">
-                    <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
-                    <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
-                    <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
-                    <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
-                </optgroup>
-                <optgroup label="📐 Other">
-                    <option value="DOOR_DRAWING">🚪 Door Drawing</option>
-                    <option value="GENERAL">📐 General</option>
-                </optgroup>
-            `;
-            if (Object.keys(customProfiles).length > 0) {
-                html += '<optgroup label="⭐ Custom Profiles">';
-                for (const [name, _] of Object.entries(customProfiles)) {
-                    html += `<option value="CUSTOM:${name}">⭐ ${name}</option>`;
-                }
-                html += '</optgroup>';
+            select.replaceChildren();
+            const auto = document.createElement('option'); auto.value = 'AUTO'; auto.textContent = '✨ Auto (Detected)'; select.appendChild(auto);
+            const builtins = document.createElement('optgroup'); builtins.label = 'Built-in Profiles';
+            for (const key of Object.keys(LAYOUT_RULES)) {
+                const option = document.createElement('option'); option.value = 'BUILTIN:' + key;
+                option.textContent = PageContext.getProfileDisplayName(key); builtins.appendChild(option);
             }
-            select.innerHTML = html;
-            select.value = currentVal || 'AUTO';
+            select.appendChild(builtins);
+            if (Object.keys(customProfiles).length > 0) {
+                const group = document.createElement('optgroup'); group.label = '⭐ Custom Profiles';
+                for (const name of Object.keys(customProfiles)) {
+                    const option = document.createElement('option'); option.value = `CUSTOM:${name}`; option.textContent = `⭐ ${name}`; group.appendChild(option);
+                }
+                select.appendChild(group);
+            }
+            select.value = !currentVal || currentVal === 'AUTO' ? 'AUTO' :
+                (/^(BUILTIN|CUSTOM|MEASURED):/.test(currentVal) ? currentVal : 'BUILTIN:' + currentVal);
             console.log(`[refreshProfileOptions] Populated dropdown ${index + 1} with ${select.options.length} options`);
         });
     }
@@ -3501,13 +3436,13 @@ class LayoutScanner {
         const container = wrapper.querySelector('.pdf-content-container');
         if(!container) return;
 
-        const width = container.offsetWidth; 
-        const height = container.offsetHeight; 
+        const { width, height } = RedactionManager.dimensions(container);
         // Scale LAYOUT_RULES font sizes (defined at scale=1.0) proportionally to current zoom
-        const scale = (typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1;
+        const scale = wrapper._generatorGeometry ? height / wrapper._generatorGeometry.height :
+            ((typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1);
         
         ruleSet.forEach(zone => { 
-            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize * scale, zone.text, zone.decoration || null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
+            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, (zone.fontSize === undefined ? 14 : zone.fontSize) * scale, zone.text, zone.decoration || null, zone.type || null, zone.fontWeight || 'bold', zone.transparent || false, zone.rotation || 0, zone.fontFamily, zone.textAlign || 'center');
         });
         RedactionManager.rescaleZones(wrapper);
     }
@@ -4385,11 +4320,508 @@ class SearchEngine {
     }
 }
 
+class Generator {
+    static state = new GeneratorState.State(() => Generator.invalidate());
+    static sourceDoc = null;
+    static sourceReady = Promise.resolve();
+    static assetsReady = null;
+    static measured = {};
+    static fingerprints = {};
+    static metadata = {};
+    static templateTasks = new Map();
+    static applying = false;
+    static scanSequence = 0;
+    static previewUrl = '';
+    static previewFrame = null;
+    static templateBytes = null;
+    static templateReference = null;
+    static templateRevision = 0;
+    static contextKey = '';
+    static generatedToken = null;
+    static generatedContext = '';
+    static generatedExportSequence = 0;
+    static generatedDocumentLoadToken = null;
+    static generatedTemplateRevision = 0;
+    static exportSequence = 0;
+
+    static invalidate() {
+        this.exportSequence++;
+        PdfExporter.previewRequest++;
+        PdfExporter.releasePreviewButtons();
+        PdfExporter.previewPdfBytes = null;
+        this.releasePreview();
+        const modal = document.getElementById('pdf-preview-modal');
+        if (modal) modal.style.display = 'none';
+    }
+    static releasePreview() {
+        if (this.previewFrame) {
+            this.previewFrame.src = 'about:blank';
+            this.previewFrame.remove();
+            this.previewFrame = null;
+        }
+        if (this.previewUrl) URL.revokeObjectURL(this.previewUrl);
+        this.previewUrl = '';
+        const container = document.getElementById('pdf-preview-container');
+        if (container) container.innerHTML = '';
+    }
+    static async loadAssets() {
+        if (!this.assetsReady) this.assetsReady = (async () => {
+            try {
+                const [profiles, fingerprints, metadata] = await Promise.all([
+                    'PDFmapping/layouts_overlay.json', 'PDFmapping/LAYOUT_FINGERPRINTS.json', 'PDFmapping/layouts_overlay.meta.json'
+                ].map(async path => {
+                    const response = await fetch(`${path}?v=${encodeURIComponent(APP_VERSION)}`, { credentials: 'same-origin' });
+                    if (!response.ok) throw new Error('Measured layouts unavailable: ' + response.status);
+                    return response.json();
+                }));
+                const validated = {};
+                for (const [key, value] of Object.entries(profiles)) validated[key] = GeneratorState.zones(value);
+                this.measured = validated;
+                this.fingerprints = fingerprints.by_profile_key;
+                this.metadata = metadata.profiles;
+                this.assetRevision = metadata.generated + ':' + Object.keys(validated).length;
+            } catch (e) {
+                this.assetError = e.message;
+                console.warn(e);
+            }
+            this.registerProfiles();
+        })();
+        return this.assetsReady;
+    }
+    static registerProfiles() {
+        const all = {};
+        for (const [key, value] of Object.entries(LAYOUT_RULES)) all['BUILTIN:' + key] = value;
+        for (const [key, value] of Object.entries(ProfileManager.getCustomProfiles())) all['CUSTOM:' + key] = value;
+        for (const [key, value] of Object.entries(this.measured)) all['MEASURED:' + key] = value;
+        const normalized = Object.fromEntries(Object.entries(all).map(([key, value]) => [key, GeneratorState.zones(value, key === 'BUILTIN:COVER_TEMPLATE' ? 1 : 0)]));
+        // Revision includes semantics, not merely a profile count or display name.
+        this.state.register(normalized, GeneratorState.profileRevision(normalized, this.assetRevision || 'builtin'));
+        for (const page of Object.keys(this.state.pages)) this.paint(Number(page));
+    }
+    static beforeRender() {
+        if (!PdfViewer.doc) return;
+        if (this.templateReference !== window.TEMPLATE_BYTES) {
+            this.templateReference = window.TEMPLATE_BYTES;
+            this.templateBytes = window.TEMPLATE_BYTES ? new Uint8Array(window.TEMPLATE_BYTES).slice() : null;
+            this.templateRevision++;
+            this.state.touch();
+        }
+        if (this.sourceDoc !== PdfViewer.doc) {
+            this.sourceDoc = PdfViewer.doc;
+            const doc = this.sourceDoc, loadToken = PdfViewer._documentLoadToken;
+            const blob = PdfViewer._pendingPdfBlob || PdfViewer.currentPdfBlob;
+            const generation = ++this.state.generation;
+            this.state.pages = Object.create(null);
+            this.state.digest = null;
+            this.state.renderCommitted = false;
+            this.state.touch();
+            this.sourceReady = (async () => {
+                try {
+                    const bytes = blob ? await blob.arrayBuffer() : await doc.getData();
+                    if (this.sourceDoc !== doc || loadToken !== PdfViewer._documentLoadToken || generation !== this.state.generation) return;
+                    await this.state.load(bytes, doc.numPages, window.crypto?.subtle);
+                } catch (e) {
+                    if (this.sourceDoc === doc && generation === this.state.generation) {
+                        this.state.error = 'Source bytes unavailable; generator disabled.'; this.state.touch();
+                    }
+                }
+            })();
+        } else this.capture();
+        this.state.renderCommitted = false;
+        this.invalidate();
+    }
+    static afterRender(renderToken) {
+        if (renderToken !== PdfViewer.currentRenderToken) return;
+        this.state.renderCommitted = true;
+        this.releaseTemplateTask(renderToken);
+        this.installControls();
+    }
+    static releaseTemplateTask(token) {
+        const task = this.templateTasks.get(token);
+        if (task) { this.templateTasks.delete(token); Promise.resolve(task.destroy()).catch(() => {}); }
+    }
+    static async ready() { await Promise.all([this.sourceReady, this.loadAssets()]); return this.getState(); }
+    static getState() {
+        return { digest: this.state.digest, sourceDigest: this.state.digest, sourcePageCount: this.state.sourcePageCount,
+            generation: this.state.generation, revision: this.state.revision, profileRevision: this.state.profileRevision,
+            error: this.state.error, renderCommitted: this.state.renderCommitted, pages: JSON.parse(JSON.stringify(this.state.pages)) };
+    }
+    static wrapper(page) {
+        return document.querySelector(`.pdf-gesture-stage:not(.pdf-gesture-stage--staging) .pdf-page-wrapper[data-page-number="${page}"]`);
+    }
+    static capture() {
+        if (this.applying || this.sourceDoc !== PdfViewer.doc || !DemoManager.isGeneratorActive) return;
+        const contextKey = JSON.stringify(DemoManager.getContext());
+        if (this.contextKey !== contextKey) { this.contextKey = contextKey; this.state.touch(); }
+        for (let page = 1; page <= this.state.sourcePageCount; page++) {
+            const wrapper = this.wrapper(page), prior = this.state.pages[page];
+            if (!wrapper || !prior || wrapper.dataset.generatorGeneration !== String(this.state.generation)) continue;
+            const container = wrapper.querySelector('.pdf-content-container');
+            const { width, height } = RedactionManager.dimensions(container);
+            const effective = Array.from(wrapper.querySelectorAll('.redaction-box')).map(box => ({
+                x: parseFloat(box.style.left) / width, y: parseFloat(box.style.top) / height,
+                w: parseFloat(box.style.width) / width, h: parseFloat(box.style.height) / height,
+                map: box.dataset.map, text: box.dataset.customText === undefined ? null : box.dataset.customText,
+                fontSize: parseFloat(box.style.fontSize) / (height / prior.geometry.height),
+                fontFamily: box.style.fontFamily, textAlign: box.style.textAlign,
+                type: box.dataset.type || null, decoration: box.dataset.decoration || null,
+                fontWeight: box.style.fontWeight, transparent: box.dataset.transparent === 'true',
+                rotation: Number(box.dataset.rotation || 0)
+            }));
+            // CSS rounding can occur at any zoom; compare normalized semantics, not raw defaults.
+            const comparable = value => JSON.stringify(GeneratorState.zones(value, page).map(z => Object.fromEntries(Object.entries(z).map(([k, v]) =>
+                [k, typeof v === 'number' ? Math.round(v * 1000000) / 1000000 : k === 'fontFamily' ? v.replace(/"/g, "'") : v]))));
+            if (comparable(effective) !== comparable(prior.zones)) {
+                const profileId = prior.profileId || 'BUILTIN:GENERAL';
+                this.state.setPage(page, profileId, 'manual', effective, prior.geometry, prior.contentSource);
+            }
+        }
+    }
+    static paint(page) {
+        const wrapper = this.wrapper(page), entry = this.state.pages[page];
+        if (!wrapper || !entry || !DemoManager.isGeneratorActive) return;
+        this.applying = true;
+        try {
+            const layer = wrapper.querySelector('.redaction-layer');
+            if (RedactionManager.activeBox && layer.contains(RedactionManager.activeBox)) RedactionManager.deselect();
+            RedactionManager.zones = RedactionManager.zones.filter(z => !layer.contains(z) && z.isConnected);
+            layer.innerHTML = '';
+            LayoutScanner.applyRuleToWrapper(wrapper, entry.zones);
+            wrapper.dataset.generatorGeneration = String(this.state.generation);
+            wrapper.dataset.generatorStatus = entry.status;
+            const select = wrapper.querySelector('.page-profile-select');
+            if (select) {
+                const selectedId = entry.profileId || 'AUTO';
+                if (!Array.from(select.options).some(o => o.value === selectedId)) {
+                    const option = document.createElement('option'); option.value = selectedId; option.textContent = selectedId; select.appendChild(option);
+                }
+                select.value = selectedId;
+            }
+            let badge = wrapper.querySelector('.generator-resolution');
+            if (!badge) { badge = document.createElement('span'); badge.className = 'generator-resolution'; wrapper.querySelector('.page-toolbar').appendChild(badge); }
+            badge.textContent = entry.status === 'resolved' ? `${entry.provenance}: ${entry.profileId}` : `⚠ Unresolved: ${entry.reason}. Choose a profile or import an exact mapping.`;
+            badge.title = 'Visual masking only — underlying PDF content is not removed.';
+            RedactionManager.refreshContentForWrapper(wrapper);
+        } finally { this.applying = false; }
+    }
+    static setPageProfile(page, profileId) {
+        this.capture();
+        const wrapper = this.wrapper(page);
+        if (profileId === 'AUTO' && page !== 1) {
+            delete this.state.pages[page]; this.state.touch();
+            return this.scan(page);
+        }
+        this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, wrapper?.dataset.contentSource);
+        this.paint(page); PageContext.setActivePage(page);
+        return this.getState();
+    }
+    static setPageZones(page, input) {
+        this.capture();
+        const prior = this.state.pages[page], wrapper = this.wrapper(page);
+        this.state.setPage(page, prior?.profileId || 'BUILTIN:GENERAL', 'manual', input, wrapper?._generatorGeometry, wrapper?.dataset.contentSource);
+        this.paint(page); return this.getState();
+    }
+    static async evidence(page, g) {
+        const operators = await page.getOperatorList();
+        const OPS = pdfjsLib.OPS, H = [], V = [];
+        let matrix = [1, 0, 0, 1, 0, 0], stack = [], cursor = null;
+        const multiply = (a, b) => [a[0]*b[0]+a[2]*b[1], a[1]*b[0]+a[3]*b[1], a[0]*b[2]+a[2]*b[3], a[1]*b[2]+a[3]*b[3], a[0]*b[4]+a[2]*b[5]+a[4], a[1]*b[4]+a[3]*b[5]+a[5]];
+        const point = (x, y) => {
+            const m = multiply(g.transform, matrix);
+            return [(m[0]*x+m[2]*y+m[4])/g.width, (m[1]*x+m[3]*y+m[5])/g.height];
+        };
+        const line = (a, b) => {
+            if (Math.abs(a[1]-b[1]) < .0002 && Math.abs(a[0]-b[0]) > .004) H.push([a[1], Math.min(a[0], b[0]), Math.max(a[0], b[0])]);
+            if (Math.abs(a[0]-b[0]) < .0002 && Math.abs(a[1]-b[1]) > .004) V.push([a[0], Math.min(a[1], b[1]), Math.max(a[1], b[1])]);
+        };
+        for (let i = 0; i < operators.fnArray.length; i++) {
+            const op = operators.fnArray[i], args = operators.argsArray[i];
+            if (op === OPS.save) stack.push(matrix.slice());
+            else if (op === OPS.restore) matrix = stack.pop() || [1,0,0,1,0,0];
+            else if (op === OPS.transform) matrix = multiply(matrix, args);
+            else if (op === OPS.constructPath) {
+                let j = 0;
+                for (const pathOp of args[0]) {
+                    if (pathOp === OPS.moveTo) cursor = point(args[1][j++], args[1][j++]);
+                    else if (pathOp === OPS.lineTo) { const next = point(args[1][j++], args[1][j++]); if (cursor) line(cursor, next); cursor = next; }
+                    else if (pathOp === OPS.rectangle) {
+                        const x=args[1][j++], y=args[1][j++], w=args[1][j++], h=args[1][j++];
+                        const p = [point(x,y),point(x+w,y),point(x+w,y+h),point(x,y+h)];
+                        p.forEach((v,k) => line(v,p[(k+1)%4])); cursor = null;
+                    } else if (pathOp === OPS.curveTo) { j += 6; cursor = null; }
+                    else if (pathOp === OPS.curveTo2 || pathOp === OPS.curveTo3) { j += 4; cursor = null; }
+                }
+            }
+        }
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(i => i.str).join(' ').toUpperCase();
+        return { H, V, edge: 'bottom', class: /\b(NOTES|SPECIFICATION|TABLE OF CONTENTS|INDEX)\b/.test(text) ? 'INFO' : 'SHEET', textContent };
+    }
+    static confirmedTextZones(evidence, g) {
+        const items = [];
+        const [a,b,c,d,e,f] = g.transform;
+        const scale = Math.hypot(a,b);
+        for (const item of evidence.textContent?.items || []) {
+            if (!item.str || !item.transform || !Number.isFinite(item.width)) continue;
+            const t = item.transform, horizontal = a*t[0]+c*t[1], vertical = b*t[0]+d*t[1];
+            // Only upright displayed text is eligible; rotated/unreadable text abstains.
+            if (horizontal <= 0 || Math.abs(vertical) > .001 || Math.abs(a*t[2]+c*t[3]) > .001) continue;
+            const fontSize = Math.abs(b*t[2]+d*t[3]), x=(a*t[4]+c*t[5]+e)/g.width;
+            const y=(b*t[4]+d*t[5]+f-fontSize)/g.height, w=item.width*scale/g.width, h=fontSize/g.height;
+            if (!Number.isFinite(fontSize) || fontSize <= 0 || x < 0 || y < .6 || x+w > 1 || y+h > 1 || w <= 0) continue;
+            items.push({ text:item.str.trim().toUpperCase(), x,y,w,h,fontSize });
+        }
+        const fields = [
+            { label:/^(PANEL\s*(ID|NO\.?|NUMBER)|CPID|CP\s*(ID|NO\.?))\s*:?\s*$/, value:/^CP\s*-?\s*\d+[A-Z0-9.-]*$/, map:'cpid' },
+            { label:/^(ISSUE\s+)?DATE\s*:?\s*$/, value:/^(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})$/, map:'date' }
+        ];
+        const zones = [];
+        for (const field of fields) {
+            const labels = items.filter(item => field.label.test(item.text)), candidates = [];
+            for (const label of labels) {
+                for (const value of items.filter(item => field.value.test(item.text))) {
+                    const right = value.x >= label.x+label.w && value.x-label.x-label.w < .15 && Math.abs(value.y-label.y) < Math.max(label.h,value.h);
+                    const below = value.y >= label.y+label.h && value.y-label.y-label.h < .035 && Math.abs(value.x-label.x) < .02;
+                    if (right || below) candidates.push(value);
+                }
+            }
+            const unique = [...new Set(candidates)];
+            if (unique.length !== 1) return null;
+            const value = unique[0];
+            zones.push({ x:value.x,y:value.y,w:value.w,h:value.h,fontSize:value.fontSize,map:field.map,transparent:false,textAlign:'left' });
+        }
+        return GeneratorState.zones(zones);
+    }
+    static async scan(onlyPage = null) {
+        await this.ready();
+        this.capture();
+        const sequence = ++this.scanSequence, generation = this.state.generation, doc = this.sourceDoc, renderToken = PdfViewer.currentRenderToken;
+        for (let page = 1; page <= this.state.sourcePageCount; page++) {
+            if (onlyPage && page !== onlyPage) continue;
+            const wrapper = this.wrapper(page);
+            if (!wrapper) continue;
+            const g = wrapper._generatorGeometry, source = wrapper.dataset.contentSource;
+            const prior = this.state.pages[page];
+            if (prior?.status === 'resolved') {
+                if (JSON.stringify(prior.geometry) !== JSON.stringify(g) || prior.contentSource !== source) {
+                    prior.geometry = g; prior.contentSource = source; this.state.touch();
+                }
+                this.paint(page); continue;
+            }
+            if (page === 1) { this.state.setPage(1, 'BUILTIN:COVER_TEMPLATE', 'auto', undefined, g, source); this.paint(1); continue; }
+            const token = this.state.token();
+            try {
+                const evidence = await this.evidence(await doc.getPage(page), g);
+                if (sequence !== this.scanSequence || generation !== this.state.generation || doc !== this.sourceDoc || renderToken !== PdfViewer.currentRenderToken || !this.state.current(token)) return;
+                const result = GeneratorState.matchMeasured(evidence, this.measured, this.fingerprints, this.metadata);
+                if (result.status === 'resolved') {
+                    const key = result.profileId.slice(9);
+                    if (this.metadata[key].cox_check_fields?.length) {
+                        result.status = 'unresolved'; result.reason = 'Mixed company branding requires exact mapping or manual review';
+                    }
+                }
+                if (result.status === 'resolved') this.state.setPage(page, result.profileId, 'auto', undefined, g, source);
+                else {
+                    const noTitleBlockEvidence = evidence.H.length === 0 || evidence.V.length === 0;
+                    const fallback = noTitleBlockEvidence && result.reason !== 'Ambiguous measured layouts' ? this.confirmedTextZones(evidence,g) : null;
+                    if (fallback) {
+                        const profile = PageClassifier.classify(evidence.textContent,g.width/g.height,page);
+                        this.state.setPage(page, 'BUILTIN:'+profile, 'auto', fallback, g, source);
+                    } else this.state.unresolved(page, result.reason || this.assetError, g);
+                }
+            } catch (e) {
+                if (generation !== this.state.generation || sequence !== this.scanSequence || renderToken !== PdfViewer.currentRenderToken) return;
+                this.state.unresolved(page, 'Page evidence unavailable; choose a profile or exact mapping.', g);
+            }
+            this.paint(page);
+        }
+        return this.getState();
+    }
+    static importMapping(input) { this.capture(); this.state.importMapping(input); Object.keys(this.state.pages).forEach(p => this.paint(Number(p))); return this.getState(); }
+    static exportMapping() { this.capture(); return this.state.exportMapping(); }
+    static importProfiles(input) {
+        const profiles = GeneratorState.migrateProfiles(input);
+        const merged = GeneratorState.migrateProfiles({ ...ProfileManager.getCustomProfiles(), ...profiles });
+        localStorage.setItem('cox_custom_profiles', JSON.stringify(merged));
+        this.registerProfiles(); LayoutScanner.refreshProfileOptions(); return profiles;
+    }
+    static exportProfiles() { return { schema: 'schematicai-profiles/1', profiles: ProfileManager.getCustomProfiles() }; }
+    static snapshot() {
+        this.capture();
+        if (!DemoManager.isGeneratorActive) throw new Error('Activate the generator before generation');
+        if (this.templateReference !== window.TEMPLATE_BYTES) throw new Error('Template changed; wait for committed generator render');
+        return Object.freeze({ ...this.state.snapshot(DemoManager.getContext(), this.templateBytes),
+            templateRevision: this.templateRevision, documentLoadToken: PdfViewer._documentLoadToken });
+    }
+    static setTemplate(bytes) {
+        const owned = bytes ? new Uint8Array(bytes).slice() : null;
+        window.TEMPLATE_BYTES = owned ? owned.buffer : null;
+        this.templateReference = window.TEMPLATE_BYTES;
+        this.templateBytes = owned;
+        this.templateRevision++;
+        this.state.renderCommitted = false;
+        this.state.touch();
+        return PdfViewer.doc && DemoManager.isGeneratorActive ? PdfViewer.renderStack() : Promise.resolve(false);
+    }
+    static assertGeneratedCurrent() {
+        this.capture();
+        if (!this.generatedToken || this.generatedExportSequence !== this.exportSequence || !this.state.current(this.generatedToken) || !this.state.renderCommitted ||
+            this.generatedDocumentLoadToken !== PdfViewer._documentLoadToken || this.generatedTemplateRevision !== this.templateRevision || this.templateReference !== window.TEMPLATE_BYTES ||
+            this.generatedContext !== JSON.stringify(DemoManager.getContext())) throw new Error('Generation superseded; preview discarded');
+    }
+    static hasCurrentPreview() {
+        try {
+            if (!PdfExporter.previewPdfBytes || !DemoManager.isGeneratorActive) return false;
+            this.assertGeneratedCurrent();
+            return true;
+        } catch (error) { return false; }
+    }
+    static installControls() {
+        const host = document.getElementById('generator-panel');
+        if (!host || document.getElementById('generator-mapping-import')) return;
+        const controls = document.createElement('div'); controls.style.padding = '8px';
+        const input = document.createElement('input'); input.type = 'file'; input.accept = 'application/json,.json'; input.id = 'generator-mapping-import';
+        input.setAttribute('aria-label', 'Import exact generator mapping');
+        const status = document.createElement('div'); status.id = 'generator-mapping-status'; status.setAttribute('role', 'status');
+        if (this.state.error) status.textContent = 'Generator disabled: ' + this.state.error + '. Original PDF actions remain available.';
+        input.addEventListener('change', async () => {
+            try {
+                const file = input.files[0]; if (!file) return;
+                if (file.size > GeneratorState.LIMITS.MAX_JSON_BYTES) throw new Error('JSON exceeds 4 MiB import/export limit');
+                const generation = this.state.generation, revision = this.state.revision;
+                const text = await file.text();
+                if (generation !== this.state.generation || revision !== this.state.revision) throw new Error('Import superseded');
+                const data = GeneratorState.parseJson(text);
+                if (data.schema === 'schematicai-profiles/1') {
+                    this.importProfiles(data); status.textContent = 'Profiles imported.';
+                } else {
+                    this.importMapping(data); status.textContent = 'Exact mapping imported.';
+                }
+            } catch (e) { status.textContent = e.message; }
+            input.value = '';
+        });
+        const button = document.createElement('button'); button.textContent = 'Export mapping';
+        button.onclick = () => { try { this.downloadJson(this.exportMapping(), 'generator-mapping.json'); } catch (e) { status.textContent = e.message; } };
+        const profiles = document.createElement('button'); profiles.textContent = 'Export profiles';
+        profiles.onclick = () => this.downloadJson(this.exportProfiles(), 'generator-profiles.json');
+        const profileInput = document.createElement('input'); profileInput.type = 'file'; profileInput.accept = 'application/json,.json'; profileInput.id = 'generator-profiles-import';
+        profileInput.setAttribute('aria-label', 'Import custom generator profiles');
+        profileInput.addEventListener('change', async () => {
+            try {
+                const file = profileInput.files[0]; if (!file) return;
+                if (file.size > GeneratorState.LIMITS.MAX_JSON_BYTES) throw new Error('JSON exceeds 4 MiB import/export limit');
+                const token = this.state.token(), text = await file.text();
+                if (!this.state.current(token)) throw new Error('Import superseded');
+                this.importProfiles(text); status.textContent = 'Profiles imported.';
+            } catch (error) { status.textContent = error.message; }
+            profileInput.value = '';
+        });
+        const warning = document.createElement('div'); warning.textContent = 'Visual masking only; underlying PDF content is not removed.';
+        const mappingLabel = document.createElement('label'); mappingLabel.textContent = 'Import mapping JSON'; mappingLabel.appendChild(input);
+        const profilesLabel = document.createElement('label'); profilesLabel.textContent = 'Import profiles JSON'; profilesLabel.appendChild(profileInput);
+        mappingLabel.style.display = 'block'; profilesLabel.style.display = 'block';
+        controls.append(mappingLabel, button, profilesLabel, profiles, status, warning); host.appendChild(controls);
+    }
+    static downloadJson(value, name) {
+        const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
+        try { const link = document.createElement('a'); link.href = url; link.download = name; link.click(); }
+        finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    }
+    static downloadBytes(bytes, name) {
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        try { const link = document.createElement('a'); link.href = url; link.download = name; link.click(); }
+        finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    }
+    static text(zone, context) {
+        if (zone.text !== null) return zone.text;
+        if (zone.map === 'job_block') {
+            const words = (context.job || '').split(' '), lines = []; let line = '';
+            for (const word of words) { if (line && (line + ' ' + word).length > JOB_BLOCK_MAX_CHARS_PER_LINE) { lines.push(line); line = word; } else line = line ? line + ' ' + word : word; }
+            if (line) lines.push(line); if (context.type) lines.push(context.type); return lines.join('\n');
+        }
+        if (zone.map === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(context.date || '')) return context.date.slice(5,7) + '/' + context.date.slice(8) + '/' + context.date.slice(2,4);
+        return context[zone.map] || '';
+    }
+    static async generatePdf() {
+        await this.ready();
+        const snapshot = this.snapshot(), generationToken = this.state.token();
+        const exportSequence = ++this.exportSequence;
+        const source = await PDFLib.PDFDocument.load(snapshot.sourceBytes);
+        if (source.getPageCount() !== snapshot.sourcePageCount) throw new Error('Source page count changed');
+        const output = await PDFLib.PDFDocument.create();
+        let replacement = null;
+        if (snapshot.pages[0].contentSource === 'replacement') {
+            if (!snapshot.replacementBytes) throw new Error('Replacement template unavailable');
+            replacement = await PDFLib.PDFDocument.load(snapshot.replacementBytes);
+        }
+        for (let i = 0; i < snapshot.sourcePageCount; i++) {
+            const [page] = await output.copyPages(i === 0 && replacement ? replacement : source, [i === 0 && replacement ? 0 : i]);
+            output.addPage(page);
+        }
+        const fonts = {
+            courier: await output.embedFont(PDFLib.StandardFonts.Courier),
+            times: await output.embedFont(PDFLib.StandardFonts.TimesRoman),
+            courierBold: await output.embedFont(PDFLib.StandardFonts.CourierBold),
+            timesBold: await output.embedFont(PDFLib.StandardFonts.TimesRomanBold)
+        };
+        for (const entry of snapshot.pages) {
+            const page = output.getPage(entry.page - 1), g = entry.geometry;
+            for (const zone of entry.zones.slice().sort((a,b) => Number(a.transparent) - Number(b.transparent))) {
+                if (!zone.transparent) page.drawRectangle({ ...GeneratorState.toPdfRect(g, zone), color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+                const text = this.text(zone, snapshot.context); if (!text) continue;
+                const bold = zone.fontWeight === 'bold' || Number.parseInt(zone.fontWeight,10) >= 600;
+                const font = /times/i.test(zone.fontFamily) ? (bold ? fonts.timesBold : fonts.times) : (bold ? fonts.courierBold : fonts.courier), size = zone.fontSize;
+                const lines = text.split('\n'), lineHeight = size * 1.4;
+                for (let i = 0; i < lines.length; i++) {
+                    if (!lines[i]) continue;
+                    const textWidth = font.widthOfTextAtSize(lines[i], size);
+                    const left = zone.x * g.width + (zone.textAlign === 'right' ? zone.w * g.width - textWidth : zone.textAlign === 'center' ? (zone.w * g.width - textWidth) / 2 : 0);
+                    const baseline = zone.y * g.height + zone.h * g.height / 2 - lineHeight * lines.length / 2 + size + i * lineHeight;
+                    const radians = zone.rotation * Math.PI / 180, centerX = (zone.x + zone.w / 2) * g.width, centerY = (zone.y + zone.h / 2) * g.height;
+                    const dx = left - centerX, dy = baseline - centerY;
+                    const rotatedX = centerX + dx * Math.cos(radians) - dy * Math.sin(radians);
+                    const rotatedY = centerY + dx * Math.sin(radians) + dy * Math.cos(radians);
+                    const point = GeneratorState.toPdfPoint(g, rotatedX / g.width, rotatedY / g.height);
+                    const angle = g.rotation - zone.rotation;
+                    page.drawText(lines[i], { ...point, size, font, color: PDFLib.rgb(0,0,0), rotate: PDFLib.degrees(angle) });
+                    if (zone.decoration === 'underline') {
+                        const radians = angle * Math.PI / 180;
+                        page.drawLine({ start: { x: point.x + 2*Math.sin(radians), y: point.y - 2*Math.cos(radians) },
+                            end: { x: point.x + textWidth*Math.cos(radians) + 2*Math.sin(radians), y: point.y + textWidth*Math.sin(radians) - 2*Math.cos(radians) },
+                            thickness: 1, color: PDFLib.rgb(0,0,0) });
+                    }
+                }
+            }
+        }
+        const bytes = await output.save();
+        this.capture();
+        if (exportSequence !== this.exportSequence || !this.state.current(generationToken) || !this.state.renderCommitted || snapshot.profileRevision !== this.state.profileRevision || snapshot.templateRevision !== this.templateRevision || snapshot.documentLoadToken !== PdfViewer._documentLoadToken ||
+            JSON.stringify(snapshot.context) !== JSON.stringify(DemoManager.getContext())) throw new Error('Generation superseded; preview discarded');
+        this.generatedToken = generationToken;
+        this.generatedContext = JSON.stringify(snapshot.context);
+        this.generatedExportSequence = exportSequence;
+        this.generatedDocumentLoadToken = snapshot.documentLoadToken;
+        this.generatedTemplateRevision = snapshot.templateRevision;
+        return bytes;
+    }
+}
+window.Generator = Generator;
+
 class PdfExporter {
     static previewPdfBytes = null;
+    static previewRequest = 0;
+    static previewButtonState = null;
+    static previewButtonOwner = 0;
+    static releasePreviewButtons(owner = null) {
+        if (owner !== null && owner !== this.previewButtonOwner) return;
+        this.previewButtonState?.forEach((state, button) => { button.innerText = state.text; button.disabled = state.disabled; });
+        this.previewButtonState = null; this.previewButtonOwner = 0;
+    }
     
     static async preview() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
+        Generator.capture();
+        const request = ++this.previewRequest;
         
         // Minimize generator panel while previewing
         DemoManager.minimizePanel();
@@ -4400,10 +4832,10 @@ class PdfExporter {
             ? window.event.currentTarget
             : document.querySelector('#generator-panel button[onclick="PdfExporter.preview()"], #context-preview-btn');
         const previewButtons = Array.from(document.querySelectorAll('button[onclick="PdfExporter.preview()"]'));
-        const previewButtonState = new Map(previewButtons.map((previewBtn) => [previewBtn, {
-            text: previewBtn.innerText,
-            disabled: previewBtn.disabled
+        if (!this.previewButtonState) this.previewButtonState = new Map(previewButtons.map((previewBtn) => [previewBtn, {
+            text: previewBtn.innerText, disabled: previewBtn.disabled
         }]));
+        this.previewButtonOwner = request;
         previewButtons.forEach((previewBtn) => {
             previewBtn.disabled = true;
         });
@@ -4411,29 +4843,36 @@ class PdfExporter {
         
         try {
             const pdfBytes = await this.generateRedactedPdf();
+            Generator.assertGeneratedCurrent();
+            if (request !== this.previewRequest) throw new Error('Preview superseded');
             this.previewPdfBytes = pdfBytes;
             
             const blob = new Blob([pdfBytes], { type: "application/pdf" });
             const blobUrl = URL.createObjectURL(blob);
-            
-            container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:100%; border:none;"></iframe>`;
+            Generator.releasePreview();
+            Generator.previewUrl = blobUrl;
+            const iframe = document.createElement('iframe'); iframe.src = blobUrl;
+            iframe.style.cssText = 'width:100%;height:100%;border:none;';
+            Generator.previewFrame = iframe;
+            container.appendChild(iframe);
             modal.style.display = 'flex';
         } catch (e) {
+            if (request !== this.previewRequest) return;
             console.error(e);
             alert("Preview Failed: " + e.message);
         } finally {
-            previewButtonState.forEach((state, previewBtn) => {
-                previewBtn.innerText = state.text;
-                previewBtn.disabled = state.disabled;
-            });
+            this.releasePreviewButtons(request);
         }
     }
     
     static closePreview() {
+        this.previewRequest++;
+        this.releasePreviewButtons();
         const modal = document.getElementById('pdf-preview-modal');
         if (modal) modal.style.display = 'none';
         const container = document.getElementById('pdf-preview-container');
         if (container) container.innerHTML = '';
+        Generator.releasePreview();
         // Restore generator panel
         DemoManager.restorePanel();
     }
@@ -4450,55 +4889,28 @@ class PdfExporter {
     
     static async printRedacted() {
         this.closePrintExportMenu();
-        if (!this.previewPdfBytes) return alert("No redacted preview available.");
-        
-        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
-        const blobUrl = URL.createObjectURL(blob);
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = blobUrl;
-        document.body.appendChild(iframe);
-        
-        let fallbackId = null;
-        const cleanup = () => {
-            if (fallbackId) { clearTimeout(fallbackId); fallbackId = null; }
-            if (iframe.parentNode === document.body) document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-        };
-        
-        iframe.onload = () => {
-            try {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
-                iframe.contentWindow.print();
-                fallbackId = setTimeout(cleanup, PdfViewer.PRINT_CLEANUP_TIMEOUT_MS);
-            } catch(e) { console.error('Print redacted error:', e); cleanup(); }
-        };
-        
-        fallbackId = setTimeout(cleanup, PdfViewer.PRINT_MAX_TIMEOUT_MS);
+        if (!Generator.hasCurrentPreview()) return alert("No current generated preview available.");
+        if (PdfViewer.isPrinting) return;
+        const bytes = this.previewPdfBytes;
+        const target = { url: URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })), revokeOnCleanup: true,
+            isCurrent: () => Generator.hasCurrentPreview() && this.previewPdfBytes === bytes };
+        if (PdfViewer._isIsolatedPdfPrintBrowser()) PdfViewer._printViaIsolatedWindow(target);
+        else PdfViewer._printViaIframe(target);
     }
     
     static downloadRedacted() {
         this.closePrintExportMenu();
-        if (!this.previewPdfBytes) return alert("No redacted preview available.");
-        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `redacted_${new Date().getTime()}.pdf`;
-        link.click();
+        if (!Generator.hasCurrentPreview()) return alert("No current generated preview available.");
+        Generator.downloadBytes(this.previewPdfBytes, `redacted_${new Date().getTime()}.pdf`);
     }
     
     static async confirmExport() {
-        if (!this.previewPdfBytes) {
+        if (!Generator.hasCurrentPreview()) {
             alert("No preview available. Please generate preview first.");
             return;
         }
         
-        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `redacted_${new Date().getTime()}.pdf`;
-        link.click();
+        Generator.downloadBytes(this.previewPdfBytes, `redacted_${new Date().getTime()}.pdf`);
         
         this.closePreview();
     }
@@ -4506,21 +4918,19 @@ class PdfExporter {
     static async export() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
         const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
-        const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
+        const origText = btn?.innerText;
+        if (btn) { btn.innerText = "⏳ PROCESSING..."; btn.disabled = true; }
         
         try {
             const pdfBytes = await this.generateRedactedPdf();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `redacted_${new Date().getTime()}.pdf`;
-            link.click();
+            Generator.assertGeneratedCurrent();
+            this.previewPdfBytes = pdfBytes;
+            Generator.downloadBytes(pdfBytes, `redacted_${new Date().getTime()}.pdf`);
         } catch (e) {
             console.error(e);
             alert("Export Failed: " + e.message);
         } finally {
-            btn.innerText = origText;
-            btn.disabled = false;
+            if (btn) { btn.innerText = origText; btn.disabled = false; }
         }
     }
     
@@ -4528,114 +4938,7 @@ class PdfExporter {
         if (!window.PDFLib) {
             throw new Error('PDF generation library (pdf-lib) is not available. Please check your network connection or contact support.');
         }
-        const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
-        const mainPdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
-        const compositeDoc = await PDFLib.PDFDocument.create();
-        
-        let coverPage;
-        if (window.TEMPLATE_BYTES) {
-            const templateDoc = await PDFLib.PDFDocument.load(window.TEMPLATE_BYTES.slice(0));
-            const [embeddedTemplate] = await compositeDoc.copyPages(templateDoc, [0]);
-            coverPage = compositeDoc.addPage(embeddedTemplate);
-        } else {
-            const [origPage1] = await compositeDoc.copyPages(mainPdfDoc, [0]);
-            coverPage = compositeDoc.addPage(origPage1);
-        }
-
-        if (mainPdfDoc.getPageCount() > 1) {
-            const remainingIndices = Array.from({ length: mainPdfDoc.getPageCount() - 1 }, (_, i) => i + 1);
-            const remainingPages = await compositeDoc.copyPages(mainPdfDoc, remainingIndices);
-            
-            remainingPages.forEach((p) => {
-                compositeDoc.addPage(p);
-            });
-        }
-
-        const pages = compositeDoc.getPages();
-        const fontTimes = await compositeDoc.embedFont(PDFLib.StandardFonts.TimesRoman); 
-        const fontCourier = await compositeDoc.embedFont(PDFLib.StandardFonts.Courier);
-
-        pages.forEach((page, index) => {
-            const pdfWidth = page.getWidth(); const pdfHeight = page.getHeight();
-            const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
-            if (wrapper) {
-                const container = wrapper.querySelector('.pdf-content-container');
-                const zones = Array.from(container.querySelectorAll('.redaction-box'));
-                
-                // Sort zones: opaque whiteouts first, then transparent overlays
-                // This ensures whiteouts are drawn before text overlays to prevent overlap issues
-                zones.sort((a, b) => {
-                    const aTransparent = a.dataset.transparent === "true";
-                    const bTransparent = b.dataset.transparent === "true";
-                    if (aTransparent === bTransparent) return 0;
-                    return aTransparent ? 1 : -1; // Transparent zones sorted last
-                });
-                
-                zones.forEach(box => {
-                    const relX = box.offsetLeft / container.offsetWidth; 
-                    const relY = box.offsetTop / container.offsetHeight;
-                    const relW = box.offsetWidth / container.offsetWidth; 
-                    const relH = box.offsetHeight / container.offsetHeight;
-                    
-                    const drawX = relX * pdfWidth; const drawH = relH * pdfHeight;
-                    const drawY = pdfHeight - (relY * pdfHeight) - drawH; const drawW = relW * pdfWidth;
-                    
-                    const isTransparent = box.dataset.transparent === "true";
-
-                    if ((!window.TEMPLATE_BYTES || index > 0) && !isTransparent) {
-                         page.drawRectangle({ x: drawX, y: drawY, width: drawW, height: drawH, color: PDFLib.rgb(1,1,1), borderColor: PDFLib.rgb(1,1,1), borderWidth: 0 });
-                    }
-
-                    const text = box.querySelector('span')?.innerText || "";
-                    if (text) { 
-                        const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
-                        
-                        let fontToUse = fontTimes;
-                        if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
-
-                        const rotation = parseFloat(box.dataset.rotation) || 0;
-                        if (rotation !== 0) {
-                            // Rotated text: single-line only (existing behavior)
-                            const textWidth = fontToUse.widthOfTextAtSize(text, fontSize);
-                            const centerX = drawX + drawW/2;
-                            const centerY = drawY + drawH/2;
-                            page.drawText(text, { x: centerX, y: centerY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0), rotate: PDFLib.degrees(rotation) });
-                            if (box.dataset.decoration === 'underline') {
-                                const halfWidth = textWidth / 2;
-                                const underlineOffset = fontSize / 8;
-                                const radians = (rotation * Math.PI) / 180;
-                                const cos = Math.cos(radians); const sin = Math.sin(radians);
-                                const startX = centerX - halfWidth * cos - underlineOffset * sin;
-                                const startY = centerY - halfWidth * sin + underlineOffset * cos;
-                                const endX = centerX + halfWidth * cos - underlineOffset * sin;
-                                const endY = centerY + halfWidth * sin + underlineOffset * cos;
-                                page.drawLine({ start: { x: startX, y: startY }, end: { x: endX, y: endY }, thickness: 1, color: PDFLib.rgb(0,0,0) });
-                            }
-                        } else {
-                            // Non-rotated: support multiline by splitting on \n
-                            const lines = text.split('\n');
-                            const lineHeight = fontSize * 1.4;
-                            const totalTextHeight = lineHeight * lines.length;
-                            const baseY = drawY + drawH/2 + totalTextHeight/2 - fontSize;
-                            lines.forEach((line, i) => {
-                                const lineText = line || '';
-                                const lineWidth = lineText ? fontToUse.widthOfTextAtSize(lineText, fontSize) : 0;
-                                let lineX = drawX;
-                                if (box.style.textAlign === 'center') lineX = drawX + (drawW/2) - (lineWidth/2);
-                                else if (box.style.textAlign === 'right') lineX = drawX + drawW - lineWidth;
-                                const lineY = baseY - i * lineHeight;
-                                if (lineText) page.drawText(lineText, { x: lineX, y: lineY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
-                                if (box.dataset.decoration === 'underline' && lineText) {
-                                    page.drawLine({ start: { x: lineX, y: lineY - 2 }, end: { x: lineX + lineWidth, y: lineY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
-                                }
-                            });
-                        }
-                    }
-                });
-            }
-        });
-
-        return await compositeDoc.save();
+        return Generator.generatePdf();
     }
 }
 
@@ -5503,6 +5806,11 @@ class PdfViewer {
     }
 
     static _beginDocumentLoad() {
+        if (typeof Generator !== 'undefined') {
+            Generator.scanSequence++;
+            Generator.state.renderCommitted = false;
+            Generator.state.touch();
+        }
         const activeStage = this._getGestureStage();
         const viewer = document.getElementById('pdf-main-view');
         this._hideIosSavePdfHint();
@@ -6748,6 +7056,9 @@ class PdfViewer {
 
     static _printViaIsolatedWindow(printTarget) {
         const session = this._createPrintSession(printTarget);
+        if (typeof printTarget.isCurrent === 'function' && !printTarget.isCurrent()) {
+            this._releasePrintSession('stale-print-target'); return;
+        }
         let popup = null;
         try {
             popup = typeof window?.open === 'function' ? window.open(printTarget.url, '_blank') : null;
@@ -6790,6 +7101,10 @@ class PdfViewer {
         iframe.src = printTarget.url;
         session.loadTimerId = setTimeout(() => this._releasePrintSession('iframe-load-timeout'), this.PRINT_IFRAME_LOAD_TIMEOUT_MS);
         iframe.onload = () => {
+            if (session !== this._activePrintSession || session.cleaned) return;
+            if (typeof printTarget.isCurrent === 'function' && !printTarget.isCurrent()) {
+                this._releasePrintSession('stale-print-target'); return;
+            }
             if (session.loadTimerId) {
                 clearTimeout(session.loadTimerId);
                 session.loadTimerId = null;
@@ -6885,12 +7200,26 @@ class PdfViewer {
         }
         
         // Capture render token to detect if rendering is superseded
+        if (typeof Generator !== 'undefined') Generator.beforeRender();
         const renderToken = ++this.currentRenderToken;
+        const renderGeneratorActive = DemoManager.isGeneratorActive;
+        const renderTemplateReference = window.TEMPLATE_BYTES;
+        const renderTemplateBytes = (typeof Generator !== 'undefined' && Generator.templateBytes)
+            ? Generator.templateBytes.slice().buffer : renderTemplateReference;
         
         let coverDoc = this.doc;
-        if (DemoManager.isGeneratorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
-             const tTask = pdfjsLib.getDocument(window.TEMPLATE_BYTES.slice(0));
-             coverDoc = await tTask.promise;
+        let renderTemplateUsable = false;
+        if (renderGeneratorActive && renderTemplateBytes instanceof ArrayBuffer) {
+            try {
+                const tTask = pdfjsLib.getDocument(renderTemplateBytes.slice(0));
+                if (typeof Generator !== 'undefined') Generator.templateTasks.set(renderToken, tTask);
+                coverDoc = await tTask.promise;
+                renderTemplateUsable = true;
+            } catch (error) {
+                if (typeof Generator !== 'undefined') Generator.releaseTemplateTask(renderToken);
+                if (this.currentRenderToken === renderToken) console.warn('Cover template unavailable; using original page 1.');
+                coverDoc = this.doc;
+            }
         }
 
         for (let i = 1; i <= this.doc.numPages; i++) {
@@ -6913,7 +7242,7 @@ class PdfViewer {
             
             // Wrap getPage in try/catch
             try {
-                if (i === 1 && DemoManager.isGeneratorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
+                if (i === 1 && renderTemplateUsable) {
                     page = await coverDoc.getPage(1);
                     isTemplate = true;
                 } else {
@@ -6947,6 +7276,10 @@ class PdfViewer {
                     transform: null
                 };
             const wrapper = document.createElement('div'); wrapper.className = 'pdf-page-wrapper';
+            if (typeof Generator !== 'undefined') {
+                wrapper._generatorGeometry = GeneratorState.geometry(page.getViewport({ scale: 1 }), page.view, page.rotate || 0);
+                wrapper.dataset.contentSource = isTemplate ? 'replacement' : 'source';
+            }
             wrapper.dataset.renderToken = String(renderToken);
             wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
@@ -6998,7 +7331,8 @@ class PdfViewer {
             contentContainer.appendChild(canvas); 
             contentContainer.appendChild(rLayer); 
 
-            if (this.currentRenderToken !== renderToken) {
+            if (this.currentRenderToken !== renderToken || renderGeneratorActive !== DemoManager.isGeneratorActive ||
+                renderTemplateReference !== window.TEMPLATE_BYTES) {
                 console.log(`[renderStack] Render cancelled before attaching page ${i} (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
                 this._removeRenderArtifactsForToken(container, renderToken);
                 if (stage.parentNode) stage.remove();
@@ -7052,6 +7386,10 @@ class PdfViewer {
             requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
         }
         await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
+        if (this.currentRenderToken !== renderToken || renderGeneratorActive !== DemoManager.isGeneratorActive || renderTemplateReference !== window.TEMPLATE_BYTES) {
+            if (stage.parentNode) stage.remove();
+            return false;
+        }
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
             if (stage.parentNode) stage.remove();
             return false;
@@ -7121,16 +7459,17 @@ class PdfViewer {
             }
             
             // Set initial page context
-            PageContext.setActivePage(1);
+            PageContext.setActivePage(Math.min(PageContext.currentPage, this.doc.numPages));
             
             // Start scan immediately after render; remove transition class once scan completes
             console.log('🔍 Auto-scanning PDF pages...');
-            SmartScanner.scanAllPages().finally(() => {
+            await SmartScanner.scanAllPages().finally(() => {
                 document.body.classList.remove('generator-transition');
             });
         } else {
             document.body.classList.remove('generator-transition');
         }
+        if (typeof Generator !== 'undefined') Generator.afterRender(renderToken);
         return true;
     }
     static zoom(delta) {
@@ -8065,7 +8404,47 @@ class ControlPanel {
 
 window.LOCAL_DB = []; window.ID_MAP = new Map(); window.FOUND_MFGS = new Set(); window.FOUND_ENCS = new Set();
 
-document.addEventListener('DOMContentLoaded', () => { 
+const renderGeneratorStack = PdfViewer.renderStack.bind(PdfViewer);
+PdfViewer.renderStack = async (...args) => {
+    const render = renderGeneratorStack(...args);
+    const token = PdfViewer.currentRenderToken;
+    try { return await render; }
+    finally { Generator.releaseTemplateTask(token); }
+};
+SmartScanner.scanAllPages = () => Generator.scan();
+SmartScanner.rescanPage = page => Generator.scan(page);
+LayoutScanner.scanAllPages = () => Generator.scan();
+LayoutScanner.updatePageProfile = (page, profile) => Generator.setPageProfile(page, profile);
+const refreshGeneratorProfileOptions = LayoutScanner.refreshProfileOptions.bind(LayoutScanner);
+LayoutScanner.refreshProfileOptions = () => {
+    refreshGeneratorProfileOptions();
+    document.querySelectorAll('.page-profile-select').forEach(select => {
+        const wrapper = select.closest('.pdf-page-wrapper');
+        for (const key of Object.keys(Generator.measured)) {
+            const option = document.createElement('option'); option.value = 'MEASURED:' + key; option.textContent = 'Measured: ' + key; select.appendChild(option);
+        }
+        const entry = Generator.state.pages[Number(wrapper.dataset.pageNumber)];
+        if (entry?.profileId) {
+            const legacy = entry.profileId.replace(/^BUILTIN:/, '');
+            select.value = Array.from(select.options).some(o => o.value === entry.profileId) ? entry.profileId : legacy;
+        }
+    });
+};
+for (const method of ['addZoneToCurrentView', 'deleteSelected', 'handleDrag', 'endDrag', 'updateActiveStyle', 'updateActiveAlignment', 'mapSelectedZone', 'updateCustomText', 'toggleBoxBackground', 'clearAll']) {
+    const original = RedactionManager[method].bind(RedactionManager);
+    RedactionManager[method] = (...args) => {
+        const result = original(...args);
+        if (!Generator.applying) { Generator.invalidate(); Generator.capture(); }
+        return result;
+    };
+}
+document.addEventListener('input', event => {
+    if (event.target.closest?.('#left-generator-context')) {
+        Generator.state.touch();
+        RedactionManager.refreshContent();
+    }
+});
+document.addEventListener('DOMContentLoaded', () => {
     try {
         // Sync version in menu
         const versionEl = document.getElementById('menu-version');
@@ -8091,7 +8470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const header = new Uint8Array(buf, 0, 4);
                 const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46;
                 if (!isPdf) throw new Error('Asset is not a valid PDF');
-                window.TEMPLATE_BYTES = buf;
+                Generator.setTemplate(buf);
                 console.log('✅ Cover sheet template loaded');
             })
             .catch(err => console.warn('⚠️ Cover sheet template not loaded (app continues without it):', err));
