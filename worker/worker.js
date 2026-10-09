@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.112
+// 🧠 SCHEMATICA ai WORKER v2.5.113
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -48,7 +48,7 @@ const MAIN_PAGE_INFLIGHT = new Map();
 const SHEETS_CACHE_MS = 5 * 60 * 1000;
 const SHEETS_MAX_BYTES = 8 * 1024 * 1024;
 const SHEETS_META_HEADER = 'X-SCHEMATICA-SHEETS-META';
-const SPEC_TRANSFORM_VERSION = 'v2.5.112';
+const SPEC_TRANSFORM_VERSION = 'v2.5.113';
 let CACHE_SHEETS = null;
 let FEEDBACK_FINGERPRINT_SOURCE = null;
 let FEEDBACK_FINGERPRINT = '';
@@ -79,9 +79,24 @@ function normalizeSheetPanelId(value) {
     const plain = typeof value === 'string' ? /^(?:CP-)?(\d+(?:R\d+)?)$/i.exec(value) : null;
     if (plain) return plain[1].toUpperCase();
     if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value);
-    const id = String(value ?? '').replace(/[!?]/g, '').trim().replace(/^CP\s*-\s*/i, '')
-        .replace(/\.(?:dwg|pdf)$/i, '').trim().toUpperCase();
+    // Sheet and Airtable cells may spell the same panel `CP 1234`, `CP1234`, `CP–1234` or `1234-R1`.
+    const id = String(value ?? '').replace(/[!?]/g, '').trim().replace(/^CP\s*[-\u2010-\u2015]?\s*(?=\d)/i, '')
+        .replace(/\.(?:dwg|pdf)$/i, '').trim().replace(/^(\d+)\s*[-_]?\s*(R\d+)$/i, '$1$2').toUpperCase();
     return /^\d+(?:R\d+)?$/.test(id) ? id : null;
+}
+
+// Classified, secret-free reason for an unavailable Sheets overlay (surfaced as MAIN `sheetStatus`).
+function sheetError(reason, message = `Sheets ${reason}`) {
+    const error = new Error(message);
+    error.sheetReason = reason;
+    return error;
+}
+
+function sheetFailureReason(error) {
+    if (error?.sheetReason) return error.sheetReason;
+    if (error?.name === 'AbortError') return 'timeout';
+    if (error instanceof SyntaxError) return 'json';
+    return 'fetch';
 }
 
 const SHEET_FIELDS = {
@@ -148,18 +163,21 @@ function sheetSnapshotVersion(schema, revision, hash) {
 
 // Validates the whole payload and indexes panel IDs once, but normalizes a row's specs only when a
 // MAIN record looks it up. Eagerly normalizing every row was the dominant cold-isolate CPU cost.
+// Rows may be same-order arrays (trailing blank cells may be omitted) or objects keyed by column.
 function compileSheetSnapshot(payload, previous = null) {
-    if (!payload || payload.ok !== true || !['string', 'number'].includes(typeof payload.schema)
+    if (!payload || payload.ok === false || payload.error !== undefined && payload.ok !== true
+        || !['string', 'number'].includes(typeof payload.schema)
         || !['string', 'number'].includes(typeof payload.revision)
         || !String(payload.schema).trim() || !String(payload.revision).trim()
         || String(payload.schema).length > 100 || String(payload.revision).length > 100
-        || typeof payload.hash !== 'string' || !payload.hash.trim() || payload.hash.length > 200
+        || !['string', 'number'].includes(typeof payload.hash) || !String(payload.hash).trim() || String(payload.hash).length > 200
         || !Array.isArray(payload.columns) || !payload.columns.length || payload.columns.length > 100
         || !payload.columns.every(c => typeof c === 'string')
         || !Array.isArray(payload.rows) || !payload.rows.length || payload.rows.length > 20000
-        || payload.rowCount !== payload.rows.length
-        || !payload.rows.every(row => Array.isArray(row) && row.length === payload.columns.length)) {
-        throw new Error('Invalid Sheets snapshot');
+        || payload.rowCount !== undefined && payload.rowCount !== payload.rows.length
+        || !payload.rows.every(row => Array.isArray(row) ? row.length <= payload.columns.length
+            : row !== null && typeof row === 'object')) {
+        throw sheetError('payload', 'Invalid Sheets snapshot');
     }
     const fields = payload.columns.map(c => {
         const key = c.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -167,13 +185,13 @@ function compileSheetSnapshot(payload, previous = null) {
     });
     if (fields.filter(f => f === 'id').length !== 1
         || fields.filter(Boolean).length !== new Set(fields.filter(Boolean)).size
-        || !fields.some(f => f && f !== 'id')) throw new Error('Invalid Sheets columns');
+        || !fields.some(f => f && f !== 'id')) throw sheetError('columns', 'Invalid Sheets columns');
     const version = sheetSnapshotVersion(payload.schema, payload.revision, payload.hash);
     if (previous?.version === version) return previous;
     const rowsById = new Map();
     const duplicateIds = new Set();
     if (payload.duplicates !== undefined) {
-        if (!Array.isArray(payload.duplicates)) throw new Error('Invalid Sheets duplicates');
+        if (!Array.isArray(payload.duplicates)) throw sheetError('payload');
         for (const duplicate of payload.duplicates) {
             const id = normalizeSheetPanelId(typeof duplicate === 'object' && duplicate !== null
                 ? (duplicate.panelId ?? duplicate.panel_id ?? duplicate.id) : duplicate);
@@ -181,14 +199,16 @@ function compileSheetSnapshot(payload, previous = null) {
         }
     }
     const idColumn = fields.indexOf('id');
-    for (const row of payload.rows) {
+    const columns = payload.columns;
+    for (const raw of payload.rows) {
+        const row = Array.isArray(raw) ? raw : columns.map(column => Object.hasOwn(raw, column) ? raw[column] : undefined);
         const id = normalizeSheetPanelId(row[idColumn]);
         if (!id) continue;
         if (rowsById.has(id)) { duplicateIds.add(id); continue; }
         rowsById.set(id, row);
     }
     for (const id of duplicateIds) rowsById.delete(id);
-    if (!rowsById.size) throw new Error('Sheets snapshot has no unambiguous panel IDs');
+    if (!rowsById.size) throw sheetError('no-ids', 'Sheets snapshot has no unambiguous panel IDs');
     const compiled = new Map();
     const compileRow = id => {
         if (compiled.has(id)) return compiled.get(id);
@@ -200,7 +220,7 @@ function compileSheetSnapshot(payload, previous = null) {
         fields.forEach((field, column) => {
             if (!field || field === 'id') return;
             if (field === 'panelType') {
-                if (typeof row[column] === 'string') meta.panelType = row[column].slice(0, 100);
+                if (typeof row[column] === 'string' && row[column].trim()) meta.panelType = row[column].trim().slice(0, 100);
                 return;
             }
             const value = normalizeSheetSpec(field, row[column]);
@@ -229,18 +249,22 @@ async function fetchSheetText(endpoint) {
     try {
         let url = new URL(endpoint);
         if (url.protocol !== 'https:' || url.hostname !== 'script.google.com' || url.username || url.password
-            || !/^\/macros\/s\/[^/]+\/exec$/.test(url.pathname)) throw new Error('Invalid Sheets endpoint');
+            || !/^\/(?:a\/macros\/[^/]+|macros)\/s\/[^/]+\/exec$/.test(url.pathname)) throw sheetError('endpoint', 'Invalid Sheets endpoint');
         let response;
         for (let redirects = 0; redirects <= 3; redirects++) {
             response = await fetch(url.toString(), { redirect: 'manual', signal: controller.signal });
             if (![301, 302, 303, 307, 308].includes(response.status)) break;
+            // Release the redirect body so it cannot hold a connection open.
+            try { await response.body?.cancel(); } catch { /* already consumed */ }
             const location = response.headers.get('Location');
-            if (!location) throw new Error('Invalid Sheets redirect');
+            if (!location) throw sheetError('redirect');
             url = new URL(location, url);
             if (url.protocol !== 'https:' || !['script.google.com', 'script.googleusercontent.com'].includes(url.hostname)
-                || url.username || url.password) throw new Error('Invalid Sheets redirect');
+                || url.username || url.password) throw sheetError('redirect');
         }
-        if (!response.ok || Number(response.headers.get('Content-Length')) > SHEETS_MAX_BYTES) throw new Error('Sheets fetch failed');
+        if ([301, 302, 303, 307, 308].includes(response.status)) throw sheetError('redirect');
+        if (!response.ok) throw sheetError(`http-${response.status}`);
+        if (Number(response.headers.get('Content-Length')) > SHEETS_MAX_BYTES) throw sheetError('too-large');
         const reader = response.body.getReader();
         const chunks = [];
         let size = 0;
@@ -250,7 +274,7 @@ async function fetchSheetText(endpoint) {
             size += value.byteLength;
             if (size > SHEETS_MAX_BYTES) {
                 await reader.cancel();
-                throw new Error('Sheets snapshot too large');
+                throw sheetError('too-large');
             }
             chunks.push(value);
         }
@@ -275,7 +299,7 @@ function decodeSheetMetaHeader(value) {
     if (!value) return null;
     const raw = JSON.parse(decodeURIComponent(value));
     if (!raw || !['string', 'number'].includes(typeof raw.schema) || !['string', 'number'].includes(typeof raw.revision)
-        || typeof raw.hash !== 'string') return null;
+        || !['string', 'number'].includes(typeof raw.hash)) return null;
     return { version: sheetSnapshotVersion(raw.schema, raw.revision, raw.hash), schema: raw.schema,
         revision: raw.revision, hash: raw.hash, updatedAt: raw.updatedAt };
 }
@@ -287,7 +311,7 @@ async function refreshSheetState(env, requestUrl) {
     const source = env.SHEETS_ENDPOINT;
     if (!source) return null;
     if (!CACHE_SHEETS || CACHE_SHEETS.source !== source) {
-        CACHE_SHEETS = { source, snapshot: null, meta: null, rawText: null, nextCheck: 0, promise: null };
+        CACHE_SHEETS = { source, snapshot: null, meta: null, rawText: null, nextCheck: 0, promise: null, failure: null };
     }
     const state = CACHE_SHEETS;
     if (state.promise) return state.promise;
@@ -328,6 +352,7 @@ async function refreshSheetState(env, requestUrl) {
                 const snapshot = compileSheetSnapshot(payload, state.snapshot);
                 Object.assign(state, { rawText: text, meta: sheetMetaOf(snapshot), snapshot });
             }
+            state.failure = null;
             if (cache) {
                 try {
                     const headers = new Headers({ 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=604800',
@@ -337,8 +362,9 @@ async function refreshSheetState(env, requestUrl) {
                     await cache.put(key, new Response(text, { headers }));
                 } catch { /* Keep the validated in-memory snapshot if persistence fails. */ }
             }
-        } catch {
-            console.warn('[Sheets] Refresh unavailable; retaining last good snapshot');
+        } catch (error) {
+            state.failure = sheetFailureReason(error);
+            console.warn(`[Sheets] Refresh unavailable (${state.failure}); retaining last good snapshot`);
         }
         return state;
     })();
@@ -352,12 +378,26 @@ function materializeSheetSnapshot(state) {
         try {
             state.snapshot = compileSheetSnapshot(JSON.parse(state.rawText));
             state.meta = sheetMetaOf(state.snapshot);
-        } catch {
+        } catch (error) {
             console.warn('[Sheets] Persisted snapshot unusable; continuing without overlay');
-            Object.assign(state, { rawText: null, meta: null, snapshot: null });
+            Object.assign(state, { rawText: null, meta: null, snapshot: null, failure: `cached-${sheetFailureReason(error)}` });
         }
     }
     return state.snapshot;
+}
+
+// Secret-free Sheets authority state: `active` when a validated snapshot identity is in use
+// (`refresh` then names a failed refresh that is serving the last good snapshot), otherwise
+// `unavailable` with a classified reason, or `pending` before the first refresh completes.
+function sheetStatusOf(state) {
+    if (!state) return null;
+    if (state.meta) return { state: 'active', refresh: state.failure || 'ok', transform: SPEC_TRANSFORM_VERSION };
+    return { state: state.failure ? 'unavailable' : 'pending', reason: state.failure || null, transform: SPEC_TRANSFORM_VERSION };
+}
+
+function sheetStatusHeader(status) {
+    if (!status) return 'unconfigured';
+    return status.state === 'active' ? `active; refresh=${status.refresh}` : `${status.state}; reason=${status.reason || 'none'}`;
 }
 
 async function getSheetSnapshot(env, requestUrl) {
@@ -1391,6 +1431,7 @@ export default {
                     let parsedRecords = 0;
                     let parsedChars = 0;
                     let sheetRecords = 0;
+                    const sheetCounts = { matchedRows: 0, withSpecs: 0, withMetadata: 0, withUncertainty: 0 };
                     const activeRecords = (mainJson.records || []).map(r => {
                         const rawId = String(r.fields['Control Panel Name'] || "");
                         const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
@@ -1454,7 +1495,7 @@ export default {
                         const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
                         const pdfStatus = pdfUrl ? "present" : "missing";
 
-                        return applySheetSpecs({
+                        const record = applySheetSpecs({
                             id: cleanId,
                             displayId: "CP-" + cleanId,
                             desc: fullDesc,
@@ -1473,11 +1514,21 @@ export default {
                             phaseV: explicit.phaseV || false,
                             encV: explicit.encV || false
                         }, sheetSnapshot);
+                        if (sheetSnapshot?.index.has(normalizeSheetPanelId(cleanId))) sheetCounts.matchedRows++;
+                        if (record.sheetSpecs) sheetCounts.withSpecs++;
+                        if (record.sheetMetadata) sheetCounts.withMetadata++;
+                        if (record.sheetUncertainty) sheetCounts.withUncertainty++;
+                        return record;
                     });
                     const processMs = Date.now() - processStart;
                     const serializeStart = Date.now();
+                    // `sheetStatus` records the authority state this page was computed with (cached with the page);
+                    // the live isolate state is in the X-SCHEMATICA-SHEETS-STATUS header.
+                    const sheetStatus = { ...(sheetStatusOf(sheetState) || { state: 'unconfigured', transform: SPEC_TRANSFORM_VERSION }),
+                        rows: sheetSnapshot ? sheetSnapshot.index.size : 0, records: activeRecords.length, ...sheetCounts };
                     const body = JSON.stringify({ records: activeRecords, offset: mainJson.offset,
-                        sheets: sheetSnapshot ? { revision: sheetSnapshot.revision, hash: sheetSnapshot.hash, updatedAt: sheetSnapshot.updatedAt } : null });
+                        sheets: sheetSnapshot ? { revision: sheetSnapshot.revision, hash: sheetSnapshot.hash, updatedAt: sheetSnapshot.updatedAt } : null,
+                        sheetStatus });
                     const serializeMs = Date.now() - serializeStart;
                     return { body, upstreamMs, processMs, serializeMs, parsedRecords, parsedChars, sheetRecords };
                 };
@@ -1529,6 +1580,7 @@ export default {
                             }
                             const hitHeaders = new Headers(cached.headers);
                             hitHeaders.set('Cache-Control', env.SHEETS_ENDPOINT ? 'private, no-store' : MAIN_PAGE_CACHE_CONTROL);
+                            hitHeaders.set('X-SCHEMATICA-SHEETS-STATUS', sheetStatusHeader(sheetStatusOf(sheetState)));
                             setMainTimingHeaders(hitHeaders, {
                                 cacheStatus: isFresh ? 'HIT' : 'STALE',
                                 authMs,
@@ -1547,6 +1599,7 @@ export default {
                 const totalMs = Date.now() - mainStart;
                 const responseHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
                 responseHeaders.set('Cache-Control', env.SHEETS_ENDPOINT ? 'private, no-store' : MAIN_PAGE_CACHE_CONTROL);
+                responseHeaders.set('X-SCHEMATICA-SHEETS-STATUS', sheetStatusHeader(sheetStatusOf(sheetState)));
                 setMainTimingHeaders(responseHeaders, {
                     cacheStatus: refresh.coalesced ? 'COALESCED' : 'MISS',
                     authMs,

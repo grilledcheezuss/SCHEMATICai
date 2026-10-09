@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.111 ---
-const APP_VERSION = "v2.5.111";
+// --- SCHEMATICA ai v2.5.113 ---
+const APP_VERSION = "v2.5.113";
 const VERSION_HISTORY = {
+    "v2.5.113": "Sheets authority made observable end to end: the Worker reports a secret-free MAIN sheetStatus (active/unavailable/pending/unconfigured, classified reason, row/match/spec counts) plus X-SCHEMATICA-SHEETS-STATUS, tolerates CP/revision ID spellings, object or trailing-blank rows, omitted rowCount and Workspace Apps Script URLs, and a new transform key invalidates pre-fix MAIN pages. Successful syncs store the per-page sheet status; read-only SheetAuthorityAudit (report/text/inspect) reports recordsWithSheetSpecs/metadata/uncertainty and a verdict without network. This release refreshes browser snapshots; fallback, descriptions, DERIVED_REV 12 and snapshot schema 1 unchanged.",
     "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; Worker-parity bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
     "v2.5.110": "Google Sheets live canonical panel specs overlay: revision-aware Worker snapshot cache, field-level parsing/ML/healer fallback, conservative duplicate handling, and authoritative browser search/derived specs. Configure SHEETS_ENDPOINT and deploy Worker plus frontend. DERIVED_REV 11; encrypted snapshot schema 1 preserved.",
     "v2.5.109": "Browser-only System Type selection compares bounded title phrases with standalone system-line evidence after explicit rows. Matching primary signals agree; a plain motor count may select only between conflicting candidates and that tie-break stays orange. Bounded caption-separated titles recover CP-1245r1 as Simplex orange; CP-1409 remains absent. Representative v2.5.108 outcomes, explicit rows, count/conflict protections, raw descriptions, snapshot schema 1 and Worker v2.5.97 are preserved. DERIVED_REV 10 refreshes cached records; live catalog accuracy remains unmeasured.",
@@ -1435,6 +1436,45 @@ class DataLoader {
         btn.innerText = `${label} ${Math.max(0, Math.min(99, Math.round(pct)))}%`;
     }
 
+    // Read-only Sheets authority evidence from MAIN pages (state, reason codes, counts and the public
+    // revision/hash identity only). Surfaced by SheetAuthorityAudit; never used for matching.
+    static SHEET_AUTHORITY_KEY = 'cox_sheet_authority';
+    static accumulateSheetStatus(acc, page) {
+        const next = acc || { pages: 0, pagesWithSheets: 0, states: {}, reasons: {}, records: 0, matchedRows: 0,
+            withSpecs: 0, withMetadata: 0, withUncertainty: 0, rows: 0, revision: null, hash: null, updatedAt: null, transform: null };
+        const text = (value, max) => (typeof value === 'string' || typeof value === 'number') ? String(value).slice(0, max) : null;
+        const status = page && page.sheetStatus && typeof page.sheetStatus === 'object' ? page.sheetStatus : null;
+        const state = status ? (text(status.state, 20) || 'unknown') : 'not-reported';
+        next.pages++;
+        next.states[state] = (next.states[state] || 0) + 1;
+        const reason = status ? text(status.reason || (status.refresh && status.refresh !== 'ok' ? status.refresh : null), 40) : null;
+        if (reason) next.reasons[reason] = (next.reasons[reason] || 0) + 1;
+        if (status) {
+            for (const key of ['records', 'matchedRows', 'withSpecs', 'withMetadata', 'withUncertainty']) {
+                if (Number.isFinite(status[key]) && status[key] >= 0) next[key] += status[key];
+            }
+            if (Number.isFinite(status.rows) && status.rows >= 0) next.rows = Math.max(next.rows, status.rows);
+            next.transform = text(status.transform, 20) || next.transform;
+        }
+        if (page && page.sheets && typeof page.sheets === 'object') {
+            next.pagesWithSheets++;
+            next.revision = text(page.sheets.revision, 100);
+            next.hash = text(page.sheets.hash, 200);
+            next.updatedAt = text(page.sheets.updatedAt, 40);
+        }
+        return next;
+    }
+    static recordSheetAuthority(summary) {
+        if (!summary) return null;
+        const record = { ...summary, appVersion: APP_VERSION, syncedAt: Date.now() };
+        try {
+            window.SHEET_AUTHORITY = record;
+            localStorage.setItem(this.SHEET_AUTHORITY_KEY, JSON.stringify(record));
+        } catch (e) { console.warn('[Sheets] Authority summary not stored', e); }
+        console.info(`[SheetAuthority] pages=${record.pages} withSheets=${record.pagesWithSheets} withSpecs=${record.withSpecs} matchedRows=${record.matchedRows} states=${JSON.stringify(record.states)} reasons=${JSON.stringify(record.reasons)}`);
+        return record;
+    }
+
     static async fetchPartition(dir, btn, { background = false, reason = 'sync', allowWaitingState = false } = {}) {
         if (!background) {
             if (this._lockReservedForSync && this._lockToken) {
@@ -1448,6 +1488,7 @@ class DataLoader {
         const recordsById = new Map();
         const foundMfgs = new Set();
         const foundEncs = new Set();
+        let sheetSync = null;
         const hadExistingData = window.LOCAL_DB.length > 0;
         const fetchStart = this.now();
         const syncStartSuspensionGeneration = this._suspensionGeneration;
@@ -1563,6 +1604,7 @@ class DataLoader {
                     break;
                 }
                 fetchedCount += d.records.length;
+                sheetSync = this.accumulateSheetStatus(sheetSync, d);
                 
                 d.records.forEach(rec => {
                     try {
@@ -1605,6 +1647,7 @@ class DataLoader {
             localStorage.setItem('cox_db_complete', 'true');
             localStorage.setItem(this.SYNC_TIMESTAMP_KEY, String(Date.now()));
             localStorage.setItem(this.DATA_RELEASE_VERSION_KEY, APP_VERSION);
+            this.recordSheetAuthority(sheetSync);
             const activeGeneration = await DB.getChunk(CacheService.ACTIVE_GENERATION_KEY).catch(() => null);
             CacheService.cleanupInactiveGenerations({ keepGeneration: typeof activeGeneration === 'string' ? activeGeneration : null }).catch(() => {});
             console.info(`[SyncTiming] fetch=${fetchMs}ms snapshot=${snapshotMs}ms encrypt=${persistStats?.encryptMs ?? 0}ms write=${persistStats?.writeMs ?? 0}ms persist=${persistStats?.totalMs ?? 0}ms apply=${applyMs}ms`);

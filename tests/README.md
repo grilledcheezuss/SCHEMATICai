@@ -6,6 +6,10 @@ This directory contains tests for the SCHEMATICA ai application.
 
 ## Test Files
 
+### sheet-authority-audit.test.js (v2.5.113)
+
+`node tests/sheet-authority-audit.test.js` runs the actual Worker MAIN with a mocked Apps Script payload, JSON-restores the records like an encrypted snapshot, and drives the real `SearchEngine`: a CP-8210-like phase converter with sheet phase `1/60` never matches a 3-phase filter despite motor `3PH` text (and the reverse for `3/60`). It also verifies the read-only `SheetAuthorityAudit` report/inspect/text output and verdicts without network or storage writes. `tests/sheets-overlay.test.js` additionally asserts browser-visible `sheetSpecs`/`sheetMetadata`/`sheetUncertainty`, `sheetStatus` counts and classified unavailable reasons, tolerant ID/payload shapes and fallback for unusable rows.
+
 ### worker-cpu-budget.test.js (v2.5.112)
 
 `node tests/worker-cpu-budget.test.js` runs locally without credentials. It bounds extraction CPU on padded-whitespace inputs that previously backtracked for seconds, fuzzes the linear HP/voltage/phase/manufacturer rewrites against the pre-v2.5.112 patterns, verifies lazy Sheets row normalization, raw-body persistence with identity header, cold-isolate MAIN hits without sheet parsing, unchanged-refresh reuse, feedback-content cache keys and the MISS work-counter headers.

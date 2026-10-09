@@ -1827,6 +1827,164 @@
         text: options => auditFormat(auditReport(options || {}))
     });
 
+    // ---------------------------------------------------------------- Sheet authority audit
+    // Opt-in, read-only console diagnostic: does the loaded snapshot carry Worker-attached Sheets
+    // authority, and what did the Worker report for it during the last successful sync? It reads
+    // window.LOCAL_DB and the stored sync summary only: no network, no writes, no descriptions/PDF URLs.
+    const SHEET_AUDIT_FIELDS = Object.freeze(['mfg', 'hp', 'volt', 'phase', 'enc', 'sys', 'encMaterial']);
+    const SHEET_AUTHORITY_KEY = 'cox_sheet_authority';
+
+    function sheetAuditLastSync() {
+        try {
+            const storage = globalScope && globalScope.localStorage;
+            const raw = storage && typeof storage.getItem === 'function' ? storage.getItem(SHEET_AUTHORITY_KEY) : null;
+            const parsed = raw ? JSON.parse(raw) : null;
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function sheetAuditHasKeys(value) {
+        return !!value && typeof value === 'object' && Object.keys(value).length > 0;
+    }
+
+    function sheetAuditVerdict(withSpecs, scanned, lastSync) {
+        if (withSpecs > 0) return 'sheet-backed';
+        if (!scanned) return 'no-records-loaded';
+        if (!lastSync) return 'no-sync-evidence: loaded snapshot predates sync status capture; run a sync';
+        const states = lastSync.states || {};
+        if (states['not-reported']) return 'worker-did-not-report: MAIN responses carry no sheetStatus (Worker older than this frontend?)';
+        if (states.unconfigured) return 'worker-unconfigured: SHEETS_ENDPOINT is not set on the API Worker';
+        if (states.unavailable || states.pending) {
+            const reasons = Object.keys(lastSync.reasons || {});
+            return `worker-sheet-unavailable${reasons.length ? `: ${reasons.join(', ')}` : ''}`;
+        }
+        if (lastSync.withSpecs > 0) return 'stale-snapshot: last sync attached sheet specs but loaded records have none';
+        return 'no-matching-rows: Worker snapshot active but no loaded panel matched a usable sheet row';
+    }
+
+    function sheetAuditReport(options) {
+        options = options || {};
+        const { scope, list } = auditRecords(options);
+        const total = list && typeof list.length === 'number' ? list.length : 0;
+        const trusted = Object.fromEntries(SHEET_AUDIT_FIELDS.map(f => [f, 0]));
+        const uncertain = Object.fromEntries(SHEET_AUDIT_FIELDS.map(f => [f, 0]));
+        const seen = new Set();
+        let scanned = 0, unique = 0, withSpecs = 0, withMetadata = 0, withUncertainty = 0, withAny = 0, withFallbackOnly = 0;
+        const sampleIds = [];
+        for (let i = 0; i < total; i++) {
+            const record = list[i];
+            if (!record || typeof record !== 'object') continue;
+            scanned++;
+            const key = auditKey(record, i);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            unique++;
+            const hasSpecs = sheetAuditHasKeys(record.sheetSpecs);
+            const hasMeta = sheetAuditHasKeys(record.sheetMetadata);
+            const hasUncertain = sheetAuditHasKeys(record.sheetUncertainty);
+            if (hasSpecs) {
+                withSpecs++;
+                if (sampleIds.length < AUDIT_SAMPLES.fallback) sampleIds.push(auditId(record, i));
+            }
+            if (hasMeta) withMetadata++;
+            if (hasUncertain) withUncertainty++;
+            if (hasSpecs || hasMeta || hasUncertain) withAny++;
+            if (!hasSpecs && (hasMeta || hasUncertain)) withFallbackOnly++;
+            SHEET_AUDIT_FIELDS.forEach(field => {
+                if (resolveTrustedSheetSpec(record, field) !== null) trusted[field]++;
+                if (hasUncertain && Object.prototype.hasOwnProperty.call(record.sheetUncertainty, field)) uncertain[field]++;
+            });
+        }
+        const lastSync = sheetAuditLastSync();
+        return {
+            tool: 'SheetAuthorityAudit',
+            ...auditInfo(),
+            scope,
+            records: { scanned, unique },
+            recordsWithSheetSpecs: withSpecs,
+            recordsWithSheetMetadata: withMetadata,
+            recordsWithSheetUncertainty: withUncertainty,
+            recordsWithAnySheetData: withAny,
+            recordsWithSheetRowButNoTrustedSpecs: withFallbackOnly,
+            trustedFields: trusted,
+            uncertainFields: uncertain,
+            sampleSheetBackedIds: sampleIds,
+            lastSync,
+            verdict: sheetAuditVerdict(withSpecs, unique, lastSync)
+        };
+    }
+
+    function sheetAuditBounded(value) {
+        if (!value || typeof value !== 'object') return null;
+        const out = {};
+        Object.keys(value).slice(0, 20).forEach(k => {
+            const v = value[k];
+            if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') out[String(k).slice(0, 40)] = String(v).slice(0, 100);
+        });
+        return out;
+    }
+
+    function sheetAuditInspect(id, options) {
+        options = options || {};
+        const { list } = auditRecords(options);
+        const want = String(id === undefined || id === null ? '' : id).trim().toUpperCase().replace(/^CP\s*-?\s*/, '');
+        const total = list && typeof list.length === 'number' ? list.length : 0;
+        let record = null;
+        for (let i = 0; i < total && !record; i++) {
+            const r = list[i];
+            if (!r || typeof r !== 'object') continue;
+            if ([r.id, r.displayId].some(v => String(v === undefined || v === null ? '' : v).trim().toUpperCase().replace(/^CP\s*-?\s*/, '') === want)) record = r;
+        }
+        if (!record) return { tool: 'SheetAuthorityAudit', id: want, found: false };
+        const fields = {};
+        SHEET_AUDIT_FIELDS.forEach(field => {
+            fields[field] = {
+                returned: field === 'sys' ? (record._sys === undefined ? null : record._sys)
+                    : field === 'encMaterial' ? null : (record[field] === undefined ? null : record[field]),
+                varied: field === 'sys' ? record._sysV === true : record[field + 'V'] === true,
+                sheet: record.sheetSpecs && record.sheetSpecs[field] !== undefined ? String(record.sheetSpecs[field]).slice(0, 100) : null,
+                trusted: resolveTrustedSheetSpec(record, field),
+                uncertainty: record.sheetUncertainty && record.sheetUncertainty[field] !== undefined ? String(record.sheetUncertainty[field]).slice(0, 100) : null
+            };
+        });
+        return {
+            tool: 'SheetAuthorityAudit',
+            id: auditId(record, 0),
+            found: true,
+            hasSheetSpecs: sheetAuditHasKeys(record.sheetSpecs),
+            sheetMetadata: sheetAuditBounded(record.sheetMetadata),
+            fields,
+            derivedRev: record._derivedRev === undefined ? null : record._derivedRev,
+            matchesFresh: record._derivedRev === DERIVED_REV
+        };
+    }
+
+    function sheetAuditFormat(report) {
+        const r = report && report.tool === 'SheetAuthorityAudit' && report.records ? report : sheetAuditReport(report || {});
+        const s = r.lastSync;
+        return [
+            `SheetAuthorityAudit ${r.appVersion || '(no app version)'} DERIVED_REV=${r.derivedRev} scope=${r.scope} scanned=${r.records.scanned} unique=${r.records.unique}`,
+            `Verdict: ${r.verdict}`,
+            `Loaded: sheetSpecs=${r.recordsWithSheetSpecs} sheetMetadata=${r.recordsWithSheetMetadata} sheetUncertainty=${r.recordsWithSheetUncertainty} rowWithoutTrustedSpecs=${r.recordsWithSheetRowButNoTrustedSpecs}`,
+            auditLine('Trusted fields', r.trustedFields),
+            auditLine('Uncertain fields', r.uncertainFields),
+            s ? `Last sync (${s.appVersion || '?'}, ${s.syncedAt ? new Date(s.syncedAt).toISOString() : '?'}): pages=${s.pages} withSheets=${s.pagesWithSheets} rows=${s.rows} records=${s.records} matchedRows=${s.matchedRows} withSpecs=${s.withSpecs} transform=${s.transform || '?'} revision=${s.revision === null || s.revision === undefined ? '?' : s.revision}`
+                : 'Last sync: (no stored sheet status)',
+            s ? auditLine('Last sync states', s.states) : null,
+            s ? auditLine('Last sync reasons', s.reasons) : null,
+            `Sample sheet-backed ids: ${r.sampleSheetBackedIds.join(' ') || '(none)'}`
+        ].filter(Boolean).join('\n');
+    }
+
+    const SheetAuthorityAudit = Object.freeze({
+        report: sheetAuditReport,
+        inspect: sheetAuditInspect,
+        format: sheetAuditFormat,
+        text: options => sheetAuditFormat(sheetAuditReport(options || {}))
+    });
+
     const InfoTableParser = Object.freeze({
         DERIVED_REV,
         SYSTEM_TYPES,
@@ -1854,12 +2012,14 @@
         deriveRecordsSync,
         deriveRecords,
         rankManufacturers,
-        SystemTypeAudit
+        SystemTypeAudit,
+        SheetAuthorityAudit
     });
 
     if (globalScope) {
         globalScope.InfoTableParser = InfoTableParser;
         globalScope.SystemTypeAudit = SystemTypeAudit;
+        globalScope.SheetAuthorityAudit = SheetAuthorityAudit;
     }
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = InfoTableParser;

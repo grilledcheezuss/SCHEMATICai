@@ -479,6 +479,123 @@ async function run() {
         ? new Response(null, { status: 302, headers: { Location: 'https://script.googleusercontent.com/macros/echo?test=1' } })
         : json(full));
     assert.strictEqual((await redirect.getSheetSnapshot(env, 'https://worker.example/')).revision, 1);
+
+    // v2.5.113: the browser-visible MAIN record carries the attached authority, and the page reports it.
+    const deployedColumns = ['id', 'sys', 'panelType', 'motors', 'volt', 'phase', 'mfg', 'pumpType', 'hp',
+        'encMaterial', 'nema', 'pdfVerified', 'confidence', 'flags'];
+    const deployedPayload = (rows, extra = {}) => ({ ok: true, schema: 1, revision: 7, hash: 'deployed-7',
+        updatedAt: '2026-10-09T00:00:00Z', rowCount: rows.length, columns: deployedColumns, rows, duplicates: [], ...extra });
+    const converterDesc = 'PHASE CONVERTER PANEL INCOMING PHASE/HZ 1/60 MOTOR 10 HP 230V 3PH BARNES NEMA 4X';
+    async function mainPage(sheetBody, airtable, workerEnv = env) {
+        const loadedWorker = loadWorker(async url => {
+            if (url === endpoint || url === workerEnv.SHEETS_ENDPOINT) return typeof sheetBody === 'function' ? sheetBody() : json(sheetBody);
+            if (url.includes('/Users')) return json({ records: [{ fields: { Username: 'user', Passcode: 'pass' } }] });
+            if (url.includes('/Feedback')) return json({ records: [] });
+            if (url.includes('/Control%20Panel%20Items')) return json({ records: airtable.map(([name, items]) => ({ fields: { 'Control Panel Name': name, Items: items } })) });
+            throw new Error('Unexpected fetch');
+        });
+        const response = await loadedWorker.worker.fetch(new Request('https://worker.example/?target=MAIN', {
+            headers: { 'X-Cox-User': 'user', 'X-Cox-Pass': 'pass' }
+        }), workerEnv);
+        assert.strictEqual(response.status, 200);
+        // Encrypted browser snapshots are JSON round-trips of exactly this body.
+        return { body: JSON.parse(await response.text()), status: response.headers.get('X-SCHEMATICA-SHEETS-STATUS'), calls: loadedWorker.calls };
+    }
+    for (const [sheetPhase, expected] of [['1/60', '1'], ['3/60', '3']]) {
+        const desc = sheetPhase === '1/60' ? converterDesc : converterDesc.replace('1/60', '3/60').replace('3PH', '1PH');
+        const page = await mainPage(deployedPayload([
+            ['CP-999821', 'Simplex', 'Phase Converter', '1', '240', sheetPhase, 'Barnes', 'Submersible', '10', 'Fiberglass', '4X', true, 1, '']
+        ]), [['CP-999821', desc]]);
+        const visible = page.body.records[0];
+        assert.strictEqual(visible.phase, expected, `CP-8210-like sheet phase ${sheetPhase} is the returned phase`);
+        assert.strictEqual(visible.phaseV, false);
+        assert.strictEqual(visible.sheetSpecs.phase, expected, 'trusted phase is observable in the loaded record');
+        assert.deepStrictEqual(visible.sheetMetadata, { panelType: 'Phase Converter' }, 'panelType stays metadata, not specs');
+        assert.strictEqual(visible.sheetSpecs.panelType, undefined);
+        assert.strictEqual(visible.desc, desc.toUpperCase(), 'full description preserved');
+        assert.strictEqual(parser.resolveTrustedSheetSpec(visible, 'phase'), expected);
+        assert.strictEqual(page.calls.length, 0, 'fully trusted converter row skips regex and ML');
+        assert.deepStrictEqual({ ...page.body.sheetStatus }, { state: 'active', refresh: 'ok', transform: 'v2.5.113',
+            rows: 1, records: 1, matchedRows: 1, withSpecs: 1, withMetadata: 1, withUncertainty: 0 });
+        assert.strictEqual(page.body.sheets.revision, 7);
+        assert.strictEqual(page.status, 'active; refresh=ok');
+    }
+    // Uncertain cells are visible as sheetUncertainty and only those fields fall back.
+    const uncertainPage = await mainPage(deployedPayload([
+        ['CP-999822', 'Duplex', 'Standard', '2', '480', 'Varies', 'Sulzer', '', 'TBD', '', '', false, 0, 'check']
+    ]), [['CP-999822', 'BARNES 7.5 HP 230V 1PH NEMA 4X FIBERGLASS']]);
+    const uncertainRecord = uncertainPage.body.records[0];
+    assert.deepStrictEqual({ ...uncertainRecord.sheetSpecs }, { sys: 'Duplex', volt: '480', mfg: 'SULZER' });
+    assert.deepStrictEqual({ ...uncertainRecord.sheetUncertainty }, { phase: 'Varies', hp: 'TBD' });
+    assert.strictEqual(uncertainRecord.phase, '1', 'uncertain sheet phase falls back to parser');
+    assert.strictEqual(uncertainRecord.hp, '7.5', 'uncertain sheet HP falls back to parser');
+    assert.strictEqual(uncertainRecord.mfg, 'SULZER', 'trusted manufacturer wins over description');
+    assert.strictEqual(uncertainRecord.volt, '480', 'trusted voltage wins over description');
+    assert.deepStrictEqual(Array.from(uncertainPage.calls.find(call => call.name === 'extractSpecsStrict').fields), ['hp', 'phase', 'enc'],
+        'only missing/uncertain fields are extracted');
+    // A row with no usable values keeps the complete legacy result; the row is still reported.
+    const unusablePage = await mainPage(deployedPayload([
+        ['CP-999823', 'N/A', '', '', '', '', 'Unknown', '', '', '', '', '', '', ''],
+        ['CP-999824', '', '', '', '', '', 'Flygt', '', '', '', '', '', '', '']
+    ]), [['CP-999823', 'BARNES 5 HP 240V 1PH NEMA 4X'], ['CP-999825', 'FLYGT 20 HP 480V 3PH NEMA 4X']]);
+    const [unusable, absent] = unusablePage.body.records;
+    assert.strictEqual(unusable.sheetSpecs, undefined, 'no usable sheet values attach no specs');
+    assert.deepStrictEqual({ ...unusable.sheetUncertainty }, { sys: 'N/A', mfg: 'Unknown' });
+    assert.deepStrictEqual([unusable.mfg, unusable.hp, unusable.volt, unusable.phase, unusable.enc], ['BARNES', '5', '240', '1', '4X'],
+        'unusable row uses the full legacy parser result; bare 4X stays conservative');
+    assert.strictEqual(absent.sheetSpecs, undefined);
+    assert.deepStrictEqual([absent.mfg, absent.hp, absent.volt, absent.phase], ['FLYGT', '20', '480', '3']);
+    assert.deepStrictEqual({ ...unusablePage.body.sheetStatus }, { state: 'active', refresh: 'ok', transform: 'v2.5.113',
+        rows: 2, records: 2, matchedRows: 1, withSpecs: 0, withMetadata: 0, withUncertainty: 1 });
+
+    // Real-world ID spellings on either side still match the same panel; revisions never collapse.
+    for (const [sheetId, airtableId] of [['CP 999826', 'CP-999826'], ['CP999826', 'CP-999826'], ['CP\u2013999826', '999826.pdf'],
+        ['999826-R1', 'CP-999826r1'], ['CP-999826 R1', 'CP-999826R1.dwg'], [999826, 'CP-999826']]) {
+        const page = await mainPage(deployedPayload([[sheetId, 'Duplex', '', '', '', '1/60', '', '', '', '', '', '', '', '']]),
+            [[airtableId, 'MOTOR 3PH']]);
+        assert.strictEqual(page.body.records[0].sheetSpecs?.phase, '1', `${sheetId} matches ${airtableId}`);
+    }
+    assert.strictEqual(helpers.normalizeSheetPanelId('999826-R1'), '999826R1');
+    assert.strictEqual(helpers.normalizeSheetPanelId('CP 999826'), '999826');
+    assert.strictEqual(helpers.normalizeSheetPanelId('CPX999826'), null);
+    assert.strictEqual(helpers.normalizeSheetPanelId('999826-1'), null, 'non-revision suffixes stay unmatched');
+
+    // Compatible payload shapes: object rows, omitted rowCount, trailing blank cells, numeric hash.
+    const objectRows = deployedPayload([{ id: 'CP-999827', phase: '1/60', sys: 'Simplex' }], { rowCount: undefined, hash: 12345 });
+    const objectSnapshot = helpers.compileSheetSnapshot(JSON.parse(JSON.stringify(objectRows)));
+    assert.deepStrictEqual({ ...objectSnapshot.index.get('999827') }, { sys: 'Simplex', phase: '1' });
+    const shortRows = helpers.compileSheetSnapshot(deployedPayload([['999828', 'Duplex']]));
+    assert.deepStrictEqual({ ...shortRows.index.get('999828') }, { sys: 'Duplex' });
+    assert.throws(() => helpers.compileSheetSnapshot(deployedPayload([[...Array(15).fill('1')]])), /Invalid Sheets snapshot/,
+        'rows wider than columns are rejected');
+    assert.throws(() => helpers.compileSheetSnapshot({ ...deployedPayload([['999828', 'Duplex']]), ok: undefined, error: 'Denied' }),
+        /Invalid Sheets snapshot/, 'Apps Script error payloads are rejected');
+    const workspace = { ...env, SHEETS_ENDPOINT: 'https://script.google.com/a/macros/example.com/s/test-deployment/exec?token=x' };
+    const workspacePage = await mainPage(deployedPayload([['999829', 'Duplex', '', '', '', '3/60', '', '', '', '', '', '', '', '']]),
+        [['CP-999829', 'MOTOR 1PH']], workspace);
+    assert.strictEqual(workspacePage.body.records[0].phase, '3', 'Workspace Apps Script endpoints are accepted');
+
+    // Unavailable overlays are reported with a secret-free reason; fallback output is unchanged.
+    for (const [sheetBody, reason] of [
+        [{ ...deployedPayload([['999830', 'Duplex']]), ok: false }, 'payload'],
+        [deployedPayload([['999830', 'Duplex']], { columns: ['hp', 'volt'], rows: [['1', '2']] }), 'columns'],
+        [deployedPayload([['not-an-id', 'Duplex']]), 'no-ids'],
+        [() => new Response('<html>Sign in</html>'), 'json'],
+        [() => new Response('denied', { status: 403 }), 'http-403'],
+        [() => new Response(null, { status: 302, headers: { Location: 'https://accounts.google.com/ServiceLogin' } }), 'redirect'],
+        [() => { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }, 'timeout']
+    ]) {
+        const page = await mainPage(sheetBody, [['CP-999830', 'BARNES 5 HP 240V 1PH']]);
+        assert.strictEqual(page.body.sheets, null);
+        assert.deepStrictEqual({ ...page.body.sheetStatus }, { state: 'unavailable', reason, transform: 'v2.5.113',
+            rows: 0, records: 1, matchedRows: 0, withSpecs: 0, withMetadata: 0, withUncertainty: 0 }, `${reason} is reported`);
+        assert.strictEqual(page.status, `unavailable; reason=${reason}`);
+        assert.strictEqual(page.body.records[0].phase, '1', 'unavailable overlay keeps legacy fallback');
+        assert.strictEqual(JSON.stringify(page.body).includes('token'), false, 'no endpoint details are exposed');
+    }
+    const unconfigured = await mainPage(full, [['CP-999830', 'BARNES 5 HP 240V 1PH']], { AIRTABLE_READ_KEY: 'test-read', AIRTABLE_WRITE_KEY: 'test-write' });
+    assert.strictEqual(unconfigured.body.sheetStatus.state, 'unconfigured');
+    assert.strictEqual(unconfigured.status, 'unconfigured');
     console.log('Sheets overlay, cache, MAIN, snapshot restore, and frontend matcher regressions passed');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });
