@@ -84,6 +84,19 @@ async function run() {
     assert.strictEqual(helpers.normalizeSheetSpec('hp', '1/2 HP'), '0.5');
     assert.strictEqual(helpers.normalizeSheetSpec('hp', '1/0'), null);
     assert.strictEqual(helpers.normalizeSheetSpec('volt', '480/240'), null);
+    for (const [value, expected] of [
+        ['1/60', '1'], ['3/60', '3'], [' 1 / 60 ', '1'], [' 3 / 60 ', '3'],
+        ['1', '1'], [3, '3'], ['1 PH', '1'], ['3 phase', '3'], ['1Ø', '1'],
+        ['Single', '1'], ['Three', '3'],
+        ['', null], ['N/A', null], ['Multiple', null], ['2/60', null],
+        ['1/60/3', null], ['1/60 or 3/60', null], ['1/600', null], [null, null]
+    ]) {
+        assert.strictEqual(helpers.normalizeSheetSpec('phase', value), expected);
+        const phaseSnapshot = helpers.compileSheetSnapshot(payload([['1234R1', '', '', '', value, '', '', '']]));
+        const phaseRecord = helpers.applySheetSpecs({ ...baseline, phase: '3' }, phaseSnapshot);
+        assert.strictEqual(phaseRecord.phase, expected || '3', 'valid sheet phase overrides; unusable phase falls back');
+        assert.strictEqual(phaseRecord.phaseV, expected ? false : true);
+    }
     assert.strictEqual(helpers.normalizeSheetSpec('mfg', '<img src=x>'), null);
     for (const value of ['Barnes & Sulzer', 'Barnes&SULZER', 'Barnes AND Sulzer', 'Barnes/Sulzer']) {
         assert.strictEqual(helpers.normalizeSheetSpec('mfg', value), null, 'manufacturer choices fall back');
@@ -137,7 +150,7 @@ async function run() {
     assert.strictEqual(HorsepowerMatcher.matches(record, '7.5').matches, true);
     assert.strictEqual(HorsepowerMatcher.matches(baseline, '5').matches, true);
 
-    let current = full;
+    let current = payload(full.rows.map(row => row.map((value, index) => index === 4 ? '1/60' : value)));
     let failed = false;
     let sheetCalls = 0;
     let mainCalls = 0;
@@ -152,7 +165,7 @@ async function run() {
         if (url.includes('/Feedback')) return json({ records: [] });
         if (url.includes('/Control%20Panel%20Items')) {
             mainCalls++;
-            return json({ records: [{ fields: { 'Control Panel Name': 'CP-1234R1', Items: baseline.desc } }] });
+            return json({ records: [{ fields: { 'Control Panel Name': 'CP-1234R1', Items: baseline.desc + '\n3 PHASE' } }] });
         }
         throw new Error('Unexpected fetch');
     };
@@ -165,11 +178,14 @@ async function run() {
         assert.strictEqual(response.status, 200);
         return response.json();
     };
-    loaded.heal({ '1234R1': { hp: '20', mfg: 'FLYGT', category: 'low_voltage', reject_keywords: ['noise'] } });
+    loaded.heal({ '1234R1': { hp: '20', mfg: 'FLYGT', phase: '3', category: 'low_voltage', reject_keywords: ['noise'] } });
     const concurrent = await Promise.all([main(), main(), main()]);
     assert.strictEqual(sheetCalls, 1, 'concurrent requests share one sheet fetch');
     assert.strictEqual(mainCalls, 1, 'concurrent MAIN pages coalesce');
     assert.strictEqual(concurrent[0].records[0].hp, '7.5', 'sheet overrides healer canonical specs');
+    assert.strictEqual(concurrent[0].records[0].phase, '1', 'first MAIN response uses sheet 1/60 over parsed/healed 3');
+    assert.strictEqual(concurrent[0].records[0].sheetSpecs.phase, '1');
+    assert.strictEqual(concurrent[0].records[0].phaseV, false);
     assert.strictEqual(concurrent[0].records[0].category, 'low_voltage');
     await main();
     assert.strictEqual(sheetCalls, 1, 'cache hit does not refetch sheet');
@@ -179,11 +195,12 @@ async function run() {
     assert.strictEqual(mainCalls, 1, 'unchanged revision keeps MAIN page cache');
     current = payload([['1234R1', '', '', '208', '', '', '', '']], 2);
     loaded.advance(5 * 60 * 1000 + 1);
-    loaded.heal({ '1234R1': { hp: '20', category: 'low_voltage' } });
+    loaded.heal({ '1234R1': { hp: '20', phase: '3', category: 'low_voltage' } });
     const changed = await main();
     assert.strictEqual(changed.sheets.revision, 2);
     assert.strictEqual(changed.records[0].volt, '208');
     assert.strictEqual(changed.records[0].hp, '20', 'partial sheet retains healer fallback');
+    assert.strictEqual(changed.records[0].phase, '3', 'missing sheet phase retains healer fallback');
     assert.strictEqual(mainCalls, 2, 'new revision bypasses old MAIN pages');
     current = { ...current, rows: [['1234R1', '', '', '575', '', '', '', '']], hash: 'changed-hash' };
     loaded.advance(5 * 60 * 1000 + 1);
@@ -204,6 +221,7 @@ async function run() {
     failed = true;
     const empty = loadWorker(fetchImpl);
     assert.strictEqual((await main(empty.worker)).sheets, null, 'initial failure leaves MAIN functional');
+    assert.strictEqual((await main(empty.worker)).records[0].phase, '3', 'unavailable sheet retains parsed phase');
     const disabled = await empty.getSheetSnapshot({}, 'https://worker.example/');
     assert.strictEqual(disabled, null);
     const unsafe = loadWorker(async () => { throw new Error('Must not fetch unsafe URL'); });

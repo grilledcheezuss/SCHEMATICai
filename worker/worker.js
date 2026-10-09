@@ -86,6 +86,7 @@ function normalizeSheetSpec(field, raw) {
         return isValidVoltage(value) ? value : null;
     }
     if (field === 'phase') {
+        value = value.replace(/^([13])\s*\/\s*60$/, '$1');
         value = value.replace(/\s*(?:PH|PHASE|Ø)$/, '').trim();
         value = ({ SINGLE: '1', THREE: '3' })[value] || value;
         return isValidPhase(value) ? value : null;
