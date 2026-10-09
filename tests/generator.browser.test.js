@@ -552,23 +552,31 @@ async function testProfileNameEscaping(browser) {
     await openFixture(browser);
     await browser.evaluate(() => __activate());
     const result = await browser.evaluate(async () => {
-        const name = 'Synthetic "<span data-profile-injection-probe="true">markup</span>';
-        ProfileManager.saveProfile(name, [{
+        const name = 'Synthetic "><img data-profile-injection-probe="true" src=x onerror="window.__profileInjection=1">';
+        window.__profileInjection = 0;
+        Generator.importProfiles({ [name]: [{
             map: 'custom', x: 0.1, y: 0.2, w: 0.3, h: 0.1, text: 'SAFE PROFILE TEXT', fontSize: 14
-        }]);
+        }] });
         await __choose(2, 'CUSTOM:' + name);
+        document.getElementById('new-profile-name').value = name;
+        ProfileManager.saveCurrentPageAsProfile();
         const selected = __wrapper(2).querySelector('.page-profile-select').selectedOptions[0];
         return {
             id: Generator.getState().pages[2].profileId, expected: 'CUSTOM:' + name,
-            label: selected.textContent, name, probes: document.querySelectorAll('[data-profile-injection-probe]').length,
+            label: selected.textContent, name,
+            probes: document.querySelectorAll('[data-profile-injection-probe], [onerror*="__profileInjection"]').length,
+            executed: window.__profileInjection !== 0,
             text: __boxes(2)[0].querySelector('span').textContent,
-            persisted: !!Generator.exportProfiles().profiles[name]
+            persisted: Generator.exportProfiles().profiles[name]?.[0]?.text === 'SAFE PROFILE TEXT',
+            builtins: Object.keys(LAYOUT_RULES).every(key => Array.from(
+                __wrapper(2).querySelector('.page-profile-select').options).some(option => option.value === 'BUILTIN:' + key))
         };
     });
-    check(result.id === result.expected && result.label.includes(result.name) && result.probes === 0,
-        'Quoted/HTML-looking profile names retain exact IDs and labels without creating HTML elements');
+    check(result.id === result.expected && result.label.includes(result.name) && result.probes === 0 && !result.executed,
+        'Imported HTML/event-handler profile names retain exact IDs and labels without injection or execution');
     check(result.text === 'SAFE PROFILE TEXT' && result.persisted,
-        'Escaped custom profile remains selectable, rendered and persisted');
+        'Imported malicious-name profile remains selectable, rendered, savable and persisted');
+    check(result.builtins, 'Real profile dropdown exposes every builtin with stable canonical IDs');
     const limits = await browser.evaluate(() => {
         const before = localStorage.getItem('cox_custom_profiles');
         const revision = Generator.getState().profileRevision;
