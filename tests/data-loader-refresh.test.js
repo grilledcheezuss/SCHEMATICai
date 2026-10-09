@@ -480,6 +480,40 @@ async function flushAsync() {
     assert(syncProgressUpdates.includes('✅ APPLYING 99%'), 'apply phase should remain below 100% until sync fully completes');
     assertEqual(localStorage.getItem('cox_db_complete'), 'true', 'successful sync should still mark cache complete');
     assertEqual(localStorage.getItem(DataLoader.DATA_RELEASE_VERSION_KEY), APP_VERSION, 'only successful sync marks release data fresh');
+    assertEqual(JSON.stringify(JSON.parse(localStorage.getItem(DataLoader.SHEET_AUTHORITY_KEY)).states), JSON.stringify({ 'not-reported': 2 }),
+        'pages from a Worker without sheetStatus are recorded as not-reported');
+
+    resetHarness();
+    console.log('🧪 Testing successful sync records Worker Sheets authority status');
+    const sheetPages = [
+        { records: [{ id: '8210', phase: '1', sheetSpecs: { phase: '1' } }], offset: 'page-2',
+            sheets: { revision: 7, hash: 'h7', updatedAt: '2026-10-09T00:00:00Z' },
+            sheetStatus: { state: 'active', refresh: 'ok', transform: 'v2.5.113', rows: 8000, records: 1, matchedRows: 1, withSpecs: 1, withMetadata: 1, withUncertainty: 0 } },
+        { records: [{ id: '8211', phase: '3' }], sheets: null,
+            sheetStatus: { state: 'unavailable', reason: 'timeout', transform: 'v2.5.113', rows: 0, records: 1, matchedRows: 0, withSpecs: 0, withMetadata: 0, withUncertainty: 0 } }
+    ];
+    networkState.fetch = async () => ({ status: 200, json: async () => sheetPages.shift() || { records: [] } });
+    cacheState.saveSnapshot = async () => ({ encryptMs: 0, writeMs: 0, totalMs: 0 });
+    DataLoader.acquireSyncLock = async () => true;
+    DataLoader.releaseSyncLock = async () => {};
+    assert((await DataLoader.fetchPartition('desc', createSearchButton(), { background: true, reason: 'test-sheets' })).success === true,
+        'sheet-status sync succeeds');
+    const sheetAuthority = JSON.parse(localStorage.getItem(DataLoader.SHEET_AUTHORITY_KEY));
+    assertEqual(JSON.stringify([sheetAuthority.pages, sheetAuthority.pagesWithSheets, sheetAuthority.rows, sheetAuthority.records,
+        sheetAuthority.matchedRows, sheetAuthority.withSpecs, sheetAuthority.withMetadata, sheetAuthority.revision, sheetAuthority.hash,
+        sheetAuthority.transform, sheetAuthority.appVersion]), JSON.stringify([2, 1, 8000, 2, 1, 1, 1, '7', 'h7', 'v2.5.113', APP_VERSION]),
+        'sync summary keeps only counts and the public sheet identity');
+    assertEqual(JSON.stringify(sheetAuthority.states), JSON.stringify({ active: 1, unavailable: 1 }), 'per-page authority states');
+    assertEqual(JSON.stringify(sheetAuthority.reasons), JSON.stringify({ timeout: 1 }), 'unavailable reasons are counted');
+    assert(windowState.SHEET_AUTHORITY.withSpecs === 1, 'summary is exposed for console diagnostics');
+    assert(windowState.LOCAL_DB[0].sheetSpecs.phase === '1', 'Worker-attached sheetSpecs reach LOCAL_DB unchanged');
+    localStorage.setItem(DataLoader.SHEET_AUTHORITY_KEY, '{"keep":true}');
+    const maxPageRetries = DataLoader.MAX_PAGE_RETRIES;
+    DataLoader.MAX_PAGE_RETRIES = 0;
+    networkState.fetch = async () => { throw new Error('offline'); };
+    await DataLoader.fetchPartition('desc', createSearchButton(), { background: true, reason: 'test-sheets-failure' }).catch(() => null);
+    DataLoader.MAX_PAGE_RETRIES = maxPageRetries;
+    assertEqual(localStorage.getItem(DataLoader.SHEET_AUTHORITY_KEY), '{"keep":true}', 'failed sync never overwrites the last stored status');
 
     console.log('🧪 Testing release-triggered atomic refresh and failure retry');
     for (const failure of ['network', 'credentials', 'quota', 'interruption']) {
