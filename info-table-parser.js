@@ -5,8 +5,8 @@
 // exceeded the Cloudflare CPU limit. Everything here runs once per record in the
 // browser when a snapshot is applied, never per search.
 (function (globalScope) {
-    // v2.5.109: bounded caption-title and system-line arbitration; refresh existing snapshots.
-    const DERIVED_REV = 11;
+    // Refresh cached derivations for per-field Sheets authority.
+    const DERIVED_REV = 12;
     const SYSTEM_TYPES = Object.freeze(['Simplex', 'Duplex', 'Triplex', 'Quadraplex']);
     const SYSTEM_WORDS = Object.freeze({
         SIMPLEX: 'Simplex',
@@ -58,6 +58,54 @@
     });
     const MFG_MENU_LIMIT = 12;
     const MFG_REQUIRED = 'SULZER';
+
+    // Only complete, bounded cells are authoritative; row confidence is not evidence.
+    function normalizeTrustedSheetSpec(field, value) {
+        if (typeof value !== 'string' && typeof value !== 'number') return null;
+        const text = String(value).trim().toUpperCase().replace(/\s+/g, ' ');
+        if (!text || text.length > 100) return null;
+        if (field === 'mfg') {
+            const name = text.replace(/[-_.]/g, ' ').replace(/\s+/g, ' ');
+            return MFG_ALIAS_LIST.find(([alias]) => alias === name)?.[1] || null;
+        }
+        if (field === 'sys') return SYSTEM_WORDS[text] || null;
+        if (field === 'phase') {
+            const cell = text.replace(/\s*(?:PH|PHASE)$/, '').trim();
+            const match = /^(1|3)(?:\s*\/\s*60(?:\s*HZ)?)?$/.exec(cell);
+            return match ? match[1] : null;
+        }
+        if (field === 'volt') {
+            const match = /^(110|115|120|208|220|230|240|277|440|460|480|575|600|120\s*\/\s*240|120\s*\/\s*208|277\s*\/\s*480)\s*(?:V|VAC|VOLTS?)?$/.exec(text);
+            if (!match) return null;
+            const volts = match[1].replace(/\s/g, '');
+            return ({ '110': '120', '115': '120', '220': '240', '230': '240',
+                '440': '480', '460': '480', '600': '575',
+                '120/240': '240', '120/208': '208', '277/480': '480' })[volts] || volts;
+        }
+        if (field === 'hp') {
+            const cell = text.replace(/\s*(?:HP|H\.P\.?|HORSEPOWER)$/, '').trim();
+            let hp;
+            if (/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(cell)) hp = Number(cell);
+            else {
+                const fraction = /^(?:(\d+)[ -])?(\d+)\/(\d+)$/.exec(cell);
+                const unicode = /^(?:(\d+)\s*)?([½¼¾])$/.exec(cell);
+                if (fraction && Number(fraction[3]) > 0 && Number(fraction[2]) < Number(fraction[3])) {
+                    hp = Number(fraction[1] || 0) + Number(fraction[2]) / Number(fraction[3]);
+                } else if (unicode) hp = Number(unicode[1] || 0) + ({ '½': 0.5, '¼': 0.25, '¾': 0.75 })[unicode[2]];
+            }
+            return Number.isFinite(hp) && hp > 0 && hp <= 10000 ? String(hp) : null;
+        }
+        if (field === 'encMaterial') {
+            if (/^(?:FG|FIBERGLASS|FIBREGLASS)$/.test(text)) return 'Fiberglass';
+            if (/^(?:SS|STAINLESS STEEL)(?:\s*(?:304|316|\((?:304|316)\)))?$/.test(text)) return 'Stainless Steel';
+            if (/^(?:PS|PAINTED STEEL)$/.test(text)) return 'Painted Steel';
+        }
+        return null;
+    }
+
+    function resolveTrustedSheetSpec(record, field) {
+        return normalizeTrustedSheetSpec(field, record?.sheetSpecs?.[field]);
+    }
 
     // Maximum characters read after a label. Values are short table cells.
     const VALUE_WINDOW = 40;
@@ -601,7 +649,7 @@
     }
 
     // One linear label scan; all forward/reverse work is bounded per info cell.
-    function extractInfoRows(desc) {
+    function extractInfoRows(desc, skip = {}) {
         const rows = { panelTypes: [], motorCounts: [], pumpMfgs: [], encMaterials: [] };
         Object.defineProperty(rows, 'associations', { value: [] });
         Object.defineProperty(rows, 'panelTypeCombinations', { value: [] });
@@ -625,6 +673,7 @@
                 && (tableAnchor(scanned[i - 1]) || tableAnchor(scanned[i + 1]))
                 && /[\n\r|]/.test(text.slice(Math.max(configurationBlock.end, label.start - REVERSE_WINDOW), label.start))) configurationBlock = null;
             if (label.label !== 'CONFIGURATION') return true;
+            if (skip.sys) return true;
             const supported = [scanned[i - 1], scanned[i + 1]].some(neighbor => neighbor
                 && Math.abs(neighbor.start - label.start) <= REVERSE_WINDOW
                 && /^(?:VOLTAGE|VOLTS|PHASE|NO\.?|NUMBER|QTY|PUMP MANUFACTURER|ENCLOSURE)/.test(neighbor.label));
@@ -644,6 +693,9 @@
             label.systemBlocked = !!contextBlock;
             label.systemBlockedBy = contextBlock ? contextBlock.label : null;
             if (!label.kind) return;
+            if ((skip.sys && (label.kind === 'panelTypes' || label.kind === 'motorCounts'))
+                || (skip.mfg && label.kind === 'pumpMfgs')
+                || (skip.encMaterial && label.kind === 'encMaterials')) return;
             const next = labels[i + 1];
             let value = readValue(text, label.end, next ? next.start : text.length, label.kind);
             if (label.kind === 'panelTypes' && !contextBlock && completeCell(text, label, next)
@@ -957,7 +1009,9 @@
         return false;
     }
 
-    function deriveFromRows(rows, desc, systemRows = rows, systemDesc = desc) {
+    function deriveSystemFromRows(systemRows, systemDesc) {
+        let sys = null;
+        let sysV = false;
         const explicit = new Set();
         const ambiguous = [];
         systemRows.panelTypes.forEach(value => {
@@ -972,8 +1026,6 @@
             if (count !== null) counts.add(count);
         });
 
-        let sys = null;
-        let sysV = false;
         let source = 'none';
         let direction = null;
         let candidates = SYSTEM_TYPES.filter(sys => explicit.has(sys));
@@ -1074,10 +1126,15 @@
             confidence: sys ? (sysV ? 'uncertain' : 'verified') : 'none',
             reasons: Object.freeze(reasons)
         });
+        return { sys, sysV, sysEvidence };
+    }
 
+    function deriveFromRows(rows, desc, systemRows = rows, systemDesc = desc, skip = {}) {
+        const { sys, sysV, sysEvidence } = skip.sys
+            ? { sys: null, sysV: false, sysEvidence: null } : deriveSystemFromRows(systemRows, systemDesc);
         const mfgs = new Set();
         let unknownMfg = false;
-        rows.pumpMfgs.forEach(value => {
+        if (!skip.mfg) rows.pumpMfgs.forEach(value => {
             const mfg = normalizeManufacturer(value);
             if (mfg) mfgs.add(mfg);
             else unknownMfg = true;
@@ -1145,8 +1202,8 @@
     function resolveEnclosureMaterial(record) {
         const none = { materials: [], varied: false, source: 'none' };
         if (!record || typeof record !== 'object') return none;
-        const sheetMaterial = record.sheetSpecs?.encMaterial;
-        if (ENCLOSURE_MATERIALS.includes(sheetMaterial)) {
+        const sheetMaterial = resolveTrustedSheetSpec(record, 'encMaterial');
+        if (sheetMaterial) {
             return { materials: [sheetMaterial], varied: false, source: 'sheet' };
         }
         const evidence = record._encEvidence;
@@ -1190,8 +1247,8 @@
     }
 
     function preferSheetSystem(record, derived) {
-        const sys = record?.sheetSpecs?.sys;
-        if (!['Simplex', 'Duplex', 'Triplex', 'Quadraplex'].includes(sys)) return derived;
+        const sys = resolveTrustedSheetSpec(record, 'sys');
+        if (!sys) return derived;
         return { ...derived, sys, sysV: false, sysEvidence: {
             source: 'sheet', candidates: [sys], direction: null, confidence: 'verified', reasons: []
         } };
@@ -1202,16 +1259,19 @@
     function deriveRecord(record) {
         if (!record || typeof record !== 'object') return false;
         if (record._derivedRev === DERIVED_REV) return false;
-        const rows = extractInfoRows(record.desc);
-        const systemDesc = systemTypeView(record.desc);
-        const systemRows = systemDesc === record.desc ? rows : extractInfoRows(systemDesc);
-        const derived = preferSheetSystem(record, deriveFromRows(rows, record.desc, systemRows, systemDesc));
-        const sheet = record.sheetSpecs || {};
+        const sheet = Object.fromEntries(['sys', 'mfg', 'encMaterial'].map(field => [field, resolveTrustedSheetSpec(record, field)]));
+        const desc = sheet.sys && sheet.mfg && sheet.encMaterial ? '' : record.desc;
+        const rows = extractInfoRows(desc, sheet);
+        const systemDesc = sheet.sys ? '' : systemTypeView(desc);
+        const systemRows = sheet.sys || systemDesc === desc ? rows : extractInfoRows(systemDesc, sheet);
+        const derived = preferSheetSystem(record, deriveFromRows(rows, desc, systemRows, systemDesc, sheet));
         defineDerived(record, '_sys', derived.sys);
         defineDerived(record, '_sysV', derived.sysV);
         defineDerived(record, '_sysEvidence', derived.sysEvidence);
         defineDerived(record, '_pumpMfg', sheet.mfg || derived.pumpMfg);
-        defineDerived(record, '_encEvidence', deriveMaterialFromRows(rows, record.desc));
+        defineDerived(record, '_encEvidence', sheet.encMaterial ? Object.freeze({
+            status: 'row', materials: Object.freeze([sheet.encMaterial]), varied: false, fgSignal: false, ssSignal: false
+        }) : deriveMaterialFromRows(rows, desc));
         defineDerived(record, '_derivedRev', DERIVED_REV);
         return true;
     }
@@ -1258,7 +1318,7 @@
             const id = String(record.id);
             if (seen.has(id)) continue;
             seen.add(id);
-            const mfg = record._pumpMfg;
+            const mfg = resolveTrustedSheetSpec(record, 'mfg') || record._pumpMfg;
             if (!mfg || (allowedSet && !allowedSet.has(mfg))) continue;
             counts[mfg] = (counts[mfg] || 0) + 1;
             eligibleRecords++;
@@ -1772,6 +1832,8 @@
         normalizeSystemType,
         parseMotorCount,
         normalizeManufacturer,
+        normalizeTrustedSheetSpec,
+        resolveTrustedSheetSpec,
         matchesManufacturer,
         extractInfoRows,
         deriveFromDesc,

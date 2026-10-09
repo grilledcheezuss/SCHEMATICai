@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.110
+// 🧠 SCHEMATICA ai WORKER v2.5.111
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -62,15 +62,15 @@ const SHEET_FIELDS = {
     hp: 'hp', horsepower: 'hp', motorhp: 'hp', motorhorsepower: 'hp',
     volt: 'volt', voltage: 'volt', servicevoltage: 'volt', panelvoltage: 'volt',
     phase: 'phase', servicephase: 'phase',
-    enc: 'enc', enclosure: 'enc', nemarating: 'enc', enclosurerating: 'enc',
-    sys: 'sys', systemtype: 'sys', paneltype: 'sys',
+    enc: 'enc', enclosure: 'enc', nema: 'enc', nemarating: 'enc', enclosurerating: 'enc',
+    sys: 'sys', systemtype: 'sys', paneltype: 'panelType',
     encmaterial: 'encMaterial', enclosurematerial: 'encMaterial', material: 'encMaterial'
 };
 
 function normalizeSheetSpec(field, raw) {
     if (typeof raw !== 'string' && typeof raw !== 'number') return null;
     let value = String(raw).trim().toUpperCase().replace(/\s+/g, ' ');
-    if (!value || value.length > 100 || /\b(?:N\/?A|VARIES|VARIED|MULTIPLE|PARTIAL|UNKNOWN|TBD|NONE|NOT APPLICABLE|NOT AVAILABLE)\b/.test(value)
+    if (!value || value.length > 100 || /\b(?:N\/?A|VARIES|VARIED|MULTIPLE|MIXED|PARTIAL|UNKNOWN|UNCERTAIN|UNSURE|TBD|NONE|NOT APPLICABLE|NOT AVAILABLE)\b/.test(value)
         || /^(?:[-–—?]+|NULL)$/.test(value)) return null;
     if (field === 'hp') {
         value = value.replace(/\s*(?:HP|HORSEPOWER)$/, '').trim();
@@ -81,13 +81,14 @@ function normalizeSheetSpec(field, raw) {
         return /^\d+(?:\.\d+)?$/.test(value) && isValidHP(value) ? String(Number(value)) : null;
     }
     if (field === 'volt') {
-        value = value.replace(/\s*(?:V|VAC|VOLTS?)$/, '').trim();
+        value = value.replace(/\s*(?:\(V\)|V|VAC|VOLTS?)$/, '').trim();
+        value = ({ '120/240': '240', '120/208': '208', '277/480': '480' })[value.replace(/\s*\/\s*/g, '/')] || value;
         value = ({ '110': '120', '115': '120', '220': '240', '230': '240', '460': '480' })[value] || value;
         return isValidVoltage(value) ? value : null;
     }
     if (field === 'phase') {
-        value = value.replace(/^([13])\s*\/\s*60$/, '$1');
         value = value.replace(/\s*(?:PH|PHASE|Ø)$/, '').trim();
+        value = value.replace(/^([13])\s*\/\s*60$/, '$1');
         value = ({ SINGLE: '1', THREE: '3' })[value] || value;
         return isValidPhase(value) ? value : null;
     }
@@ -96,6 +97,7 @@ function normalizeSheetSpec(field, raw) {
             QUADRAPLEX: 'Quadraplex', QUADRUPLEX: 'Quadraplex', QUADPLEX: 'Quadraplex' })[value] || null;
     }
     if (field === 'encMaterial') {
+        value = value.replace(/^(STAINLESS STEEL)\s*\((?:304|316)\)$/, '$1');
         return ({ FIBERGLASS: 'Fiberglass', 'FIBREGLASS': 'Fiberglass', FG: 'Fiberglass',
             'STAINLESS STEEL': 'Stainless Steel', SS: 'Stainless Steel',
             'PAINTED STEEL': 'Painted Steel' })[value] || null;
@@ -105,7 +107,8 @@ function normalizeSheetSpec(field, raw) {
         return /^(?:1|3R|4|4X|4XFG|4XSS|12|POLY)$/.test(value) ? value : null;
     }
     if (field === 'mfg' && /^[A-Z][A-Z0-9 .'-]*$/.test(value) && !/\b(?:OR|AND)\b/.test(value)) {
-        const canonical = Object.keys(EXACT_MFGS).find(key => key === value || EXACT_MFGS[key].includes(value));
+        const alias = value.replace(/[-_.]/g, ' ').replace(/\s+/g, ' ');
+        const canonical = Object.keys(EXACT_MFGS).find(key => key === alias || EXACT_MFGS[key].includes(alias));
         return canonical || value;
     }
     return null;
@@ -131,9 +134,11 @@ function compileSheetSnapshot(payload, previous = null) {
     if (fields.filter(f => f === 'id').length !== 1
         || fields.filter(Boolean).length !== new Set(fields.filter(Boolean)).size
         || !fields.some(f => f && f !== 'id')) throw new Error('Invalid Sheets columns');
-    const version = JSON.stringify([payload.schema, payload.revision, payload.hash]);
+    const version = JSON.stringify(['v2.5.111', payload.schema, payload.revision, payload.hash]);
     if (previous?.version === version) return previous;
     const index = new Map();
+    const uncertainty = new Map();
+    const metadata = new Map();
     const duplicateIds = new Set();
     if (payload.duplicates !== undefined) {
         if (!Array.isArray(payload.duplicates)) throw new Error('Invalid Sheets duplicates');
@@ -149,16 +154,31 @@ function compileSheetSnapshot(payload, previous = null) {
         if (!id) continue;
         if (index.has(id)) { duplicateIds.add(id); continue; }
         const specs = {};
+        const rejected = {};
+        const meta = {};
         fields.forEach((field, column) => {
             if (!field || field === 'id') return;
+            if (field === 'panelType') {
+                if (typeof row[column] === 'string') meta.panelType = row[column].slice(0, 100);
+                return;
+            }
             const value = normalizeSheetSpec(field, row[column]);
             if (value !== null) specs[field] = value;
+            else if (['string', 'number'].includes(typeof row[column]) && String(row[column]).trim()) {
+                rejected[field] = String(row[column]).slice(0, 100);
+            }
         });
         index.set(id, specs);
+        if (Object.keys(rejected).length) uncertainty.set(id, rejected);
+        if (Object.keys(meta).length) metadata.set(id, meta);
     }
-    for (const id of duplicateIds) index.delete(id);
+    for (const id of duplicateIds) {
+        index.delete(id);
+        uncertainty.delete(id);
+        metadata.delete(id);
+    }
     if (!index.size) throw new Error('Sheets snapshot has no unambiguous panel IDs');
-    return { version, index, revision: payload.revision, hash: payload.hash, updatedAt: payload.updatedAt };
+    return { version, index, uncertainty, metadata, revision: payload.revision, hash: payload.hash, updatedAt: payload.updatedAt };
 }
 
 async function fetchSheetPayload(endpoint) {
@@ -249,7 +269,10 @@ async function getSheetSnapshot(env, requestUrl) {
 }
 
 function applySheetSpecs(record, snapshot) {
-    const specs = snapshot?.index.get(normalizeSheetPanelId(record.id));
+    const id = normalizeSheetPanelId(record.id);
+    if (snapshot?.uncertainty?.has(id)) record.sheetUncertainty = snapshot.uncertainty.get(id);
+    if (snapshot?.metadata?.has(id)) record.sheetMetadata = snapshot.metadata.get(id);
+    const specs = snapshot?.index.get(id);
     if (!specs || !Object.keys(specs).length) return record;
     record.sheetSpecs = specs;
     if (specs.enc !== undefined && specs.encMaterial === undefined) {
@@ -348,7 +371,7 @@ function buildMainCacheKey(requestUrl, { pageSize, direction, offset, feedbackVe
     cacheUrl.searchParams.set('sortDirection', direction);
     cacheUrl.searchParams.set('offset', offset || '');
     cacheUrl.searchParams.set('feedbackVersion', String(feedbackVersion || 0));
-    cacheUrl.searchParams.set('specOverlay', 'v2.5.110-phase-frequency');
+    cacheUrl.searchParams.set('specOverlay', 'v2.5.111');
     cacheUrl.searchParams.set('sheetVersion', sheetVersion || '');
     cacheUrl.searchParams.set('sheetSource', sheetSource || '');
     return cacheUrl.toString();
@@ -819,7 +842,7 @@ function _parseVoltageContextAware(t) {
 // Parse enclosure type: detects NEMA 4X, NEMA4X, TYPE 4X, 4XSS, 4XFG, POLY.
 // When both SS and FG detected, spec-table context keywords determine the winner.
 // Logic mirrored in worker/lib/extract.js for unit testing.
-function _parseEnclosure(t) {
+function _parseEnclosure(t, inferBareRating = true) {
     const foundEnclosures = new Set();
     // Explicit compound codes take priority; track presence for tie-breaking
     const hasExplicit4XFG = /\b4XFG\b/i.test(t);
@@ -833,7 +856,7 @@ function _parseEnclosure(t) {
     if (has4X) {
         if (hasFG) foundEnclosures.add("4XFG");
         if (hasSS) foundEnclosures.add("4XSS");
-        if (!hasFG && !hasSS && !foundEnclosures.has("4XFG") && !foundEnclosures.has("4XSS")) foundEnclosures.add("4XSS");
+        if (!hasFG && !hasSS && !foundEnclosures.has("4XFG") && !foundEnclosures.has("4XSS")) foundEnclosures.add(inferBareRating ? "4XSS" : "4X");
     }
     if (/\bPOLY(?:CARBONATE)?\b/i.test(t)) foundEnclosures.add("POLY");
 
@@ -873,18 +896,20 @@ function _parseEnclosure(t) {
     return foundEnclosures;
 }
 
-function extractSpecsStrict(t) {
+function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], inferBareRating = true) {
+    if (!Array.isArray(fields)) fields = ['mfg', 'hp', 'volt', 'phase', 'enc'];
     // Return object: parameter values with variance flags (suffix 'V' indicates varied/ambiguous)
     const s = { 
         mfg: null, hp: null, volt: null, phase: null, enc: null,
         mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false
     };
-    if (!t || typeof t !== 'string') return s;
+    if (!t || typeof t !== 'string' || !fields.length) return s;
     
     // Normalize CAD control codes before parsing
     t = normalizeCADText(t);
     
     // --- Manufacturer ---
+    if (fields.includes('mfg')) {
     const foundMfgs = new Set();
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
@@ -901,8 +926,10 @@ function extractSpecsStrict(t) {
         s.mfg = [...foundMfgs][0];
         s.mfgV = true;
     }
+    }
 
     // --- HP (number-before-unit + table format) ---
+    if (fields.includes('hp')) {
     const foundHPs = _parseHP(t);
     if (foundHPs.size === 1) {
         s.hp = [...foundHPs][0];
@@ -910,8 +937,10 @@ function extractSpecsStrict(t) {
         s.hp = [...foundHPs].sort((a, b) => parseFloat(b) - parseFloat(a))[0];
         s.hpV = true;
     }
+    }
 
     // --- Voltage (service-first, context-aware) ---
+    if (fields.includes('volt')) {
     // Excludes inline transformer notation (e.g. "480V-120VAC") from service candidates.
     const { serviceVolts, controlVolts } = _parseVoltageContextAware(t);
     const targetVolts = serviceVolts.size > 0 ? serviceVolts : controlVolts;
@@ -946,8 +975,10 @@ function extractSpecsStrict(t) {
             }
         }
     }
+    }
 
     // --- Phase ---
+    if (fields.includes('phase')) {
     const foundPhases = new Set();
     if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*3)\b/i.test(t)) foundPhases.add("3");
     if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*1)\b/i.test(t)) foundPhases.add("1");
@@ -957,9 +988,11 @@ function extractSpecsStrict(t) {
         s.phase = "3";
         s.phaseV = true;
     }
+    }
 
     // --- Enclosure (NEMA 4X, NEMA4X, TYPE 4X, 4XSS, 4XFG, POLY) ---
-    const foundEnclosures = _parseEnclosure(t);
+    if (fields.includes('enc')) {
+    const foundEnclosures = _parseEnclosure(t, inferBareRating);
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
@@ -967,6 +1000,7 @@ function extractSpecsStrict(t) {
         // If multiple enclosures still remain, output "Varied / Multiple" (no SS canonical tie-break).
         s.enc = "Varied / Multiple";
         s.encV = true;
+    }
     }
 
     return s;
@@ -1250,18 +1284,22 @@ export default {
                         fullDesc = normalizeCADText(fullDesc).toUpperCase();
 
                         const textToParse = fullDesc + " " + cleanId;
-                        const explicit = extractSpecsStrict(textToParse);
+                        const sheet = sheetSnapshot?.index.get(normalizeSheetPanelId(cleanId)) || {};
+                        // Rating and material are independent: retain material fallback for rating-only rows.
+                        const fallbackFields = ['mfg', 'hp', 'volt', 'phase'].filter(field => sheet[field] === undefined);
+                        if (sheet.encMaterial === undefined) fallbackFields.push('enc');
+                        const explicit = fallbackFields.length ? extractSpecsStrict(textToParse, fallbackFields, false) : {};
 
-                        let finalMfg = explicit.mfg;
-                        let finalEnc = explicit.enc;
-                        let finalHp = explicit.hp;
-                        let finalVolt = explicit.volt;
-                        let finalPhase = explicit.phase;
+                        let finalMfg = sheet.mfg ?? explicit.mfg ?? null;
+                        let finalEnc = fallbackFields.includes('enc') ? explicit.enc : (sheet.enc ?? null);
+                        let finalHp = sheet.hp ?? explicit.hp ?? null;
+                        let finalVolt = sheet.volt ?? explicit.volt ?? null;
+                        let finalPhase = sheet.phase ?? explicit.phase ?? null;
 
-                        if (CACHE_NB_MODEL) {
+                        if (CACHE_NB_MODEL && fallbackFields.length) {
                             const bayesText = textToParse.slice(0, 1500);
                             if (!finalMfg) finalMfg = CACHE_NB_MODEL.predict(bayesText, 'mfg');
-                            if (!finalEnc) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
+                            if (!finalEnc && fallbackFields.includes('enc')) finalEnc = CACHE_NB_MODEL.predict(bayesText, 'enc');
                             if (!finalHp) {
                                 const predictedHp = CACHE_NB_MODEL.predict(bayesText, 'hp');
                                 if (predictedHp && isValidHP(predictedHp)) finalHp = predictedHp;
@@ -1279,11 +1317,11 @@ export default {
                         let finalCategory = null;
                         const overrides = CACHE_HEALED[cleanId];
                         if (overrides) {
-                            if (overrides.mfg) finalMfg = overrides.mfg;
-                            if (overrides.hp) finalHp = overrides.hp;
-                            if (overrides.volt) finalVolt = overrides.volt;
-                            if (overrides.phase) finalPhase = overrides.phase;
-                            if (overrides.enc) finalEnc = overrides.enc;
+                            if (sheet.mfg === undefined && overrides.mfg) finalMfg = overrides.mfg;
+                            if (sheet.hp === undefined && overrides.hp) finalHp = overrides.hp;
+                            if (sheet.volt === undefined && overrides.volt) finalVolt = overrides.volt;
+                            if (sheet.phase === undefined && overrides.phase) finalPhase = overrides.phase;
+                            if (fallbackFields.includes('enc') && overrides.enc) finalEnc = overrides.enc;
                             if (overrides.category) finalCategory = overrides.category;
                         }
 
