@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai WORKER v2.5.111
+// 🧠 SCHEMATICA ai WORKER v2.5.112
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -44,13 +44,41 @@ const MAIN_PAGE_CACHE_STALE_SECONDS = 65 * 60;
 const MAIN_PAGE_CACHE_CONTROL = `public, max-age=${MAIN_PAGE_CACHE_FRESH_SECONDS}, stale-while-revalidate=${Math.max(0, MAIN_PAGE_CACHE_STALE_SECONDS - MAIN_PAGE_CACHE_FRESH_SECONDS)}`;
 const MAIN_PAGE_CACHE_FRESH_MS = MAIN_PAGE_CACHE_FRESH_SECONDS * 1000;
 const MAIN_PAGE_CACHE_STALE_MS = MAIN_PAGE_CACHE_STALE_SECONDS * 1000;
-let FEEDBACK_CACHE_VERSION = 0;
 const MAIN_PAGE_INFLIGHT = new Map();
 const SHEETS_CACHE_MS = 5 * 60 * 1000;
 const SHEETS_MAX_BYTES = 8 * 1024 * 1024;
+const SHEETS_META_HEADER = 'X-SCHEMATICA-SHEETS-META';
+const SPEC_TRANSFORM_VERSION = 'v2.5.112';
 let CACHE_SHEETS = null;
+let FEEDBACK_FINGERPRINT_SOURCE = null;
+let FEEDBACK_FINGERPRINT = '';
+
+// Deterministic content fingerprint (FNV-1a and a Murmur-style 32-bit hash + length). Used instead of a
+// per-isolate counter so every isolate derives the same MAIN cache key for the same overrides.
+function fingerprintText(text) {
+    let a = 0x811c9dc5;
+    let b = 0x01000193;
+    for (let i = 0; i < text.length; i++) {
+        const c = text.charCodeAt(i);
+        a = Math.imul(a ^ c, 0x01000193);
+        b = Math.imul(b + c, 0x5bd1e995) ^ (b >>> 15);
+    }
+    return `${text.length.toString(36)}-${(a >>> 0).toString(36)}-${(b >>> 0).toString(36)}`;
+}
+
+function getFeedbackCacheVersion() {
+    if (FEEDBACK_FINGERPRINT_SOURCE !== CACHE_HEALED) {
+        FEEDBACK_FINGERPRINT_SOURCE = CACHE_HEALED;
+        FEEDBACK_FINGERPRINT = fingerprintText(JSON.stringify(CACHE_HEALED || {}));
+    }
+    return FEEDBACK_FINGERPRINT;
+}
 
 function normalizeSheetPanelId(value) {
+    // Fast path for the common already-canonical cell; identical to the full normalization below.
+    const plain = typeof value === 'string' ? /^(?:CP-)?(\d+(?:R\d+)?)$/i.exec(value) : null;
+    if (plain) return plain[1].toUpperCase();
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) return String(value);
     const id = String(value ?? '').replace(/[!?]/g, '').trim().replace(/^CP\s*-\s*/i, '')
         .replace(/\.(?:dwg|pdf)$/i, '').trim().toUpperCase();
     return /^\d+(?:R\d+)?$/.test(id) ? id : null;
@@ -114,6 +142,12 @@ function normalizeSheetSpec(field, raw) {
     return null;
 }
 
+function sheetSnapshotVersion(schema, revision, hash) {
+    return JSON.stringify([SPEC_TRANSFORM_VERSION, schema, revision, hash]);
+}
+
+// Validates the whole payload and indexes panel IDs once, but normalizes a row's specs only when a
+// MAIN record looks it up. Eagerly normalizing every row was the dominant cold-isolate CPU cost.
 function compileSheetSnapshot(payload, previous = null) {
     if (!payload || payload.ok !== true || !['string', 'number'].includes(typeof payload.schema)
         || !['string', 'number'].includes(typeof payload.revision)
@@ -134,11 +168,9 @@ function compileSheetSnapshot(payload, previous = null) {
     if (fields.filter(f => f === 'id').length !== 1
         || fields.filter(Boolean).length !== new Set(fields.filter(Boolean)).size
         || !fields.some(f => f && f !== 'id')) throw new Error('Invalid Sheets columns');
-    const version = JSON.stringify(['v2.5.111', payload.schema, payload.revision, payload.hash]);
+    const version = sheetSnapshotVersion(payload.schema, payload.revision, payload.hash);
     if (previous?.version === version) return previous;
-    const index = new Map();
-    const uncertainty = new Map();
-    const metadata = new Map();
+    const rowsById = new Map();
     const duplicateIds = new Set();
     if (payload.duplicates !== undefined) {
         if (!Array.isArray(payload.duplicates)) throw new Error('Invalid Sheets duplicates');
@@ -152,7 +184,16 @@ function compileSheetSnapshot(payload, previous = null) {
     for (const row of payload.rows) {
         const id = normalizeSheetPanelId(row[idColumn]);
         if (!id) continue;
-        if (index.has(id)) { duplicateIds.add(id); continue; }
+        if (rowsById.has(id)) { duplicateIds.add(id); continue; }
+        rowsById.set(id, row);
+    }
+    for (const id of duplicateIds) rowsById.delete(id);
+    if (!rowsById.size) throw new Error('Sheets snapshot has no unambiguous panel IDs');
+    const compiled = new Map();
+    const compileRow = id => {
+        if (compiled.has(id)) return compiled.get(id);
+        const row = rowsById.get(id);
+        if (!row) return null;
         const specs = {};
         const rejected = {};
         const meta = {};
@@ -168,20 +209,21 @@ function compileSheetSnapshot(payload, previous = null) {
                 rejected[field] = String(row[column]).slice(0, 100);
             }
         });
-        index.set(id, specs);
-        if (Object.keys(rejected).length) uncertainty.set(id, rejected);
-        if (Object.keys(meta).length) metadata.set(id, meta);
-    }
-    for (const id of duplicateIds) {
-        index.delete(id);
-        uncertainty.delete(id);
-        metadata.delete(id);
-    }
-    if (!index.size) throw new Error('Sheets snapshot has no unambiguous panel IDs');
-    return { version, index, uncertainty, metadata, revision: payload.revision, hash: payload.hash, updatedAt: payload.updatedAt };
+        const entry = { specs, rejected: Object.keys(rejected).length ? rejected : null,
+            meta: Object.keys(meta).length ? meta : null };
+        compiled.set(id, entry);
+        return entry;
+    };
+    const view = key => ({
+        has: id => Boolean(compileRow(id)?.[key]),
+        get: id => compileRow(id)?.[key] || undefined
+    });
+    const index = { has: id => rowsById.has(id), get: id => compileRow(id)?.specs, get size() { return rowsById.size; } };
+    return { version, index, uncertainty: view('rejected'), metadata: view('meta'),
+        schema: payload.schema, revision: payload.revision, hash: payload.hash, updatedAt: payload.updatedAt };
 }
 
-async function fetchSheetPayload(endpoint) {
+async function fetchSheetText(endpoint) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     try {
@@ -212,21 +254,44 @@ async function fetchSheetPayload(endpoint) {
             }
             chunks.push(value);
         }
-        return JSON.parse(await new Response(new Blob(chunks)).text());
+        return await new Response(new Blob(chunks)).text();
     } finally {
         clearTimeout(timeout);
     }
 }
 
-async function getSheetSnapshot(env, requestUrl) {
+function sheetMetaOf(snapshot) {
+    return snapshot ? { version: snapshot.version, schema: snapshot.schema, revision: snapshot.revision,
+        hash: snapshot.hash, updatedAt: snapshot.updatedAt } : null;
+}
+
+function encodeSheetMetaHeader(meta) {
+    const { schema, revision, hash, updatedAt } = meta;
+    const encoded = encodeURIComponent(JSON.stringify({ schema, revision, hash, updatedAt }));
+    return encoded.length <= 4000 ? encoded : null;
+}
+
+function decodeSheetMetaHeader(value) {
+    if (!value) return null;
+    const raw = JSON.parse(decodeURIComponent(value));
+    if (!raw || !['string', 'number'].includes(typeof raw.schema) || !['string', 'number'].includes(typeof raw.revision)
+        || typeof raw.hash !== 'string') return null;
+    return { version: sheetSnapshotVersion(raw.schema, raw.revision, raw.hash), schema: raw.schema,
+        revision: raw.revision, hash: raw.hash, updatedAt: raw.updatedAt };
+}
+
+// The validated raw Apps Script body is the canonical cached artifact: it is persisted verbatim
+// (never re-serialized) with its identity in a header, so cold isolates can build MAIN cache keys
+// without parsing it, and an unchanged refresh is a string comparison rather than parse + compile.
+async function refreshSheetState(env, requestUrl) {
     const source = env.SHEETS_ENDPOINT;
     if (!source) return null;
     if (!CACHE_SHEETS || CACHE_SHEETS.source !== source) {
-        CACHE_SHEETS = { source, snapshot: null, nextCheck: 0, promise: null };
+        CACHE_SHEETS = { source, snapshot: null, meta: null, rawText: null, nextCheck: 0, promise: null };
     }
     const state = CACHE_SHEETS;
     if (state.promise) return state.promise;
-    if (Date.now() < state.nextCheck) return state.snapshot;
+    if (Date.now() < state.nextCheck) return state;
     state.promise = (async () => {
         state.nextCheck = Date.now() + SHEETS_CACHE_MS;
         const cache = typeof caches !== 'undefined' ? caches.default : null;
@@ -236,36 +301,67 @@ async function getSheetSnapshot(env, requestUrl) {
         cacheUrl.searchParams.set('source', source);
         const key = new Request(cacheUrl.toString());
         try {
-            if (!state.snapshot && cache) {
+            if (!state.meta && cache) {
                 try {
                     const saved = await cache.match(key);
                     if (saved) {
-                        state.snapshot = compileSheetSnapshot(await saved.json());
+                        const text = await saved.text();
+                        const savedMeta = decodeSheetMetaHeader(saved.headers.get(SHEETS_META_HEADER));
+                        if (savedMeta) {
+                            Object.assign(state, { rawText: text, meta: savedMeta, snapshot: null });
+                        } else {
+                            // Entries persisted before v2.5.112 carry no identity header.
+                            const snapshot = compileSheetSnapshot(JSON.parse(text));
+                            Object.assign(state, { rawText: text, meta: sheetMetaOf(snapshot), snapshot });
+                        }
                         const freshUntil = Number(saved.headers.get('X-SCHEMATICA-CACHED-AT')) + SHEETS_CACHE_MS;
                         if (Date.now() < freshUntil) {
                             state.nextCheck = freshUntil;
-                            return state.snapshot;
+                            return state;
                         }
                     }
                 } catch { /* A bad cache entry must not prevent a live refresh. */ }
             }
-            const payload = await fetchSheetPayload(source);
-            const snapshot = compileSheetSnapshot(payload, state.snapshot);
-            state.snapshot = snapshot;
+            const text = await fetchSheetText(source);
+            if (text !== state.rawText || !state.meta) {
+                const payload = JSON.parse(text);
+                const snapshot = compileSheetSnapshot(payload, state.snapshot);
+                Object.assign(state, { rawText: text, meta: sheetMetaOf(snapshot), snapshot });
+            }
             if (cache) {
                 try {
-                    await cache.put(key, new Response(JSON.stringify(payload), { headers: {
-                        'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=604800',
-                        'X-SCHEMATICA-CACHED-AT': String(Date.now())
-                    } }));
+                    const headers = new Headers({ 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=604800',
+                        'X-SCHEMATICA-CACHED-AT': String(Date.now()) });
+                    const metaHeader = encodeSheetMetaHeader(state.meta);
+                    if (metaHeader) headers.set(SHEETS_META_HEADER, metaHeader);
+                    await cache.put(key, new Response(text, { headers }));
                 } catch { /* Keep the validated in-memory snapshot if persistence fails. */ }
             }
         } catch {
             console.warn('[Sheets] Refresh unavailable; retaining last good snapshot');
         }
-        return state.snapshot;
+        return state;
     })();
     try { return await state.promise; } finally { state.promise = null; }
+}
+
+// Parses/indexes the persisted body only when a MAIN cache miss actually needs row specs.
+function materializeSheetSnapshot(state) {
+    if (!state) return null;
+    if (!state.snapshot && state.rawText && state.meta) {
+        try {
+            state.snapshot = compileSheetSnapshot(JSON.parse(state.rawText));
+            state.meta = sheetMetaOf(state.snapshot);
+        } catch {
+            console.warn('[Sheets] Persisted snapshot unusable; continuing without overlay');
+            Object.assign(state, { rawText: null, meta: null, snapshot: null });
+        }
+    }
+    return state.snapshot;
+}
+
+async function getSheetSnapshot(env, requestUrl) {
+    return materializeSheetSnapshot(await refreshSheetState(env, requestUrl));
 }
 
 function applySheetSpecs(record, snapshot) {
@@ -310,13 +406,13 @@ const EXACT_MFGS = {
 };
 
 const VOLT_PRIORITY = [
-    { id: '575', match: /\b(?:575|600)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:575|600)\b/i },
-    { id: '480', match: /\b(?:480|460|440)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:480|460|440)\b/i },
-    { id: '415', match: /\b(?:415|380)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:415|380)\b/i },
-    { id: '277', match: /\b(?:277)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:277)\b/i },
-    { id: '240', match: /\b(?:240|(?<!208\/)230|(?<!208\/)220)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*(?!208\b)[\d\.\/]*\b(?:240|230|220)\b/i },
-    { id: '208', match: /\b(?:208)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:208)\b/i },
-    { id: '120', match: /\b(?:120|115|110)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:120|115|110)\b/i }
+    { id: '575', match: /\b(?:575|600)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:575|600)\b/i },
+    { id: '480', match: /\b(?:480|460|440)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:480|460|440)\b/i },
+    { id: '415', match: /\b(?:415|380)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:415|380)\b/i },
+    { id: '277', match: /\b(?:277)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:277)\b/i },
+    { id: '240', match: /\b(?:240|(?<!208\/)230|(?<!208\/)220)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?(?!208\b)[\d\.\/]*\b(?:240|230|220)\b/i },
+    { id: '208', match: /\b(?:208)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:208)\b/i },
+    { id: '120', match: /\b(?:120|115|110)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:120|115|110)\b/i }
 ];
 
 // Canonical dual-voltage pairs (split-phase configurations)
@@ -371,19 +467,25 @@ function buildMainCacheKey(requestUrl, { pageSize, direction, offset, feedbackVe
     cacheUrl.searchParams.set('sortDirection', direction);
     cacheUrl.searchParams.set('offset', offset || '');
     cacheUrl.searchParams.set('feedbackVersion', String(feedbackVersion || 0));
-    cacheUrl.searchParams.set('specOverlay', 'v2.5.111');
+    cacheUrl.searchParams.set('specOverlay', SPEC_TRANSFORM_VERSION);
     cacheUrl.searchParams.set('sheetVersion', sheetVersion || '');
     cacheUrl.searchParams.set('sheetSource', sheetSource || '');
     return cacheUrl.toString();
 }
 
-function setMainTimingHeaders(headers, { cacheStatus, authMs = 0, upstreamMs = 0, processMs = 0, serializeMs = 0, totalMs = 0 }) {
+function setMainTimingHeaders(headers, { cacheStatus, authMs = 0, upstreamMs = 0, processMs = 0, serializeMs = 0, totalMs = 0,
+    parsedRecords = 0, parsedChars = 0, sheetRecords = 0 }) {
     headers.set('X-SCHEMATICA-MAIN-CACHE', cacheStatus);
     headers.set('X-SCHEMATICA-AUTH-MS', String(Math.max(0, Math.round(authMs))));
     headers.set('X-SCHEMATICA-MAIN-UPSTREAM-MS', String(Math.max(0, Math.round(upstreamMs))));
     headers.set('X-SCHEMATICA-MAIN-PROCESS-MS', String(Math.max(0, Math.round(processMs))));
     headers.set('X-SCHEMATICA-MAIN-SERIALIZE-MS', String(Math.max(0, Math.round(serializeMs))));
     headers.set('X-SCHEMATICA-MAIN-TOTAL-MS', String(Math.max(0, Math.round(totalMs))));
+    // Workers freeze Date.now() while executing, so the *-MS headers capture I/O, not CPU. These
+    // deterministic work counters (plus Workers Logs cpuTime) measure the CPU-bound fallback work.
+    headers.set('X-SCHEMATICA-MAIN-PARSED-RECORDS', String(parsedRecords));
+    headers.set('X-SCHEMATICA-MAIN-PARSED-CHARS', String(parsedChars));
+    headers.set('X-SCHEMATICA-MAIN-SHEET-RECORDS', String(sheetRecords));
 }
 
 function sanitizePdfFilename(name, fallback = 'schematica.pdf') {
@@ -619,7 +721,6 @@ async function ensureHealedCache(env) {
         }
         CACHE_HEALED = nextHealed;
         CACHE_HEALED_TIME = Date.now();
-        FEEDBACK_CACHE_VERSION++;
     })();
     try {
         await CACHE_HEALED_PROMISE;
@@ -798,7 +899,7 @@ function _parseHP(t) {
         if (!isNaN(val) && val >= 0.1 && val <= 500) foundHPs.add((Math.round(val * 10) / 10).toString());
     }
     // Table/header format: "HP: 7.5", "MOTOR HP: 7.5"
-    const tableHpRegex = /\b(?:MOTOR\s+)?(?:HP|HORSEPOWER)\s*[:\s|]+\s*(\d+(?:\.\d+)?)\b/gi;
+    const tableHpRegex = /\b(?:MOTOR\s+)?(?:HP|HORSEPOWER)[:\s|]+(\d+(?:\.\d+)?)\b/gi;
     while ((match = tableHpRegex.exec(t)) !== null) {
         const val = parseFloat(match[1]);
         if (!isNaN(val) && val >= 0.1 && val <= 500) foundHPs.add((Math.round(val * 10) / 10).toString());
@@ -917,10 +1018,14 @@ function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], i
     // --- Manufacturer ---
     if (fields.includes('mfg')) {
     const foundMfgs = new Set();
+    // Case-insensitive ASCII aliases can only match where the uppercased text contains them, so the
+    // substring prefilter skips the per-alias boundary regex scans that dominated MAIN CPU time.
+    const upperText = t.toUpperCase();
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
-            const r = new RegExp(`(?<=[^A-Z0-9]|^)${alias}(?=[^A-Z0-9]|$)`, 'i');
-            if (r.test(t)) { 
+            if (!upperText.includes(alias)) continue;
+            const r = new RegExp(`(?:^|[^A-Z0-9])${alias}(?=[^A-Z0-9]|$)`, 'i');
+            if (r.test(t)) {
                 foundMfgs.add(mfgKey);
                 break;
             }
@@ -986,8 +1091,8 @@ function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], i
     // --- Phase ---
     if (fields.includes('phase')) {
     const foundPhases = new Set();
-    if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*3)\b/i.test(t)) foundPhases.add("3");
-    if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*1)\b/i.test(t)) foundPhases.add("1");
+    if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*(?:[:\-]\s*)?3)\b/i.test(t)) foundPhases.add("3");
+    if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*(?:[:\-]\s*)?1)\b/i.test(t)) foundPhases.add("1");
     if (foundPhases.size === 1) {
         s.phase = [...foundPhases][0];
     } else if (foundPhases.size > 1) {
@@ -1252,13 +1357,15 @@ export default {
                 const pageSizeParam = url.searchParams.get('pageSize');
                 const pageSize = validatePageSize(pageSizeParam);
                 const mainStart = Date.now();
-                const sheetSnapshot = await getSheetSnapshot(env, request.url);
-                const cacheKeyUrl = buildMainCacheKey(request.url, { pageSize, direction, offset, feedbackVersion: FEEDBACK_CACHE_VERSION,
-                    sheetVersion: sheetSnapshot?.version, sheetSource: env.SHEETS_ENDPOINT });
+                // Cache hits only need the canonical sheet identity; the sheet body is parsed lazily on a miss.
+                const sheetState = await refreshSheetState(env, request.url);
+                const mainCacheKey = sheetVersion => buildMainCacheKey(request.url, { pageSize, direction, offset,
+                    feedbackVersion: getFeedbackCacheVersion(), sheetVersion, sheetSource: env.SHEETS_ENDPOINT });
+                const cacheKeyUrl = mainCacheKey(sheetState?.meta?.version);
                 const cacheKeyRequest = new Request(cacheKeyUrl, { method: 'GET' });
                 const workerCache = (typeof caches !== 'undefined' && caches.default) ? caches.default : null;
 
-                const fetchMainPayload = async () => {
+                const fetchMainPayload = async (sheetSnapshot, healedOverrides) => {
                     const upstreamStart = Date.now();
                     let mainUrl = `https://api.airtable.com/v0/${BASE_MAIN_ID}/${TABLE_MAIN}?pageSize=${String(pageSize)}` +
                                 `&fields%5B%5D=Control%20Panel%20Name` +
@@ -1281,6 +1388,9 @@ export default {
                     const upstreamMs = Date.now() - upstreamStart;
 
                     const processStart = Date.now();
+                    let parsedRecords = 0;
+                    let parsedChars = 0;
+                    let sheetRecords = 0;
                     const activeRecords = (mainJson.records || []).map(r => {
                         const rawId = String(r.fields['Control Panel Name'] || "");
                         const cleanId = rawId.replace(/^CP-/i, '').replace(/\.dwg$/i, '').replace(/\.pdf$/i, '').replace(/[!?]/g,'').trim();
@@ -1296,6 +1406,11 @@ export default {
                         const inferMaterial = sheet.encMaterial === undefined;
                         if (sheet.enc === undefined || inferMaterial) fallbackFields.push('enc');
                         const explicit = fallbackFields.length ? extractSpecsStrict(textToParse, fallbackFields, false, inferMaterial) : {};
+                        if (fallbackFields.length) {
+                            parsedRecords++;
+                            parsedChars += textToParse.length;
+                        }
+                        if (Object.keys(sheet).length) sheetRecords++;
 
                         let finalMfg = sheet.mfg ?? explicit.mfg ?? null;
                         let finalEnc = fallbackFields.includes('enc') ? explicit.enc : (sheet.enc ?? null);
@@ -1322,7 +1437,7 @@ export default {
                         }
 
                         let finalCategory = null;
-                        const overrides = CACHE_HEALED[cleanId];
+                        const overrides = healedOverrides[cleanId];
                         if (overrides) {
                             if (sheet.mfg === undefined && overrides.mfg) finalMfg = overrides.mfg;
                             if (sheet.hp === undefined && overrides.hp) finalHp = overrides.hp;
@@ -1364,31 +1479,36 @@ export default {
                     const body = JSON.stringify({ records: activeRecords, offset: mainJson.offset,
                         sheets: sheetSnapshot ? { revision: sheetSnapshot.revision, hash: sheetSnapshot.hash, updatedAt: sheetSnapshot.updatedAt } : null });
                     const serializeMs = Date.now() - serializeStart;
-                    return { body, upstreamMs, processMs, serializeMs };
+                    return { body, upstreamMs, processMs, serializeMs, parsedRecords, parsedChars, sheetRecords };
                 };
 
                 const startRefresh = () => {
-                    const existing = MAIN_PAGE_INFLIGHT.get(cacheKeyUrl);
+                    // Key the computed page by the snapshot actually applied, never by an unverified header.
+                    const sheetSnapshot = materializeSheetSnapshot(sheetState);
+                    const healedOverrides = CACHE_HEALED;
+                    const refreshKeyUrl = mainCacheKey(sheetSnapshot?.version);
+                    const existing = MAIN_PAGE_INFLIGHT.get(refreshKeyUrl);
                     if (existing) return { promise: existing, coalesced: true };
                     const promise = (async () => {
                         try {
-                            const result = await fetchMainPayload();
+                            const result = await fetchMainPayload(sheetSnapshot, healedOverrides);
                             if (workerCache) {
                                 const cacheHeaders = new Headers({ ...corsHeaders, 'Content-Type': 'application/json' });
                                 cacheHeaders.set('Cache-Control', MAIN_PAGE_CACHE_CONTROL);
                                 cacheHeaders.set('X-SCHEMATICA-CACHED-AT', String(Date.now()));
                                 const cacheResponse = new Response(result.body, { headers: cacheHeaders });
-                                if (ctx && ctx.waitUntil) ctx.waitUntil(workerCache.put(cacheKeyRequest, cacheResponse));
-                                else await workerCache.put(cacheKeyRequest, cacheResponse);
+                                const refreshKeyRequest = new Request(refreshKeyUrl, { method: 'GET' });
+                                if (ctx && ctx.waitUntil) ctx.waitUntil(workerCache.put(refreshKeyRequest, cacheResponse));
+                                else await workerCache.put(refreshKeyRequest, cacheResponse);
                             }
                             return result;
                         } finally {
-                            if (MAIN_PAGE_INFLIGHT.get(cacheKeyUrl) === promise) {
-                                MAIN_PAGE_INFLIGHT.delete(cacheKeyUrl);
+                            if (MAIN_PAGE_INFLIGHT.get(refreshKeyUrl) === promise) {
+                                MAIN_PAGE_INFLIGHT.delete(refreshKeyUrl);
                             }
                         }
                     })();
-                    MAIN_PAGE_INFLIGHT.set(cacheKeyUrl, promise);
+                    MAIN_PAGE_INFLIGHT.set(refreshKeyUrl, promise);
                     return { promise, coalesced: false };
                 };
 
@@ -1433,7 +1553,10 @@ export default {
                     upstreamMs: mainResult.upstreamMs,
                     processMs: mainResult.processMs,
                     serializeMs: mainResult.serializeMs,
-                    totalMs
+                    totalMs,
+                    parsedRecords: mainResult.parsedRecords,
+                    parsedChars: mainResult.parsedChars,
+                    sheetRecords: mainResult.sheetRecords
                 });
                 return new Response(mainResult.body, { headers: responseHeaders });
             }
@@ -1458,7 +1581,7 @@ export default {
                     try {
                         await ensureHealedCache(env);
                     } catch (_refreshError) {
-                        FEEDBACK_CACHE_VERSION++;
+                        // CACHE_HEALED stays {}; its content fingerprint already keys MAIN pages apart.
                     }
                 }
                 return new Response(JSON.stringify(await resp.json()), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

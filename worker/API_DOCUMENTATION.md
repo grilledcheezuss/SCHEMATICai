@@ -1,6 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.111 (frontend and Worker)
+## Version: v2.5.112 (Worker; frontend v2.5.111)
+
+_Release note: v2.5.112 is a Worker-only CPU fix for MAIN "Worker exceeded CPU time limit" failures (frontend stays v2.5.111). Measured locally: the HP table pattern backtracked cubically on padded whitespace (one record with `HP` + 5,000 spaces took ~28 s CPU) and voltage/phase separators quadratically; they are now linear with identical matches. Manufacturer detection prefilters aliases (~34 ms -> ~3 ms per 100 x 4.5 KB records). Sheets rows are normalized lazily on lookup (20k-row compile 200 ms -> ~15 ms); the raw Apps Script body is persisted verbatim with an identity header so unchanged refreshes skip parse/serialize and cold-isolate MAIN hits never parse the sheet. MAIN pages are keyed by the applied sheet identity and a deterministic feedback-content fingerprint instead of a per-isolate counter. All fallback semantics are unchanged. Deploy the API Worker only._
 
 _Release note: v2.5.111 enforces exclusive trusted Sheets authority before per-field inference and matching. Selective Worker extraction skips trusted fields; browser filters, badges and ranking use only their accepted sheet value. Deploy the API Worker separately and frontend; DERIVED_REV 12, snapshot schema 1._
 
@@ -28,6 +30,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.112**: Worker-only MAIN CPU fix: linear-time HP/voltage/phase regexes, prefiltered manufacturer detection, lazy Sheets row normalization, raw-body Sheets persistence with identity header, deterministic feedback-content MAIN cache keys and work-counter headers. Fallback semantics unchanged; frontend unchanged.
 - **v2.5.111**: Strict per-field authority, selective extraction, bounded normalization, sys/panelType separation, nema rating mapping, uncertainty metadata and transformation-aware MAIN cache migration. Worker deployment required.
 - **v2.5.110**: Google Sheets live source-of-truth overlay, validated last-good edge snapshot, five-minute fetch coalescing and revision/hash-keyed MAIN pages. Conservative duplicate and placeholder fallback. Sheet-first browser search/derivation; aligned five-minute foreground/reconnect freshness. Worker deployment required.
 - **v2.5.109**: Browser-only System Type evidence hierarchy and bounded caption-title recovery. Explicit rows remain primary; a motor-count tie-break cannot promote badge confidence. CP-1245r1 recovers as Simplex orange and CP-1409 remains abstained. DERIVED_REV 10; representative baseline fixtures and Worker v2.5.97 preserved. No live-catalog accuracy claim.
@@ -365,7 +368,15 @@ Deployment verification (operator action; this PR does not deploy or change secr
 5. Confirm missing/uncertain cells retain fallback, then foreground/background/manual refresh and first search after JSON cache restoration. Keep the same sheet revision/hash across Worker deployment to verify old merged pages cannot hit; edit a sheet field and wait five minutes to verify normal revision refresh.
 6. Check live Worker invocation metrics/logs for CPU and upstream failures. The previously reported CPU-limit failure occurred before Sheets was enabled; these synthetic checks establish neither production accuracy nor CPU headroom and do not attribute that failure to Sheets.
 
-Local regressions: `node tests/sheets-overlay.test.js`, `node tests/worker-airtable-token-routing.test.js`, `node worker/tests/run.js`, `node tests/data-loader-refresh.test.js`, `node tests/system-type-audit.test.js`, and the existing parser/search/browser tests.
+#### MAIN CPU budget and Sheets-first caching (v2.5.112)
+
+- Sheets refresh (once per five minutes per isolate, coalesced) compares the fetched body with the last validated body; an unchanged body is not parsed, compiled or re-serialized. A changed body is validated and its panel IDs indexed once; each row's specs are normalized only when a MAIN record looks that panel up, then memoized.
+- The validated raw body is persisted verbatim at `/__schematica_sheets_v1` with `X-SCHEMATICA-CACHED-AT` and `X-SCHEMATICA-SHEETS-META` (schema/revision/hash/updatedAt). A cold isolate builds MAIN cache keys from that header and parses the body only on a MAIN miss. Pages are stored under the identity of the snapshot actually applied; if a persisted body proves unusable the page is keyed without a sheet identity and served without overlay. Entries written by v2.5.111 (no header) are still restored.
+- `feedbackVersion` in MAIN cache keys is a fingerprint of the healer overrides content, so identical feedback no longer invalidates pages every 10 minutes and isolates share pages.
+- Cloudflare freezes `Date.now()` during execution, so the `X-SCHEMATICA-MAIN-*-MS` headers measure I/O, not CPU. Use Workers Logs `cpuTime` (observability is enabled in `wrangler.toml`) together with the deterministic counters on MISS responses: `X-SCHEMATICA-MAIN-PARSED-RECORDS` (records needing fallback extraction), `X-SCHEMATICA-MAIN-PARSED-CHARS` (description characters parsed) and `X-SCHEMATICA-MAIN-SHEET-RECORDS` (records with canonical sheet specs). HIT/STALE responses report 0.
+- Operator check after deploying the Worker: run a full sync, then in Workers Logs compare `cpuTime` and outcome for MAIN requests (including the previously failing offset pages) against these counters. This PR does not deploy or change secrets; the Worker plan's CPU allowance is not assumed.
+
+Local regressions: `node tests/worker-cpu-budget.test.js`, `node tests/sheets-overlay.test.js`, `node tests/worker-airtable-token-routing.test.js`, `node worker/tests/run.js`, `node tests/data-loader-refresh.test.js`, `node tests/system-type-audit.test.js`, and the existing parser/search/browser tests.
 
 ### In-Memory Edge Cache
 - **Duration**: 1 hour (3600 seconds)
@@ -434,6 +445,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.112**: Linear-time extraction regexes, lazy Sheets row normalization and Sheets-first MAIN caching remove measured CPU hotspots without changing fallback output. Deploy the API Worker only.
 - **v2.5.111**: Trusted specs bypass per-field regex/ML/healer work; missing/uncertain specs retain fallback. Compatible script columns and transformation-aware cache migration. Separate API Worker deployment required.
 - **v2.5.110**: Worker adds validated revision-aware Sheets snapshot ingestion and field-level canonical overlays; failures retain the last-good snapshot and missing fields retain parser/ML/healer behavior. Configure `SHEETS_ENDPOINT` and redeploy.
 - **v2.5.97**: Sulzer aliases were added to strict Worker extraction and canonical normalization only; MAIN/auth/cache/ML execution paths and response shape are unchanged. Separate Worker deployment is required.

@@ -6,6 +6,10 @@ This directory contains tests for the SCHEMATICA ai application.
 
 ## Test Files
 
+### worker-cpu-budget.test.js (v2.5.112)
+
+`node tests/worker-cpu-budget.test.js` runs locally without credentials. It bounds extraction CPU on padded-whitespace inputs that previously backtracked for seconds, fuzzes the linear HP/voltage/phase/manufacturer rewrites against the pre-v2.5.112 patterns, verifies lazy Sheets row normalization, raw-body persistence with identity header, cold-isolate MAIN hits without sheet parsing, unchanged-refresh reuse, feedback-content cache keys and the MISS work-counter headers.
+
 ### sheets-overlay.test.js (v2.5.110)
 
 `node tests/sheets-overlay.test.js` runs locally without credentials or dependencies. It exercises the actual Worker with mocked Apps Script/Airtable responses and Cache API: full/partial/missing/revision-specific matches, placeholder validation, normalized duplicate IDs, fetch coalescing, unchanged/revised hashes, MAIN cache invalidation, healer fallback, outage throttling, cold-isolate recovery, initial failure, Google redirects, browser derivation, JSON snapshot restoration and conflicting HP/voltage description matching.

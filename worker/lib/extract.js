@@ -24,13 +24,13 @@ const EXACT_MFGS = {
 };
 
 const VOLT_PRIORITY = [
-    { id: '575', match: /\b(?:575|600)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:575|600)\b/i },
-    { id: '480', match: /\b(?:480|460|440)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:480|460|440)\b/i },
-    { id: '415', match: /\b(?:415|380)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:415|380)\b/i },
-    { id: '277', match: /\b(?:277)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:277)\b/i },
-    { id: '240', match: /\b(?:240|(?<!208\/)230|(?<!208\/)220)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*(?!208\b)[\d\.\/]*\b(?:240|230|220)\b/i },
-    { id: '208', match: /\b(?:208)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:208)\b/i },
-    { id: '120', match: /\b(?:120|115|110)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*[:\-]?\s*[\d\.\/]*\b(?:120|115|110)\b/i }
+    { id: '575', match: /\b(?:575|600)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:575|600)\b/i },
+    { id: '480', match: /\b(?:480|460|440)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:480|460|440)\b/i },
+    { id: '415', match: /\b(?:415|380)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:415|380)\b/i },
+    { id: '277', match: /\b(?:277)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:277)\b/i },
+    { id: '240', match: /\b(?:240|(?<!208\/)230|(?<!208\/)220)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?(?!208\b)[\d\.\/]*\b(?:240|230|220)\b/i },
+    { id: '208', match: /\b(?:208)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:208)\b/i },
+    { id: '120', match: /\b(?:120|115|110)\s*(?:V\b|VAC|VOLT|PH)|(?:VOLTAGE|VOLTS|VOLT)\s*(?:[:\-]\s*)?[\d\.\/]*\b(?:120|115|110)\b/i }
 ];
 
 // Canonical dual-voltage pairs (split-phase configurations)
@@ -72,7 +72,7 @@ function parseHP(t) {
     }
 
     // Secondary pattern: HP unit before number (table/header format: "HP: 7.5", "MOTOR HP: 7.5")
-    const tableHpRegex = /\b(?:MOTOR\s+)?(?:HP|HORSEPOWER)\s*[:\s|]+\s*(\d+(?:\.\d+)?)\b/gi;
+    const tableHpRegex = /\b(?:MOTOR\s+)?(?:HP|HORSEPOWER)[:\s|]+(\d+(?:\.\d+)?)\b/gi;
     while ((match = tableHpRegex.exec(t)) !== null) {
         const val = parseFloat(match[1]);
         if (!isNaN(val) && val >= 0.1 && val <= 500) {
@@ -257,9 +257,13 @@ function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], i
     // --- Manufacturer ---
     if (fields.includes('mfg')) {
     const foundMfgs = new Set();
+    // Case-insensitive ASCII aliases can only match where the uppercased text contains them, so the
+    // substring prefilter skips the per-alias boundary regex scans that dominated MAIN CPU time.
+    const upperText = t.toUpperCase();
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
-            const r = new RegExp(`(?<=[^A-Z0-9]|^)${alias}(?=[^A-Z0-9]|$)`, 'i');
+            if (!upperText.includes(alias)) continue;
+            const r = new RegExp(`(?:^|[^A-Z0-9])${alias}(?=[^A-Z0-9]|$)`, 'i');
             if (r.test(t)) {
                 foundMfgs.add(mfgKey);
                 break;
@@ -329,8 +333,8 @@ function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], i
     // --- Phase ---
     if (fields.includes('phase')) {
     const foundPhases = new Set();
-    if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*3)\b/i.test(t)) foundPhases.add("3");
-    if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*1)\b/i.test(t)) foundPhases.add("1");
+    if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*(?:[:\-]\s*)?3)\b/i.test(t)) foundPhases.add("3");
+    if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*(?:[:\-]\s*)?1)\b/i.test(t)) foundPhases.add("1");
     if (foundPhases.size === 1) {
         s.phase = [...foundPhases][0];
     } else if (foundPhases.size > 1) {
