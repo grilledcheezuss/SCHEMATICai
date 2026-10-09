@@ -4,6 +4,45 @@
 
 This directory contains tests for the SCHEMATICA ai application.
 
+## Generator integration (v2.5.114)
+
+```bash
+node tests/generator-state.test.js
+REQUIRE_BROWSER=1 node tests/generator.browser.test.js
+REQUIRE_BROWSER=1 node tests/ui-housekeeping.browser.test.js
+REQUIRE_BROWSER=1 node tests/release-update.browser.test.js
+REQUIRE_BROWSER=1 node tests/release-snapshot.browser.test.js
+node tests/pdf-viewer-print-download.test.js
+node tests/pdf-viewer-scale-zoom.test.js
+node tests/pdf-viewer-scroll-stability.test.js
+node tests/pdf-render-helper.test.js
+node tests/pdf-ui-state.test.js
+node worker/tests/run.js
+```
+
+Browser prerequisites: Node >=22 (native WebSocket), installed Chrome/Chromium
+(`CHROME_PATH` may override its path), and checked-in `assets/vendor/pdfjs`,
+`assets/vendor/pdf-lib`, and `assets/vendor/fontkit`. No npm install, live
+credentials, external mapping corpus, or deployment is required. Tests use the
+actual app/PDF libraries and synthetic non-sensitive PDFs. External network is
+blocked. Always use `REQUIRE_BROWSER=1` for acceptance: an optional browser skip
+is **not** a passing browser test. Native Safari print/download and real-document
+placement remain manual acceptance items.
+
+Unmodified base `d37233c` was tested separately in a `/tmp` archive: 35/36 offline
+Node test files passed, all three existing required-browser runners passed, and
+the Worker unit runner passed 125/125. `tests/enclosure-parsing.test.js` case 18
+fails on that base: expected `{enc:"Varied / Multiple", encV:true}`, actual
+`{enc:"4XSS", encV:false}` (22/23 assertions pass). This unrelated parser behavior
+is not changed or exempted by the generator work. The live
+`worker.integration.test.js` is not part of the credential-free offline suite.
+
+Current integration verification includes the actual generated PDF's pixel
+geometry at 0/90/180/270 degrees, CropBox offsets, mixed page sizes, whiteout
+versus transparency, and proof that covered original text remains extractable.
+Browser results validate synthetic behavior only, not the supplied report's
+production/corpus accuracy.
+
 ## Test Files
 
 ### sheet-authority-audit.test.js (v2.5.113)

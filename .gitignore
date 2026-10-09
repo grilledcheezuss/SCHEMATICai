@@ -22,6 +22,7 @@ build/
 dist/
 .netlify/
 .local-browser-tests/
+.schematica-ui-*/
 
 # --- System Files: OS garbage ---
 .DS_Store
