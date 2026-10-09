@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.113 ---
-const APP_VERSION = "v2.5.113";
+// --- SCHEMATICA ai v2.5.114 ---
+const APP_VERSION = "v2.5.114";
 const VERSION_HISTORY = {
+    "v2.5.114": "Versioned in-memory generator assignments, measured core layout matching with review evidence, persistent manual edits, frozen masked export, crop/rotation-aware coordinates and stale asynchronous load/scan/render guards. Masked output is not sanitized redaction.",
     "v2.5.113": "Sheets authority made observable end to end: the Worker reports a secret-free MAIN sheetStatus (active/unavailable/pending/unconfigured, classified reason, row/match/spec counts) plus X-SCHEMATICA-SHEETS-STATUS, tolerates CP/revision ID spellings, object or trailing-blank rows, omitted rowCount and Workspace Apps Script URLs, and a new transform key invalidates pre-fix MAIN pages. Successful syncs store the per-page sheet status; read-only SheetAuthorityAudit (report/text/inspect) reports recordsWithSheetSpecs/metadata/uncertainty and a verdict without network. This release refreshes browser snapshots; fallback, descriptions, DERIVED_REV 12 and snapshot schema 1 unchanged.",
     "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; Worker-parity bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
     "v2.5.110": "Google Sheets live canonical panel specs overlay: revision-aware Worker snapshot cache, field-level parsing/ML/healer fallback, conservative duplicate handling, and authoritative browser search/derived specs. Configure SHEETS_ENDPOINT and deploy Worker plus frontend. DERIVED_REV 11; encrypted snapshot schema 1 preserved.",
@@ -1964,6 +1965,10 @@ class PageContext {
     static getActivePage() {
         return this.currentPage;
     }
+
+    static getActiveWrapper() {
+        return document.querySelector(`.pdf-page-wrapper[data-page-number="${this.currentPage}"]`);
+    }
     
     static getActiveProfile() {
         const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${this.currentPage}"]`);
@@ -2110,16 +2115,7 @@ class ProfileManager {
         const name = document.getElementById('new-profile-name').value.trim();
         if (!name) return alert("Please enter a profile name.");
         
-        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
-        let targetContainer = null;
-        
-        for(const w of wrappers) {
-             const rect = w.getBoundingClientRect();
-             if (rect.top >= -100 && rect.top < window.innerHeight) {
-                 targetContainer = w.querySelector('.pdf-content-container');
-                 break;
-             }
-        }
+        const targetContainer = PageContext.getActiveWrapper()?.querySelector('.pdf-content-container');
 
         if (!targetContainer) return alert("No visible page found.");
 
@@ -2134,8 +2130,10 @@ class ProfileManager {
                 y: parseFloat((box.offsetTop / h).toFixed(4)),
                 w: parseFloat((box.offsetWidth / w).toFixed(4)),
                 h: parseFloat((box.offsetHeight / h).toFixed(4)),
-                text: box.dataset.customText || null,
-                fontSize: parseInt(box.style.fontSize),
+                text: box.dataset.customText ?? null,
+                fontSize: Number(box.dataset.fontSize) || parseFloat(box.style.fontSize) / PdfViewer.currentScale,
+                fontWeight: box.style.fontWeight || 'normal',
+                decoration: box.dataset.decoration || null,
                 fontFamily: box.style.fontFamily, 
                 rotation: parseFloat(box.dataset.rotation || 0),
                 textAlign: box.style.textAlign || 'center', 
@@ -2334,8 +2332,10 @@ class ConfigExporter {
                     y: parseFloat((box.offsetTop / h).toFixed(3)),
                     w: parseFloat((box.offsetWidth / w).toFixed(3)),
                     h: parseFloat((box.offsetHeight / h).toFixed(3)),
-                    text: box.dataset.customText || null,
-                    fontSize: parseInt(box.style.fontSize),
+                    text: box.dataset.customText ?? null,
+                    fontSize: Number(box.dataset.fontSize) || parseFloat(box.style.fontSize) / PdfViewer.currentScale,
+                    fontWeight: box.style.fontWeight || 'normal',
+                    decoration: box.dataset.decoration || null,
                     fontFamily: box.style.fontFamily, 
                     rotation: parseFloat(box.dataset.rotation || 0),
                     textAlign: box.style.textAlign || 'center', 
@@ -2356,6 +2356,31 @@ class ConfigExporter {
 
 class RedactionManager {
     static activeBox = null; static zones = []; static isDragging = false; static startX = 0; static startY = 0; static startLeft = 0; static startTop = 0;
+    static nextZoneId = 0;
+
+    static readZones(wrapper) {
+        const container = wrapper.querySelector('.pdf-content-container');
+        return Array.from(container.querySelectorAll('.redaction-box')).map((box, index) => ({
+            id: box.dataset.zoneId || `${wrapper.dataset.pageNumber}:manual:${index}`,
+            map: box.dataset.map, x: Number(box.dataset.relX), y: Number(box.dataset.relY),
+            w: Number(box.dataset.relW), h: Number(box.dataset.relH),
+            text: box.dataset.customText ?? null,
+            resolvedText: box.querySelector('span')?.innerText || '',
+            fontSize: Number(box.dataset.fontSize) || parseFloat(box.style.fontSize) / PdfViewer.currentScale,
+            fontFamily: box.style.fontFamily, fontWeight: box.style.fontWeight || 'normal',
+            decoration: box.dataset.decoration || null, type: box.dataset.type || null,
+            rotation: Number(box.dataset.rotation || 0), textAlign: box.style.textAlign || 'center',
+            transparent: box.dataset.transparent === 'true'
+        }));
+    }
+
+    static persistPage(box = this.activeBox) {
+        const wrapper = box?.closest('.pdf-page-wrapper');
+        if (wrapper && SmartScanner.state?.document) {
+            SmartScanner.state.editPage(Number(wrapper.dataset.pageNumber), this.readZones(wrapper));
+        }
+        PdfExporter.invalidatePreview();
+    }
     
     static createZoneOnWrapper(wrapper, x, y, w, h, mapKey, fontSize = 14, text = null, decoration = null, type = null, fontWeight = 'normal', transparent = false, rotation = 0, fontFamily = null, textAlign = 'center') {
         let container = wrapper.querySelector('.pdf-content-container');
@@ -2374,17 +2399,20 @@ class RedactionManager {
         console.log(`✅ Creating zone: ${mapKey} at (${Math.round(x)}, ${Math.round(y)}) size: ${Math.round(w)}x${Math.round(h)}`);
         
         const box = document.createElement('div'); box.className = 'redaction-box';
+        box.dataset.zoneId = SmartScanner.state?.nextZoneId(Number(wrapper.dataset.pageNumber)) ||
+            `${wrapper.dataset.pageNumber}:manual:${++this.nextZoneId}`;
         box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
         // Store relative geometry for zoom-scaling
-        const cw = container.offsetWidth || 1;
-        const ch = container.offsetHeight || 1;
+        const cw = container.offsetWidth || parseFloat(container.style.width) || 1;
+        const ch = container.offsetHeight || parseFloat(container.style.height) || 1;
         box.dataset.relX = (x / cw).toFixed(6);
         box.dataset.relY = (y / ch).toFixed(6);
         box.dataset.relW = (w / cw).toFixed(6);
         box.dataset.relH = (h / ch).toFixed(6);
         box.dataset.relFont = (fontSize / ch).toFixed(6);
+        box.dataset.fontSize = Number(fontSize) / (PdfViewer.currentScale || 1);
         box.dataset.map = mapKey || 'custom';
-        if(text) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration; 
+        if(text !== null && text !== undefined) box.dataset.customText = text; if(type) box.dataset.type = type; if(decoration) box.dataset.decoration = decoration;
         
         box.dataset.transparent = transparent.toString(); 
         
@@ -2418,21 +2446,11 @@ class RedactionManager {
         return box;
     }
 
-    static addManualZone() { const pages = document.querySelectorAll('.pdf-page-wrapper'); if(pages.length === 0) return; const wrapper = pages[0]; const container = wrapper.querySelector('.pdf-content-container'); const w = container.offsetWidth; const h = container.offsetHeight; this.createZoneOnWrapper(wrapper, w*0.3, h*0.4, w*0.4, h*0.1, 'custom', 16, null, null, 'blocker'); this.refreshContent(); }
+    static addManualZone() { const wrapper = PageContext.getActiveWrapper(); if(!wrapper) return; const container = wrapper.querySelector('.pdf-content-container'); const w = container.offsetWidth; const h = container.offsetHeight; const box = this.createZoneOnWrapper(wrapper, w*0.3, h*0.4, w*0.4, h*0.1, 'custom', 16 * PdfViewer.currentScale, '', null, 'blocker'); this.refreshContent(); this.persistPage(box); }
 
     static addZoneToCurrentView(type) {
-        const wrappers = document.querySelectorAll('.pdf-page-wrapper');
-        if (wrappers.length === 0) return;
-        
-        let targetWrapper = wrappers[0];
-        
-        for(const w of wrappers) {
-             const rect = w.getBoundingClientRect();
-             if (rect.top >= -100 && rect.top < window.innerHeight) {
-                 targetWrapper = w;
-                 break;
-             }
-        }
+        const targetWrapper = PageContext.getActiveWrapper();
+        if (!targetWrapper) return;
 
         const container = targetWrapper.querySelector('.pdf-content-container');
         const w = container.offsetWidth;
@@ -2443,21 +2461,33 @@ class RedactionManager {
         const isWhiteout = type === 'blocker';
         const transparent = false; // All new zones default to opaque (whiteout) per default styling rules
 
-        this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize, isWhiteout ? '' : 'New Text', null, null, 'bold', transparent, 0, currentFontFamily, 'center');
+        const box = this.createZoneOnWrapper(targetWrapper, w*0.35, h*0.4, w*0.3, h*0.05, 'custom', fontSize * PdfViewer.currentScale, isWhiteout ? '' : 'New Text', null, null, 'bold', transparent, 0, currentFontFamily, 'center');
         this.refreshContent();
+        this.persistPage(box);
     }
     
     static deleteSelected() {
         if (this.activeBox) {
+            const wrapper = this.activeBox.closest('.pdf-page-wrapper');
             this.activeBox.remove();
             this.zones = this.zones.filter(z => z !== this.activeBox);
+            const page = Number(wrapper?.dataset.pageNumber);
+            if (wrapper && SmartScanner.state?.document) SmartScanner.state.editPage(page, this.readZones(wrapper));
+            PdfExporter.invalidatePreview();
             this.activeBox = null;
             document.getElementById('editor-controls').classList.add('disabled-overlay');
         }
     }
 
-    static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = box.offsetLeft; this.startTop = box.offsetTop; box.style.cursor = 'grabbing'; }
-    static handleDrag(e) { if(!this.isDragging || !this.activeBox) return; e.preventDefault(); const deltaX = e.clientX - this.startX; const deltaY = e.clientY - this.startY; this.activeBox.style.left = (this.startLeft + deltaX) + 'px'; this.activeBox.style.top = (this.startTop + deltaY) + 'px'; }
+    static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; SmartScanner.state?.touch(Number(box.closest('.pdf-page-wrapper')?.dataset.pageNumber)); this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = box.offsetLeft; this.startTop = box.offsetTop; box.style.cursor = 'grabbing'; }
+    static handleDrag(e) {
+        if(!this.isDragging || !this.activeBox) return;
+        e.preventDefault();
+        const container = this.activeBox.closest('.pdf-content-container');
+        const x = this.startLeft + e.clientX - this.startX, y = this.startTop + e.clientY - this.startY;
+        this.activeBox.style.left = Math.max(0, Math.min(x, container.offsetWidth - this.activeBox.offsetWidth)) + 'px';
+        this.activeBox.style.top = Math.max(0, Math.min(y, container.offsetHeight - this.activeBox.offsetHeight)) + 'px';
+    }
     static endDrag() {
         if(this.activeBox) {
             this.activeBox.style.cursor = 'grab';
@@ -2473,10 +2503,14 @@ class RedactionManager {
                 this.activeBox.dataset.relH = (this.activeBox.offsetHeight / ch).toFixed(6);
             }
         }
+        if (this.isDragging) this.persistPage();
         this.isDragging = false;
+        PdfExporter.syncPreviewControls();
     }
     
     static selectZone(box) { 
+        const wrapper = box.closest('.pdf-page-wrapper');
+        if (wrapper) PageContext.setActivePage(Number(wrapper.dataset.pageNumber));
         if(this.activeBox) this.activeBox.classList.remove('selected'); 
         this.activeBox = box; 
         box.classList.add('selected'); 
@@ -2494,7 +2528,7 @@ class RedactionManager {
             customInputWrapper.style.display = 'none';
         }
 
-        const fs = parseInt(box.style.fontSize) || 14;
+        const fs = Number(box.dataset.fontSize) || 14;
         document.getElementById('redact-size').value = fs; 
         document.getElementById('font-size-val').innerText = fs; 
         
@@ -2514,15 +2548,18 @@ class RedactionManager {
         
         if(!this.activeBox) return; 
         this.activeBox.style.fontFamily = document.getElementById('redact-font').value; 
-        this.activeBox.style.fontSize = fs + 'px';
+        this.activeBox.style.fontSize = (fs * PdfViewer.currentScale) + 'px';
+        this.activeBox.dataset.fontSize = fs;
         const container = this.activeBox.closest('.pdf-content-container');
         const ch = container ? (container.offsetHeight || 1) : 1;
-        this.activeBox.dataset.relFont = (parseFloat(fs) / ch).toFixed(6);
+        this.activeBox.dataset.relFont = (parseFloat(fs) * PdfViewer.currentScale / ch).toFixed(6);
+        this.persistPage();
     }
     
     static updateActiveAlignment(align) {
         if(!this.activeBox) return;
         this.activeBox.style.textAlign = align;
+        this.persistPage();
     }
 
     static mapSelectedZone() { 
@@ -2538,12 +2575,14 @@ class RedactionManager {
         }
         
         this.refreshContent(); 
+        this.persistPage();
     }
     
     static updateCustomText(text) {
         if(!this.activeBox) return;
         this.activeBox.dataset.customText = text;
         this.activeBox.querySelector('span').innerText = text;
+        this.persistPage();
     }
 
     static toggleBoxBackground() {
@@ -2552,9 +2591,14 @@ class RedactionManager {
         this.activeBox.dataset.transparent = isOpaque ? "false" : "true";
         const wrapper = this.activeBox.closest('.pdf-page-wrapper');
         if (wrapper) RedactionManager.rescaleZones(wrapper);
+        this.persistPage();
     }
     
     static refreshContent(wrapper) { 
+        if (!wrapper) {
+            SmartScanner.state?.touch();
+            PdfExporter.invalidatePreview();
+        }
         const ctx = DemoManager.getContext(); 
         
         let displayDate = ctx.date;
@@ -2570,7 +2614,7 @@ class RedactionManager {
             const map = box.dataset.map; 
             let text = ""; 
             
-            if(box.dataset.customText) {
+            if(box.dataset.customText !== undefined) {
                 text = box.dataset.customText;
             } else if(map === 'cust') {
                 text = ctx.cust;
@@ -2796,6 +2840,157 @@ class PageClassifier {
 }
 
 class SmartScanner {
+    static state = typeof GeneratorState !== 'undefined' ? new GeneratorState() : null;
+    static { if (this.state) this.state.onChange = () => PdfExporter.invalidatePreview(); }
+
+    static async resolvePage(pageNum, wrapper, page) {
+        const state = this.state;
+        const record = state.page(pageNum);
+        const intent = record.intent;
+        const legacy = key => key.startsWith('CUSTOM:')
+            ? ProfileManager.getCustomProfiles()[key.slice(7)] : LAYOUT_RULES[key];
+        if (pageNum === 1 && record.source === 'replacement') {
+            return { namespace: 'legacy', key: 'COVER_TEMPLATE', rules: LAYOUT_RULES.COVER_TEMPLATE,
+                evidence: { method: 'forced-replacement', review: false } };
+        }
+        if (intent.mode === 'manual') {
+            const rules = legacy(intent.key);
+            if (!GeneratorState.validateZones(rules)) throw new Error('Unknown or invalid manual profile contract');
+            return { namespace: intent.key.startsWith('CUSTOM:') ? 'custom' : 'legacy', key: intent.key,
+                rules, evidence: { method: 'manual', review: false } };
+        }
+        // Preserve the established page-one contract, even without the bundled replacement cover.
+        if (pageNum === 1) return { namespace: 'legacy', key: 'COVER_TEMPLATE', rules: LAYOUT_RULES.COVER_TEMPLATE,
+            evidence: { method: 'legacy-cover', review: true } };
+        const text = await page.getTextContent();
+        const viewport = page.getViewport({ scale: 1 });
+        const base = PageClassifier.classify(text, viewport.width / viewport.height, pageNum);
+        let measured = null;
+        try {
+            const matcher = await state.loadCatalog();
+            if (matcher) measured = matcher.match(LayoutMatcher.measure(await page.getOperatorList(), pdfjsLib.OPS, viewport),
+                base, viewport.width > viewport.height ? 'landscape' : 'portrait');
+        } catch (error) { console.warn('[generator] Unsupported geometry; falling back', error); }
+        if (measured?.accepted) return { namespace: 'measured', key: measured.key, templateHash: measured.templateHash,
+            placement: measured.placement, titleBlockEdge: measured.titleBlockEdge, rules: measured.rules,
+            evidence: { method: 'geometry', score: measured.score, runnerUp: measured.runnerUp,
+                precision: measured.precision, recall: measured.recall, matchedLines: measured.matchedLines,
+                expectedLines: measured.expectedLines, observedLines: measured.observedLines,
+                ambiguous: measured.ambiguous, affineApplied: false, review: measured.review } };
+        let zones = null;
+        if (text.items.length > 10) zones = await this.extractTextBasedZones(page, text, wrapper);
+        else zones = await this.ocrBasedZones(page, wrapper);
+        return { namespace: zones?.length ? 'detected' : 'legacy', key: base,
+            rules: zones?.length ? null : LAYOUT_RULES[base], detected: zones,
+            evidence: { method: zones?.length ? (text.items.length > 10 ? 'text' : 'ocr') : 'classifier',
+                score: measured?.score ?? null, runnerUp: measured?.runnerUp ?? null,
+                ambiguous: measured?.ambiguous || false, review: true,
+                fallbackReason: measured?.ambiguous ? 'ambiguous-geometry' : 'no-supported-match' } };
+    }
+
+    static async scanPage(pageNum, wrapper) {
+        const state = this.state;
+        if (!state || !PdfViewer.isDocumentValid() || !wrapper) return false;
+        const token = state.scanToken(pageNum, PdfViewer.currentRenderToken);
+        const fetchId = PdfViewer.currentFetchId;
+        const doc = PdfViewer.doc;
+        state.pendingScans++;
+        state.refreshReady();
+        PdfExporter.invalidatePreview();
+        try {
+            const page = await doc.getPage(pageNum);
+            const resolved = await this.resolvePage(pageNum, wrapper, page);
+            const container = wrapper.querySelector('.pdf-content-container');
+            await PdfViewer.waitForLayoutStable(container);
+            const draggingPage = Number(RedactionManager.activeBox?.closest('.pdf-page-wrapper')?.dataset.pageNumber);
+            if (!state.isCurrent(token, PdfViewer.currentRenderToken) || PdfViewer.currentFetchId !== fetchId ||
+                doc !== PdfViewer.doc || !DemoManager.isGeneratorActive ||
+                (RedactionManager.isDragging && draggingPage === pageNum) || !wrapper.isConnected) return false;
+            const width = container.offsetWidth, height = container.offsetHeight;
+            const ruleSet = resolved.detected?.length ? resolved.detected.map(zone => {
+                const x = Math.max(0, zone.x / width), y = Math.max(0, zone.y / height);
+                return { map: zone.map, x, y, w: Math.min(zone.w / width, 1 - x), h: Math.min(zone.h / height, 1 - y),
+                    fontSize: zone.fontSize / PdfViewer.currentScale, transparent: !!zone.transparent,
+                    fontFamily: zone.fontFamily, textAlign: zone.textAlign || 'left', rotation: zone.rotation || 0 };
+            }) : resolved.rules;
+            if (!GeneratorState.validateZones(ruleSet)) throw new Error('Invalid normalized scan geometry/map');
+            // Only replace a successful, current scan. Failed/stale scans never clear existing masks.
+            const layer = wrapper.querySelector('.redaction-layer');
+            RedactionManager.zones = RedactionManager.zones.filter(z => !layer.contains(z));
+            layer.innerHTML = '';
+            LayoutScanner.applyRuleToWrapper(wrapper, ruleSet);
+            const zones = RedactionManager.readZones(wrapper);
+            const { rules, detected, ...assignment } = resolved;
+            state.page(pageNum).role = pageNum === 1 ? 'cover' : resolved.key.startsWith('INFO') ? 'info'
+                : resolved.key.includes('DOOR') ? 'door-drawing' : 'schematic';
+            state.assign(pageNum, assignment, zones);
+            this.restorePage(wrapper);
+            const select = wrapper.querySelector('.page-profile-select');
+            if (select) {
+                select.value = state.page(pageNum).intent.mode === 'manual' ? state.page(pageNum).intent.key : 'AUTO';
+                select.disabled = pageNum === 1 && state.page(pageNum).source === 'replacement';
+                select.title = `${assignment.namespace}:${assignment.key}`;
+            }
+            this.addConfidenceIndicator(wrapper, assignment.evidence.review ? 'low' : 'high');
+            const indicator = wrapper.querySelector('.scan-confidence');
+            if (indicator) indicator.title = JSON.stringify(assignment.evidence);
+            RedactionManager.refreshContentForWrapper(wrapper);
+            return true;
+        } catch (error) {
+            if (state.isCurrent(token, PdfViewer.currentRenderToken)) console.error('[generator] Scan failed; masks retained', error);
+            return false;
+        } finally {
+            if (state.generation === token.document) state.pendingScans = Math.max(0, state.pendingScans - 1);
+            state.refreshReady();
+            PdfExporter.syncPreviewControls();
+        }
+    }
+
+    static restorePage(wrapper) {
+        const number = Number(wrapper.dataset.pageNumber), state = this.state;
+        const record = state?.pages.get(number);
+        if (!record?.assignment && !record?.manualEdits) return false;
+        const layer = wrapper.querySelector('.redaction-layer');
+        RedactionManager.zones = RedactionManager.zones.filter(z => !layer.contains(z));
+        layer.innerHTML = '';
+        LayoutScanner.applyRuleToWrapper(wrapper, state.effectiveZones(number));
+        wrapper.querySelectorAll('.redaction-box').forEach((box, index) => {
+            box.dataset.zoneId = state.effectiveZones(number)[index].id;
+        });
+        const select = wrapper.querySelector('.page-profile-select');
+        if (select) select.value = record.intent.mode === 'manual' ? record.intent.key : 'AUTO';
+        RedactionManager.refreshContentForWrapper(wrapper);
+        return true;
+    }
+
+    static async scanAllPages() {
+        if (!this.state || !PdfViewer.isDocumentValid()) return;
+        const generation = ++this.state.scanGeneration;
+        const fetchId = PdfViewer.currentFetchId, render = PdfViewer.currentRenderToken;
+        const btn = document.getElementById('auto-scan-btn');
+        const text = btn?.innerText;
+        if (btn) { btn.disabled = true; btn.innerText = '🔍 SCANNING...'; }
+        try {
+            for (let number = 1; number <= PdfViewer.doc.numPages; number++) {
+                if (generation !== this.state.scanGeneration || fetchId !== PdfViewer.currentFetchId ||
+                    render !== PdfViewer.currentRenderToken || !DemoManager.isGeneratorActive) return;
+                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${number}"]`);
+                const scanned = await this.scanPage(number, wrapper);
+                if (!scanned && !this.state.page(number).assignment && generation === this.state.scanGeneration &&
+                    fetchId === PdfViewer.currentFetchId && render === PdfViewer.currentRenderToken) {
+                    await this.scanPage(number, wrapper);
+                }
+            }
+        } finally {
+            if (generation === this.state.scanGeneration && btn) { btn.disabled = false; btn.innerText = text; }
+        }
+    }
+
+    static async rescanPage(pageNum) {
+        const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${pageNum}"]`);
+        return this.scanPage(pageNum, wrapper);
+    }
+
     // Configuration constants
     static WIDTH_PADDING_FACTOR = 1.5;
     static HEIGHT_PADDING_FACTOR = 1.2;
@@ -2804,194 +2999,23 @@ class SmartScanner {
     static FONT_SIZE_ESTIMATE_FACTOR = 0.8; // OCR font size estimation adjustment
     static MIN_OCR_BOX_WIDTH = 20; // Minimum width in pixels to avoid "too small to scale" errors
     static MIN_OCR_BOX_HEIGHT = 10; // Minimum height in pixels to avoid "too small to scale" errors
-    
-    static async scanAllPages() {
-        console.log('🔍 Auto-scanning PDF pages...');
-        RedactionManager.clearAll(); 
-        if(!PdfViewer.isDocumentValid()) {
-            console.error('❌ Cannot scan: PDF document is not loaded or invalid');
-            return;
-        }
-        
-        const numPages = PdfViewer.doc?.numPages || 0;
-        if(numPages === 0) {
-            console.error('❌ Cannot scan: PDF has no pages');
-            return;
-        }
-        
-        console.log(`🔍 Starting scan of ${numPages} pages...`);
-        
-        // Capture current fetchId to detect if PDF changes during scan
-        const scanFetchId = PdfViewer.currentFetchId;
-        
-        const btn = document.getElementById('auto-scan-btn');
-        const origText = btn ? btn.innerText : "";
-        if(btn) { btn.innerText = "🔍 INITIALIZING..."; btn.disabled = true; }
-        
-        let textPages = 0;
-        let ocrPages = 0;
-        
-        try {
-            console.log(`📄 Scanning ${numPages} pages...`);
-            for(let i = 1; i <= numPages; i++) {
-                // Check if PDF has changed (user switched to different PDF)
-                if (PdfViewer.currentFetchId !== scanFetchId) {
-                    console.log('[scanAllPages] Scan cancelled - PDF changed during scan');
-                    break;
-                }
-                
-                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`);
-                if(!wrapper) continue;
-                
-                if(btn) btn.innerText = `🔍 ANALYZING PAGE ${i}/${PdfViewer.doc.numPages}...`;
-                
-                // Page 1 always uses COVER_TEMPLATE deterministically - skip text/OCR detection
-                if (i === 1) {
-                    await this.applyPage1CoverTemplate(wrapper);
-                    continue;
-                }
-                
-                // Validate document is still valid before getPage()
-                if(!PdfViewer.isDocumentValid()) {
-                    console.warn('[scanAllPages] PDF document became invalid during scan');
-                    break;
-                }
-                
-                // Wrap getPage in try/catch
-                let page;
-                try {
-                    page = await PdfViewer.doc.getPage(i);
-                } catch (pageError) {
-                    console.error(`[scanAllPages] Failed to get page ${i}:`, pageError);
-                    // Check for destroyed transport
-                    if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
-                        console.error('[scanAllPages] Transport destroyed - stopping scan');
-                        break;
-                    }
-                    continue; // Skip this page
-                }
-                
-                if (!page) {
-                    console.warn(`[scanAllPages] Page ${i} is null, skipping`);
-                    continue;
-                }
-                
-                // Check again if PDF changed after await
-                if (PdfViewer.currentFetchId !== scanFetchId) {
-                    console.log('[scanAllPages] Scan cancelled - PDF changed after getPage');
-                    break;
-                }
-                
-                // Wrap getTextContent in try/catch
-                let textContent;
-                try {
-                    textContent = await page.getTextContent();
-                } catch (textError) {
-                    console.error(`[scanAllPages] Failed to get text content for page ${i}:`, textError);
-                    if (textError.message?.includes('destroyed')) {
-                        console.error('[scanAllPages] Transport destroyed - stopping scan');
-                        break;
-                    }
-                    continue; // Skip this page
-                }
-                
-                // Check again if PDF changed after await
-                if (PdfViewer.currentFetchId !== scanFetchId) {
-                    console.log('[scanAllPages] Scan cancelled - PDF changed after getTextContent');
-                    break;
-                }
-                
-                let detectedZones = null;
-                let scanConfidence = 'low';
-                
-                // Check if text extraction yielded useful results
-                if(textContent.items.length > 10) {
-                    if(btn) btn.innerText = `🔍 TEXT SCAN PAGE ${i}/${PdfViewer.doc.numPages}...`;
-                    detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
-                    if(detectedZones && detectedZones.length > 0) {
-                        scanConfidence = 'high';
-                        textPages++;
-                    }
-                } else {
-                    // Fallback to OCR for scanned/image PDFs
-                    if(btn) btn.innerText = `🔍 OCR PAGE ${i}/${PdfViewer.doc.numPages}...`;
-                    detectedZones = await this.ocrBasedZones(page, wrapper);
-                    if(detectedZones && detectedZones.length > 0) {
-                        scanConfidence = 'medium';
-                        ocrPages++;
-                    }
-                }
-                
-                // Check again if PDF changed after processing
-                if (PdfViewer.currentFetchId !== scanFetchId) {
-                    console.log('[scanAllPages] Scan cancelled - PDF changed after zone detection');
-                    break;
-                }
-                
-                // Apply detected zones or fallback to layout rules
-                if(detectedZones && detectedZones.length > 0) {
-                    this.applyDetectedZones(wrapper, detectedZones);
-                    RedactionManager.rescaleZones(wrapper);
-                } else {
-                    // Fallback to existing LAYOUT_RULES
-                    scanConfidence = 'low';
-                    await this.fallbackToLayoutRules(wrapper, i, page, textContent);
-                }
-                
-                // Add scan confidence indicator to toolbar
-                this.addConfidenceIndicator(wrapper, scanConfidence);
-            }
-            
-            RedactionManager.refreshContent();
-            
-            console.log(`✅ Scan complete. Created zones on ${textPages + ocrPages} pages`);
-            console.log(`📊 Total zones in manager: ${RedactionManager.zones.length}`);
-            
-            // Show summary
-            if(btn) {
-                const summary = `✅ Scanned ${numPages} pages (${textPages} text, ${ocrPages} OCR)`;
-                btn.innerText = summary;
-                setTimeout(() => { btn.innerText = origText; }, 3000);
-            }
-        } catch(e) { 
-            console.error('[scanAllPages] Scan error:', e); 
-            if(btn) btn.innerText = "❌ SCAN FAILED";
-        } finally {
-            if(btn) btn.disabled = false;
-        }
-    }
-    
-    static async applyPage1CoverTemplate(wrapper) {
-        const container = wrapper.querySelector('.pdf-content-container');
-        console.log(`[SmartScanner] Page 1: applying COVER_TEMPLATE deterministically. Container: ${container?.offsetWidth}x${container?.offsetHeight}`);
-        if (container) await PdfViewer.waitForLayoutStable(container);
-        console.log(`[SmartScanner] Page 1 after layout stable. Container: ${container?.offsetWidth}x${container?.offsetHeight}`);
-        LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES['COVER_TEMPLATE']);
-        console.log(`[SmartScanner] Page 1 COVER_TEMPLATE zones applied: ${wrapper.querySelectorAll('.redaction-box').length}`);
-        // Populate text immediately so cover zones show text without waiting for global scan end
-        requestAnimationFrame(() => RedactionManager.refreshContentForWrapper(wrapper));
-        this.addConfidenceIndicator(wrapper, 'high');
-    }
 
     static async extractTextBasedZones(page, textContent, wrapper) {
         const viewport = page.getViewport({ scale: 1.0 });
         const container = wrapper.querySelector('.pdf-content-container');
         if(!container) return null;
         
-        const width = container.offsetWidth;
-        const height = container.offsetHeight;
+        const width = container.offsetWidth || parseFloat(container.style.width);
+        const height = container.offsetHeight || parseFloat(container.style.height);
         const scaleX = width / viewport.width;
         const scaleY = height / viewport.height;
         
         // Build spatial map of text items
-        const textItems = textContent.items.map(item => ({
-            text: item.str.toUpperCase(),
-            x: item.transform[4] * scaleX,
-            y: height - (item.transform[5] * scaleY), // Flip Y coordinate
-            width: item.width * scaleX,
-            height: item.height * scaleY,
-            fontSize: Math.abs(item.transform[0]) * scaleY
-        })).filter(item => {
+        const textItems = textContent.items.map(item => {
+            const bounds = LayoutMatcher.textBounds(item, viewport);
+            return { text: item.str.toUpperCase(), x: bounds.x * scaleX, y: bounds.y * scaleY,
+                width: bounds.width * scaleX, height: bounds.height * scaleY, fontSize: bounds.fontSize * scaleY };
+        }).filter(item => {
             // Filter out boxes that are too small to prevent processing errors
             return item.width >= this.MIN_OCR_BOX_WIDTH && item.height >= this.MIN_OCR_BOX_HEIGHT;
         });
@@ -3225,27 +3249,6 @@ class SmartScanner {
         });
     }
     
-    static async fallbackToLayoutRules(wrapper, pageNum, page, textContent) {
-        const container = wrapper.querySelector('.pdf-content-container');
-        const manualSelect = wrapper.querySelector('.page-profile-select');
-        let profileKey = manualSelect ? manualSelect.value : null;
-        
-        if (!profileKey || profileKey === "AUTO") {
-            // Enhanced classification using content and page number heuristics
-            const viewport = page.getViewport({ scale: 1.0 });
-            const aspectRatio = viewport.width / viewport.height;
-            
-            // Use enhanced PageClassifier with page number support
-            profileKey = PageClassifier.classify(textContent, aspectRatio, pageNum);
-            
-            if(manualSelect) manualSelect.value = profileKey;
-        }
-
-        // Flush layout before measuring container dimensions for zone placement
-        if (container) await PdfViewer.waitForLayoutStable(container);
-        LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
-    }
-    
     static addConfidenceIndicator(wrapper, confidence) {
         const toolbar = wrapper.querySelector('.page-toolbar');
         if(!toolbar) return;
@@ -3272,147 +3275,11 @@ class SmartScanner {
         toolbar.appendChild(indicator);
     }
     
-    static async rescanPage(pageNum) {
-        if(!PdfViewer.isDocumentValid()) {
-            console.warn('[rescanPage] Cannot rescan: PDF document is not loaded or invalid');
-            return;
-        }
-        
-        // Capture current fetchId to detect if PDF changes during rescan
-        const scanFetchId = PdfViewer.currentFetchId;
-        
-        const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${pageNum}"]`);
-        if(!wrapper) return;
-        
-        const btn = wrapper.querySelector('.rescan-page-btn');
-        const origText = btn ? btn.innerHTML : "🔄";
-        if(btn) btn.innerHTML = "⏳";
-        
-        try {
-            // Clear existing zones on this page
-            const layer = wrapper.querySelector('.redaction-layer');
-            if(layer) layer.innerHTML = '';
-            
-            // Page 1 always uses COVER_TEMPLATE deterministically - skip text/OCR detection
-            if (pageNum === 1) {
-                await this.applyPage1CoverTemplate(wrapper);
-                RedactionManager.refreshContent();
-                return;
-            }
-            
-            // Validate document is still valid before getPage()
-            if(!PdfViewer.isDocumentValid()) {
-                console.warn('[rescanPage] PDF document is invalid, cannot rescan');
-                return;
-            }
-            
-            // Wrap getPage in try/catch
-            let page;
-            try {
-                page = await PdfViewer.doc.getPage(pageNum);
-            } catch (pageError) {
-                console.error(`[rescanPage] Failed to get page ${pageNum}:`, pageError);
-                // Check for destroyed transport
-                if (pageError.message?.includes('destroyed') || pageError.message?.includes('Transport destroyed')) {
-                    console.error('[rescanPage] Transport destroyed - cannot rescan');
-                }
-                return;
-            }
-            
-            if (!page) {
-                console.warn(`[rescanPage] Page ${pageNum} is null, cannot rescan`);
-                return;
-            }
-            
-            // Check if PDF changed after await
-            if (PdfViewer.currentFetchId !== scanFetchId) {
-                console.log('[rescanPage] Rescan cancelled - PDF changed');
-                return;
-            }
-            
-            // Wrap getTextContent in try/catch
-            let textContent;
-            try {
-                textContent = await page.getTextContent();
-            } catch (textError) {
-                console.error(`[rescanPage] Failed to get text content for page ${pageNum}:`, textError);
-                if (textError.message?.includes('destroyed')) {
-                    console.error('[rescanPage] Transport destroyed - cannot rescan');
-                }
-                return;
-            }
-            
-            // Check if PDF changed after await
-            if (PdfViewer.currentFetchId !== scanFetchId) {
-                console.log('[rescanPage] Rescan cancelled - PDF changed after getTextContent');
-                return;
-            }
-            
-            let detectedZones = null;
-            let scanConfidence = 'low';
-            
-            if(textContent.items.length > 10) {
-                detectedZones = await this.extractTextBasedZones(page, textContent, wrapper);
-                if(detectedZones && detectedZones.length > 0) scanConfidence = 'high';
-            } else {
-                detectedZones = await this.ocrBasedZones(page, wrapper);
-                if(detectedZones && detectedZones.length > 0) scanConfidence = 'medium';
-            }
-            
-            // Check if PDF changed after processing
-            if (PdfViewer.currentFetchId !== scanFetchId) {
-                console.log('[rescanPage] Rescan cancelled - PDF changed after zone detection');
-                return;
-            }
-            
-            if(detectedZones && detectedZones.length > 0) {
-                this.applyDetectedZones(wrapper, detectedZones);
-                RedactionManager.rescaleZones(wrapper);
-            } else {
-                await this.fallbackToLayoutRules(wrapper, pageNum, page, textContent);
-            }
-            
-            this.addConfidenceIndicator(wrapper, scanConfidence);
-            RedactionManager.refreshContent();
-        } catch(e) {
-            console.error('[rescanPage] Rescan failed:', e);
-        } finally {
-            if(btn) btn.innerHTML = origText;
-        }
-    }
 }
 
 class LayoutScanner {
     static async scanAllPages() {
-        RedactionManager.clearAll(); if(!PdfViewer.doc) return;
-        const btn = document.querySelector('button[onclick="LayoutScanner.scanAllPages()"]');
-        const origText = btn ? btn.innerText : "";
-        if(btn) { btn.innerText = "⏳ SCANNING..."; btn.disabled = true; }
-        
-        try { 
-            for(let i=1; i <= PdfViewer.doc.numPages; i++) { 
-                const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${i}"]`); 
-                if(!wrapper) continue;
-                
-                const container = wrapper.querySelector('.pdf-content-container');
-                const manualSelect = wrapper.querySelector('.page-profile-select');
-                let profileKey = manualSelect ? manualSelect.value : null;
-
-                if (!profileKey || profileKey === "AUTO") {
-                    if (i === 1) profileKey = 'COVER_TEMPLATE';
-                    else if (i === 2) profileKey = 'INFO';
-                    else {
-                        const w = container.offsetWidth; const h = container.offsetHeight;
-                        profileKey = (w > h) ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
-                    }
-                    if(manualSelect) manualSelect.value = profileKey;
-                }
-                if (container) await PdfViewer.waitForLayoutStable(container);
-                LayoutScanner.applyRuleToWrapper(wrapper, LAYOUT_RULES[profileKey]);
-            } 
-            RedactionManager.refreshContent(); 
-        } catch(e) { console.error(e); }
-        if(btn) { btn.innerText = origText; btn.disabled = false; }
+        return SmartScanner.scanAllPages();
     }
 
     static refreshProfileOptions() {
@@ -3463,36 +3330,22 @@ class LayoutScanner {
     static updatePageProfile(pageNum, profileKey) {
         const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${pageNum}"]`);
         if(!wrapper) return;
-        
-        const container = wrapper.querySelector('.pdf-content-container');
-        const layer = container.querySelector('.redaction-layer');
-        
-        RedactionManager.zones = RedactionManager.zones.filter(z => !layer.contains(z));
-        if(layer) layer.innerHTML = '';
-
-        let rules = [];
-        if (profileKey.startsWith('CUSTOM:')) {
-            const name = profileKey.split('CUSTOM:')[1];
-            rules = ProfileManager.getCustomProfiles()[name] || [];
-        } else if (profileKey === "AUTO") {
-             const w = container.offsetWidth; const h = container.offsetHeight;
-             if (pageNum === 1) profileKey = 'COVER_TEMPLATE';
-             else if (pageNum === 2) profileKey = 'INFO';
-             else profileKey = (w > h) ? 'SCHEMATIC_LANDSCAPE' : 'SCHEMATIC_PORTRAIT';
-             const select = wrapper.querySelector('.page-profile-select');
-             if(select) select.value = profileKey;
-             rules = LAYOUT_RULES[profileKey];
-        } else {
-            rules = LAYOUT_RULES[profileKey];
+        if (profileKey !== 'AUTO') {
+            const rules = profileKey.startsWith('CUSTOM:')
+                ? ProfileManager.getCustomProfiles()[profileKey.slice(7)] : LAYOUT_RULES[profileKey];
+            if (!GeneratorState.validateZones(rules)) {
+                console.warn('[generator] Unknown or invalid profile; existing masks and intent retained');
+                const intent = SmartScanner.state?.page(pageNum).intent;
+                const select = wrapper.querySelector('.page-profile-select');
+                if (select) select.value = intent?.mode === 'manual' ? intent.key : 'AUTO';
+                return Promise.resolve(false);
+            }
         }
-
-        LayoutScanner.applyRuleToWrapper(wrapper, rules);
-        RedactionManager.refreshContent();
-        
-        // Update page context UI if this is the active page
-        if (PageContext.getActivePage() === pageNum) {
-            PageContext.updateUI();
-        }
+        SmartScanner.state?.setIntent(pageNum, profileKey);
+        PdfExporter.invalidatePreview();
+        return SmartScanner.rescanPage(pageNum).then(() => {
+            if (PageContext.getActivePage() === pageNum) PageContext.updateUI();
+        });
     }
 
     static applyProfileToPage(pageNum, profileKey) { return this.updatePageProfile(pageNum, profileKey); }
@@ -3507,7 +3360,7 @@ class LayoutScanner {
         const scale = (typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1;
         
         ruleSet.forEach(zone => { 
-            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, zone.fontSize * scale, zone.text, zone.decoration || null, null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign); 
+            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, (zone.fontSize || 14) * scale, zone.text, zone.decoration || null, zone.type || null, zone.fontWeight || 'bold', zone.transparent, zone.rotation, zone.fontFamily, zone.textAlign);
         });
         RedactionManager.rescaleZones(wrapper);
     }
@@ -4387,9 +4240,86 @@ class SearchEngine {
 
 class PdfExporter {
     static previewPdfBytes = null;
+    static previewSnapshot = null;
+    static previewBlobUrl = '';
+    static generation = 0;
+    static pendingExports = 0;
+    static DOWNLOAD_REVOKE_DELAY_MS = 30000;
+
+    static syncPreviewControls() {
+        const state = typeof SmartScanner !== 'undefined' ? SmartScanner.state : null;
+        const enabled = state?.ready && !state.rendering && !state.pendingScans && !this.pendingExports &&
+            !RedactionManager.isDragging && DemoManager.isGeneratorActive && !PdfViewer._documentActionsInvalidated &&
+            state.pages.size === PdfViewer.doc?.numPages && [...state.pages.values()].every(p => p.assignment);
+        document.querySelectorAll('button[onclick="PdfExporter.preview()"]').forEach(button => {
+            button.disabled = !enabled;
+            button.title = state?.digestError || (enabled ? 'Visual masking, not sanitized redaction.' : 'Wait for rendering and all page assignments.');
+        });
+    }
+
+    static invalidatePreview() {
+        this.generation++;
+        this.previewPdfBytes = null;
+        this.previewSnapshot = null;
+        if (typeof PdfViewer !== 'undefined' && PdfViewer._activePrintSession?.generated) {
+            PdfViewer._releasePrintSession('generated-preview-invalidated');
+        }
+        if (this.previewBlobUrl) URL.revokeObjectURL(this.previewBlobUrl);
+        this.previewBlobUrl = '';
+        const container = document.getElementById('pdf-preview-container');
+        if (container) container.innerHTML = '';
+        const modal = document.getElementById('pdf-preview-modal');
+        if (modal) modal.style.display = 'none';
+        this.syncPreviewControls();
+    }
+
+    static captureSnapshot() {
+        const state = SmartScanner.state;
+        if (!DemoManager.isGeneratorActive || !PdfViewer.doc || PdfViewer._documentActionsInvalidated ||
+            !state?.ready || state.rendering || state.pendingScans || this.pendingExports ||
+            RedactionManager.isDragging || !state.document?.digest)
+            throw new Error('Wait for the current document, rendering and scanning to complete.');
+        const pageCount = PdfViewer._committedPageCount;
+        const pages = [...state.pages.values()].sort((a, b) => a.outputPage - b.outputPage);
+        if (state.expectedPageCount !== pageCount || pages.length !== pageCount || PdfViewer.doc.numPages !== pageCount)
+            throw new Error('Generator assignments do not match the committed source page count.');
+        for (const [index, page] of pages.entries()) {
+            if (page.outputPage !== index + 1 || page.sourcePage !== (page.source === 'replacement' ? 1 : page.outputPage) ||
+                (page.source === 'replacement' && page.outputPage !== 1))
+                throw new Error('Invalid source/output page assignment.');
+            const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${page.outputPage}"]`);
+            if (!wrapper || !page.assignment) throw new Error('Every page must have a completed scan before export.');
+            const zones = RedactionManager.readZones(wrapper);
+            const effective = state.effectiveZones(page.outputPage);
+            const fields = ['map', 'x', 'y', 'w', 'h', 'text', 'fontSize', 'fontFamily', 'fontWeight',
+                'decoration', 'type', 'rotation', 'textAlign', 'transparent'];
+            if (!GeneratorState.validateZones(zones) || zones.length !== effective.length ||
+                zones.some((zone, i) => zone.id !== effective[i].id || fields.some(field =>
+                    typeof zone[field] === 'number' && typeof effective[i][field] === 'number'
+                        ? Math.abs(zone[field] - effective[i][field]) > .000001
+                        : (zone[field] ?? null) !== (effective[i][field] ?? null))))
+                throw new Error('Uncommitted zone edits. Finish editing and re-scan before export.');
+            if (page.manualEdits !== null) page.manualEdits = zones;
+            else page.zones = zones;
+        }
+        return state.snapshot({ replacement: state.page(1).source === 'replacement' ? state.templateBytes : null,
+            context: DemoManager.getContext() });
+    }
+
+    static hasCurrentPreview() {
+        return !!this.previewPdfBytes && SmartScanner.state?.ready &&
+            !SmartScanner.state.rendering && !SmartScanner.state.pendingScans &&
+            !PdfViewer._documentActionsInvalidated && SmartScanner.state.snapshotCurrent(this.previewSnapshot);
+    }
     
     static async preview() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
+        let snapshot;
+        try { snapshot = this.captureSnapshot(); }
+        catch (error) { return alert(error.message); }
+        this.pendingExports++;
+        this.invalidatePreview();
+        const generation = this.generation;
         
         // Minimize generator panel while previewing
         DemoManager.minimizePanel();
@@ -4410,22 +4340,29 @@ class PdfExporter {
         if (btn) btn.innerText = "⏳ GENERATING...";
         
         try {
-            const pdfBytes = await this.generateRedactedPdf();
+            const pdfBytes = await this.generateRedactedPdf(snapshot);
+            if (generation !== this.generation || !SmartScanner.state.snapshotCurrent(snapshot)) return;
             this.previewPdfBytes = pdfBytes;
+            this.previewSnapshot = snapshot;
             
             const blob = new Blob([pdfBytes], { type: "application/pdf" });
             const blobUrl = URL.createObjectURL(blob);
+            this.previewBlobUrl = blobUrl;
             
             container.innerHTML = `<iframe src="${blobUrl}" style="width:100%; height:100%; border:none;"></iframe>`;
             modal.style.display = 'flex';
         } catch (e) {
-            console.error(e);
-            alert("Preview Failed: " + e.message);
+            if (generation === this.generation) {
+                console.error(e);
+                alert("Preview Failed: " + e.message);
+            }
         } finally {
+            this.pendingExports--;
             previewButtonState.forEach((state, previewBtn) => {
                 previewBtn.innerText = state.text;
                 previewBtn.disabled = state.disabled;
             });
+            this.syncPreviewControls();
         }
     }
     
@@ -4434,6 +4371,7 @@ class PdfExporter {
         if (modal) modal.style.display = 'none';
         const container = document.getElementById('pdf-preview-container');
         if (container) container.innerHTML = '';
+        this.invalidatePreview();
         // Restore generator panel
         DemoManager.restorePanel();
     }
@@ -4450,55 +4388,47 @@ class PdfExporter {
     
     static async printRedacted() {
         this.closePrintExportMenu();
-        if (!this.previewPdfBytes) return alert("No redacted preview available.");
-        
-        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
-        const blobUrl = URL.createObjectURL(blob);
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = blobUrl;
-        document.body.appendChild(iframe);
-        
-        let fallbackId = null;
-        const cleanup = () => {
-            if (fallbackId) { clearTimeout(fallbackId); fallbackId = null; }
-            if (iframe.parentNode === document.body) document.body.removeChild(iframe);
-            URL.revokeObjectURL(blobUrl);
-        };
-        
-        iframe.onload = () => {
-            try {
-                iframe.contentWindow.focus();
-                iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
-                iframe.contentWindow.print();
-                fallbackId = setTimeout(cleanup, PdfViewer.PRINT_CLEANUP_TIMEOUT_MS);
-            } catch(e) { console.error('Print redacted error:', e); cleanup(); }
-        };
-        
-        fallbackId = setTimeout(cleanup, PdfViewer.PRINT_MAX_TIMEOUT_MS);
+        if (!this.hasCurrentPreview()) return alert("No current masked preview available. Generate it again.");
+        const snapshot = this.previewSnapshot;
+        if (PdfViewer.isPrinting) return;
+        const target = { url: URL.createObjectURL(new Blob([this.previewPdfBytes], { type: 'application/pdf' })),
+            revokeOnCleanup: true, generated: true,
+            isCurrent: () => this.hasCurrentPreview() && snapshot === this.previewSnapshot };
+        if (PdfViewer._isIsolatedPdfPrintBrowser()) PdfViewer._printViaIsolatedWindow(target);
+        else PdfViewer._printViaIframe(target);
+    }
+
+    static saveBytes(bytes) {
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        const link = document.createElement('a');
+        link.href = url; link.rel = 'noopener';
+        if (PdfViewer._supportsBlobDownload()) link.download = `masked_${Date.now()}.pdf`;
+        else link.target = '_blank';
+        try {
+            document.body.appendChild(link);
+            link.click();
+        } catch (error) {
+            URL.revokeObjectURL(url);
+            throw error;
+        } finally {
+            link.remove();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), this.DOWNLOAD_REVOKE_DELAY_MS);
     }
     
     static downloadRedacted() {
         this.closePrintExportMenu();
-        if (!this.previewPdfBytes) return alert("No redacted preview available.");
-        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `redacted_${new Date().getTime()}.pdf`;
-        link.click();
+        if (!this.hasCurrentPreview()) return alert("No current masked preview available. Generate it again.");
+        this.saveBytes(this.previewPdfBytes);
     }
     
     static async confirmExport() {
-        if (!this.previewPdfBytes) {
+        if (!this.hasCurrentPreview()) {
             alert("No preview available. Please generate preview first.");
             return;
         }
         
-        const blob = new Blob([this.previewPdfBytes], { type: "application/pdf" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `redacted_${new Date().getTime()}.pdf`;
-        link.click();
+        this.saveBytes(this.previewPdfBytes);
         
         this.closePreview();
     }
@@ -4506,35 +4436,40 @@ class PdfExporter {
     static async export() {
         if (!PdfViewer.doc) return alert("No PDF loaded!");
         const btn = document.querySelector('button[onclick="PdfExporter.export()"]');
-        const origText = btn.innerText; btn.innerText = "⏳ PROCESSING..."; btn.disabled = true;
+        const origText = btn?.innerText;
+        let started = false;
+        if (btn) { btn.innerText = "⏳ PROCESSING..."; btn.disabled = true; }
         
         try {
-            const pdfBytes = await this.generateRedactedPdf();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `redacted_${new Date().getTime()}.pdf`;
-            link.click();
+            const snapshot = this.captureSnapshot(), generation = this.generation;
+            this.pendingExports++; started = true; this.syncPreviewControls();
+            const pdfBytes = await this.generateRedactedPdf(snapshot);
+            if (generation !== this.generation) return;
+            this.saveBytes(pdfBytes);
         } catch (e) {
             console.error(e);
             alert("Export Failed: " + e.message);
         } finally {
-            btn.innerText = origText;
-            btn.disabled = false;
+            if (started) this.pendingExports--;
+            if (btn) { btn.innerText = origText; btn.disabled = false; }
+            this.syncPreviewControls();
         }
     }
     
-    static async generateRedactedPdf() {
+    static async generateRedactedPdf(snapshot = this.captureSnapshot()) {
+        if (!SmartScanner.state.snapshotCurrent(snapshot)) throw new Error('Export snapshot was superseded. Generate a new preview.');
         if (!window.PDFLib) {
             throw new Error('PDF generation library (pdf-lib) is not available. Please check your network connection or contact support.');
         }
-        const existingPdfBytes = await fetch(PdfViewer.currentBlobUrl).then(res => res.arrayBuffer());
+        const existingPdfBytes = Uint8Array.from(snapshot.sourceBytes);
         const mainPdfDoc = await PDFLib.PDFDocument.load(existingPdfBytes);
+        if (mainPdfDoc.getPageCount() !== snapshot.sourcePageCount)
+            throw new Error('Snapshot source page count does not match committed bytes.');
         const compositeDoc = await PDFLib.PDFDocument.create();
         
         let coverPage;
-        if (window.TEMPLATE_BYTES) {
-            const templateDoc = await PDFLib.PDFDocument.load(window.TEMPLATE_BYTES.slice(0));
+        if (snapshot.replacement) {
+            const templateDoc = await PDFLib.PDFDocument.load(Uint8Array.from(snapshot.replacement));
             const [embeddedTemplate] = await compositeDoc.copyPages(templateDoc, [0]);
             coverPage = compositeDoc.addPage(embeddedTemplate);
         } else {
@@ -4554,53 +4489,58 @@ class PdfExporter {
         const pages = compositeDoc.getPages();
         const fontTimes = await compositeDoc.embedFont(PDFLib.StandardFonts.TimesRoman); 
         const fontCourier = await compositeDoc.embedFont(PDFLib.StandardFonts.Courier);
+        const fontTimesBold = await compositeDoc.embedFont(PDFLib.StandardFonts.TimesRomanBold);
+        const fontCourierBold = await compositeDoc.embedFont(PDFLib.StandardFonts.CourierBold);
 
         pages.forEach((page, index) => {
-            const pdfWidth = page.getWidth(); const pdfHeight = page.getHeight();
-            const wrapper = document.querySelector(`.pdf-page-wrapper[data-page-number="${index + 1}"]`);
-            if (wrapper) {
-                const container = wrapper.querySelector('.pdf-content-container');
-                const zones = Array.from(container.querySelectorAll('.redaction-box'));
+            const record = snapshot.pages.find(p => p.outputPage === index + 1);
+            if (record) {
+                const geometry = LayoutMatcher.exportGeometry(record.box, record.rotation);
+                const pdfWidth = geometry.width, pdfHeight = geometry.height;
+                page.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(...geometry.matrix));
+                const zones = record.zones.slice();
                 
                 // Sort zones: opaque whiteouts first, then transparent overlays
                 // This ensures whiteouts are drawn before text overlays to prevent overlap issues
                 zones.sort((a, b) => {
-                    const aTransparent = a.dataset.transparent === "true";
-                    const bTransparent = b.dataset.transparent === "true";
+                    const aTransparent = a.transparent;
+                    const bTransparent = b.transparent;
                     if (aTransparent === bTransparent) return 0;
                     return aTransparent ? 1 : -1; // Transparent zones sorted last
                 });
                 
                 zones.forEach(box => {
-                    const relX = box.offsetLeft / container.offsetWidth; 
-                    const relY = box.offsetTop / container.offsetHeight;
-                    const relW = box.offsetWidth / container.offsetWidth; 
-                    const relH = box.offsetHeight / container.offsetHeight;
+                    const relX = box.x;
+                    const relY = box.y;
+                    const relW = box.w;
+                    const relH = box.h;
                     
                     const drawX = relX * pdfWidth; const drawH = relH * pdfHeight;
                     const drawY = pdfHeight - (relY * pdfHeight) - drawH; const drawW = relW * pdfWidth;
                     
-                    const isTransparent = box.dataset.transparent === "true";
+                    const isTransparent = box.transparent;
 
-                    if ((!window.TEMPLATE_BYTES || index > 0) && !isTransparent) {
+                    if ((!snapshot.replacement || index > 0) && !isTransparent) {
                          page.drawRectangle({ x: drawX, y: drawY, width: drawW, height: drawH, color: PDFLib.rgb(1,1,1), borderColor: PDFLib.rgb(1,1,1), borderWidth: 0 });
                     }
 
-                    const text = box.querySelector('span')?.innerText || "";
+                    const text = box.resolvedText || "";
                     if (text) { 
-                        const fontSizeStr = box.style.fontSize; const fontSize = parseInt(fontSizeStr) || 12;
+                        const fontSize = box.fontSize || 12;
                         
                         let fontToUse = fontTimes;
-                        if (box.style.fontFamily.includes('Courier')) fontToUse = fontCourier;
+                        const courier = box.fontFamily.includes('Courier');
+                        const bold = box.fontWeight === 'bold' || Number(box.fontWeight) >= 600;
+                        fontToUse = courier ? (bold ? fontCourierBold : fontCourier) : (bold ? fontTimesBold : fontTimes);
 
-                        const rotation = parseFloat(box.dataset.rotation) || 0;
+                        const rotation = box.rotation || 0;
                         if (rotation !== 0) {
                             // Rotated text: single-line only (existing behavior)
                             const textWidth = fontToUse.widthOfTextAtSize(text, fontSize);
                             const centerX = drawX + drawW/2;
                             const centerY = drawY + drawH/2;
                             page.drawText(text, { x: centerX, y: centerY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0), rotate: PDFLib.degrees(rotation) });
-                            if (box.dataset.decoration === 'underline') {
+                            if (box.decoration === 'underline') {
                                 const halfWidth = textWidth / 2;
                                 const underlineOffset = fontSize / 8;
                                 const radians = (rotation * Math.PI) / 180;
@@ -4621,21 +4561,26 @@ class PdfExporter {
                                 const lineText = line || '';
                                 const lineWidth = lineText ? fontToUse.widthOfTextAtSize(lineText, fontSize) : 0;
                                 let lineX = drawX;
-                                if (box.style.textAlign === 'center') lineX = drawX + (drawW/2) - (lineWidth/2);
-                                else if (box.style.textAlign === 'right') lineX = drawX + drawW - lineWidth;
+                                if (box.textAlign === 'center') lineX = drawX + (drawW/2) - (lineWidth/2);
+                                else if (box.textAlign === 'right') lineX = drawX + drawW - lineWidth;
                                 const lineY = baseY - i * lineHeight;
                                 if (lineText) page.drawText(lineText, { x: lineX, y: lineY, size: fontSize, font: fontToUse, color: PDFLib.rgb(0,0,0) });
-                                if (box.dataset.decoration === 'underline' && lineText) {
+                                if (box.decoration === 'underline' && lineText) {
                                     page.drawLine({ start: { x: lineX, y: lineY - 2 }, end: { x: lineX + lineWidth, y: lineY - 2 }, thickness: 1, color: PDFLib.rgb(0,0,0) });
                                 }
                             });
                         }
                     }
                 });
+                page.pushOperators(PDFLib.popGraphicsState());
             }
         });
 
-        return await compositeDoc.save();
+        const bytes = await compositeDoc.save();
+        if (!SmartScanner.state.snapshotCurrent(snapshot) || !SmartScanner.state.ready || SmartScanner.state.rendering ||
+            SmartScanner.state.pendingScans || PdfViewer._documentActionsInvalidated)
+            throw new Error('Document or edits changed during PDF generation. Generate a new preview.');
+        return bytes;
     }
 }
 
@@ -5036,6 +4981,7 @@ class PdfViewer {
     static _activePanelId = '';
     static _committedPanelId = '';
     static _committedUrl = '';
+    static _committedPageCount = 0;
     static _documentActionsInvalidated = false;
     static _uiState = 'empty';
     static _pendingLoadUiState = '';
@@ -5415,10 +5361,16 @@ class PdfViewer {
         }
         this.currentBlobUrl = nextBlobUrl;
         this.currentPdfBlob = this._pendingPdfBlob || null;
+        this._committedPageCount = this.doc?.numPages || 0;
         this._committedPanelId = this._pendingPanelId || this._committedPanelId;
         this._committedUrl = this._pendingUrl || this._committedUrl;
         this._hasEverCommittedDocument = true;
         this._documentActionsInvalidated = false;
+        if (typeof SmartScanner !== 'undefined' && SmartScanner.state?.document) {
+            SmartScanner.state.documentReady = true;
+            SmartScanner.state.refreshReady();
+        }
+        if (typeof PdfExporter !== 'undefined') PdfExporter.syncPreviewControls();
         this._clearPendingDocumentResources({ revoke: false });
         const nextCommittedDocumentIdentity = this._getCommittedDocumentIdentity();
         if (priorCommittedDocumentIdentity !== nextCommittedDocumentIdentity) {
@@ -5437,6 +5389,7 @@ class PdfViewer {
     }
 
     static _clearCommittedDocumentResources({ revoke = true } = {}) {
+        this._committedPageCount = 0;
         if (revoke && this.currentBlobUrl && typeof URL?.revokeObjectURL === 'function') {
             try {
                 URL.revokeObjectURL(this.currentBlobUrl);
@@ -5503,6 +5456,9 @@ class PdfViewer {
     }
 
     static _beginDocumentLoad() {
+        this.currentFetchId++;
+        if (typeof PdfExporter !== 'undefined') PdfExporter.invalidatePreview();
+        if (typeof SmartScanner !== 'undefined') SmartScanner.state?.invalidate();
         const activeStage = this._getGestureStage();
         const viewer = document.getElementById('pdf-main-view');
         this._hideIosSavePdfHint();
@@ -6181,6 +6137,31 @@ class PdfViewer {
         }
     }
 
+    static async _parseCurrentDocument(arrayBuffer, fetchId) {
+        const task = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer.slice(0)) });
+        this.loadingTask = task;
+        const doc = await task.promise;
+        if (this.currentFetchId !== fetchId) {
+            await task.destroy().catch(() => {});
+            return false;
+        }
+        if (SmartScanner.state) {
+            try {
+                if (!await SmartScanner.state.begin(arrayBuffer, fetchId)) return false;
+            } catch (error) {
+                if (this.currentFetchId !== fetchId) return false;
+                console.warn('[generator] Digest unavailable; original PDF remains usable, generated export disabled', error);
+            }
+        }
+        if (SmartScanner.state) SmartScanner.state.expectedPageCount = doc.numPages;
+        if (this.currentFetchId !== fetchId) {
+            await task.destroy().catch(() => {});
+            return false;
+        }
+        this.doc = doc;
+        return true;
+    }
+
     static async loadById(panelId, fallbackUrl) {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
@@ -6194,19 +6175,21 @@ class PdfViewer {
         this._bindPendingReplacementViewportAnchor();
         setPdfUiState(this._getLoadingUiState());
 
-        const fetchId = Date.now();
-        this.currentFetchId = fetchId;
+        const fetchId = this.currentFetchId;
 
         try {
             // === CLEANUP PREVIOUS LOADING TASK ===
             if (this.loadingTask) {
-                await this.loadingTask.destroy().catch(()=>{});
+                const previousTask = this.loadingTask;
                 this.loadingTask = null;
+                await previousTask.destroy().catch(()=>{});
             }
+            if (this.currentFetchId !== fetchId) return;
 
             // === PRIMARY FETCH: PDF_BY_ID ===
             const proxyUrl = buildWorkerUrl('PDF_BY_ID', { id: panelId });
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+            if (this.currentFetchId !== fetchId) return;
             
             if (!resp.ok) {
                 // === HANDLE 404: ATTEMPT FALLBACK ===
@@ -6214,6 +6197,7 @@ class PdfViewer {
                     console.warn(`PDF_BY_ID returned 404 for panel ${panelId}`);
                     
                     const fallbackResult = await attemptPdfFallbackFetch(fallbackUrl, panelId, AuthService.headers);
+                    if (this.currentFetchId !== fetchId) return;
                     if (fallbackResult) {
                         // === FALLBACK SUCCESS: LOAD AND RENDER ===
                         this._stagePendingDocumentResources({
@@ -6225,8 +6209,7 @@ class PdfViewer {
                         
                         try {
                             const docInitStartMs = getNowMs();
-                            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fallbackResult.arrayBuffer) });
-                            this.doc = await this.loadingTask.promise;
+                            if (!await this._parseCurrentDocument(fallbackResult.arrayBuffer, fetchId)) return;
                             logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-fallback' });
                         } catch (pdfError) {
                             console.error(`[loadById-fallback] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
@@ -6255,7 +6238,7 @@ class PdfViewer {
                         this._setScaleForDevice();
                         this._applyPendingReplacementScale();
                         const committed = await this.renderStack({ timingSource: 'network-fallback', renderMode: 'document-load' });
-                        if (committed && this._commitPendingDocumentResources()) {
+                        if (this.currentFetchId === fetchId && committed && this._commitPendingDocumentResources()) {
                             setPdfUiState(PDF_UI_STATE.READY);
                             logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-fallback' });
                         }
@@ -6301,8 +6284,7 @@ class PdfViewer {
             
             try {
                 const docInitStartMs = getNowMs();
-                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-                this.doc = await this.loadingTask.promise;
+                if (!await this._parseCurrentDocument(arrayBuffer, fetchId)) return;
                 logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-by-id' });
             } catch (pdfError) {
                 console.error(`[loadById] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
@@ -6325,11 +6307,12 @@ class PdfViewer {
             this._setScaleForDevice();
             this._applyPendingReplacementScale();
             const committed = await this.renderStack({ timingSource: 'network-by-id', renderMode: 'document-load' });
-            if (committed && this._commitPendingDocumentResources()) {
+            if (this.currentFetchId === fetchId && committed && this._commitPendingDocumentResources()) {
                 setPdfUiState(PDF_UI_STATE.READY);
                 logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-by-id' });
             }
         } catch(e) {
+            if (this.currentFetchId !== fetchId) return;
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
@@ -6373,6 +6356,7 @@ class PdfViewer {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
         this._beginDocumentLoad();
+        this._activePanelId = (panelId || '').trim();
         const loadStartMs = getNowMs();
         
         // === VALIDATE CACHED DATA ===
@@ -6394,15 +6378,16 @@ class PdfViewer {
         this._bindPendingReplacementViewportAnchor();
         setPdfUiState(this._getLoadingUiState());
 
-        const fetchId = Date.now();
-        this.currentFetchId = fetchId;
+        const fetchId = this.currentFetchId;
 
         try {
             // === CLEANUP PREVIOUS LOADING TASK ===
             if (this.loadingTask) {
-                await this.loadingTask.destroy().catch(()=>{});
+                const previousTask = this.loadingTask;
                 this.loadingTask = null;
+                await previousTask.destroy().catch(()=>{});
             }
+            if (this.currentFetchId !== fetchId) return;
 
             // === LOAD FROM CACHE ===
             this._stagePendingDocumentResources({
@@ -6414,10 +6399,10 @@ class PdfViewer {
             
             try {
                 const docInitStartMs = getNowMs();
-                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
-                this.doc = await this.loadingTask.promise;
+                if (!await this._parseCurrentDocument(cached.arrayBuffer, fetchId)) return;
                 logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'cache-hit' });
             } catch (pdfError) {
+                if (this.currentFetchId !== fetchId) return;
                 console.error(`[loadFromCache] pdfjsLib.getDocument failed for panel ${panelId}:`, pdfError);
                 if (pdfError.name === 'InvalidPDFException' || pdfError.message?.includes('Invalid PDF')) {
                     console.error(`[loadFromCache] InvalidPDFException detected - evicting bad cache entry`);
@@ -6441,15 +6426,16 @@ class PdfViewer {
             this._setScaleForDevice();
             this._applyPendingReplacementScale();
             const committed = await this.renderStack({ timingSource: 'cache-hit', renderMode: 'document-load' });
-            if (committed && this._commitPendingDocumentResources()) {
+            if (this.currentFetchId === fetchId && committed && this._commitPendingDocumentResources()) {
                 setPdfUiState(PDF_UI_STATE.READY);
                 logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'cache-hit' });
                 console.log('✓ Loaded from cache');
             }
         } catch(e) {
+            if (this.currentFetchId !== fetchId) return;
             console.error("[loadFromCache] Cache Load Error:", e);
             PdfController.evictFromCache(panelId);
-            this.loadById(panelId, fallbackUrl);
+            return this.loadById(panelId, fallbackUrl);
         }
     }
 
@@ -6465,19 +6451,21 @@ class PdfViewer {
         this._bindPendingReplacementViewportAnchor();
         setPdfUiState(this._getLoadingUiState());
 
-        const fetchId = Date.now();
-        this.currentFetchId = fetchId;
+        const fetchId = this.currentFetchId;
 
         try {
             // === CLEANUP PREVIOUS LOADING TASK ===
             if (this.loadingTask) {
-                await this.loadingTask.destroy().catch(()=>{});
+                const previousTask = this.loadingTask;
                 this.loadingTask = null;
+                await previousTask.destroy().catch(()=>{});
             }
+            if (this.currentFetchId !== fetchId) return;
 
             // === FETCH PDF ===
             const proxyUrl = buildWorkerUrl('PDF', { url });
             const resp = await fetch(proxyUrl, { headers: AuthService.headers() });
+            if (this.currentFetchId !== fetchId) return;
             if (!resp.ok) throw new Error(`Fetch Error: ${resp.status}`);
             
             const arrayBuffer = await resp.arrayBuffer();
@@ -6506,8 +6494,7 @@ class PdfViewer {
             
             try {
                 const docInitStartMs = getNowMs();
-                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-                this.doc = await this.loadingTask.promise;
+                if (!await this._parseCurrentDocument(arrayBuffer, fetchId)) return;
                 logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-url' });
             } catch (pdfError) {
                 console.error(`[load] pdfjsLib.getDocument failed for URL ${url}:`, pdfError);
@@ -6530,11 +6517,12 @@ class PdfViewer {
             this._setScaleForDevice();
             this._applyPendingReplacementScale();
             const committed = await this.renderStack({ timingSource: 'network-url', renderMode: 'document-load' });
-            if (committed && this._commitPendingDocumentResources()) {
+            if (this.currentFetchId === fetchId && committed && this._commitPendingDocumentResources()) {
                 setPdfUiState(PDF_UI_STATE.READY);
                 logPdfTiming('load_complete', getNowMs() - loadStartMs, { source: 'network-url' });
             }
         } catch(e) {
+            if (this.currentFetchId !== fetchId) return;
             // === ERROR HANDLING ===
             if (e.name === 'RenderingCancelledException' || e.message?.includes('destroyed')) {
                 console.log('PDF Load Cancelled (Fast Click)');
@@ -6720,6 +6708,7 @@ class PdfViewer {
             popup: null,
             printUrl: printTarget.url,
             revokeOnCleanup: !!printTarget.revokeOnCleanup,
+            generated: !!printTarget.generated,
             afterPrintHandler: null,
             focusHandler: null,
             visibilityHandler: null,
@@ -6790,6 +6779,11 @@ class PdfViewer {
         iframe.src = printTarget.url;
         session.loadTimerId = setTimeout(() => this._releasePrintSession('iframe-load-timeout'), this.PRINT_IFRAME_LOAD_TIMEOUT_MS);
         iframe.onload = () => {
+            if (session.cleaned || this._activePrintSession !== session) return;
+            if (printTarget.isCurrent && !printTarget.isCurrent()) {
+                this._releasePrintSession('stale-generated-print');
+                return;
+            }
             if (session.loadTimerId) {
                 clearTimeout(session.loadTimerId);
                 session.loadTimerId = null;
@@ -6811,6 +6805,7 @@ class PdfViewer {
             }
         };
         iframe.onerror = () => {
+            if (session.cleaned || this._activePrintSession !== session) return;
             console.error('Print iframe failed to load');
             this._releasePrintSession('iframe-error');
         };
@@ -6886,11 +6881,27 @@ class PdfViewer {
         
         // Capture render token to detect if rendering is superseded
         const renderToken = ++this.currentRenderToken;
+        if (SmartScanner.state) {
+            SmartScanner.state.rendering = true;
+            SmartScanner.state.scanGeneration++;
+        }
+        if (typeof PdfExporter !== 'undefined') PdfExporter.invalidatePreview();
+        const renderDoc = this.doc;
+        const generatorActive = DemoManager.isGeneratorActive;
+        const replacementBytes = generatorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer ? window.TEMPLATE_BYTES.slice(0) : null;
+        let coverTask = null, renderSucceeded = false;
+        try {
+        let replacementRevision = null;
+        if (replacementBytes && typeof GeneratorState !== 'undefined') {
+            try { replacementRevision = await GeneratorState.digest(replacementBytes); }
+            catch (error) { console.warn('[generator] Replacement digest failed; displaying original cover', error); }
+        }
         
         let coverDoc = this.doc;
-        if (DemoManager.isGeneratorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
-             const tTask = pdfjsLib.getDocument(window.TEMPLATE_BYTES.slice(0));
-             coverDoc = await tTask.promise;
+        if (replacementBytes && (typeof GeneratorState === 'undefined' || replacementRevision)) {
+             coverTask = pdfjsLib.getDocument(replacementBytes.slice(0));
+             try { coverDoc = await coverTask.promise; }
+             catch (error) { coverDoc = renderDoc; console.warn('[generator] Replacement unavailable; displaying original cover', error); }
         }
 
         for (let i = 1; i <= this.doc.numPages; i++) {
@@ -6913,7 +6924,7 @@ class PdfViewer {
             
             // Wrap getPage in try/catch
             try {
-                if (i === 1 && DemoManager.isGeneratorActive && window.TEMPLATE_BYTES instanceof ArrayBuffer) {
+                if (i === 1 && replacementBytes && coverDoc !== renderDoc) {
                     page = await coverDoc.getPage(1);
                     isTemplate = true;
                 } else {
@@ -6927,8 +6938,9 @@ class PdfViewer {
                     if (stage.parentNode) stage.remove();
                     return false;
                 }
-                // Fall back to original doc's page 1 if template fails
-                try { page = await this.doc.getPage(i); } catch(e) { continue; }
+                // A partial stack must never become export-ready.
+                if (stage.parentNode) stage.remove();
+                return false;
             }
 
             if (!page) {
@@ -6937,6 +6949,19 @@ class PdfViewer {
             }
             
             const viewport = page.getViewport({ scale: this.currentScale });
+            const unitViewport = page.getViewport({ scale: 1 });
+            if (SmartScanner.state?.document && this.currentRenderToken === renderToken) {
+                SmartScanner.state.setPage(i, { source: isTemplate ? 'replacement' : 'original', sourcePage: isTemplate ? 1 : i,
+                    role: i === 1 ? 'cover' : 'drawing', width: unitViewport.width, height: unitViewport.height,
+                    box: page.view.slice(), rotation: page.rotate || 0 });
+                if (isTemplate) {
+                    SmartScanner.state.templateBytes = replacementBytes.slice(0);
+                    SmartScanner.state.templateRevision = replacementRevision;
+                } else if (i === 1) {
+                    SmartScanner.state.templateBytes = null;
+                    SmartScanner.state.templateRevision = null;
+                }
+            }
             const renderMetrics = (typeof PdfRenderHelper !== 'undefined' && PdfRenderHelper?.getRenderMetrics)
                 ? PdfRenderHelper.getRenderMetrics(viewport, window.devicePixelRatio || 1)
                 : {
@@ -6975,7 +7000,7 @@ class PdfViewer {
                 </select>
                 <button class="rescan-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
             `;
-            if (i === 1) {
+            if (i === 1 && isTemplate) {
                 const sel = toolbar.querySelector('.page-profile-select');
                 if (sel) { sel.value = 'COVER_TEMPLATE'; sel.disabled = true; }
             }
@@ -7031,13 +7056,12 @@ class PdfViewer {
                     }
                 } catch (renderError) {
                     console.warn(`[renderStack] Failed to render page ${i}:`, renderError);
-                    // Check for destroyed transport
-                    if (renderError.message?.includes('destroyed') || renderError.message?.includes('Transport destroyed')) {
-                        console.error('[renderStack] Transport destroyed during render - stopping');
-                        if (stage.parentNode) stage.remove();
-                        return false;
-                    }
+                    if (stage.parentNode) stage.remove();
+                    return false;
                 }
+            } else {
+                stage.remove();
+                return false;
             }
             if (this.currentRenderToken !== renderToken) {
                 console.log(`[renderStack] Render cancelled after canvas render (token mismatch): ${renderToken} != ${this.currentRenderToken}`);
@@ -7047,11 +7071,21 @@ class PdfViewer {
             }
             // Re-scale any existing overlay zones to match new page dimensions
             await PdfViewer.waitForLayoutStable(contentContainer);
+            if (this.currentRenderToken !== renderToken || renderDoc !== this.doc) {
+                stage.remove();
+                return false;
+            }
             RedactionManager.rescaleZones(wrapper);
             // Second pass after fade-in animation may alter layout
-            requestAnimationFrame(() => RedactionManager.rescaleZones(wrapper));
+            requestAnimationFrame(() => {
+                if (this.currentRenderToken === renderToken && wrapper.isConnected) RedactionManager.rescaleZones(wrapper);
+            });
         }
         await PdfViewer.waitForLayoutStable(stage, { minWidth: 1, minHeight: 1 });
+        if (this.currentRenderToken !== renderToken || renderDoc !== this.doc || generatorActive !== DemoManager.isGeneratorActive) {
+            stage.remove();
+            return false;
+        }
         if (expectedDocumentLoadToken !== null && expectedDocumentLoadToken !== this._documentLoadToken) {
             if (stage.parentNode) stage.remove();
             return false;
@@ -7070,6 +7104,11 @@ class PdfViewer {
         });
         stage.classList.remove('pdf-gesture-stage--staging');
         stage.removeAttribute('aria-hidden');
+        RedactionManager.zones = [];
+        RedactionManager.deselect?.();
+        if (generatorActive && SmartScanner.state) {
+            stage.querySelectorAll('.pdf-page-wrapper').forEach(wrapper => SmartScanner.restorePage(wrapper));
+        }
         let restored = false;
         if (scrollPlan.mode === 'replacement-anchor') {
             restored = this._restoreScrollFromReplacementAnchor(container, stage, replacementAnchor);
@@ -7104,7 +7143,7 @@ class PdfViewer {
         // This ensures all <select> elements exist in the DOM before population
         console.log('[renderStack] All pages rendered, calling refreshProfileOptions()');
         setTimeout(() => {
-            LayoutScanner.refreshProfileOptions();
+            if (this.currentRenderToken === renderToken && stage.isConnected) LayoutScanner.refreshProfileOptions();
         }, 100); // 100ms delay to ensure DOM has fully updated
         if(DemoManager.isGeneratorActive) {
             // Populate page selector
@@ -7121,17 +7160,31 @@ class PdfViewer {
             }
             
             // Set initial page context
-            PageContext.setActivePage(1);
+            PageContext.setActivePage(renderMode === 'document-load' ? 1 : Math.min(PageContext.getActivePage(), this.doc.numPages));
             
             // Start scan immediately after render; remove transition class once scan completes
             console.log('🔍 Auto-scanning PDF pages...');
-            SmartScanner.scanAllPages().finally(() => {
-                document.body.classList.remove('generator-transition');
-            });
+            await SmartScanner.scanAllPages();
+            if (this.currentRenderToken !== renderToken || renderDoc !== this.doc) return false;
+            document.body.classList.remove('generator-transition');
         } else {
             document.body.classList.remove('generator-transition');
         }
+        renderSucceeded = true;
+        if (SmartScanner.state) {
+            SmartScanner.state.rendering = false;
+            SmartScanner.state.refreshReady();
+        }
+        if (typeof PdfExporter !== 'undefined') PdfExporter.syncPreviewControls();
         return true;
+        } finally {
+            if (coverTask) await coverTask.destroy().catch(() => {});
+            if (!renderSucceeded && this.currentRenderToken === renderToken && SmartScanner.state) {
+                SmartScanner.state.rendering = false;
+                SmartScanner.state.ready = false;
+                PdfExporter.syncPreviewControls();
+            }
+        }
     }
     static zoom(delta) {
         if (!Number.isFinite(delta)) return;
@@ -7178,6 +7231,7 @@ class PdfViewer {
 }
 
 class PdfController {
+    static loadRequestGeneration = 0;
     static pdfCache = new Map(); // Cache for preloaded PDFs
     static preloadQueue = [];
     static isPreloading = false;
@@ -7227,6 +7281,7 @@ class PdfController {
                 if (resp.status === 404) {
                     console.warn(`[preload] PDF_BY_ID returned 404 for ${result.displayId || result.id}`);
                     const fallbackResult = await attemptPdfFallbackFetch(result.pdfUrl, result.displayId || result.id, AuthService.headers());
+                    if (!this.isPreloading || generation !== this.preloadGeneration) return;
                     if (fallbackResult && this.isPreloading && generation === this.preloadGeneration) {
                         logPdfTiming('preload_fetch', getNowMs() - preloadFetchStartMs, { source: 'fallback', status: 'ok' });
                         this._cachePdfArrayBuffer(result.id, fallbackResult.arrayBuffer, 'preload-fallback');
@@ -7276,6 +7331,8 @@ class PdfController {
     }
 
     static async load(id, url) {
+        const request = ++this.loadRequestGeneration;
+        PdfViewer._beginDocumentLoad?.();
         const rec = window.ID_MAP.get(id);
         if(rec && rec.displayId) {
             const panelIdEl = DOM_CACHE.get('demo-panel-id');
@@ -7307,6 +7364,7 @@ class PdfController {
             } catch (e) {
                 console.warn('[load] In-flight preload wait failed; proceeding with direct load', e);
             }
+            if (request !== this.loadRequestGeneration) return;
             logPdfTiming('preload_inflight_wait', getNowMs() - waitStartMs, { source: 'click-load' });
             const warmed = this.pdfCache.get(id);
             if (warmed) {

@@ -6,6 +6,32 @@ This directory contains tests for the SCHEMATICA ai application.
 
 ## Test Files
 
+### Generator assignments and output snapshots (frontend v2.5.114)
+
+`generator-state.test.js` exercises the production assignment/matcher helper and the checked-in
+measured core catalog. `page-classification.test.js` extracts the production classifier from
+`app.js`, rather than maintaining a copied historical implementation.
+
+`generator.browser.test.js` uses the existing local Chrome harness and synthetic, non-sensitive
+PDFs with PDF.js/pdf-lib to exercise canonical assignments, manual overrides, zoom/toggle
+restoration, frozen export, crop/rotation coordinates, stale previews and preload selection.
+It also records the current output privacy limitation: visual masking does not remove copied
+source content. This test requires Chrome and Node >= 22; it does not contact the Worker.
+
+```bash
+node tests/generator-state.test.js
+node tests/page-classification.test.js
+node tests/generator.browser.test.js
+node tests/pdf-preload-inflight.test.js
+node tests/pdf-viewer-scale-zoom.test.js
+node tests/pdf-viewer-scroll-stability.test.js
+node tests/pdf-viewer-print-download.test.js
+```
+
+Catalog matching is intentionally conservative and exact-placement-only. These synthetic tests
+are not a claim of live-catalog accuracy or destructive sanitization. Any future sanitization
+feature must add covered-content removal acceptance tests, including text and image content.
+
 ### sheet-authority-audit.test.js (v2.5.113)
 
 `node tests/sheet-authority-audit.test.js` runs the actual Worker MAIN with a mocked Apps Script payload, JSON-restores the records like an encrypted snapshot, and drives the real `SearchEngine`: a CP-8210-like phase converter with sheet phase `1/60` never matches a 3-phase filter despite motor `3PH` text (and the reverse for `3/60`). It also verifies the read-only `SheetAuthorityAudit` report/inspect/text output and verdicts without network or storage writes. `tests/sheets-overlay.test.js` additionally asserts browser-visible `sheetSpecs`/`sheetMetadata`/`sheetUncertainty`, `sheetStatus` counts and classified unavailable reasons, tolerant ID/payload shapes and fallback for unusable rows.
@@ -118,14 +144,14 @@ node tests/data-loader-refresh.test.js
 
 ## Future Tests
 
-Additional test coverage planned for v2.5.4+:
+Additional coverage beyond the current synthetic generator regressions:
 
 - [ ] Snapshot tests for PDF redaction export (portrait/landscape)
 - [ ] Snapshot tests for rotated overlay rendering
-- [ ] Unit tests for auto-detection algorithm
+- [ ] Real-document accuracy benchmark for auto-detection (without sensitive fixtures)
 - [ ] Unit tests for HP fuzzy matching
 - [ ] Unit tests for Naive Bayes classifier
-- [ ] E2E tests for PDF redaction workflow
+- [ ] Destructive sanitization acceptance tests before any sanitization claim
 
 ## Test Infrastructure
 

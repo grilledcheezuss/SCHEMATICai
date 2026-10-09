@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="app-version" content="v2.5.113">
-    <title>Cox Research | SCHEMATICA ai (v2.5.113)</title>
+    <meta name="app-version" content="v2.5.114">
+    <title>Cox Research | SCHEMATICA ai (v2.5.114)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -34,7 +34,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="style.css?v=2.5.113">
+    <link rel="stylesheet" href="style.css?v=2.5.114">
 </head>
 <body>
 
@@ -197,7 +197,7 @@
             <div id="demo-context-panel">
                 <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:8px; margin-bottom:10px; border-radius:4px; cursor:pointer;" onclick="DemoManager.toggleContext()">
                     <span style="font-size:11px; font-weight:600; color:var(--glass-text);">📄 CUSTOM PDF INFO</span>
-                    <button id="context-preview-btn" onclick="PdfExporter.preview()">Preview</button>
+                    <button id="context-preview-btn" onclick="PdfExporter.preview()" disabled>Masked Preview</button>
                     <span id="context-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
                 </div>
 
@@ -243,7 +243,7 @@
 
     <div id="preview-pane">
         <div id="pdf-toolbar">
-            <button id="pdf-print-btn" class="pdf-tool-btn" onclick="PdfViewer.print()" title="Print original (unredacted) PDF — For redacted print/export, use Submittal Generator preview" aria-label="Print" disabled><span class="pdf-tool-btn-icon" aria-hidden="true">🖨️</span><span class="pdf-tool-btn-label">Print</span></button>
+            <button id="pdf-print-btn" class="pdf-tool-btn" onclick="PdfViewer.print()" title="Print original (unredacted) PDF — For masked output, use Submittal Generator preview" aria-label="Print" disabled><span class="pdf-tool-btn-icon" aria-hidden="true">🖨️</span><span class="pdf-tool-btn-label">Print</span></button>
             <div id="pdf-download-control" class="pdf-download-control">
                 <button id="pdf-download-btn" class="pdf-tool-btn" onclick="PdfViewer.download()" title="Download original (unredacted) PDF currently shown in the viewer" aria-label="Download" aria-expanded="false" disabled><span class="pdf-tool-btn-icon" aria-hidden="true">💾</span><span id="pdf-download-btn-label" class="pdf-tool-btn-label">Download</span></button>
                 <div id="pdf-download-hint" class="pdf-toolbar-hint" role="group" aria-label="Save PDF instructions" aria-hidden="true">
@@ -401,7 +401,8 @@
                         <button class="thumb-btn add-zone-btn" onclick="RedactionManager.addZoneToCurrentView('custom')" title="Add new redaction box">+</button>
                         <button class="thumb-btn del-zone-btn" onclick="RedactionManager.deleteSelected()" title="Remove existing redaction box">&#215;</button>
                     </div>
-                    <button class="search-btn" style="background:#8b5cf6 !important; width:100%; font-size:11px; padding:8px;" onclick="PdfExporter.preview()">Preview Custom PDF</button>
+                    <p role="note" style="font-size:11px;">Visual masking only — not sanitized redaction. Original text and images may remain recoverable. Review every page before sharing.</p>
+                    <button class="search-btn" style="background:#8b5cf6 !important; width:100%; font-size:11px; padding:8px;" onclick="PdfExporter.preview()" disabled>Preview Masked PDF</button>
                     <button id="auto-scan-btn" class="search-btn" style="background:var(--app-accent) !important; width:100%; font-size:11px; padding:8px;">Auto-Scan Pages</button>
                 </div>
         </div>
@@ -413,13 +414,13 @@
             <div style="position:relative; z-index:2; min-width:90px;">
                 <button class="search-btn" style="background:rgba(255,255,255,0.15) !important; border:1px solid rgba(255,255,255,0.3); font-size:11px; padding:5px 10px; white-space:nowrap;" onclick="PdfExporter.openPrintExportMenu()">🖨️ Export ▾</button>
                 <div id="print-export-menu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.3); min-width:220px; z-index:100; overflow:hidden;">
-                    <button class="menu-item" onclick="PdfExporter.printRedacted()"><span class="menu-icon">🖨️</span> Print Redacted PDF</button>
-                    <button class="menu-item" onclick="PdfExporter.downloadRedacted()"><span class="menu-icon">💾</span> Download Redacted PDF</button>
+                    <button class="menu-item" onclick="PdfExporter.printRedacted()"><span class="menu-icon">🖨️</span> Print Masked PDF (not sanitized)</button>
+                    <button class="menu-item" onclick="PdfExporter.downloadRedacted()"><span class="menu-icon">💾</span> Download Masked PDF (not sanitized)</button>
                     <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon">📧</span> Email (coming soon)</button>
                     <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon">💬</span> Text (coming soon)</button>
                 </div>
             </div>
-            <span style="position:absolute; left:0; right:0; text-align:center; color:white; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:1px; pointer-events:none;">Custom PDF Preview</span>
+            <span style="position:absolute; left:0; right:0; text-align:center; color:white; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:1px; pointer-events:none;">Masked PDF — not sanitized</span>
             <button class="search-btn" style="background:rgba(255,255,255,0.15) !important; border:1px solid rgba(255,255,255,0.3); font-size:14px; padding:4px 10px; line-height:1; min-width:36px; z-index:2;" onclick="PdfExporter.closePreview()">✕</button>
         </div>
         <div id="pdf-preview-container" style="flex:1; background:#fff; overflow:auto;"></div>
@@ -427,10 +428,11 @@
 
     <button id="generator-restore-btn" onclick="DemoManager.restorePanel()" title="Open Control Panel">⚙️</button>
 
-<script src="release-update.js?v=2.5.113"></script>
-<script src="pdf-render-helper.js?v=2.5.113"></script>
-<script src="pdf-ui-state.js?v=2.5.113"></script>
-<script src="info-table-parser.js?v=2.5.113"></script>
-<script src="app.js?v=2.5.113"></script>
+<script src="release-update.js?v=2.5.114"></script>
+<script src="pdf-render-helper.js?v=2.5.114"></script>
+<script src="pdf-ui-state.js?v=2.5.114"></script>
+<script src="info-table-parser.js?v=2.5.114"></script>
+<script src="generator-state.js?v=2.5.114"></script>
+<script src="app.js?v=2.5.114"></script>
 </body>
 </html>

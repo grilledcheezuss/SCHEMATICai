@@ -4,7 +4,6 @@
 // Node 22+ global WebSocket. Requests outside the local server (fonts, Worker, Airtable)
 // are blocked so these tests never touch the network or backend.
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
@@ -64,7 +63,7 @@ class HeadlessBrowser {
         const chromePath = findChrome();
         if (!chromePath || typeof WebSocket === 'undefined') return null;
         const server = await startServer();
-        const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'schematica-ui-'));
+        const userDataDir = fs.mkdtempSync(path.join(REPO_ROOT, '.schematica-ui-'));
         let proc = null;
         let ws = null;
         let browser = null;
@@ -204,10 +203,15 @@ class HeadlessBrowser {
     }
 
     async close() {
+        const exited = this.proc.exitCode !== null || this.proc.signalCode !== null
+            ? Promise.resolve() : new Promise(resolve => this.proc.once('exit', resolve));
+        const timeout = setTimeout(() => this.proc.kill('SIGKILL'), 10000);
+        try { await this.send('Browser.close', {}, null); } catch (_) { /* Chrome closes the socket during shutdown. */ }
+        await exited;
+        clearTimeout(timeout);
         try { this.ws.close(); } catch (_) { /* ignore */ }
-        this.proc.kill('SIGKILL');
         await new Promise(resolve => this.server.close(resolve));
-        try { fs.rmSync(this.userDataDir, { recursive: true, force: true }); } catch (_) { /* ignore */ }
+        fs.rmSync(this.userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
 }
 

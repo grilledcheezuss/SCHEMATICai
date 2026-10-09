@@ -1,5 +1,7 @@
 # SCHEMATICA ai - Comprehensive Redaction System Documentation
 
+**Privacy notice (frontend v2.5.114):** this historical guide uses “redaction” to describe visual masking. Generated PDFs copy source content and cover it with rectangles/text; underlying content may remain extractable. Neither automatic profiles nor manual whiteouts provide destructive sanitization. Review `REDACTION_SCHEMA.md` for the current assignment/export contract, and do not rely on masking alone for confidential external disclosure.
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Layout Profiles](#layout-profiles)
@@ -192,7 +194,7 @@ Custom profiles can be created through:
 
 ### Best Practices
 
-- **Always redact**: Customer, Job, Panel ID for external sharing
+- **Review sensitive fields**: Customer, Job and Panel ID require review before external sharing; masking these fields does not remove recoverable source content
 - **Keep visible**: System Type, Stage (for context)
 - **Situational**: Company info (redact for competitors, keep for customers)
 - **Test before export**: Review all pages with different toggle states

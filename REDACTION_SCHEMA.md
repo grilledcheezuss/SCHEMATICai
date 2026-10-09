@@ -353,6 +353,26 @@ Custom profiles retain the browser localStorage shape `{name: [zones]}` at `cox_
 
 Assignment state is separate from these profile definitions and initially lives only in memory. Source content identity, not panel ID alone, distinguishes revisions. Reload/logout does not restore page assignments; logout retains its existing localStorage-clearing behavior.
 
+### Canonical document/page assignments
+
+`generator-state.js` owns the in-memory assignment model consumed by the generator. The application release is not the assignment-schema, measured-catalog or matcher revision.
+
+The document schema is `schematicai-generator-document/1.0`; export snapshots use `schematicai-generator-export/1.0` and `schemaVersion: 1`. `document.catalog` records the catalog schema, fingerprint schema, revision and source provenance; assignments carry separate `catalogRevision` and `matcherRevision` identifiers. Profile namespaces are `legacy`, `custom`, `measured` and `detected`; resolution records include `key`, `templateHash`, `placement`, `titleBlockEdge` and `evidence`. Snapshots bind `documentDigest`, `documentGeneration`, `documentRevision`, `editRevision` and `exportRevision` to their source/template bytes, context and pages.
+
+| Information | Contract |
+|---|---|
+| Document | Existing viewer identity plus SHA-256 of committed source PDF bytes and a monotonic generation |
+| Page numbering | Explicit 1-based source and output page numbers; replacement cover substitutes output page 1 |
+| Page source | Original source versus frozen replacement template; source-cover measurements never apply to the template |
+| Geometry | Effective page box, rotation and displayed dimensions; zones use normalized displayed top-left coordinates |
+| Intent | `auto` or `manual`, independent of the resolved profile key |
+| Resolution | Profile namespace/key, template hash where available, placement and method/score/runner-up/review/fallback evidence |
+| Zones | Stable identifiers, normalized geometry and complete style; manual edits separate from automatic candidates |
+| Ownership | Document/render/scan and per-page edit revisions guard asynchronous application; document-wide edits invalidate a separate frozen export revision |
+| Persistence | In-memory only; unchanged legacy custom-profile arrays remain the only persisted profile definitions |
+
+Measured application initially supports exact placement, not arbitrary title-block affine relocation. Unsupported geometry, catalog failures and ambiguous matches fall back for review. Excluded no-title-block groups remain excluded; catalog provenance is not rewritten to the frontend release version.
+
 ---
 
 ## Editor Visibility
@@ -432,7 +452,7 @@ Generation uses committed source bytes, a fixed cover/template choice, normalize
 2. **Group related fields** vertically for easy reading
 3. **Choose appropriate fonts**: Times for formal, Courier for technical
 4. **Test with preview** before exporting to verify zone placement
-5. **Use transparency wisely**: Whiteout for removal, transparent for overlay
+5. **Use transparency wisely**: Whiteout for visual masking, transparent for overlay; neither removes underlying content
 6. **Consider rotation** for space-constrained areas
 7. **Validate zones** ensure they don't overlap sensitive areas unintentionally
 
