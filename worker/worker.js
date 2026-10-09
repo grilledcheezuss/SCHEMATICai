@@ -86,6 +86,7 @@ function normalizeSheetSpec(field, raw) {
         return isValidVoltage(value) ? value : null;
     }
     if (field === 'phase') {
+        value = value.replace(/^([13])\s*\/\s*60$/, '$1');
         value = value.replace(/\s*(?:PH|PHASE|Ø)$/, '').trim();
         value = ({ SINGLE: '1', THREE: '3' })[value] || value;
         return isValidPhase(value) ? value : null;
@@ -347,7 +348,7 @@ function buildMainCacheKey(requestUrl, { pageSize, direction, offset, feedbackVe
     cacheUrl.searchParams.set('sortDirection', direction);
     cacheUrl.searchParams.set('offset', offset || '');
     cacheUrl.searchParams.set('feedbackVersion', String(feedbackVersion || 0));
-    cacheUrl.searchParams.set('specOverlay', 'v2.5.110');
+    cacheUrl.searchParams.set('specOverlay', 'v2.5.110-phase-frequency');
     cacheUrl.searchParams.set('sheetVersion', sheetVersion || '');
     cacheUrl.searchParams.set('sheetSource', sheetSource || '');
     return cacheUrl.toString();
