@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.110 ---
-const APP_VERSION = "v2.5.110";
+// --- SCHEMATICA ai v2.5.111 ---
+const APP_VERSION = "v2.5.111";
 const VERSION_HISTORY = {
+    "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; Worker-parity bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
     "v2.5.110": "Google Sheets live canonical panel specs overlay: revision-aware Worker snapshot cache, field-level parsing/ML/healer fallback, conservative duplicate handling, and authoritative browser search/derived specs. Configure SHEETS_ENDPOINT and deploy Worker plus frontend. DERIVED_REV 11; encrypted snapshot schema 1 preserved.",
     "v2.5.109": "Browser-only System Type selection compares bounded title phrases with standalone system-line evidence after explicit rows. Matching primary signals agree; a plain motor count may select only between conflicting candidates and that tie-break stays orange. Bounded caption-separated titles recover CP-1245r1 as Simplex orange; CP-1409 remains absent. Representative v2.5.108 outcomes, explicit rows, count/conflict protections, raw descriptions, snapshot schema 1 and Worker v2.5.97 are preserved. DERIVED_REV 10 refreshes cached records; live catalog accuracy remains unmeasured.",
     "v2.5.108": "Browser-only System Type coverage: bounded adjective/equipment phrases near panel/title context are orange evidence only; hardware, reference and competing-type mentions abstain. Numeric combinations in a Panel Type cell are an internal mixed conflict; motor-count combinations retain prior behavior. DERIVED_REV 9 refreshes cached records; Worker v2.5.97, snapshot schema, search/badges and raw descriptions unchanged. Live accuracy remains unmeasured.",
@@ -1148,7 +1149,10 @@ class DataLoader {
     static applySnapshot(snapshot) {
         const records = Array.isArray(snapshot?.records) ? snapshot.records : [];
         const idMap = snapshot?.idMap instanceof Map ? snapshot.idMap : new Map(records.map(r => [r.id, r]));
-        const foundMfgs = snapshot?.foundMfgs instanceof Set ? snapshot.foundMfgs : new Set(records.map(r => r?.mfg).filter(Boolean));
+        const sheetMfgs = records.map(r => typeof InfoTableParser !== 'undefined' ? InfoTableParser.resolveTrustedSheetSpec(r, 'mfg') : null);
+        const foundMfgs = sheetMfgs.some(Boolean)
+            ? new Set(records.map((r, index) => sheetMfgs[index] || r?.mfg).filter(Boolean))
+            : snapshot?.foundMfgs instanceof Set ? snapshot.foundMfgs : new Set(records.map(r => r?.mfg).filter(Boolean));
         const foundEncs = snapshot?.foundEncs instanceof Set ? snapshot.foundEncs : new Set(records.map(r => r?.enc).filter(Boolean));
         window.LOCAL_DB.length = 0;
         records.forEach(rec => window.LOCAL_DB.push(rec));
@@ -3747,6 +3751,11 @@ class VoltageMatcher {
      * @returns {Object} { matches: boolean, confidence: 'high'|'medium'|'low', weight: number, isFuzzy: boolean }
      */
     static matches(record, searchVoltage) {
+        const sheetVolt = typeof InfoTableParser !== 'undefined' ? InfoTableParser.resolveTrustedSheetSpec(record, 'volt') : null;
+        if (sheetVolt) {
+            const matches = sheetVolt === InfoTableParser.normalizeTrustedSheetSpec('volt', searchVoltage);
+            return { matches, confidence: matches ? 'high' : 'low', weight: matches ? this.FIELD_MATCH_WEIGHT : 0, isFuzzy: false };
+        }
         const voltConfig = this.VOLTAGE_EQUIVALENTS[searchVoltage];
         
         if (!voltConfig) {
@@ -3780,7 +3789,7 @@ class VoltageMatcher {
         }
         
         // === STEP 2: If no field match, check description ===
-        if (!matched && !record.sheetSpecs?.volt && record.desc) {
+        if (!matched && record.desc) {
             for (const pattern of voltConfig.descPatterns) {
                 if (pattern.test(record.desc)) {
                     matched = true;
@@ -3835,6 +3844,11 @@ class HorsepowerMatcher {
      * @returns {Object} { matches: boolean, isVariant: boolean, weight: number }
      */
     static matches(record, searchHp) {
+        const sheetHp = typeof InfoTableParser !== 'undefined' ? InfoTableParser.resolveTrustedSheetSpec(record, 'hp') : null;
+        if (sheetHp) {
+            const matches = sheetHp === InfoTableParser.normalizeTrustedSheetSpec('hp', searchHp);
+            return { matches, isVariant: false, weight: matches ? this.HP_STRICT_WEIGHT : 0 };
+        }
         const searchHpNum = parseFloat(searchHp);
         
         // === STRICT FIELD MATCH ===
@@ -3844,7 +3858,7 @@ class HorsepowerMatcher {
         }
         
         // === FUZZY DESCRIPTION MATCH ===
-        if (record.sheetSpecs?.hp || !record.desc) {
+        if (!record.desc) {
             return { matches: false, isVariant: false, weight: 0 };
         }
         
@@ -4111,11 +4125,14 @@ class SearchEngine {
         let res = [];
         window.LOCAL_DB.forEach(r => {
             let w = 0, p = true;
+            const sheet = Object.fromEntries(['mfg', 'hp', 'volt', 'phase', 'sys'].map(field => [
+                field, typeof InfoTableParser !== 'undefined' ? InfoTableParser.resolveTrustedSheetSpec(r, field) : null
+            ]));
             // Preserve varied flags from worker, may be overridden by fuzzy matching
-            let mfgV = r.mfgV || false;
-            let hpV = r.hpV || false;
-            let voltV = r.voltV || false;
-            let phaseV = r.phaseV || false;
+            let mfgV = sheet.mfg ? false : r.mfgV || false;
+            let hpV = sheet.hp ? false : r.hpV || false;
+            let voltV = sheet.volt ? false : r.voltV || false;
+            let phaseV = sheet.phase ? false : r.phaseV || false;
             let encV = false;
 
             // Category filter
@@ -4124,9 +4141,12 @@ class SearchEngine {
             
             // Manufacturer filter
             if(crit.mfg !== "Any") { 
-                if (r.mfg === crit.mfg) { 
+                if (sheet.mfg) {
+                    if (sheet.mfg !== InfoTableParser.normalizeTrustedSheetSpec('mfg', crit.mfg)) return;
+                    w += 10000;
+                } else if (r.mfg === crit.mfg) {
                     w += 10000; 
-                } else if (!r.sheetSpecs?.mfg && r.desc && (crit.mfg === 'SULZER'
+                } else if (r.desc && (crit.mfg === 'SULZER'
                     ? InfoTableParser.matchesManufacturer(r.desc, crit.mfg)
                     : r.desc.includes(crit.mfg))) {
                     w += 1000;
@@ -4159,11 +4179,14 @@ class SearchEngine {
                 voltV = voltMatch.isFuzzy;
             }
             if(crit.phase!=="Any") { 
-                if(r.phase===crit.phase) {
+                if (sheet.phase) {
+                    if (sheet.phase !== InfoTableParser.normalizeTrustedSheetSpec('phase', crit.phase)) return;
+                    w += 500;
+                } else if(r.phase===crit.phase) {
                     // Strict field match - override worker variance flag for green badge
                     phaseV = false;
                     w += 500;
-                } else if(!r.sheetSpecs?.phase && r.desc && r.desc.includes(crit.phase)) {
+                } else if(r.desc && r.desc.includes(crit.phase)) {
                     // Fuzzy description match
                     phaseV = true;
                     w += 100;
@@ -4182,7 +4205,7 @@ class SearchEngine {
             // (r._sys, derived once per record when the snapshot was applied). Independent of
             // keywords, category, and enclosure; never re-parses the description here.
             if(crit.sys !== "Any") {
-                if (r._sys !== crit.sys) return;
+                if (sheet.sys ? sheet.sys !== InfoTableParser.normalizeTrustedSheetSpec('sys', crit.sys) : r._sys !== crit.sys) return;
                 w += 500;
             }
             
@@ -4214,14 +4237,14 @@ class SearchEngine {
                 (crit.volt !== 'Any' && a.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && a.phaseV ? 1 : 0) +
                 (crit.enc !== 'Any' && encVariedByRecord.get(a) ? 1 : 0) +
-                (crit.sys !== 'Any' && a._sysV === true ? 1 : 0);
+                (crit.sys !== 'Any' && !InfoTableParser.resolveTrustedSheetSpec(a, 'sys') && a._sysV === true ? 1 : 0);
             const bVariedCount = 
                 (crit.mfg !== 'Any' && b.mfgV ? 1 : 0) +
                 (crit.hp !== 'Any' && b.hpV ? 1 : 0) +
                 (crit.volt !== 'Any' && b.voltV ? 1 : 0) +
                 (crit.phase !== 'Any' && b.phaseV ? 1 : 0) +
                 (crit.enc !== 'Any' && encVariedByRecord.get(b) ? 1 : 0) +
-                (crit.sys !== 'Any' && b._sysV === true ? 1 : 0);
+                (crit.sys !== 'Any' && !InfoTableParser.resolveTrustedSheetSpec(b, 'sys') && b._sysV === true ? 1 : 0);
             
             if(aVariedCount !== bVariedCount) return aVariedCount - bVariedCount; // Fewer varied flags = better
             
@@ -4232,7 +4255,7 @@ class SearchEngine {
                     if (crit.volt !== 'Any' && r.voltV) return 3;
                     if (crit.phase !== 'Any' && r.phaseV) return 3;
                     if (crit.enc !== 'Any' && encVariedByRecord.get(r)) return 2;
-                    if (crit.sys !== 'Any' && r._sysV === true) return 2;
+                    if (crit.sys !== 'Any' && !InfoTableParser.resolveTrustedSheetSpec(r, 'sys') && r._sysV === true) return 2;
                     if (crit.mfg !== 'Any' && r.mfgV) return 1;  // worst
                     return 0;
                 };
@@ -7879,6 +7902,9 @@ static pop() {
  */
 static _generateBadges(record, criteria) {
     const badges = [];
+    const sheet = Object.fromEntries(['mfg', 'hp', 'volt', 'phase', 'sys'].map(field => [
+        field, typeof InfoTableParser !== 'undefined' ? InfoTableParser.resolveTrustedSheetSpec(record, field) : null
+    ]));
     const isMissingPdf = !record.pdfUrl || record.pdfStatus === PDF_STATUS.MISSING;
     
     // Category badge
@@ -7887,29 +7913,32 @@ static _generateBadges(record, criteria) {
     }
 
     // Manufacturer badge - only show when actively filtering
-    const badgeMfg = record.mfg || (criteria.mfg === 'SULZER' && record.desc && InfoTableParser.matchesManufacturer(record.desc, criteria.mfg) ? criteria.mfg : null);
+    const badgeMfg = sheet.mfg || record.mfg || (criteria.mfg === 'SULZER' && record.desc && InfoTableParser.matchesManufacturer(record.desc, criteria.mfg) ? criteria.mfg : null);
     if (criteria.mfg !== "Any" && badgeMfg) {
-        const isMatch = (record.mfg === criteria.mfg);
-        const badgeClass = record.mfgV ? 'match-orange' : (isMatch ? 'match-green' : 'match-orange');
+        const isMatch = sheet.mfg ? true : (record.mfg === criteria.mfg);
+        const badgeClass = sheet.mfg ? 'match-green' : record.mfgV ? 'match-orange' : (isMatch ? 'match-green' : 'match-orange');
         badges.push(`<span class="hud-badge ${badgeClass}">${badgeMfg}</span>`);
     }
 
     // Voltage badge
     if (criteria.volt !== "Any") {
-        const badgeClass = record.voltV ? 'match-orange' : (record.volt ? 'match-green' : 'unknown');
-        badges.push(`<span class="hud-badge ${badgeClass}">${record.volt ? record.volt + 'V' : '? V'}</span>`);
+        const volt = sheet.volt || record.volt;
+        const badgeClass = sheet.volt ? 'match-green' : record.voltV ? 'match-orange' : (volt ? 'match-green' : 'unknown');
+        badges.push(`<span class="hud-badge ${badgeClass}">${volt ? volt + 'V' : '? V'}</span>`);
     }
     
     // Phase badge
     if (criteria.phase !== "Any") {
-        const badgeClass = record.phaseV ? 'match-orange' : (record.phase ? 'match-green' : 'unknown');
-        badges.push(`<span class="hud-badge ${badgeClass}">${record.phase ? record.phase + 'PH' : '? PH'}</span>`);
+        const phase = sheet.phase || record.phase;
+        const badgeClass = sheet.phase ? 'match-green' : record.phaseV ? 'match-orange' : (phase ? 'match-green' : 'unknown');
+        badges.push(`<span class="hud-badge ${badgeClass}">${phase ? phase + 'PH' : '? PH'}</span>`);
     }
     
     // HP badge (orange for varied/fuzzy matches, green for strict)
     if (criteria.hp !== "Any") {
-        const hpBadgeClass = record.hpV ? 'match-orange' : (record.hp ? 'match-green' : 'unknown');
-        badges.push(`<span class="hud-badge ${hpBadgeClass}">${record.hp ? record.hp + ' HP' : '? HP'}</span>`);
+        const hp = sheet.hp || record.hp;
+        const hpBadgeClass = sheet.hp ? 'match-green' : record.hpV ? 'match-orange' : (hp ? 'match-green' : 'unknown');
+        badges.push(`<span class="hud-badge ${hpBadgeClass}">${hp ? hp + ' HP' : '? HP'}</span>`);
     }
     
     // Enclosure material badge - only when filtering; shows the material label, never a 4X code
@@ -7922,9 +7951,9 @@ static _generateBadges(record, criteria) {
     }
 
     // System Type badge - only when filtering (orange when Panel Type / No. Motors disagree or are inferred)
-    if (criteria.sys && criteria.sys !== "Any" && record._sys) {
-        const badgeClass = record._sysV === true ? 'match-orange' : 'match-green';
-        badges.push(`<span class="hud-badge ${badgeClass}">${record._sys.toUpperCase()}</span>`);
+    if (criteria.sys && criteria.sys !== "Any" && (sheet.sys || record._sys)) {
+        const badgeClass = !sheet.sys && record._sysV === true ? 'match-orange' : 'match-green';
+        badges.push(`<span class="hud-badge ${badgeClass}">${(sheet.sys || record._sys).toUpperCase()}</span>`);
     }
 
     // Keyword badges (avoid duplicating mfg badge)

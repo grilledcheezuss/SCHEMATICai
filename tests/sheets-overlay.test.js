@@ -22,14 +22,41 @@ function cacheStore() {
 function loadWorker(fetchImpl, cache = cacheStore()) {
     let source = fs.readFileSync(path.join(root, 'worker/worker.js'), 'utf8')
         .replace(/export\s+default\s*\{/, 'const worker = {');
-    source += '\nmodule.exports = { worker, compileSheetSnapshot, normalizeSheetPanelId, normalizeSheetSpec, applySheetSpecs, getSheetSnapshot };';
+    source += '\nmodule.exports = { worker, compileSheetSnapshot, normalizeSheetPanelId, normalizeSheetSpec, applySheetSpecs, getSheetSnapshot, extractSpecsStrict };';
     let now = Date.now();
     class Clock extends Date { static now() { return now; } }
     const sandbox = { module: { exports: {} }, console, URL, URLSearchParams, Request, Response,
         Headers, Blob, Date: Clock, setTimeout, clearTimeout, AbortController,
         fetch: fetchImpl, caches: { default: cache } };
     vm.runInNewContext(source, sandbox, { filename: 'worker.js' });
+    const calls = [];
+    sandbox.calls = calls;
+    vm.runInNewContext(`
+        for (const name of ['extractSpecsStrict', '_parseHP', '_parseVoltageContextAware', '_parseEnclosure']) {
+            const original = globalThis[name];
+            globalThis[name] = (...args) => {
+                calls.push({ name, fields: name === 'extractSpecsStrict' ? args[1] : undefined,
+                    inferMaterial: name === 'extractSpecsStrict' ? args[3] : name === '_parseEnclosure' ? args[2] : undefined });
+                return original(...args);
+            };
+        }
+        const materialSources = [
+            /\\b4XFG\\b/.source, /\\b4XSS\\b/.source,
+            /\\b(?:FIBERGLASS|FIBER\\s*GLASS|FRP)\\b/.source,
+            /\\bSTAINLESS\\b/.source, /\\bPOLY(?:CARBONATE)?\\b/.source
+        ];
+        const originalTest = RegExp.prototype.test;
+        RegExp.prototype.test = function(value) {
+            if (materialSources.includes(this.source)) calls.push({ name: 'materialRegex', source: this.source });
+            return originalTest.call(this, value);
+        };
+    `, sandbox);
     return { ...sandbox.module.exports, advance: ms => { now += ms; },
+        calls,
+        predict: value => {
+            sandbox.predictedEnc = value ?? null;
+            vm.runInNewContext(`CACHE_NB_MODEL = { predict(text, field) { calls.push({ name: 'predict', field }); return field === 'enc' ? predictedEnc : null; } };`, sandbox);
+        },
         heal: value => { sandbox.healed = value; vm.runInNewContext('CACHE_HEALED = healed; CACHE_HEALED_TIME = Date.now();', sandbox); } };
 }
 function extractClass(name) {
@@ -38,13 +65,54 @@ function extractClass(name) {
     let depth = 0;
     for (let i = source.indexOf('{', start); i < source.length; i++) {
         if (source[i] === '{') depth++;
-        if (source[i] === '}' && --depth === 0) return new Function(`return ${source.slice(start, i + 1)}`)();
+        if (source[i] === '}' && --depth === 0) return new Function('InfoTableParser', `return ${source.slice(start, i + 1)}`)(parser);
     }
     throw new Error(`Missing class ${name}`);
 }
 
 async function run() {
     const helpers = loadWorker(() => { throw new Error('No network expected'); });
+    const normalizationSamples = {
+        mfg: ['Barnes', 'CRANE', 'SITHE', 'Sulzer Pumps', 'Gorman-Rupp', 'GRSP', 'Custom Pump Co.',
+            "O'Brien Pumps", 'Acme 123', 'ACME-PUMP', 'GODWIN SP', 'Barnes&SULZER', 'Barnes / Sulzer',
+            'Barnes AND Sulzer', 'Barnes OR Flygt', '<img src=x>', 'ACME_PUMPS'],
+        hp: ['0.1', 0.1, '0.09', '0', '-1', '500', '500.01', '10000', '5.00 HP',
+            '7.5 HORSEPOWER', '1/2 HP', '3/4', '3/2', '1/10', '1/11', '1/0', '0/0',
+            '1 / 2', '1-1/2', '1 1/2', '½', '2¾ HP', '.5', '5 H.P.', '5 or 10', '5e1'],
+        volt: ['110', '115', '120', '208', '220', '230', '240', '277', '415', '440', '460', '480', '575', '600',
+            '120/240', '120/208 V', '277/480(V)', '120 / 240 VAC', '120 /208(V)',
+            '277 / 480 VOLTS', '120/230', '240/480', '208 or 240', '480?', '4800', '0480', '480 PH'],
+        phase: ['1', 3, '1 PH', '3 PHASE', '1Ø', '1/60', '3 / 60', '1/60 PH', '3/60Ø',
+            'Single', 'Three', 'SINGLE PHASE', '1/60 HZ', '3/50', '2/60', '1/600', '1/3', '1/60/3'],
+        sys: ['Simplex', 'Duplex', 'Triplex', 'Quadraplex', 'Quadruplex', 'Quadplex',
+            'DUP', 'QUAD', '2 PUMPS', 'Duplex Panel', 'Duplex/Triplex', 'Duplex or Triplex'],
+        encMaterial: ['Fiberglass', 'FibreGlass', 'FG', 'SS', 'Stainless Steel', 'Stainless Steel (304)',
+            'Stainless Steel(316)', 'SS (304)', 'SS (316)', 'SS304', 'Painted Steel', 'PS',
+            '4XFG', '4XSS', '4X', 'SS or FG', 'Stainless Steel hardware', 'Steel', 'Polycarbonate'],
+        enc: ['1', '3R', '4', '4X', '4XFG', '4XSS', '12', 'POLY', 'NEMA4X', 'NEMA 4 X',
+            'NEMA 3R', '6P', '13', 'SS', 'Fiberglass', 'NEMA 4X OR 12']
+    };
+    const unavailable = ['', ' ', 'N/A', 'NA', 'Varies', 'Varied', 'Multiple', 'Mixed',
+        'Partial', 'Unknown', 'Uncertain', 'Unsure', 'TBD', 'None', 'Not Applicable', 'Not Available',
+        '-', '–', '—', '???', 'NULL', null, undefined, true, false, {}, [], NaN, Infinity,
+        'A'.repeat(100), 'A'.repeat(101)];
+    let normalizationChecks = 0;
+    for (const [field, samples] of Object.entries(normalizationSamples)) {
+        for (const raw of [...samples, ...unavailable]) {
+            const variants = typeof raw === 'string' ? [raw, raw.toLowerCase(), `  ${raw}  `] : [raw];
+            for (const value of variants) {
+                const expected = helpers.normalizeSheetSpec(field, value);
+                assert.strictEqual(parser.normalizeTrustedSheetSpec(field, value), expected,
+                    `browser/Worker ${field} eligibility differs for ${JSON.stringify(value)}`);
+                assert.strictEqual(parser.resolveTrustedSheetSpec({ sheetSpecs: { [field]: value } }, field), expected,
+                    `trusted resolver ${field} eligibility differs`);
+                if (expected !== null) assert.strictEqual(parser.normalizeTrustedSheetSpec(field, expected), expected,
+                    `canonical ${field} must remain authoritative`);
+                normalizationChecks++;
+            }
+        }
+    }
+    console.log(`Browser/Worker normalization parity: ${normalizationChecks} supported/rejected samples passed`);
     for (const id of ['CP-1234R1', 'CP-1234r1', '1234r1.pdf', ' CP-1234r1.dwg!? ']) {
         assert.strictEqual(helpers.normalizeSheetPanelId(id), '1234R1');
     }
@@ -67,6 +135,11 @@ async function run() {
     assert.strictEqual(record.category, baseline.category);
     assert.strictEqual(record.reject_keywords, baseline.reject_keywords);
     assert.strictEqual(helpers.compileSheetSnapshot(full, snapshot), snapshot, 'unchanged revision/hash reuses index');
+    const oldTransformation = {
+        ...snapshot, version: JSON.stringify([full.schema, full.revision, full.hash])
+    };
+    assert.notStrictEqual(helpers.compileSheetSnapshot(full, oldTransformation), oldTransformation,
+        'old transformation cannot reuse the same revision/hash compiled snapshot');
 
     const partial = helpers.compileSheetSnapshot(payload([['1234r1', '', 'Partial', '208', 'Multiple', 'N/A', 'Varies', 'Unknown']]));
     const partialRecord = helpers.applySheetSpecs({ ...baseline }, partial);
@@ -84,9 +157,41 @@ async function run() {
     assert.strictEqual(helpers.normalizeSheetSpec('hp', '1/2 HP'), '0.5');
     assert.strictEqual(helpers.normalizeSheetSpec('hp', '1/0'), null);
     assert.strictEqual(helpers.normalizeSheetSpec('volt', '480/240'), null);
+    for (const [value, expected] of [['120/240(V)', '240'], ['120/208 V', '208'], ['277/480VAC', '480']]) {
+        assert.strictEqual(helpers.normalizeSheetSpec('volt', value), expected);
+    }
+    for (const grade of ['304', '316']) {
+        assert.strictEqual(helpers.normalizeSheetSpec('encMaterial', `Stainless Steel (${grade})`), 'Stainless Steel');
+    }
+    const deployedContract = helpers.compileSheetSnapshot({
+        ...payload([['999001', 'Duplex', 'Phase Converter', '2', '120/240(V)', '1/60', 'Sulzer',
+            'Submersible', '1/2', 'Stainless Steel (316)', '4X', true, 1, '']]),
+        columns: ['id', 'sys', 'panelType', 'motors', 'volt', 'phase', 'mfg', 'pumpType', 'hp',
+            'encMaterial', 'nema', 'pdfVerified', 'confidence', 'flags']
+    });
+    assert.strictEqual(deployedContract.index.get('999001').sys, 'Duplex');
+    assert.strictEqual(deployedContract.index.get('999001').enc, '4X');
+    assert.strictEqual(deployedContract.metadata.get('999001').panelType, 'Phase Converter');
+    assert.strictEqual(partialRecord.sheetUncertainty.phase, 'Multiple');
+    assert.strictEqual(partialRecord.sheetSpecs.phase, undefined, 'uncertainty is not canonical evidence');
+    const pure = require('../worker/lib/extract.js');
+    assert.strictEqual(pure.extractSpecsStrict('NEMA 4X', ['enc'], false).enc, '4X');
+    assert.strictEqual(helpers.extractSpecsStrict('NEMA 4X', ['enc'], false).enc, '4X');
+    assert.strictEqual(pure.extractSpecsStrict('NEMA 4X').enc, '4XSS', 'default extraction API stays compatible');
+    const longDescription = 'UNRELATED '.repeat(1000) + '7.5 HP';
+    assert.strictEqual(helpers.extractSpecsStrict(longDescription, ['hp']).hp, '7.5',
+        'selective extraction never truncates missing-field descriptions');
+    const text = 'BARNES 20 HP 480V 3PH NEMA 4X FIBERGLASS';
+    for (const fields of [[], ['hp'], ['volt'], ['phase'], ['enc'], ['mfg'], ['hp', 'phase']]) {
+        const workerResult = JSON.parse(JSON.stringify(helpers.extractSpecsStrict(text, fields)));
+        assert.deepStrictEqual(workerResult, pure.extractSpecsStrict(text, fields), 'field-selected deployed/helper parity');
+        for (const field of ['mfg', 'hp', 'volt', 'phase', 'enc']) {
+            if (!fields.includes(field)) assert.strictEqual(workerResult[field], null);
+        }
+    }
     for (const [value, expected] of [
         ['1/60', '1'], ['3/60', '3'], [' 1 / 60 ', '1'], [' 3 / 60 ', '3'],
-        ['1', '1'], [3, '3'], ['1 PH', '1'], ['3 phase', '3'], ['1Ø', '1'],
+        ['1', '1'], [3, '3'], ['1 PH', '1'], ['3 phase', '3'], ['1Ø', '1'], ['1/60 PH', '1'],
         ['Single', '1'], ['Three', '3'],
         ['', null], ['N/A', null], ['Multiple', null], ['2/60', null],
         ['1/60/3', null], ['1/60 or 3/60', null], ['1/600', null], [null, null]
@@ -98,6 +203,11 @@ async function run() {
         assert.strictEqual(phaseRecord.phaseV, expected ? false : true);
     }
     assert.strictEqual(helpers.normalizeSheetSpec('mfg', '<img src=x>'), null);
+    for (const field of ['mfg', 'hp', 'volt', 'phase', 'sys', 'encMaterial']) {
+        for (const uncertain of ['Uncertain', 'Unsure', 'Mixed']) {
+            assert.strictEqual(helpers.normalizeSheetSpec(field, uncertain), null);
+        }
+    }
     for (const value of ['Barnes & Sulzer', 'Barnes&SULZER', 'Barnes AND Sulzer', 'Barnes/Sulzer']) {
         assert.strictEqual(helpers.normalizeSheetSpec('mfg', value), null, 'manufacturer choices fall back');
     }
@@ -113,6 +223,41 @@ async function run() {
     parser.deriveRecord(restoredFallback);
     assert.strictEqual(parser.matchEnclosureMaterial(restoredFallback, 'Stainless Steel').matches, true,
         'independent material fallback survives snapshot restoration');
+    const noMaterial = helpers.applySheetSpecs({
+        id: '1234', desc: 'NEMA 4X ENCLOSURE',
+        ...pure.extractSpecsStrict('NEMA 4X ENCLOSURE', ['enc'], false)
+    }, ratingOnly);
+    assert.strictEqual(noMaterial.sheetEnclosureFallback.enc, '4X', 'bare rating fallback never guesses stainless');
+    for (const candidate of [noMaterial, JSON.parse(JSON.stringify(noMaterial))]) {
+        parser.deriveRecord(candidate);
+        for (const material of parser.ENCLOSURE_MATERIALS) {
+            assert.strictEqual(parser.matchEnclosureMaterial(candidate, material).matches, false,
+                `rating-only sheet and description cannot establish ${material}, including after restore`);
+        }
+    }
+    const historicalRatingOnly = {
+        id: '1234', desc: 'NEMA 4X ENCLOSURE', enc: '4X', sheetSpecs: { enc: '4X' },
+        sheetEnclosureFallback: { enc: '4XSS', encV: false }
+    };
+    const restoredHistorical = JSON.parse(JSON.stringify(historicalRatingOnly));
+    parser.deriveRecord(restoredHistorical);
+    assert.strictEqual(restoredHistorical._encEvidence.ssSignal, false, 'bare rating supplies no stainless evidence');
+    Object.defineProperty(restoredHistorical, 'desc', { get() { throw new Error('material resolver reparsed the description'); } });
+    for (const material of parser.ENCLOSURE_MATERIALS) {
+        assert.strictEqual(parser.matchEnclosureMaterial(restoredHistorical, material).matches, false,
+            `historical bare-4X guess cannot establish ${material} after restore`);
+    }
+    const restoredCompound = JSON.parse(JSON.stringify({ ...historicalRatingOnly, desc: 'NEMA 4XSS ENCLOSURE' }));
+    parser.deriveRecord(restoredCompound);
+    assert.strictEqual(restoredCompound._encEvidence.ssSignal, true, 'explicit compound supplies independent stainless evidence');
+    assert.strictEqual(parser.matchEnclosureMaterial(restoredCompound, 'Stainless Steel').matches, true,
+        'historical rating overlay keeps independently supported compound material');
+    const restoredMaterialRow = JSON.parse(JSON.stringify({
+        ...historicalRatingOnly, desc: 'ENCLOSURE MATERIAL: FIBERGLASS'
+    }));
+    parser.deriveRecord(restoredMaterialRow);
+    assert.strictEqual(parser.matchEnclosureMaterial(restoredMaterialRow, 'Fiberglass').matches, true,
+        'explicit material row wins over historical rating-only fallback');
     const duplicates = helpers.compileSheetSnapshot(payload([
         ['CP-1234r1', 'Barnes', '', '', '', '', '', ''],
         ['1234R1', 'Sulzer', '', '', '', '', '', ''],
@@ -150,14 +295,95 @@ async function run() {
     assert.strictEqual(HorsepowerMatcher.matches(record, '7.5').matches, true);
     assert.strictEqual(HorsepowerMatcher.matches(baseline, '5').matches, true);
 
+    for (const [missingField, column] of [['mfg', 1], ['hp', 2], ['volt', 3], ['phase', 4], ['enc', 5], ['encMaterial', 7]]) {
+        const row = [...full.rows[0]];
+        row[column] = 'Uncertain';
+        const selective = loadWorker(async url => {
+            if (url === endpoint) return json(payload([row]));
+            if (url.includes('/Users')) return json({ records: [{ fields: { Username: 'user', Passcode: 'pass' } }] });
+            if (url.includes('/Feedback')) return json({ records: [] });
+            if (url.includes('/Control%20Panel%20Items')) return json({
+                records: [{ fields: { 'Control Panel Name': 'CP-1234R1', Items: 'UNRELATED KEYWORD' } }]
+            });
+            throw new Error('Unexpected fetch');
+        });
+        selective.predict();
+        selective.heal({ '1234R1': { hp: '20', mfg: 'FLYGT', volt: '240', phase: '1', enc: '4XSS' } });
+        const response = await selective.worker.fetch(new Request('https://worker.example/?target=MAIN', {
+            headers: { 'X-Cox-User': 'user', 'X-Cox-Pass': 'pass' }
+        }), { SHEETS_ENDPOINT: endpoint, AIRTABLE_READ_KEY: 'test-read', AIRTABLE_WRITE_KEY: 'test-write' });
+        const result = (await response.json()).records[0];
+        const fallback = missingField === 'encMaterial' ? 'enc' : missingField;
+        assert.deepStrictEqual(Array.from(selective.calls.find(call => call.name === 'extractSpecsStrict').fields), [fallback]);
+        assert.deepStrictEqual(selective.calls.filter(call => call.name === 'predict').map(call => call.field), [fallback],
+            'only the uncertain field invokes ML');
+        assert.strictEqual(result.desc, 'UNRELATED KEYWORD', 'unrelated description survives selective extraction');
+        assert.strictEqual(result.sheetUncertainty[missingField], 'Uncertain');
+        if (missingField === 'enc') {
+            assert.strictEqual(result.enc, '4X', 'missing sheet rating uses only rating from material-bearing healer code');
+            assert.strictEqual(result.sheetSpecs.encMaterial, 'Fiberglass', 'trusted material survives rating fallback');
+            assert.strictEqual(selective.calls.some(call => call.name === 'materialRegex'), false, 'missing rating never invokes trusted material regexes');
+            assert.strictEqual(selective.calls.find(call => call.name === '_parseEnclosure').inferMaterial, false, 'rating-only parser disables material inference');
+        }
+        for (const field of ['mfg', 'hp', 'volt', 'phase']) {
+            if (field !== missingField) assert.strictEqual(result[field], snapshot.index.get('1234R1')[field]);
+        }
+
+        async function missingRatingRecord(ratingCell, description, { prediction, override } = {}) {
+            const row = [...full.rows[0]];
+            row[5] = ratingCell;
+            const loaded = loadWorker(async url => {
+                if (url === endpoint) return json(payload([row]));
+                if (url.includes('/Users')) return json({ records: [{ fields: { Username: 'user', Passcode: 'pass' } }] });
+                if (url.includes('/Feedback')) return json({ records: [] });
+                if (url.includes('/Control%20Panel%20Items')) return json({
+                    records: [{ fields: { 'Control Panel Name': 'CP-1234R1', Items: description } }]
+                });
+                throw new Error('Unexpected fetch');
+            });
+            loaded.predict(prediction);
+            if (override !== undefined) loaded.heal({ '1234R1': { enc: override } });
+            const response = await loaded.worker.fetch(new Request('https://worker.example/?target=MAIN', {
+                headers: { 'X-Cox-User': 'user', 'X-Cox-Pass': 'pass' }
+            }), { SHEETS_ENDPOINT: endpoint, AIRTABLE_READ_KEY: 'test-read', AIRTABLE_WRITE_KEY: 'test-write' });
+            assert.strictEqual(response.status, 200);
+            const result = (await response.json()).records[0];
+            const extraction = loaded.calls.find(call => call.name === 'extractSpecsStrict');
+            assert.deepStrictEqual(Array.from(extraction.fields), ['enc'], 'only missing rating selects legacy extraction');
+            assert.strictEqual(extraction.inferMaterial, false, 'trusted material disables enclosure material inference');
+            assert.strictEqual(loaded.calls.some(call => call.name === 'materialRegex'), false, 'trusted material bypasses every material regex');
+            assert.strictEqual(result.sheetSpecs.encMaterial, 'Fiberglass', 'canonical sheet material remains Fiberglass');
+            parser.deriveRecord(result);
+            assert.strictEqual(parser.matchEnclosureMaterial(result, 'Fiberglass').matches, true);
+            assert.strictEqual(parser.matchEnclosureMaterial(result, 'Stainless Steel').matches, false);
+            return { result, calls: loaded.calls };
+        }
+        for (const ratingCell of ['', 'N/A', 'Uncertain']) {
+            for (const description of ['NEMA4X STAINLESS STEEL', 'NEMA 4XSS', '4XFG']) {
+                const { result, calls } = await missingRatingRecord(ratingCell, description);
+                assert.strictEqual(result.enc, '4X', 'trusted material does not suppress independent description rating');
+                assert.strictEqual(calls.some(call => call.name === 'predict'), false, 'description rating needs no rating ML; trusted fields need no ML');
+            }
+        }
+        for (const code of ['4XSS', '4XFG', 'POLY']) {
+            const expected = code === 'POLY' ? null : '4X';
+            const predicted = await missingRatingRecord('', 'UNRELATED KEYWORD', { prediction: code });
+            assert.strictEqual(predicted.result.enc, expected, 'rating-only ML strips material suffix and rejects POLY');
+            assert.deepStrictEqual(predicted.calls.filter(call => call.name === 'predict').map(call => call.field), ['enc'], 'only missing rating invokes ML');
+            const healed = await missingRatingRecord('N/A', 'UNRELATED KEYWORD', { override: code });
+            assert.strictEqual(healed.result.enc, expected, 'rating-only healer strips material suffix and rejects POLY');
+        }
+    }
+
     let current = payload(full.rows.map(row => row.map((value, index) => index === 4 ? '1/60' : value)));
+    let descriptionPhase = '3 PHASE';
     let failed = false;
     let sheetCalls = 0;
     let mainCalls = 0;
     const cache = cacheStore();
     const match = cache.match;
     cache.match = async key => {
-        if (new URL(key.url).searchParams.get('specOverlay') === 'v2.5.110') {
+        if (['v2.5.110', 'v2.5.110-phase-frequency'].includes(new URL(key.url).searchParams.get('specOverlay'))) {
             return new Response(JSON.stringify({ records: [{ ...baseline, phase: '3' }] }), {
                 headers: { 'Content-Type': 'application/json', 'X-SCHEMATICA-CACHED-AT': String(Date.now()) }
             });
@@ -174,7 +400,7 @@ async function run() {
         if (url.includes('/Feedback')) return json({ records: [] });
         if (url.includes('/Control%20Panel%20Items')) {
             mainCalls++;
-            return json({ records: [{ fields: { 'Control Panel Name': 'CP-1234R1', Items: baseline.desc + '\n3 PHASE' } }] });
+            return json({ records: [{ fields: { 'Control Panel Name': 'CP-1234R1', Items: baseline.desc + '\n' + descriptionPhase } }] });
         }
         throw new Error('Unexpected fetch');
     };
@@ -188,6 +414,7 @@ async function run() {
         return response.json();
     };
     loaded.heal({ '1234R1': { hp: '20', mfg: 'FLYGT', phase: '3', category: 'low_voltage', reject_keywords: ['noise'] } });
+    loaded.predict();
     const concurrent = await Promise.all([main(), main(), main()]);
     assert.strictEqual(sheetCalls, 1, 'concurrent requests share one sheet fetch');
     assert.strictEqual(mainCalls, 1, 'concurrent MAIN pages coalesce');
@@ -196,12 +423,19 @@ async function run() {
     assert.strictEqual(concurrent[0].records[0].sheetSpecs.phase, '1');
     assert.strictEqual(concurrent[0].records[0].phaseV, false);
     assert.strictEqual(concurrent[0].records[0].category, 'low_voltage');
+    assert.strictEqual(loaded.calls.length, 0, 'fully trusted specs skip regex and ML completely');
     await main();
     assert.strictEqual(sheetCalls, 1, 'cache hit does not refetch sheet');
     loaded.advance(5 * 60 * 1000 + 1);
     await main();
     assert.strictEqual(sheetCalls, 2);
     assert.strictEqual(mainCalls, 1, 'unchanged revision keeps MAIN page cache');
+    current = payload(full.rows.map(row => row.map((value, index) => index === 4 ? '3/60' : value)), 'reverse-phase');
+    descriptionPhase = '1 PHASE';
+    loaded.advance(5 * 60 * 1000 + 1);
+    loaded.heal({ '1234R1': { phase: '1' } });
+    assert.strictEqual((await main()).records[0].phase, '3', 'sheet 3/60 overrides opposite healer phase in MAIN');
+    assert.strictEqual(loaded.calls.length, 0, 'reverse fully trusted case still bypasses inference');
     current = payload([['1234R1', '', '', '208', '', '', '', '']], 2);
     loaded.advance(5 * 60 * 1000 + 1);
     loaded.heal({ '1234R1': { hp: '20', phase: '3', category: 'low_voltage' } });
@@ -210,7 +444,12 @@ async function run() {
     assert.strictEqual(changed.records[0].volt, '208');
     assert.strictEqual(changed.records[0].hp, '20', 'partial sheet retains healer fallback');
     assert.strictEqual(changed.records[0].phase, '3', 'missing sheet phase retains healer fallback');
-    assert.strictEqual(mainCalls, 2, 'new revision bypasses old MAIN pages');
+    const selected = loaded.calls.find(call => call.name === 'extractSpecsStrict');
+    assert.deepStrictEqual(Array.from(selected.fields), ['mfg', 'hp', 'phase', 'enc']);
+    assert.strictEqual(loaded.calls.some(call => call.name === '_parseVoltageContextAware'), false,
+        'partial overlay skips trusted voltage parser');
+    assert.strictEqual(loaded.calls.some(call => call.name === 'predict' && call.field === 'volt'), false);
+    assert.strictEqual(mainCalls, 3, 'new revision bypasses old MAIN pages');
     current = { ...current, rows: [['1234R1', '', '', '575', '', '', '', '']], hash: 'changed-hash' };
     loaded.advance(5 * 60 * 1000 + 1);
     assert.strictEqual((await main()).records[0].volt, '575', 'hash changes invalidate even at same revision');
@@ -228,6 +467,7 @@ async function run() {
     loaded.advance(5 * 60 * 1000 + 1);
     assert.strictEqual((await main()).records[0].volt, '575', 'invalid payload cannot replace last good');
     failed = true;
+    descriptionPhase = '3 PHASE';
     const empty = loadWorker(fetchImpl);
     assert.strictEqual((await main(empty.worker)).sheets, null, 'initial failure leaves MAIN functional');
     assert.strictEqual((await main(empty.worker)).records[0].phase, '3', 'unavailable sheet retains parsed phase');

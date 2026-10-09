@@ -263,6 +263,8 @@ global.PRELOAD_START_DELAY_MS = 0;
 const SearchEngine = new Function(`return ${extractClassSource('SearchEngine')}`)();
 const UI = new Function(`return ${extractClassSource('UI')}`)();
 global.InfoTableParser = InfoTableParser;
+global.VoltageMatcher = new Function(`return ${extractClassSource('VoltageMatcher')}`)();
+global.HorsepowerMatcher = new Function(`return ${extractClassSource('HorsepowerMatcher')}`)();
 global.SearchEngine = SearchEngine;
 global.UI = UI;
 
@@ -514,6 +516,121 @@ runTest('Performance: ~8,000 records derive well under 1s and scale linearly', (
     InfoTableParser.deriveRecord(pathological);
     const worstMs = Number(process.hrtime.bigint() - start) / 1e6;
     assert(worstMs < 250, `pathological input took ${worstMs.toFixed(1)}ms`);
+});
+
+runTest('Trusted Sheets cells normalize complete formats and reject uncertainty independently', () => {
+    const normalize = InfoTableParser.normalizeTrustedSheetSpec;
+    for (const [field, raw, expected] of [
+        ['phase', '1/60', '1'], ['phase', '3/60', '3'], ['phase', '1/60 PH', '1'],
+        ['volt', '120/240V', '240'], ['volt', '120 / 208 V', '208'], ['volt', '277/480V', '480'],
+        ['hp', '1/2 HP', '0.5'], ['hp', '3/2', '1.5'], ['hp', '11/4 HP', '2.75'],
+        ['mfg', 'Gorman-Rupp', 'GORMAN RUPP'], ['sys', 'quadruplex', 'Quadraplex'],
+        ['encMaterial', 'Stainless Steel (304)', 'Stainless Steel'], ['encMaterial', 'Stainless Steel (316)', 'Stainless Steel']
+    ]) assertEqual(normalize(field, raw), expected, `${field} ${raw}`);
+    for (const [field, raw] of [
+        ['phase', '1/3'], ['phase', '3/50'], ['volt', '240/480'], ['volt', '480?'],
+        ['hp', '5 or 10'], ['hp', '5/10 HP motor'], ['mfg', 'BARNES or FLYGT'],
+        ['sys', 'Duplex/Triplex'], ['encMaterial', 'SS or Fiberglass'], ['encMaterial', '4X'],
+        ['encMaterial', 'SS (304/316)'], ['encMaterial', 'Stainless Steel hardware']
+    ]) assertEqual(normalize(field, raw), null, `reject ${field} ${raw}`);
+    for (const field of ['mfg', 'hp', 'volt', 'phase', 'sys', 'encMaterial']) {
+        for (const placeholder of ['MIXED', 'UNCERTAIN', 'UNSURE']) {
+            assertEqual(normalize(field, placeholder), null, `reject ${field} ${placeholder}`);
+        }
+    }
+    assertEqual(InfoTableParser.resolveTrustedSheetSpec({ confidence: 'high', pdfVerified: true, sheetSpecs: { hp: '5?' } }, 'hp'), null, 'row metadata cannot validate uncertainty');
+});
+
+runTest('Trusted HP and voltage short-circuit legacy fields, tolerance and descriptions', () => {
+    const record = { hp: '5', volt: '120', sheetSpecs: { hp: '1/2 HP', volt: '277/480V' } };
+    Object.defineProperty(record, 'desc', { get() { throw new Error('legacy description accessed'); } });
+    assertEqual(HorsepowerMatcher.matches(record, '0.5'), { matches: true, isVariant: false, weight: 5000 }, 'fraction matches cleanly');
+    assertEqual(HorsepowerMatcher.matches(record, '0.55').matches, false, 'no legacy HP tolerance');
+    assertEqual(HorsepowerMatcher.matches(record, '5').matches, false, 'stale HP cannot match');
+    assertEqual(VoltageMatcher.matches(record, '480').matches, true, 'dual-voltage canonical match');
+    assertEqual(VoltageMatcher.matches(record, '120').matches, false, 'stale voltage cannot match');
+    assertEqual(VoltageMatcher.matches(record, '999').matches, false, 'unknown query cannot fall through');
+    assertEqual(HorsepowerMatcher.matches({ sheetSpecs: { hp: '5?' }, desc: '10 HP motor' }, '10').matches, true, 'rejected HP retains description fallback');
+    assertEqual(VoltageMatcher.matches({ sheetSpecs: { volt: '480?' }, desc: '120V panel' }, '120').matches, true, 'rejected voltage retains description fallback');
+});
+
+runTest('Clean unknown sheet manufacturers retain strict authority and ranking', () => {
+    const record = { id: 'CUSTOM', mfg: 'BARNES', mfgV: true, _pumpMfg: 'BARNES',
+        sheetSpecs: { mfg: 'Custom Pump Co.' }, pdfUrl: 'x' };
+    Object.defineProperty(record, 'desc', { get() { throw new Error('trusted manufacturer description accessed'); } });
+    assertEqual(searchWith([record], { mfg: 'Custom Pump Co.' }).total, 1, 'unknown manufacturer matches canonical sheet name');
+    assertEqual(searchWith([record], { mfg: 'BARNES' }).total, 0, 'unknown manufacturer blocks stale legacy name');
+    assertEqual(InfoTableParser.rankManufacturers([record]).counts, { 'CUSTOM PUMP CO.': 1 }, 'unknown manufacturer replaces stale ranking');
+    const badges = UI._generateBadges(record, { mfg: 'Custom Pump Co.', hp: 'Any', volt: 'Any', phase: 'Any', kw: [] }).join(' ');
+    assert(badges.includes('CUSTOM PUMP CO.') && !badges.includes('match-orange'), 'unknown canonical sheet badge is clean');
+});
+
+runTest('Snapshot manufacturer sets and fallback dropdown exclude sheet-shadowed stale names', () => {
+    const previousWindow = global.window;
+    const windowState = { LOCAL_DB: [], ID_MAP: new Map(), FOUND_MFGS: new Set(), FOUND_ENCS: new Set() };
+    global.window = windowState;
+    try {
+        const DataLoader = buildDataLoader(windowState);
+        const stale = { id: 'ACME', desc: '', mfg: 'BARNES', _pumpMfg: 'BARNES', _derivedRev: 12, sheetSpecs: { mfg: 'ACME' } };
+        for (const snapshot of [{ records: [stale] }, { records: [stale], foundMfgs: new Set(['BARNES']) }]) {
+            DataLoader.applySnapshot(snapshot);
+            assertEqual(Array.from(windowState.FOUND_MFGS), ['ACME'], 'trusted sheet manufacturer replaces stale snapshot index');
+            assertEqual(windowState.MFG_RANKING.eligibleRecords, 0, 'unknown sheet manufacturer cannot rank stale known name');
+            const inputs = setupInputs();
+            UI.pop();
+            assert(!inputs.mfgInput.options.some(option => option.value === 'BARNES'), 'alphabetical dropdown fallback cannot restore stale manufacturer');
+        }
+        DataLoader.applySnapshot({ records: [{ id: 'LEGACY', desc: '', mfg: 'BARNES' }], foundMfgs: new Set(['FLYGT']) });
+        assertEqual(Array.from(windowState.FOUND_MFGS), ['FLYGT'], 'no-sheet precomputed manufacturer set remains unchanged');
+        const inputs = setupInputs();
+        UI.pop();
+        assert(inputs.mfgInput.options.some(option => option.value === 'FLYGT'), 'no-sheet precomputed dropdown fallback remains available');
+    } finally {
+        global.window = previousWindow;
+    }
+});
+
+runTest('Trusted derivation skips each corresponding legacy parser while preserving unrelated rows', () => {
+    const desc = 'Panel Type Duplex No. Motors 2 Pump Manufacturer Barnes Enclosure Material Fiberglass';
+    const expected = { sys: 'Duplex', mfg: 'BARNES', material: 'Fiberglass' };
+    for (const [field, value] of [['sys', 'Triplex'], ['mfg', 'FLYGT'], ['encMaterial', 'Stainless Steel (316)']]) {
+        const record = { desc, sheetSpecs: { [field]: value } };
+        InfoTableParser.deriveRecord(record);
+        assertEqual(record._sys, field === 'sys' ? 'Triplex' : expected.sys, `${field} system`);
+        assertEqual(record._pumpMfg, field === 'mfg' ? 'FLYGT' : expected.mfg, `${field} manufacturer`);
+        assertEqual(InfoTableParser.resolveEnclosureMaterial(record).materials, [field === 'encMaterial' ? 'Stainless Steel' : expected.material], `${field} material`);
+        const rows = InfoTableParser.extractInfoRows(desc, { [field]: true });
+        const skipped = field === 'sys' ? rows.panelTypes.concat(rows.motorCounts) : field === 'mfg' ? rows.pumpMfgs : rows.encMaterials;
+        assertEqual(skipped, [], `${field} cell parsers skipped`);
+    }
+    const fullyTrusted = { sheetSpecs: { sys: 'Simplex', mfg: 'SULZER', encMaterial: 'Stainless Steel (304)' } };
+    Object.defineProperty(fullyTrusted, 'desc', { get() { throw new Error('fully trusted description accessed'); } });
+    InfoTableParser.deriveRecord(fullyTrusted);
+    assertEqual(fullyTrusted._sys, 'Simplex', 'fully trusted derivation');
+    assertEqual(fullyTrusted._derivedRev, 12, 'cache revision updated');
+    assertEqual(InfoTableParser.resolveTrustedSheetSpec({ sheetSpecs: { panelType: 'Duplex', enc: '4X' } }, 'sys'), null, 'Panel Type is not System Type');
+    assertEqual(InfoTableParser.matchEnclosureMaterial({ sheetSpecs: { enc: '4X' } }, 'Stainless Steel').matches, false, 'NEMA is not material');
+});
+
+runTest('Sheets authority wins search, badges, sorting and ranking despite stale derived fields', () => {
+    const stale = {
+        id: '40', mfg: 'BARNES', hp: '5', volt: '120', phase: '1', _sys: 'Simplex', _sysV: true,
+        _pumpMfg: 'BARNES', mfgV: true, hpV: true, voltV: true, phaseV: true, pdfUrl: 'x',
+        _encEvidence: { status: 'row', materials: ['Fiberglass'], varied: true },
+        sheetSpecs: { mfg: 'FLYGT', hp: '1/2', volt: '277/480V', phase: '3/60', sys: 'Duplex', encMaterial: 'Stainless Steel (316)' }
+    };
+    Object.defineProperty(stale, 'desc', { get() { throw new Error('trusted field accessed legacy description'); } });
+    const values = { mfg: 'FLYGT', hp: '0.5', volt: '480', phase: '3', sys: 'Duplex', enc: 'Stainless Steel' };
+    const badges = UI._generateBadges(stale, { ...values, kw: [] }).join(' ');
+    assert(!badges.includes('match-orange'), 'stale varied flags do not color canonical sheet badges');
+    for (const label of ['FLYGT', '0.5 HP', '480V', '3PH', 'DUPLEX', 'Stainless Steel']) assert(badges.includes(label), `canonical ${label} badge`);
+    assertEqual(InfoTableParser.rankManufacturers([stale]).counts, { FLYGT: 1 }, 'sheet manufacturer outranks stale derived manufacturer');
+    const clean = { ...stale, id: '30', mfg: 'FLYGT', hp: '0.5', volt: '480', phase: '3', _sys: 'Duplex', _sysV: false, sheetSpecs: undefined,
+        mfgV: false, hpV: false, voltV: false, phaseV: false, _encEvidence: { status: 'row', materials: ['Stainless Steel'], varied: false } };
+    assertEqual(searchWith([stale, clean], values).page.map(r => r.id), ['40', '30'], 'sheet stale variance is not a sorting penalty');
+    for (const [field, value] of [['mfg', 'BARNES'], ['hp', '5'], ['volt', '120'], ['phase', '1'], ['sys', 'Simplex'], ['enc', 'Fiberglass']]) {
+        assertEqual(searchWith([stale], { [field]: value }).total, 0, `${field} trusted mismatch cannot use stale field`);
+    }
 });
 
 (async () => {

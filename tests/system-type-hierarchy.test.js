@@ -2,7 +2,7 @@ const assert = require('assert');
 const parser = require('../info-table-parser.js');
 const { baseline, cp1245, cp1409 } = require('./fixtures/system-type-hierarchy.js');
 
-assert.strictEqual(parser.DERIVED_REV, 11);
+assert.strictEqual(parser.DERIVED_REV, 12);
 
 const derive = desc => {
     const record = { id: 'fixture', desc };

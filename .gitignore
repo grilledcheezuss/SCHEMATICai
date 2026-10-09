@@ -21,6 +21,7 @@ out/
 build/
 dist/
 .netlify/
+.local-browser-tests/
 
 # --- System Files: OS garbage ---
 .DS_Store

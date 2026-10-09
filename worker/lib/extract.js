@@ -170,18 +170,21 @@ function parseVoltageContextAware(t) {
  *   keyword are treated as high-confidence spec-table evidence.
  * Returns a Set of enclosure type strings.
  */
-function parseEnclosure(t) {
+function parseEnclosure(t, inferBareRating = true, inferMaterial = true) {
     const foundEnclosures = new Set();
+    const has4X = inferMaterial
+        ? /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t)
+        : /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?:FG|SS)?\b/i.test(t);
+    if (!inferMaterial) {
+        if (has4X) foundEnclosures.add("4X");
+        return foundEnclosures;
+    }
 
     // Explicit compound codes take priority; track presence for tie-breaking
     const hasExplicit4XFG = /\b4XFG\b/i.test(t);
     const hasExplicit4XSS = /\b4XSS\b/i.test(t);
     if (hasExplicit4XFG) foundEnclosures.add("4XFG");
     if (hasExplicit4XSS) foundEnclosures.add("4XSS");
-
-    // Detect generic 4X rating (covers NEMA 4X, NEMA4X, TYPE 4X, 4 X, plain 4X)
-    // Does NOT match 4XSS/4XFG (they contain more chars after X, already handled above)
-    const has4X = /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t);
 
     // Material keywords (used when bare 4X is present); FRP is a strong FG signal
     const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(t);
@@ -192,7 +195,7 @@ function parseEnclosure(t) {
         if (hasSS) foundEnclosures.add("4XSS");
         // Bare 4X without material defaults to 4XSS
         if (!hasFG && !hasSS && !foundEnclosures.has("4XFG") && !foundEnclosures.has("4XSS")) {
-            foundEnclosures.add("4XSS");
+            foundEnclosures.add(inferBareRating ? "4XSS" : "4X");
         }
     }
 
@@ -241,16 +244,18 @@ function parseEnclosure(t) {
  * Extract specs from a panel description string.
  * Returns canonical { mfg, hp, volt, phase, enc, mfgV, hpV, voltV, phaseV, encV }.
  */
-function extractSpecsStrict(t) {
+function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], inferBareRating = true, inferMaterial = true) {
+    if (!Array.isArray(fields)) fields = ['mfg', 'hp', 'volt', 'phase', 'enc'];
     const s = {
         mfg: null, hp: null, volt: null, phase: null, enc: null,
         mfgV: false, hpV: false, voltV: false, phaseV: false, encV: false
     };
-    if (!t || typeof t !== 'string') return s;
+    if (!t || typeof t !== 'string' || !fields.length) return s;
 
     t = normalizeCADText(t);
 
     // --- Manufacturer ---
+    if (fields.includes('mfg')) {
     const foundMfgs = new Set();
     for (const [mfgKey, aliases] of Object.entries(EXACT_MFGS)) {
         for (const alias of aliases) {
@@ -267,8 +272,10 @@ function extractSpecsStrict(t) {
         s.mfg = [...foundMfgs][0];
         s.mfgV = true;
     }
+    }
 
     // --- HP ---
+    if (fields.includes('hp')) {
     const foundHPs = parseHP(t);
     if (foundHPs.size === 1) {
         s.hp = [...foundHPs][0];
@@ -276,8 +283,10 @@ function extractSpecsStrict(t) {
         s.hp = [...foundHPs].sort((a, b) => parseFloat(b) - parseFloat(a))[0];
         s.hpV = true;
     }
+    }
 
     // --- Voltage (service-first, context-aware) ---
+    if (fields.includes('volt')) {
     const { serviceVolts, controlVolts } = parseVoltageContextAware(t);
     // Use service voltages; fall back to control-only if no service found
     const targetVolts = serviceVolts.size > 0 ? serviceVolts : controlVolts;
@@ -315,8 +324,10 @@ function extractSpecsStrict(t) {
             }
         }
     }
+    }
 
     // --- Phase ---
+    if (fields.includes('phase')) {
     const foundPhases = new Set();
     if (/\b(3 PHASE|3PH|3Ø|3\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*3)\b/i.test(t)) foundPhases.add("3");
     if (/\b(1 PHASE|1PH|1Ø|1\/60|PHASE(?:\/HZ)?\s*[:\-]?\s*1)\b/i.test(t)) foundPhases.add("1");
@@ -326,9 +337,11 @@ function extractSpecsStrict(t) {
         s.phase = "3";
         s.phaseV = true;
     }
+    }
 
     // --- Enclosure ---
-    const foundEnclosures = parseEnclosure(t);
+    if (fields.includes('enc')) {
+    const foundEnclosures = parseEnclosure(t, inferBareRating, inferMaterial);
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
@@ -336,6 +349,7 @@ function extractSpecsStrict(t) {
         // If multiple enclosures still remain, output "Varied / Multiple" (no SS canonical tie-break).
         s.enc = "Varied / Multiple";
         s.encV = true;
+    }
     }
 
     return s;
