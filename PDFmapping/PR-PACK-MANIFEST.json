@@ -1,0 +1,26 @@
+{
+  "purpose": "SCHEMATICai measured overlay PR pack",
+  "generated": "2026-10-09",
+  "app_ref": {
+    "repo": "grilledcheezuss/SCHEMATICai",
+    "commit": "3a9159e8",
+    "app_version": "v2.5.113",
+    "file": "app.js (const LAYOUT_RULES)"
+  },
+  "files": {
+    "COPILOT-PR-PROMPT-FULL.md": "Paste this into Copilot (primary brief)",
+    "layouts_overlay_core.json": "81 core profiles for LAYOUT_RULES merge",
+    "layouts_overlay.json": "186 all profiles including long tail",
+    "layouts_overlay.meta.json": "per-profile metadata + not_exported",
+    "LAYOUT_FINGERPRINTS.json": "AUTO matcher fingerprints keyed by profile",
+    "ALIGNMENT-NOTES.md": "nomenclature, accuracy, program-side recs",
+    "LAYOUT-REPORT.md": "measurement methodology and coverage",
+    "zone_examples_snippet.json": "first 3 zones of 3 example profiles",
+    "match_layout.py": "offline reference matcher (Python); port logic, do not require at runtime"
+  },
+  "counts": {
+    "core": 81,
+    "all": 186,
+    "fingerprints": 186
+  }
+}

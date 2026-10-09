@@ -1,0 +1,115 @@
+{
+  "SCHEMATIC_PORTRAIT_TB01A": [
+    {
+      "map": "custom",
+      "x": 0.4525,
+      "y": 0.9303,
+      "w": 0.3051,
+      "h": 0.0412,
+      "fontSize": 14,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "left",
+      "text": ""
+    },
+    {
+      "map": "custom",
+      "x": 0.386,
+      "y": 0.9162,
+      "w": 0.4201,
+      "h": 0.0708,
+      "fontSize": 14,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "left",
+      "text": ""
+    },
+    {
+      "map": "custom",
+      "x": 0.6626,
+      "y": 0.9055,
+      "w": 0.1528,
+      "h": 0.0087,
+      "fontSize": 6,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "left",
+      "text": ""
+    }
+  ],
+  "INFO_TB01A": [
+    {
+      "map": "custom",
+      "x": 0.4518,
+      "y": 0.9303,
+      "w": 0.3058,
+      "h": 0.0418,
+      "fontSize": 14,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "left",
+      "text": ""
+    },
+    {
+      "map": "custom",
+      "x": 0.386,
+      "y": 0.9162,
+      "w": 0.4201,
+      "h": 0.0708,
+      "fontSize": 14,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "left",
+      "text": ""
+    },
+    {
+      "map": "custom",
+      "x": 0.6626,
+      "y": 0.9055,
+      "w": 0.1528,
+      "h": 0.0087,
+      "fontSize": 6,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "left",
+      "text": ""
+    }
+  ],
+  "COVER_TEMPLATE_COV01": [
+    {
+      "map": "custom",
+      "x": 0.3569,
+      "y": 0.8928,
+      "w": 0.2792,
+      "h": 0.0351,
+      "fontSize": 14,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "center",
+      "text": ""
+    },
+    {
+      "map": "custom",
+      "x": 0.3231,
+      "y": 0.8928,
+      "w": 0.3522,
+      "h": 0.0725,
+      "fontSize": 14,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "center",
+      "text": ""
+    },
+    {
+      "map": "logo",
+      "x": 0.3224,
+      "y": 0.2149,
+      "w": 0.4047,
+      "h": 0.1536,
+      "fontSize": 14,
+      "transparent": false,
+      "fontFamily": "'Courier New', monospace",
+      "textAlign": "center"
+    }
+  ]
+}
