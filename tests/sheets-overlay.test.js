@@ -58,6 +58,47 @@ function extractClass(name) {
 
 async function run() {
     const helpers = loadWorker(() => { throw new Error('No network expected'); });
+    const normalizationSamples = {
+        mfg: ['Barnes', 'CRANE', 'SITHE', 'Sulzer Pumps', 'Gorman-Rupp', 'GRSP', 'Custom Pump Co.',
+            "O'Brien Pumps", 'Acme 123', 'ACME-PUMP', 'GODWIN SP', 'Barnes&SULZER', 'Barnes / Sulzer',
+            'Barnes AND Sulzer', 'Barnes OR Flygt', '<img src=x>', 'ACME_PUMPS'],
+        hp: ['0.1', 0.1, '0.09', '0', '-1', '500', '500.01', '10000', '5.00 HP',
+            '7.5 HORSEPOWER', '1/2 HP', '3/4', '3/2', '1/10', '1/11', '1/0', '0/0',
+            '1 / 2', '1-1/2', '1 1/2', '½', '2¾ HP', '.5', '5 H.P.', '5 or 10', '5e1'],
+        volt: ['110', '115', '120', '208', '220', '230', '240', '277', '415', '440', '460', '480', '575', '600',
+            '120/240', '120/208 V', '277/480(V)', '120 / 240 VAC', '120 /208(V)',
+            '277 / 480 VOLTS', '120/230', '240/480', '208 or 240', '480?', '4800', '0480', '480 PH'],
+        phase: ['1', 3, '1 PH', '3 PHASE', '1Ø', '1/60', '3 / 60', '1/60 PH', '3/60Ø',
+            'Single', 'Three', 'SINGLE PHASE', '1/60 HZ', '3/50', '2/60', '1/600', '1/3', '1/60/3'],
+        sys: ['Simplex', 'Duplex', 'Triplex', 'Quadraplex', 'Quadruplex', 'Quadplex',
+            'DUP', 'QUAD', '2 PUMPS', 'Duplex Panel', 'Duplex/Triplex', 'Duplex or Triplex'],
+        encMaterial: ['Fiberglass', 'FibreGlass', 'FG', 'SS', 'Stainless Steel', 'Stainless Steel (304)',
+            'Stainless Steel(316)', 'SS (304)', 'SS (316)', 'SS304', 'Painted Steel', 'PS',
+            '4XFG', '4XSS', '4X', 'SS or FG', 'Stainless Steel hardware', 'Steel', 'Polycarbonate'],
+        enc: ['1', '3R', '4', '4X', '4XFG', '4XSS', '12', 'POLY', 'NEMA4X', 'NEMA 4 X',
+            'NEMA 3R', '6P', '13', 'SS', 'Fiberglass', 'NEMA 4X OR 12']
+    };
+    const unavailable = ['', ' ', 'N/A', 'NA', 'Varies', 'Varied', 'Multiple', 'Mixed',
+        'Partial', 'Unknown', 'Uncertain', 'Unsure', 'TBD', 'None', 'Not Applicable', 'Not Available',
+        '-', '–', '—', '???', 'NULL', null, undefined, true, false, {}, [], NaN, Infinity,
+        'A'.repeat(100), 'A'.repeat(101)];
+    let normalizationChecks = 0;
+    for (const [field, samples] of Object.entries(normalizationSamples)) {
+        for (const raw of [...samples, ...unavailable]) {
+            const variants = typeof raw === 'string' ? [raw, raw.toLowerCase(), `  ${raw}  `] : [raw];
+            for (const value of variants) {
+                const expected = helpers.normalizeSheetSpec(field, value);
+                assert.strictEqual(parser.normalizeTrustedSheetSpec(field, value), expected,
+                    `browser/Worker ${field} eligibility differs for ${JSON.stringify(value)}`);
+                assert.strictEqual(parser.resolveTrustedSheetSpec({ sheetSpecs: { [field]: value } }, field), expected,
+                    `trusted resolver ${field} eligibility differs`);
+                if (expected !== null) assert.strictEqual(parser.normalizeTrustedSheetSpec(field, expected), expected,
+                    `canonical ${field} must remain authoritative`);
+                normalizationChecks++;
+            }
+        }
+    }
+    console.log(`Browser/Worker normalization parity: ${normalizationChecks} supported/rejected samples passed`);
     for (const id of ['CP-1234R1', 'CP-1234r1', '1234r1.pdf', ' CP-1234r1.dwg!? ']) {
         assert.strictEqual(helpers.normalizeSheetPanelId(id), '1234R1');
     }
@@ -180,6 +221,29 @@ async function run() {
                 `rating-only sheet and description cannot establish ${material}, including after restore`);
         }
     }
+    const historicalRatingOnly = {
+        id: '1234', desc: 'NEMA 4X ENCLOSURE', enc: '4X', sheetSpecs: { enc: '4X' },
+        sheetEnclosureFallback: { enc: '4XSS', encV: false }
+    };
+    const restoredHistorical = JSON.parse(JSON.stringify(historicalRatingOnly));
+    parser.deriveRecord(restoredHistorical);
+    assert.strictEqual(restoredHistorical._encEvidence.ssSignal, false, 'bare rating supplies no stainless evidence');
+    Object.defineProperty(restoredHistorical, 'desc', { get() { throw new Error('material resolver reparsed the description'); } });
+    for (const material of parser.ENCLOSURE_MATERIALS) {
+        assert.strictEqual(parser.matchEnclosureMaterial(restoredHistorical, material).matches, false,
+            `historical bare-4X guess cannot establish ${material} after restore`);
+    }
+    const restoredCompound = JSON.parse(JSON.stringify({ ...historicalRatingOnly, desc: 'NEMA 4XSS ENCLOSURE' }));
+    parser.deriveRecord(restoredCompound);
+    assert.strictEqual(restoredCompound._encEvidence.ssSignal, true, 'explicit compound supplies independent stainless evidence');
+    assert.strictEqual(parser.matchEnclosureMaterial(restoredCompound, 'Stainless Steel').matches, true,
+        'historical rating overlay keeps independently supported compound material');
+    const restoredMaterialRow = JSON.parse(JSON.stringify({
+        ...historicalRatingOnly, desc: 'ENCLOSURE MATERIAL: FIBERGLASS'
+    }));
+    parser.deriveRecord(restoredMaterialRow);
+    assert.strictEqual(parser.matchEnclosureMaterial(restoredMaterialRow, 'Fiberglass').matches, true,
+        'explicit material row wins over historical rating-only fallback');
     const duplicates = helpers.compileSheetSnapshot(payload([
         ['CP-1234r1', 'Barnes', '', '', '', '', '', ''],
         ['1234R1', 'Sulzer', '', '', '', '', '', ''],
@@ -338,6 +402,7 @@ async function run() {
     loaded.advance(5 * 60 * 1000 + 1);
     assert.strictEqual((await main()).records[0].volt, '575', 'invalid payload cannot replace last good');
     failed = true;
+    descriptionPhase = '3 PHASE';
     const empty = loadWorker(fetchImpl);
     assert.strictEqual((await main(empty.worker)).sheets, null, 'initial failure leaves MAIN functional');
     assert.strictEqual((await main(empty.worker)).records[0].phase, '3', 'unavailable sheet retains parsed phase');

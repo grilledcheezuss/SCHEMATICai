@@ -1,7 +1,7 @@
 // --- SCHEMATICA ai v2.5.111 ---
 const APP_VERSION = "v2.5.111";
 const VERSION_HISTORY = {
-    "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
+    "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; Worker-parity bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
     "v2.5.110": "Google Sheets live canonical panel specs overlay: revision-aware Worker snapshot cache, field-level parsing/ML/healer fallback, conservative duplicate handling, and authoritative browser search/derived specs. Configure SHEETS_ENDPOINT and deploy Worker plus frontend. DERIVED_REV 11; encrypted snapshot schema 1 preserved.",
     "v2.5.109": "Browser-only System Type selection compares bounded title phrases with standalone system-line evidence after explicit rows. Matching primary signals agree; a plain motor count may select only between conflicting candidates and that tie-break stays orange. Bounded caption-separated titles recover CP-1245r1 as Simplex orange; CP-1409 remains absent. Representative v2.5.108 outcomes, explicit rows, count/conflict protections, raw descriptions, snapshot schema 1 and Worker v2.5.97 are preserved. DERIVED_REV 10 refreshes cached records; live catalog accuracy remains unmeasured.",
     "v2.5.108": "Browser-only System Type coverage: bounded adjective/equipment phrases near panel/title context are orange evidence only; hardware, reference and competing-type mentions abstain. Numeric combinations in a Panel Type cell are an internal mixed conflict; motor-count combinations retain prior behavior. DERIVED_REV 9 refreshes cached records; Worker v2.5.97, snapshot schema, search/badges and raw descriptions unchanged. Live accuracy remains unmeasured.",
@@ -1149,7 +1149,10 @@ class DataLoader {
     static applySnapshot(snapshot) {
         const records = Array.isArray(snapshot?.records) ? snapshot.records : [];
         const idMap = snapshot?.idMap instanceof Map ? snapshot.idMap : new Map(records.map(r => [r.id, r]));
-        const foundMfgs = snapshot?.foundMfgs instanceof Set ? snapshot.foundMfgs : new Set(records.map(r => r?.mfg).filter(Boolean));
+        const sheetMfgs = records.map(r => typeof InfoTableParser !== 'undefined' ? InfoTableParser.resolveTrustedSheetSpec(r, 'mfg') : null);
+        const foundMfgs = sheetMfgs.some(Boolean)
+            ? new Set(records.map((r, index) => sheetMfgs[index] || r?.mfg).filter(Boolean))
+            : snapshot?.foundMfgs instanceof Set ? snapshot.foundMfgs : new Set(records.map(r => r?.mfg).filter(Boolean));
         const foundEncs = snapshot?.foundEncs instanceof Set ? snapshot.foundEncs : new Set(records.map(r => r?.enc).filter(Boolean));
         window.LOCAL_DB.length = 0;
         records.forEach(rec => window.LOCAL_DB.push(rec));

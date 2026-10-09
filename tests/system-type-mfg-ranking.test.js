@@ -521,11 +521,11 @@ runTest('Performance: ~8,000 records derive well under 1s and scale linearly', (
 runTest('Trusted Sheets cells normalize complete formats and reject uncertainty independently', () => {
     const normalize = InfoTableParser.normalizeTrustedSheetSpec;
     for (const [field, raw, expected] of [
-        ['phase', '1/60', '1'], ['phase', '3/60 Hz', '3'], ['phase', '1/60 PH', '1'],
+        ['phase', '1/60', '1'], ['phase', '3/60', '3'], ['phase', '1/60 PH', '1'],
         ['volt', '120/240V', '240'], ['volt', '120 / 208 V', '208'], ['volt', '277/480V', '480'],
-        ['hp', '1/2 HP', '0.5'], ['hp', '1-1/2', '1.5'], ['hp', '2¾ HP', '2.75'],
+        ['hp', '1/2 HP', '0.5'], ['hp', '3/2', '1.5'], ['hp', '11/4 HP', '2.75'],
         ['mfg', 'Gorman-Rupp', 'GORMAN RUPP'], ['sys', 'quadruplex', 'Quadraplex'],
-        ['encMaterial', 'SS (304)', 'Stainless Steel'], ['encMaterial', 'SS (316)', 'Stainless Steel']
+        ['encMaterial', 'Stainless Steel (304)', 'Stainless Steel'], ['encMaterial', 'Stainless Steel (316)', 'Stainless Steel']
     ]) assertEqual(normalize(field, raw), expected, `${field} ${raw}`);
     for (const [field, raw] of [
         ['phase', '1/3'], ['phase', '3/50'], ['volt', '240/480'], ['volt', '480?'],
@@ -554,10 +554,46 @@ runTest('Trusted HP and voltage short-circuit legacy fields, tolerance and descr
     assertEqual(VoltageMatcher.matches({ sheetSpecs: { volt: '480?' }, desc: '120V panel' }, '120').matches, true, 'rejected voltage retains description fallback');
 });
 
+runTest('Clean unknown sheet manufacturers retain strict authority and ranking', () => {
+    const record = { id: 'CUSTOM', mfg: 'BARNES', mfgV: true, _pumpMfg: 'BARNES',
+        sheetSpecs: { mfg: 'Custom Pump Co.' }, pdfUrl: 'x' };
+    Object.defineProperty(record, 'desc', { get() { throw new Error('trusted manufacturer description accessed'); } });
+    assertEqual(searchWith([record], { mfg: 'Custom Pump Co.' }).total, 1, 'unknown manufacturer matches canonical sheet name');
+    assertEqual(searchWith([record], { mfg: 'BARNES' }).total, 0, 'unknown manufacturer blocks stale legacy name');
+    assertEqual(InfoTableParser.rankManufacturers([record]).counts, { 'CUSTOM PUMP CO.': 1 }, 'unknown manufacturer replaces stale ranking');
+    const badges = UI._generateBadges(record, { mfg: 'Custom Pump Co.', hp: 'Any', volt: 'Any', phase: 'Any', kw: [] }).join(' ');
+    assert(badges.includes('CUSTOM PUMP CO.') && !badges.includes('match-orange'), 'unknown canonical sheet badge is clean');
+});
+
+runTest('Snapshot manufacturer sets and fallback dropdown exclude sheet-shadowed stale names', () => {
+    const previousWindow = global.window;
+    const windowState = { LOCAL_DB: [], ID_MAP: new Map(), FOUND_MFGS: new Set(), FOUND_ENCS: new Set() };
+    global.window = windowState;
+    try {
+        const DataLoader = buildDataLoader(windowState);
+        const stale = { id: 'ACME', desc: '', mfg: 'BARNES', _pumpMfg: 'BARNES', _derivedRev: 12, sheetSpecs: { mfg: 'ACME' } };
+        for (const snapshot of [{ records: [stale] }, { records: [stale], foundMfgs: new Set(['BARNES']) }]) {
+            DataLoader.applySnapshot(snapshot);
+            assertEqual(Array.from(windowState.FOUND_MFGS), ['ACME'], 'trusted sheet manufacturer replaces stale snapshot index');
+            assertEqual(windowState.MFG_RANKING.eligibleRecords, 0, 'unknown sheet manufacturer cannot rank stale known name');
+            const inputs = setupInputs();
+            UI.pop();
+            assert(!inputs.mfgInput.options.some(option => option.value === 'BARNES'), 'alphabetical dropdown fallback cannot restore stale manufacturer');
+        }
+        DataLoader.applySnapshot({ records: [{ id: 'LEGACY', desc: '', mfg: 'BARNES' }], foundMfgs: new Set(['FLYGT']) });
+        assertEqual(Array.from(windowState.FOUND_MFGS), ['FLYGT'], 'no-sheet precomputed manufacturer set remains unchanged');
+        const inputs = setupInputs();
+        UI.pop();
+        assert(inputs.mfgInput.options.some(option => option.value === 'FLYGT'), 'no-sheet precomputed dropdown fallback remains available');
+    } finally {
+        global.window = previousWindow;
+    }
+});
+
 runTest('Trusted derivation skips each corresponding legacy parser while preserving unrelated rows', () => {
     const desc = 'Panel Type Duplex No. Motors 2 Pump Manufacturer Barnes Enclosure Material Fiberglass';
     const expected = { sys: 'Duplex', mfg: 'BARNES', material: 'Fiberglass' };
-    for (const [field, value] of [['sys', 'Triplex'], ['mfg', 'FLYGT'], ['encMaterial', 'SS (316)']]) {
+    for (const [field, value] of [['sys', 'Triplex'], ['mfg', 'FLYGT'], ['encMaterial', 'Stainless Steel (316)']]) {
         const record = { desc, sheetSpecs: { [field]: value } };
         InfoTableParser.deriveRecord(record);
         assertEqual(record._sys, field === 'sys' ? 'Triplex' : expected.sys, `${field} system`);
@@ -567,7 +603,7 @@ runTest('Trusted derivation skips each corresponding legacy parser while preserv
         const skipped = field === 'sys' ? rows.panelTypes.concat(rows.motorCounts) : field === 'mfg' ? rows.pumpMfgs : rows.encMaterials;
         assertEqual(skipped, [], `${field} cell parsers skipped`);
     }
-    const fullyTrusted = { sheetSpecs: { sys: 'Simplex', mfg: 'SULZER', encMaterial: 'SS (304)' } };
+    const fullyTrusted = { sheetSpecs: { sys: 'Simplex', mfg: 'SULZER', encMaterial: 'Stainless Steel (304)' } };
     Object.defineProperty(fullyTrusted, 'desc', { get() { throw new Error('fully trusted description accessed'); } });
     InfoTableParser.deriveRecord(fullyTrusted);
     assertEqual(fullyTrusted._sys, 'Simplex', 'fully trusted derivation');
@@ -581,7 +617,7 @@ runTest('Sheets authority wins search, badges, sorting and ranking despite stale
         id: '40', mfg: 'BARNES', hp: '5', volt: '120', phase: '1', _sys: 'Simplex', _sysV: true,
         _pumpMfg: 'BARNES', mfgV: true, hpV: true, voltV: true, phaseV: true, pdfUrl: 'x',
         _encEvidence: { status: 'row', materials: ['Fiberglass'], varied: true },
-        sheetSpecs: { mfg: 'FLYGT', hp: '1/2', volt: '277/480V', phase: '3/60', sys: 'Duplex', encMaterial: 'SS (316)' }
+        sheetSpecs: { mfg: 'FLYGT', hp: '1/2', volt: '277/480V', phase: '3/60', sys: 'Duplex', encMaterial: 'Stainless Steel (316)' }
     };
     Object.defineProperty(stale, 'desc', { get() { throw new Error('trusted field accessed legacy description'); } });
     const values = { mfg: 'FLYGT', hp: '0.5', volt: '480', phase: '3', sys: 'Duplex', enc: 'Stainless Steel' };
