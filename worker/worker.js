@@ -53,7 +53,7 @@ let CACHE_SHEETS = null;
 let FEEDBACK_FINGERPRINT_SOURCE = null;
 let FEEDBACK_FINGERPRINT = '';
 
-// Deterministic content fingerprint (two 32-bit FNV-style hashes + length). Used instead of a
+// Deterministic content fingerprint (FNV-1a and a Murmur-style 32-bit hash + length). Used instead of a
 // per-isolate counter so every isolate derives the same MAIN cache key for the same overrides.
 function fingerprintText(text) {
     let a = 0x811c9dc5;
