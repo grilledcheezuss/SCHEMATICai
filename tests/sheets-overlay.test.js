@@ -155,6 +155,15 @@ async function run() {
     let sheetCalls = 0;
     let mainCalls = 0;
     const cache = cacheStore();
+    const match = cache.match;
+    cache.match = async key => {
+        if (new URL(key.url).searchParams.get('specOverlay') === 'v2.5.110') {
+            return new Response(JSON.stringify({ records: [{ ...baseline, phase: '3' }] }), {
+                headers: { 'Content-Type': 'application/json', 'X-SCHEMATICA-CACHED-AT': String(Date.now()) }
+            });
+        }
+        return match(key);
+    };
     const fetchImpl = async url => {
         if (url === endpoint) {
             sheetCalls++;
