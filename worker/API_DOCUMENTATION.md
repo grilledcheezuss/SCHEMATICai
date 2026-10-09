@@ -1,6 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.113 (Worker and frontend)
+## Version: v2.5.113 (Worker); v2.5.114 (frontend)
+
+_Frontend release note: v2.5.114 adds revision-safe, in-memory PDF page assignments, browser-side profile resolution and immutable generator snapshots. Source PDF routing and original print/download remain separate from generated visually masked output. Generated PDFs are not destructively sanitized: underlying copied page content can remain recoverable. No Worker code, API, Airtable/Sheets processing, transform-version or snapshot-schema change is required; deploy the frontend only._
 
 _Release note: v2.5.113 makes Google Sheets authority observable and more robust end to end (Worker and frontend, deploy both). MAIN keeps `sheets` (revision/hash or null) and adds a secret-free `sheetStatus`: state active/unavailable/pending/unconfigured, a classified reason (endpoint, redirect, http-<status>, timeout, too-large, json, payload, columns, no-ids, cached-*), the indexed row count and per-page matchedRows/withSpecs/withMetadata/withUncertainty; every MAIN response carries the live X-SCHEMATICA-SHEETS-STATUS header. Panel IDs also match `CP 1234`, `CP1234`, en-dash prefixes and `1234-R1`; rows may be objects keyed by column or omit trailing blank cells, `rowCount` may be omitted, numeric hashes and Workspace `/a/macros/<domain>/s/<id>/exec` URLs are accepted, blank panelType is not metadata, and redirect bodies are released. SPEC_TRANSFORM_VERSION v2.5.113 invalidates pre-fix MAIN pages and the frontend release refreshes browser snapshots. Successful syncs store the per-page status (counts and public revision/hash only) and the read-only console helper `SheetAuthorityAudit.report()/text()/inspect(id)` reports recordsWithSheetSpecs/metadata/uncertainty, trusted/uncertain field counts and a verdict (sheet-backed, no-sync-evidence, worker-did-not-report, worker-unconfigured, worker-sheet-unavailable, stale-snapshot, no-matching-rows) without network access. Fallback, full descriptions, lazy sheet compilation/caching, DERIVED_REV 12 and snapshot schema 1 are unchanged. Live sheet contents/endpoint were not available to this change; synthetic tests only._
 
@@ -32,6 +34,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **Frontend v2.5.114**: In-memory PDF assignments, deterministic browser-side profile resolution, manual override preservation and revision-bound generated previews. Visual masking only; Worker remains v2.5.113.
 - **v2.5.113**: Observable Sheets authority: MAIN `sheetStatus` + `X-SCHEMATICA-SHEETS-STATUS`, classified unavailable reasons, tolerant panel ID spellings and compatible payload shapes, transform-key MAIN invalidation, stored per-sync status and read-only `SheetAuthorityAudit`. Deploy Worker and frontend.
 - **v2.5.112**: Worker-only MAIN CPU fix: linear-time HP/voltage/phase regexes, prefiltered manufacturer detection, lazy Sheets row normalization, raw-body Sheets persistence with identity header, deterministic feedback-content MAIN cache keys and work-counter headers. Fallback semantics unchanged; frontend unchanged.
 - **v2.5.111**: Strict per-field authority, selective extraction, bounded normalization, sys/panelType separation, nema rating mapping, uncertainty metadata and transformation-aware MAIN cache migration. Worker deployment required.

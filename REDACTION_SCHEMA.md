@@ -1,10 +1,12 @@
 # SCHEMATICA ai Redaction Profile Schema
 
-## Version: v2.5.3
+## Version: frontend v2.5.114
 
 ## Overview
 
-The redaction profile schema defines how sensitive information is identified and redacted on PDF pages. Profiles consist of layout rules that specify redaction zones with precise positioning, styling, and field mappings.
+The profile schema defines visual masking and replacement-text zones on PDF pages. Legacy built-in and custom profiles remain arrays of layout rules with normalized positioning, styling, and field mappings.
+
+**Privacy limitation:** export copies source PDF pages and draws white rectangles/text over them. It does not remove underlying content. A masked PDF is not a sanitized PDF, even when the preview looks correct. Original print/download deliberately use the unmodified source PDF.
 
 ---
 
@@ -56,6 +58,8 @@ const LAYOUT_RULES = {
   - `"address"` - Address
   - `"phone"` - Phone number
   - `"fax"` - Fax number
+  - `"job_block"` - Multiline job and system-type block
+  - `"logo"` - Blank branding mask
 - **Special Values**:
   - `"custom"` - Static text (requires `text` property)
 
@@ -130,7 +134,7 @@ const LAYOUT_RULES = {
 ---
 
 #### `fontSize` (number)
-**Purpose**: Font size in points for rendered text.
+**Purpose**: Zoom-independent font size in PDF points; converted to CSS pixels at the displayed page scale.
 
 **Range**: Typically 8-72 points
 
@@ -242,14 +246,14 @@ const LAYOUT_RULES = {
 
 ## Built-in Profiles
 
-SCHEMATICA ai includes 13 built-in layout profiles:
+SCHEMATICA ai retains 14 legacy built-in layout profiles:
 
 ### Title Sheets
 1. **TITLE** - Standard title sheet
 2. **TITLE_ASBUILT** - As-built title sheet
-3. **TITLE_COX** - Cox-specific title sheet
-4. **TITLE_DELTA** - Delta-specific title sheet
-5. **TITLE_3RDPARTY** - Third-party title sheet
+3. **COX_COVER** - Cox-specific title sheet
+4. **DELTA_COVER** - Delta-specific title sheet
+5. **THIRD_PARTY_COVER** - Third-party title sheet
 
 ### Info Pages
 6. **INFO** - Standard info page with border
@@ -264,6 +268,7 @@ SCHEMATICA ai includes 13 built-in layout profiles:
 ### Specialty
 12. **DOOR_DRAWING** - Door/enclosure drawings
 13. **GENERAL** - Fallback profile
+14. **COVER_TEMPLATE** - Universal replacement cover (page 1)
 
 ---
 
@@ -330,12 +335,9 @@ TITLE: [
 
 ## Auto-Detection
 
-The system can automatically detect which profile to use based on:
+Profile resolution is per page. Explicit manual choices and manual zone edits take precedence over automatic candidates. The replacement cover remains `COVER_TEMPLATE`; measured source-cover profiles must not be applied to it.
 
-1. **Content Analysis**: Scanning for keywords (SUBMITTAL, AS-BUILT, etc.)
-2. **Layout Heuristics**: Analyzing text density and distribution
-3. **Position Clues**: Detecting title blocks and info sections
-4. **HP Matching**: Fuzzy matching with ±10% tolerance
+Supported measured title-block matching uses the checked-in `PDFmapping` catalog. Unknown, unsupported or ambiguous matches retain compatibility detection/classifier fallbacks and require review. Profile match confidence is evidence about layout selection, not proof that all sensitive information has been covered. HP search matching is unrelated to PDF layout selection.
 
 ---
 
@@ -343,14 +345,13 @@ The system can automatically detect which profile to use based on:
 
 Users can create custom profiles by:
 
-1. **Upload**: Upload a reference PDF to auto-generate zones
+1. **Upload**: Preview a reference PDF/image and create an empty profile, then add zones manually
 2. **Manual**: Manually place redaction boxes in the editor
 3. **Export**: Export the configuration for reuse
 
-Custom profiles are stored in browser localStorage and can be:
-- Applied to specific pages
-- Used as defaults for new documents
-- Exported as JSON for sharing
+Custom profiles retain the browser localStorage shape `{name: [zones]}` at `cox_custom_profiles`, selected as `CUSTOM:<name>`. They can be applied to individual pages and exported with page configuration. Reference upload is not JSON import, duplicate-layout detection, or a working-document upload. There is no persisted page-range/default binding.
+
+Assignment state is separate from these profile definitions and initially lives only in memory. Source content identity, not panel ID alone, distinguishes revisions. Reload/logout does not restore page assignments; logout retains its existing localStorage-clearing behavior.
 
 ---
 
@@ -373,15 +374,19 @@ This ensures zones are never accidentally hidden by opacity or toggle settings.
 1. **Opaque whiteout zones** (transparent: false) - Drawn first
 2. **Transparent text overlays** (transparent: true) - Drawn second
 
-This ensures proper layering: whiteouts cover content, then text appears on top.
+This ensures visual layering only: whiteouts cover content, then text appears on top. Copied PDF content underneath remains in the document. The template cover is substituted for source page 1 rather than prepended, so output page count is unchanged.
+
+### Snapshot consistency
+
+Generation uses committed source bytes, a fixed cover/template choice, normalized effective zones and resolved replacement text captured together. Saved preview bytes are associated with their document/edit revision. Document, context, profile and zone changes invalidate them; incomplete loading/rendering/scanning must finish before preview generation. Print/download from the preview use the approved generated bytes, not a newly resolved page layout.
 
 ### Coordinate Transformation
-- UI coordinates (top-left origin) → PDF coordinates (bottom-left origin)
+- Displayed-page coordinates (top-left origin) → PDF coordinates (bottom-left origin), accounting for page rotation and effective page box
 - Relative positions (0-1) → Absolute PDF points
 - Rotation applied around zone center
 
 ### Text Rendering
-- Font selection (Times Roman or Courier)
+- Standard PDF font selection for Times or Courier
 - Width calculation for alignment
 - Rotation transform for vertical text
 - Underline with proper rotation transform
@@ -435,6 +440,7 @@ This ensures proper layering: whiteouts cover content, then text appears on top.
 
 ## Version History
 
+- **Frontend v2.5.114**: Revision-safe page assignments, shared profile resolution and frozen generated-output snapshots; visual masking, not destructive redaction. Worker and legacy zone arrays unchanged.
 - **v2.5.3**: Added preview, improved export, rotation underline fix
 - **v2.5.2**: Fixed overlay visibility, CSS improvements
 - **v2.5.1**: Refactored redaction UI
