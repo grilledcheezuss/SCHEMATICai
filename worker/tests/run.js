@@ -340,6 +340,24 @@ console.log('\n=== parseVoltageContextAware: 208V boundary guards ===');
     assertEqual(s.voltV, false, '208/220V panel: voltV === false');
 }
 
+// ─── Rating-only enclosure inference ──────────────────────────────────────────
+console.log('\n=== parseEnclosure: rating-only inference ===');
+{
+    const workerSource = fs.readFileSync(path.join(__dirname, '..', 'worker.js'), 'utf8');
+    const deployedParse = new Function(`return (${functionSource(workerSource, '_parseEnclosure')});`)();
+    for (const text of ['NEMA 4X STAINLESS STEEL', 'NEMA4X', 'TYPE 4 X FIBERGLASS', '4XSS', '4XFG', 'NEMA4XSS',
+        'ENCLOSURE MATERIAL: STAINLESS / FIBERGLASS NEMA 4X', 'POLY NEMA 4X']) {
+        assertDeepEqual([...parseEnclosure(text, false, false)], ['4X'], `rating-only helper: ${text}`);
+        assertDeepEqual([...deployedParse(text, false, false)], ['4X'], `rating-only deployed: ${text}`);
+        assertEqual(extractSpecsStrict(text, ['enc'], false, false).enc, '4X', `selected rating-only extraction: ${text}`);
+        assertDeepEqual([...parseEnclosure(text)], [...parseEnclosure(text, true, true)], `default helper API unchanged: ${text}`);
+    }
+    for (const text of ['POLY', 'STAINLESS STEEL', 'FIBERGLASS', '4XSSS']) {
+        assertEqual(parseEnclosure(text, false, false).size, 0, `material is not a rating: ${text}`);
+        assertEqual(deployedParse(text, false, false).size, 0, `deployed material is not a rating: ${text}`);
+    }
+}
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 console.log('\n' + '='.repeat(60));
 console.log(`Results: ${passed} passed, ${failed} failed out of ${passed + failed} tests`);

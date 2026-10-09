@@ -170,18 +170,21 @@ function parseVoltageContextAware(t) {
  *   keyword are treated as high-confidence spec-table evidence.
  * Returns a Set of enclosure type strings.
  */
-function parseEnclosure(t, inferBareRating = true) {
+function parseEnclosure(t, inferBareRating = true, inferMaterial = true) {
     const foundEnclosures = new Set();
+    const has4X = inferMaterial
+        ? /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t)
+        : /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?:FG|SS)?\b/i.test(t);
+    if (!inferMaterial) {
+        if (has4X) foundEnclosures.add("4X");
+        return foundEnclosures;
+    }
 
     // Explicit compound codes take priority; track presence for tie-breaking
     const hasExplicit4XFG = /\b4XFG\b/i.test(t);
     const hasExplicit4XSS = /\b4XSS\b/i.test(t);
     if (hasExplicit4XFG) foundEnclosures.add("4XFG");
     if (hasExplicit4XSS) foundEnclosures.add("4XSS");
-
-    // Detect generic 4X rating (covers NEMA 4X, NEMA4X, TYPE 4X, 4 X, plain 4X)
-    // Does NOT match 4XSS/4XFG (they contain more chars after X, already handled above)
-    const has4X = /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t);
 
     // Material keywords (used when bare 4X is present); FRP is a strong FG signal
     const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(t);
@@ -241,7 +244,7 @@ function parseEnclosure(t, inferBareRating = true) {
  * Extract specs from a panel description string.
  * Returns canonical { mfg, hp, volt, phase, enc, mfgV, hpV, voltV, phaseV, encV }.
  */
-function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], inferBareRating = true) {
+function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], inferBareRating = true, inferMaterial = true) {
     if (!Array.isArray(fields)) fields = ['mfg', 'hp', 'volt', 'phase', 'enc'];
     const s = {
         mfg: null, hp: null, volt: null, phase: null, enc: null,
@@ -338,7 +341,7 @@ function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], i
 
     // --- Enclosure ---
     if (fields.includes('enc')) {
-    const foundEnclosures = parseEnclosure(t, inferBareRating);
+    const foundEnclosures = parseEnclosure(t, inferBareRating, inferMaterial);
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {

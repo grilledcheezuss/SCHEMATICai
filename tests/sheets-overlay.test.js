@@ -35,14 +35,28 @@ function loadWorker(fetchImpl, cache = cacheStore()) {
         for (const name of ['extractSpecsStrict', '_parseHP', '_parseVoltageContextAware', '_parseEnclosure']) {
             const original = globalThis[name];
             globalThis[name] = (...args) => {
-                calls.push({ name, fields: name === 'extractSpecsStrict' ? args[1] : undefined });
+                calls.push({ name, fields: name === 'extractSpecsStrict' ? args[1] : undefined,
+                    inferMaterial: name === 'extractSpecsStrict' ? args[3] : name === '_parseEnclosure' ? args[2] : undefined });
                 return original(...args);
             };
         }
+        const materialSources = [
+            /\\b4XFG\\b/.source, /\\b4XSS\\b/.source,
+            /\\b(?:FIBERGLASS|FIBER\\s*GLASS|FRP)\\b/.source,
+            /\\bSTAINLESS\\b/.source, /\\bPOLY(?:CARBONATE)?\\b/.source
+        ];
+        const originalTest = RegExp.prototype.test;
+        RegExp.prototype.test = function(value) {
+            if (materialSources.includes(this.source)) calls.push({ name: 'materialRegex', source: this.source });
+            return originalTest.call(this, value);
+        };
     `, sandbox);
     return { ...sandbox.module.exports, advance: ms => { now += ms; },
         calls,
-        predict: () => vm.runInNewContext(`CACHE_NB_MODEL = { predict(text, field) { calls.push({ name: 'predict', field }); return null; } };`, sandbox),
+        predict: value => {
+            sandbox.predictedEnc = value ?? null;
+            vm.runInNewContext(`CACHE_NB_MODEL = { predict(text, field) { calls.push({ name: 'predict', field }); return field === 'enc' ? predictedEnc : null; } };`, sandbox);
+        },
         heal: value => { sandbox.healed = value; vm.runInNewContext('CACHE_HEALED = healed; CACHE_HEALED_TIME = Date.now();', sandbox); } };
 }
 function extractClass(name) {
@@ -281,7 +295,7 @@ async function run() {
     assert.strictEqual(HorsepowerMatcher.matches(record, '7.5').matches, true);
     assert.strictEqual(HorsepowerMatcher.matches(baseline, '5').matches, true);
 
-    for (const [missingField, column] of [['mfg', 1], ['hp', 2], ['volt', 3], ['phase', 4], ['encMaterial', 7]]) {
+    for (const [missingField, column] of [['mfg', 1], ['hp', 2], ['volt', 3], ['phase', 4], ['enc', 5], ['encMaterial', 7]]) {
         const row = [...full.rows[0]];
         row[column] = 'Uncertain';
         const selective = loadWorker(async url => {
@@ -305,8 +319,59 @@ async function run() {
             'only the uncertain field invokes ML');
         assert.strictEqual(result.desc, 'UNRELATED KEYWORD', 'unrelated description survives selective extraction');
         assert.strictEqual(result.sheetUncertainty[missingField], 'Uncertain');
+        if (missingField === 'enc') {
+            assert.strictEqual(result.enc, '4X', 'missing sheet rating uses only rating from material-bearing healer code');
+            assert.strictEqual(result.sheetSpecs.encMaterial, 'Fiberglass', 'trusted material survives rating fallback');
+            assert.strictEqual(selective.calls.some(call => call.name === 'materialRegex'), false, 'missing rating never invokes trusted material regexes');
+            assert.strictEqual(selective.calls.find(call => call.name === '_parseEnclosure').inferMaterial, false, 'rating-only parser disables material inference');
+        }
         for (const field of ['mfg', 'hp', 'volt', 'phase']) {
             if (field !== missingField) assert.strictEqual(result[field], snapshot.index.get('1234R1')[field]);
+        }
+
+        async function missingRatingRecord(ratingCell, description, { prediction, override } = {}) {
+            const row = [...full.rows[0]];
+            row[5] = ratingCell;
+            const loaded = loadWorker(async url => {
+                if (url === endpoint) return json(payload([row]));
+                if (url.includes('/Users')) return json({ records: [{ fields: { Username: 'user', Passcode: 'pass' } }] });
+                if (url.includes('/Feedback')) return json({ records: [] });
+                if (url.includes('/Control%20Panel%20Items')) return json({
+                    records: [{ fields: { 'Control Panel Name': 'CP-1234R1', Items: description } }]
+                });
+                throw new Error('Unexpected fetch');
+            });
+            loaded.predict(prediction);
+            if (override !== undefined) loaded.heal({ '1234R1': { enc: override } });
+            const response = await loaded.worker.fetch(new Request('https://worker.example/?target=MAIN', {
+                headers: { 'X-Cox-User': 'user', 'X-Cox-Pass': 'pass' }
+            }), { SHEETS_ENDPOINT: endpoint, AIRTABLE_READ_KEY: 'test-read', AIRTABLE_WRITE_KEY: 'test-write' });
+            assert.strictEqual(response.status, 200);
+            const result = (await response.json()).records[0];
+            const extraction = loaded.calls.find(call => call.name === 'extractSpecsStrict');
+            assert.deepStrictEqual(Array.from(extraction.fields), ['enc'], 'only missing rating selects legacy extraction');
+            assert.strictEqual(extraction.inferMaterial, false, 'trusted material disables enclosure material inference');
+            assert.strictEqual(loaded.calls.some(call => call.name === 'materialRegex'), false, 'trusted material bypasses every material regex');
+            assert.strictEqual(result.sheetSpecs.encMaterial, 'Fiberglass', 'canonical sheet material remains Fiberglass');
+            parser.deriveRecord(result);
+            assert.strictEqual(parser.matchEnclosureMaterial(result, 'Fiberglass').matches, true);
+            assert.strictEqual(parser.matchEnclosureMaterial(result, 'Stainless Steel').matches, false);
+            return { result, calls: loaded.calls };
+        }
+        for (const ratingCell of ['', 'N/A', 'Uncertain']) {
+            for (const description of ['NEMA4X STAINLESS STEEL', 'NEMA 4XSS', '4XFG']) {
+                const { result, calls } = await missingRatingRecord(ratingCell, description);
+                assert.strictEqual(result.enc, '4X', 'trusted material does not suppress independent description rating');
+                assert.strictEqual(calls.some(call => call.name === 'predict'), false, 'description rating needs no rating ML; trusted fields need no ML');
+            }
+        }
+        for (const code of ['4XSS', '4XFG', 'POLY']) {
+            const expected = code === 'POLY' ? null : '4X';
+            const predicted = await missingRatingRecord('', 'UNRELATED KEYWORD', { prediction: code });
+            assert.strictEqual(predicted.result.enc, expected, 'rating-only ML strips material suffix and rejects POLY');
+            assert.deepStrictEqual(predicted.calls.filter(call => call.name === 'predict').map(call => call.field), ['enc'], 'only missing rating invokes ML');
+            const healed = await missingRatingRecord('N/A', 'UNRELATED KEYWORD', { override: code });
+            assert.strictEqual(healed.result.enc, expected, 'rating-only healer strips material suffix and rejects POLY');
         }
     }
 

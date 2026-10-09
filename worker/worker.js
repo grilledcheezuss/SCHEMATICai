@@ -842,14 +842,20 @@ function _parseVoltageContextAware(t) {
 // Parse enclosure type: detects NEMA 4X, NEMA4X, TYPE 4X, 4XSS, 4XFG, POLY.
 // When both SS and FG detected, spec-table context keywords determine the winner.
 // Logic mirrored in worker/lib/extract.js for unit testing.
-function _parseEnclosure(t, inferBareRating = true) {
+function _parseEnclosure(t, inferBareRating = true, inferMaterial = true) {
     const foundEnclosures = new Set();
+    const has4X = inferMaterial
+        ? /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t)
+        : /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?:FG|SS)?\b/i.test(t);
+    if (!inferMaterial) {
+        if (has4X) foundEnclosures.add("4X");
+        return foundEnclosures;
+    }
     // Explicit compound codes take priority; track presence for tie-breaking
     const hasExplicit4XFG = /\b4XFG\b/i.test(t);
     const hasExplicit4XSS = /\b4XSS\b/i.test(t);
     if (hasExplicit4XFG) foundEnclosures.add("4XFG");
     if (hasExplicit4XSS) foundEnclosures.add("4XSS");
-    const has4X = /\b(?:NEMA\s*|TYPE\s*)?4\s*X(?!FG|SS)\b/i.test(t);
     // FRP is a strong FG signal alongside FIBERGLASS/FIBER GLASS
     const hasFG = /\b(?:FIBERGLASS|FIBER\s*GLASS|FRP)\b/i.test(t);
     const hasSS = /\bSTAINLESS\b/i.test(t);
@@ -896,7 +902,7 @@ function _parseEnclosure(t, inferBareRating = true) {
     return foundEnclosures;
 }
 
-function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], inferBareRating = true) {
+function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], inferBareRating = true, inferMaterial = true) {
     if (!Array.isArray(fields)) fields = ['mfg', 'hp', 'volt', 'phase', 'enc'];
     // Return object: parameter values with variance flags (suffix 'V' indicates varied/ambiguous)
     const s = { 
@@ -992,7 +998,7 @@ function extractSpecsStrict(t, fields = ['mfg', 'hp', 'volt', 'phase', 'enc'], i
 
     // --- Enclosure (NEMA 4X, NEMA4X, TYPE 4X, 4XSS, 4XFG, POLY) ---
     if (fields.includes('enc')) {
-    const foundEnclosures = _parseEnclosure(t, inferBareRating);
+    const foundEnclosures = _parseEnclosure(t, inferBareRating, inferMaterial);
     if (foundEnclosures.size === 1) {
         s.enc = [...foundEnclosures][0];
     } else if (foundEnclosures.size > 1) {
@@ -1285,10 +1291,11 @@ export default {
 
                         const textToParse = fullDesc + " " + cleanId;
                         const sheet = sheetSnapshot?.index.get(normalizeSheetPanelId(cleanId)) || {};
-                        // Rating and material are independent: retain material fallback for rating-only rows.
+                        // Rating and material fall back independently; trusted material never needs material inference.
                         const fallbackFields = ['mfg', 'hp', 'volt', 'phase'].filter(field => sheet[field] === undefined);
-                        if (sheet.encMaterial === undefined) fallbackFields.push('enc');
-                        const explicit = fallbackFields.length ? extractSpecsStrict(textToParse, fallbackFields, false) : {};
+                        const inferMaterial = sheet.encMaterial === undefined;
+                        if (sheet.enc === undefined || inferMaterial) fallbackFields.push('enc');
+                        const explicit = fallbackFields.length ? extractSpecsStrict(textToParse, fallbackFields, false, inferMaterial) : {};
 
                         let finalMfg = sheet.mfg ?? explicit.mfg ?? null;
                         let finalEnc = fallbackFields.includes('enc') ? explicit.enc : (sheet.enc ?? null);
@@ -1323,6 +1330,10 @@ export default {
                             if (sheet.phase === undefined && overrides.phase) finalPhase = overrides.phase;
                             if (fallbackFields.includes('enc') && overrides.enc) finalEnc = overrides.enc;
                             if (overrides.category) finalCategory = overrides.category;
+                        }
+                        if (!inferMaterial && sheet.enc === undefined) {
+                            const rating = normalizeSheetSpec('enc', finalEnc);
+                            finalEnc = rating === '4XSS' || rating === '4XFG' ? '4X' : rating === 'POLY' ? null : rating;
                         }
 
                         const pdfUrl = r.fields['Control Panel PDF']?.[0]?.url || "";
