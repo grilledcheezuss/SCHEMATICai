@@ -235,11 +235,44 @@ async function loaded(count = 2) {
         assert.equal(G.matchMeasured(evidence, onlyProfiles, onlyFp, { [key]: { ...metadata[key], low_confidence: true } }).status, 'unresolved');
         assert.equal(G.matchMeasured({H:[],V:[],edge:'bottom',class:'SHEET'}, onlyProfiles, onlyFp, onlyMeta).status, 'unresolved');
         const shifted = { ...evidence, H:evidence.H.map(l=>[l[0]+.02,l[1],l[2]]), V:evidence.V.map(l=>[l[0],l[1]+.02,l[2]+.02]) };
-        assert.equal(G.matchMeasured(shifted, onlyProfiles, onlyFp, onlyMeta).status, 'unresolved');
+        const moved = G.matchMeasured(shifted, onlyProfiles, onlyFp, onlyMeta);
+        assert.equal(moved.status, 'resolved');
+        assert.equal(moved.placement, 'affine');
+        const sourceZone = profiles[key].find(z => z.map === 'cpid') || profiles[key][0];
+        const placed = moved.zones.find(z => z.map === sourceZone.map);
+        assert(Math.abs((placed.y - sourceZone.y) - 0.02) < 0.015, 'affine slide follows the printed title block');
     });
     test('competing geometries visibly unresolved, never affine placement', () => {
         const result = G.matchMeasured(evidence, { ...onlyProfiles, twin: profiles[key] }, { ...onlyFp, twin: entry }, { ...onlyMeta, twin: metadata[key] });
         assert.equal(result.status, 'unresolved'); assert.match(result.reason, /Ambiguous/);
+    });
+    test('full catalog resolves TB01A sheet, TB01A info, and COV01 cover without a twin', () => {
+        const sheetKey = 'SCHEMATIC_PORTRAIT_TB01A';
+        const infoKey = 'INFO_TB01A';
+        const coverKey = 'COVER_TEMPLATE_COV01';
+        const reconstruct = name => {
+            const fp = fingerprints[name].fingerprint, box = fp.title_block_bbox, lines = fp.template_lines_rel;
+            return {
+                edge: metadata[name].title_block_edge, class: fingerprints[name].class,
+                H: lines.H.map(l => [box[1] + l[0] * (box[3] - box[1]), box[0] + l[1] * (box[2] - box[0]), box[0] + l[2] * (box[2] - box[0])]),
+                V: lines.V.map(l => [box[0] + l[0] * (box[2] - box[0]), box[1] + l[1] * (box[3] - box[1]), box[1] + l[2] * (box[3] - box[1])])
+            };
+        };
+        const sheet = G.matchMeasured(reconstruct(sheetKey), profiles, fingerprints, metadata);
+        const info = G.matchMeasured(reconstruct(infoKey), profiles, fingerprints, metadata);
+        assert.equal(sheet.profileId, 'MEASURED:' + sheetKey);
+        assert.equal(sheet.placement, 'exact');
+        assert.equal(info.profileId, 'MEASURED:' + infoKey);
+        assert.equal(info.placement, 'exact');
+        const cpid = profiles[coverKey].find(z => z.map === 'cpid');
+        const cover = G.matchMeasured({
+            H: [], V: [], edge: 'bottom', class: 'COVER', page: 1, preferCover: true,
+            textItems: [{ text: 'CP-8377', x: cpid.x + 0.01, y: cpid.y, w: cpid.w - 0.02, h: cpid.h }]
+        }, profiles, fingerprints, metadata);
+        assert.equal(cover.status, 'resolved');
+        assert.equal(cover.profileId, 'MEASURED:' + coverKey);
+        const infoLines = G.matchMeasured({ ...reconstruct(sheetKey), class: 'INFO' }, profiles, fingerprints, metadata);
+        assert.equal(infoLines.profileId, 'MEASURED:' + infoKey);
     });
     test('actual built-in semantics all validate, including missing fontSize and type', () => {
         const source = fs.readFileSync(require.resolve('../app.js'), 'utf8');
@@ -271,6 +304,7 @@ async function loaded(count = 2) {
         });
         scanner.refreshProfileOptions();
         assert.equal(select.options.filter(option => option.value.startsWith('BUILTIN:')).length, 14);
+        assert.equal(select.options.filter(option => option.value.startsWith('MEASURED:')).length, 0);
         const imported = select.options.find(option => option.value === 'CUSTOM:'+name);
         assert.equal(imported.textContent, '⭐ '+name); assert.equal(imported.tag, 'option');
         assert.equal(select.value, 'BUILTIN:TITLE_ASBUILT');

@@ -140,27 +140,131 @@
         const n = a.H.length + a.V.length + b.H.length + b.V.length;
         return n ? 2 * (lineMatches(a.H, b.H, .03, .03) + lineMatches(a.V, b.V, .006, .08)) / n : 0;
     }
-    // Exact placement only: never synthesize affine masks or guess from keywords.
+    function relLines(H, V, bbox) {
+        const [x0, y0, x1, y1] = bbox, bw = x1 - x0, bh = y1 - y0;
+        if (!(bw > 0) || !(bh > 0)) return null;
+        return {
+            H: H.map(l => [(l[0] - y0) / bh, (l[1] - x0) / bw, (l[2] - x0) / bw]),
+            V: V.map(l => [(l[0] - x0) / bw, (l[1] - y0) / bh, (l[2] - y0) / bh])
+        };
+    }
+    // Title-block band from the page's own lines, not from a catalog bbox.
+    // Full-page borders are excluded so a shifted block can still be scored.
+    function titleBand(H, V) {
+        // Include rules that sit just past the page edge so a small downward print shift
+        // still reconstructs the same grid instead of losing the bottom border.
+        const wide = H.filter(l => l[2] - l[1] >= 0.35 && l[0] >= 0.62 && l[0] <= 1.02);
+        const pool = wide.length >= 2 ? wide : H.filter(l => l[0] >= 0.62 && l[0] <= 1.02);
+        if (pool.length < 2) return null;
+        const top = Math.min(...pool.map(l => l[0])), bottom = Math.max(...pool.map(l => l[0]));
+        const Hs = H.filter(l => l[0] >= top - 0.02 && l[0] <= bottom + 0.02 && l[2] - l[1] >= 0.004);
+        const Vs = V.filter(l => l[1] >= top - 0.03 && l[2] <= bottom + 0.03 && l[2] - l[1] >= 0.004);
+        if (Hs.length < 2 || !Vs.length) return null;
+        const bbox = [
+            Math.min(...Hs.map(l => l[1]), ...Vs.map(l => l[0])),
+            Math.min(...Hs.map(l => l[0]), ...Vs.map(l => l[1])),
+            Math.max(...Hs.map(l => l[2]), ...Vs.map(l => l[0])),
+            Math.max(...Hs.map(l => l[0]), ...Vs.map(l => l[2]))
+        ];
+        if (!(bbox[2] > bbox[0]) || !(bbox[3] > bbox[1])) return null;
+        return { bbox, H: Hs, V: Vs };
+    }
+    function bboxDistance(a, b) { return Math.max(...a.map((v, i) => Math.abs(v - b[i]))); }
+    function placeZones(zones, profileBBox, observedBBox) {
+        const [px0, py0, px1, py1] = profileBBox, pw = px1 - px0, ph = py1 - py0;
+        const [ox0, oy0, ox1, oy1] = observedBBox, ow = ox1 - ox0, oh = oy1 - oy0;
+        if (!(pw > 0) || !(ph > 0) || !(ow > 0) || !(oh > 0)) return null;
+        return zones.map(z => {
+            let x = ox0 + (z.x - px0) / pw * ow, y = oy0 + (z.y - py0) / ph * oh, w = z.w / pw * ow, h = z.h / ph * oh;
+            x = Math.min(Math.max(0, x), 0.99); y = Math.min(Math.max(0, y), 0.99);
+            w = Math.min(Math.max(0.004, w), 1 - x); h = Math.min(Math.max(0.004, h), 1 - y);
+            return { ...z, x, y, w, h };
+        });
+    }
+    function matchCover(evidence, profiles, fingerprints, metadata) {
+        const items = (evidence.textItems || []).filter(i => i && typeof i.text === 'string');
+        const cps = items.filter(i => /^CP\s*-?\s*\d+/i.test(i.text));
+        if (!cps.length) return null;
+        const cpid = cps.slice().sort((a, b) => b.y - a.y || b.x - a.x)[0];
+        const hits = [];
+        for (const [key, entry] of Object.entries(fingerprints)) {
+            if (entry.class !== 'COVER' || entry.low_confidence) continue;
+            const meta = metadata[key], zones = profiles[key];
+            if (!meta || meta.low_confidence || !Array.isArray(zones)) continue;
+            const zone = zones.find(z => z.map === 'cpid');
+            if (!zone) continue;
+            const dy = Math.abs(zone.y - cpid.y);
+            const dx = Math.abs((zone.x + zone.w / 2) - (cpid.x + (cpid.w || 0) / 2));
+            if (dy <= 0.03 && dx <= 0.08) hits.push({ key, score: 1 - dy / 0.03 - dx / 0.2 });
+        }
+        hits.sort((a, b) => b.score - a.score);
+        if (!hits.length) return null;
+        if (hits.length > 1 && hits[0].score - hits[1].score < 0.08) return { status: 'unresolved', reason: 'Ambiguous measured layouts', candidates: hits };
+        return { status: 'resolved', profileId: 'MEASURED:' + hits[0].key, confidence: Math.max(0, hits[0].score), placement: 'exact' };
+    }
+    // Group identical templates, accept the closest placement, and slide zones when the
+    // same grid is printed a little high/low or left/right. Identical competing templates stay unresolved.
     function matchMeasured(evidence, profiles, fingerprints, metadata) {
         if (!evidence || !evidence.H || !evidence.V) return { status: 'unresolved', reason: 'No geometric evidence' };
-        const matches = [];
+        if (evidence.preferCover) {
+            const cover = matchCover(evidence, profiles, fingerprints, metadata);
+            return cover || { status: 'unresolved', reason: 'Unknown title-block geometry' };
+        }
+        const band = evidence.H.length && evidence.V.length ? titleBand(evidence.H, evidence.V) : null;
+        if (!band) {
+            if (evidence.class === 'COVER' || evidence.page === 1) {
+                const cover = matchCover(evidence, profiles, fingerprints, metadata);
+                if (cover) return cover;
+            }
+            return { status: 'unresolved', reason: 'Unknown title-block geometry' };
+        }
+        const observedRel = relLines(band.H, band.V, band.bbox);
+        const groups = new Map();
         for (const [key, entry] of Object.entries(fingerprints)) {
             const meta = metadata[key], fp = entry.fingerprint, bbox = fp?.title_block_bbox;
-            if (!profiles[key] || !meta || meta.low_confidence || entry.low_confidence || !bbox || !fp.template_lines_rel || meta.title_block_edge !== evidence.edge || entry.class !== evidence.class) continue;
-            const [x0, y0, x1, y1] = bbox, bw = x1 - x0, bh = y1 - y0;
-            const H = evidence.H.filter(l => l[0] >= y0 - .008 && l[0] <= y1 + .008 && l[1] >= x0 - .008 && l[2] <= x1 + .008);
-            const V = evidence.V.filter(l => l[0] >= x0 - .008 && l[0] <= x1 + .008 && l[1] >= y0 - .008 && l[2] <= y1 + .008);
-            if (!H.length || !V.length) continue;
-            const observed = [Math.min(...H.map(l => l[1]), ...V.map(l => l[0])), Math.min(...H.map(l => l[0]), ...V.map(l => l[1])), Math.max(...H.map(l => l[2]), ...V.map(l => l[0])), Math.max(...H.map(l => l[0]), ...V.map(l => l[2]))];
-            if (observed.some((v, i) => Math.abs(v - bbox[i]) > .008)) continue;
-            const rel = { H: H.map(l => [(l[0] - y0) / bh, (l[1] - x0) / bw, (l[2] - x0) / bw]), V: V.map(l => [(l[0] - x0) / bw, (l[1] - y0) / bh, (l[2] - y0) / bh]) };
-            const score = rscore(rel, fp.template_lines_rel);
-            if (score >= .70) matches.push({ key, score });
+            if (!profiles[key] || !meta || meta.low_confidence || entry.low_confidence || !bbox || !fp.template_lines_rel) continue;
+            if (meta.title_block_edge && evidence.edge && meta.title_block_edge !== evidence.edge) continue;
+            if (entry.class && evidence.class && entry.class !== evidence.class) continue;
+            const hash = (entry.class || '') + '|' + (meta.title_block_edge || '') + '|' + (entry.template_hash || fp.template_hash || key);
+            let group = groups.get(hash);
+            if (!group) {
+                group = { score: rscore(observedRel, fp.template_lines_rel), keys: [] };
+                groups.set(hash, group);
+            }
+            group.keys.push({ key, bbox, dist: bboxDistance(band.bbox, bbox) });
         }
-        matches.sort((a, b) => b.score - a.score);
-        if (!matches.length) return { status: 'unresolved', reason: 'Unknown title-block geometry' };
-        if (matches.length > 1) return { status: 'unresolved', reason: 'Ambiguous measured layouts', candidates: matches };
-        return { status: 'resolved', profileId: 'MEASURED:' + matches[0].key, confidence: matches[0].score, placement: 'exact' };
+        const ranked = [...groups.values()].filter(g => g.score >= 0.70).sort((a, b) => b.score - a.score);
+        if (!ranked.length) {
+            if (evidence.class === 'COVER' || evidence.page === 1) {
+                const cover = matchCover(evidence, profiles, fingerprints, metadata);
+                if (cover) return cover;
+            }
+            return { status: 'unresolved', reason: 'Unknown title-block geometry' };
+        }
+        const leader = ranked[0];
+        leader.keys.sort((a, b) => a.dist - b.dist || ((metadata[b.key]?.n_pages || 0) - (metadata[a.key]?.n_pages || 0)));
+        const best = leader.keys[0], second = leader.keys[1];
+        const runner = ranked[1];
+        if (runner && leader.score - runner.score < 0.02) {
+            return { status: 'unresolved', reason: 'Ambiguous measured layouts', candidates: leader.keys.concat(runner.keys).map(k => ({ key: k.key, score: leader.score })) };
+        }
+        if (second && Math.abs(second.dist - best.dist) <= 0.004 && best.dist <= 0.012) {
+            return { status: 'unresolved', reason: 'Ambiguous measured layouts', candidates: [best, second] };
+        }
+        if (best.dist <= 0.012) return { status: 'resolved', profileId: 'MEASURED:' + best.key, confidence: leader.score, placement: 'exact' };
+        if (best.dist <= 0.05) {
+            const zones = placeZones(profiles[best.key], best.bbox, band.bbox);
+            if (!zones) return { status: 'unresolved', reason: 'Unknown title-block geometry' };
+            return { status: 'resolved', profileId: 'MEASURED:' + best.key, confidence: leader.score, placement: 'affine', zones };
+        }
+        return { status: 'unresolved', reason: 'Unknown title-block geometry' };
+    }
+    // Page 1 keeps the cover-template fallback for legacy builtins, and accepts a measured or named cover.
+    function pageOneProfile(profileId) {
+        const stable = id(profileId);
+        if (/^(MEASURED|CUSTOM):/.test(stable)) return stable;
+        if (/^BUILTIN:(COVER_TEMPLATE|COX_COVER|DELTA_COVER|THIRD_PARTY_COVER)$/.test(stable)) return stable;
+        return 'BUILTIN:COVER_TEMPLATE';
     }
     class State {
         constructor(onChange = () => {}) {
@@ -199,7 +303,7 @@
         current(token) { return token.generation === this.generation && token.revision === this.revision; }
         setPage(page, profileId, provenance = 'manual', input, g, contentSource) {
             check(Number.isInteger(page) && page > 0 && page <= this.sourcePageCount, 'Invalid page');
-            const stable = page === 1 ? 'BUILTIN:COVER_TEMPLATE' : id(profileId);
+            const stable = page === 1 ? pageOneProfile(profileId) : id(profileId);
             check(this.profiles[stable], 'Missing profile: ' + stable);
             check(['manual', 'exact', 'auto'].includes(provenance), 'Invalid provenance');
             const existing = this.pages[page];
@@ -232,7 +336,7 @@
                 check(p.coordinateSpace === COORDINATES && p.profileRevision === this.profileRevision, 'Invalid page coordinate space/revision');
                 check(['manual', 'exact', 'auto'].includes(p.provenance), 'Missing mapping provenance');
                 check(typeof p.profileId === 'string' && /^(BUILTIN|CUSTOM|MEASURED):[\s\S]+$/.test(p.profileId) && this.profiles[p.profileId], 'Missing mapping profile');
-                check(p.page !== 1 || p.profileId === 'BUILTIN:COVER_TEMPLATE', 'Page 1 must use COVER_TEMPLATE');
+                check(p.page !== 1 || pageOneProfile(p.profileId) === p.profileId, 'Page 1 must use COVER_TEMPLATE');
                 check(p.contentSource === (this.pages[p.page]?.contentSource || 'source'), 'Mapping content source mismatch');
                 pending.push({ ...p, zones: zones(p.zones, p.page) });
             }

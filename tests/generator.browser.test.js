@@ -120,7 +120,7 @@ async function main() {
             'Synthetic fixture loads with real locally vendored PDF libraries');
         const failures = [];
         for (const test of [testProfilesAndEditing, testGeometryAndOutput, testOriginalActions,
-            testMappingAndDigest, testMeasuredEvidence, testProfileNameEscaping, testAsyncInvalidation, testTemplateFailure, testTemplateRaces,
+            testMappingAndDigest, testMeasuredEvidence, testAutoCoxDetection, testZonePixelAlignment, testProfileNameEscaping, testAsyncInvalidation, testTemplateFailure, testTemplateRaces,
             testTemplateSourceSwap, testDigestFailure]) {
             try {
                 await test(browser);
@@ -526,6 +526,132 @@ async function testMeasuredEvidence(browser) {
         'Real synthetic PDF vector operators automatically resolve the matching measured profile');
     check(measured.manual.provenance === 'manual' && measured.manual.profileId === 'BUILTIN:GENERAL' && measured.visible,
         'Explicit mixed-page profile and edits outrank measured auto detection on rescan');
+}
+
+async function testAutoCoxDetection(browser) {
+    console.log('Generator: auto-scan selects measured cover, info, and schematic profiles');
+    await openFixture(browser);
+    const detected = await browser.evaluate(async () => {
+        const sheetKey = 'SCHEMATIC_PORTRAIT_TB01A';
+        const infoKey = 'INFO_TB01A';
+        const coverKey = 'COVER_TEMPLATE_COV01';
+        const linesFor = key => {
+            const fp = Generator.fingerprints[key].fingerprint;
+            const [x0, y0, x1, y1] = fp.title_block_bbox;
+            return {
+                H: fp.template_lines_rel.H.map(([y, a, b]) => [y0 + y * (y1 - y0), x0 + a * (x1 - x0), x0 + b * (x1 - x0)]),
+                V: fp.template_lines_rel.V.map(([x, a, b]) => [x0 + x * (x1 - x0), y0 + a * (y1 - y0), y0 + b * (y1 - y0)])
+            };
+        };
+        const cpid = Generator.measured[coverKey].find(zone => zone.map === 'cpid');
+        const { PDFDocument, StandardFonts, rgb } = PDFLib;
+        const pdf = await PDFDocument.create();
+        const font = await pdf.embedFont(StandardFonts.Courier);
+        const drawLines = (page, lines) => {
+            const w = page.getWidth(), h = page.getHeight();
+            for (const [y, a, b] of lines.H) page.drawLine({
+                start: { x: a * w, y: (1 - y) * h }, end: { x: b * w, y: (1 - y) * h }, thickness: 0.6, color: rgb(0, 0, 0) });
+            for (const [x, a, b] of lines.V) page.drawLine({
+                start: { x: x * w, y: (1 - a) * h }, end: { x: x * w, y: (1 - b) * h }, thickness: 0.6, color: rgb(0, 0, 0) });
+        };
+        const cover = pdf.addPage([612, 792]);
+        cover.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(1, 1, 1) });
+        const fontSize = 11;
+        cover.drawText('CP-8377', {
+            x: (cpid.x + cpid.w / 2) * 612 - 26,
+            y: 792 - (cpid.y * 792) - fontSize,
+            size: fontSize, font, color: rgb(0, 0, 0)
+        });
+        const info = pdf.addPage([612, 792]);
+        info.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(1, 1, 1) });
+        info.drawText('PANEL TYPE VOLTAGE SPECIFICATION', { x: 40, y: 740, size: 12, font });
+        for (const y of [0.04, 0.08, 0.12]) info.drawLine({
+            start: { x: 30, y: (1 - y) * 792 }, end: { x: 580, y: (1 - y) * 792 }, thickness: 0.6, color: rgb(0, 0, 0) });
+        drawLines(info, linesFor(infoKey));
+        const sheet = pdf.addPage([612, 792]);
+        sheet.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(1, 1, 1) });
+        sheet.drawText('WIRING SCHEMATIC', { x: 40, y: 740, size: 12, font });
+        drawLines(sheet, linesFor(sheetKey));
+        const spare = pdf.addPage([612, 792]);
+        spare.drawText('DOOR FRONT VIEW', { x: 40, y: 700, size: 12, font });
+        await __loadFixture((await pdf.save()).buffer, 'SYNTHETIC-COX-AUTO');
+        await __activate();
+        const pages = Generator.getState().pages;
+        const options = Array.from(__wrapper(2).querySelector('.page-profile-select').options).map(option => option.value);
+        const page1Select = __wrapper(1).querySelector('.page-profile-select');
+        return {
+            cover: pages[1], info: pages[2], sheet: pages[3],
+            measuredOption: options.includes('MEASURED:' + sheetKey),
+            optionCount: options.length,
+            measuredCount: options.filter(value => value.startsWith('MEASURED:')).length,
+            catalog: Object.keys(Generator.measured || {}).length,
+            page1Enabled: !page1Select.disabled,
+            page1Value: page1Select.value
+        };
+    });
+    check(detected.measuredOption, `Measured Cox profiles are selectable in the page dropdown (options ${detected.optionCount}, measured ${detected.measuredCount}, catalog ${detected.catalog})`);
+    check(detected.page1Enabled, 'Page 1 profile dropdown stays enabled');
+    check(detected.cover.status === 'resolved' && detected.cover.profileId === 'MEASURED:COVER_TEMPLATE_COV01' && detected.cover.contentSource === 'source',
+        `Page 1 auto-selects the measured cover and shows the source sheet (${detected.cover && detected.cover.profileId} / ${detected.cover && detected.cover.reason} / ${detected.cover && detected.cover.contentSource} / ${detected.page1Value})`);
+    check(detected.info.status === 'resolved' && detected.info.profileId === 'MEASURED:INFO_TB01A',
+        `Info title block auto-selects INFO_TB01A (${detected.info && detected.info.profileId} / ${detected.info && detected.info.reason})`);
+    check(detected.sheet.status === 'resolved' && detected.sheet.profileId === 'MEASURED:SCHEMATIC_PORTRAIT_TB01A',
+        `Schematic title block auto-selects TB01A (${detected.sheet && detected.sheet.profileId} / ${detected.sheet && detected.sheet.reason})`);
+}
+
+async function testZonePixelAlignment(browser) {
+    console.log('Generator: normalized zones cover the same rectangles in the viewer and the export');
+    await openFixture(browser);
+    const aligned = await browser.evaluate(async () => {
+        const { PDFDocument, rgb } = PDFLib;
+        const pdf = await PDFDocument.create();
+        const rects = [
+            { x: 0.05, y: 0.04, w: 0.12, h: 0.03 },
+            { x: 0.42, y: 0.48, w: 0.16, h: 0.04 },
+            { x: 0.81, y: 0.94, w: 0.16, h: 0.03 }
+        ];
+        for (let i = 0; i < 4; i++) {
+            const page = pdf.addPage([612, 792]);
+            page.drawRectangle({ x: 0, y: 0, width: 612, height: 792, color: rgb(0.75, 0.75, 0.75) });
+            if (i !== 1) continue;
+            for (const rect of rects) page.drawRectangle({
+                x: rect.x * 612, y: (1 - rect.y - rect.h) * 792,
+                width: rect.w * 612, height: rect.h * 792, color: rgb(0, 0, 0)
+            });
+        }
+        await __loadFixture((await pdf.save()).buffer, 'SYNTHETIC-ALIGN');
+        await __activate();
+        Generator.setPageZones(2, rects.map(rect => ({
+            map: 'custom', ...rect, text: '', type: 'blocker', fontSize: 8, transparent: false
+        })));
+        await __choose(3, 'GENERAL');
+        await __choose(4, 'GENERAL');
+        const container = __wrapper(2).querySelector('.pdf-content-container');
+        const dom = __boxes(2).map(box => ({
+            x: parseFloat(box.style.left) / container.offsetWidth,
+            y: parseFloat(box.style.top) / container.offsetHeight,
+            w: parseFloat(box.style.width) / container.offsetWidth,
+            h: parseFloat(box.style.height) / container.offsetHeight
+        }));
+        const bytes = await PdfExporter.generateRedactedPdf();
+        const pages = await __raster(bytes.buffer || bytes);
+        return {
+            dom, zones: rects,
+            samples: rects.map(rect => ({
+                inside: pages[1].pixel(rect.x + rect.w / 2, rect.y + rect.h / 2),
+                outside: pages[1].pixel(Math.min(0.98, rect.x + rect.w + 0.015), Math.min(0.98, rect.y + rect.h / 2))
+            }))
+        };
+    });
+    aligned.zones.forEach((zone, index) => {
+        const box = aligned.dom[index];
+        const inside = aligned.samples[index].inside, outside = aligned.samples[index].outside;
+        check(Math.abs(box.x - zone.x) < 0.012 && Math.abs(box.y - zone.y) < 0.012
+            && Math.abs(box.w - zone.w) < 0.012 && Math.abs(box.h - zone.h) < 0.012,
+            `Viewer zone ${index} stays on its normalized rectangle`);
+        check(inside[0] > 245 && inside[1] > 245 && inside[2] > 245, `Exported whiteout covers rectangle ${index} (${inside})`);
+        check(outside[0] < 230, `Exported whiteout stays inside rectangle ${index} (${outside})`);
+    });
 }
 
 async function gateExport(browser) {

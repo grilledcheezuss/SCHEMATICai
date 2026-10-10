@@ -14,7 +14,7 @@
 
 ## Overview
 
-SCHEMATICA ai v2.5.114 provides per-page profile assignment and visual masking/title-block replacement for electrical panel PDFs. It does **not** securely remove covered source content: text and images underneath an overlay can remain extractable. Do not use generated PDFs as an irreversible redaction tool.
+SCHEMATICA ai v2.5.115 provides per-page profile assignment and visual masking/title-block replacement for electrical panel PDFs. Auto-Scan selects measured Cox info, schematic, and cover profiles when the title block matches; otherwise page 1 stays on Cover Template. It does **not** securely remove covered source content: text and images underneath an overlay can remain extractable. Do not use generated PDFs as an irreversible redaction tool.
 
 The generator owns source bytes and binds edits and exact mapping imports to their content digest and load generation. Profiles and normalized zones are maintained separately from disposable viewer DOM. Original PDF actions remain original/unmodified; generated preview actions share the generated artifact. See [REDACTION_SCHEMA.md](REDACTION_SCHEMA.md) for the current mapping contract, measured-asset provenance, limits, and reset/migration behavior.
 
