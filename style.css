@@ -919,7 +919,7 @@ body.demo-mode .redaction-layer {
     min-height: 0;
 }
 
-.redaction-text { white-space: pre-line; }
+.redaction-text { white-space: pre-line; overflow: hidden; max-width: 100%; max-height: 100%; }
 
 .redaction-box[data-transparent="false"] { 
     background: white; 
@@ -928,6 +928,7 @@ body.demo-mode .redaction-layer {
 
 /* CRITICAL: Editor mode - always show outlines and make interactive */
 body.editor-active .redaction-box { 
+    overflow: visible; /* resize handle sits outside the text-tight box; text is clipped by .redaction-text */
     pointer-events: auto !important; 
     cursor: grab !important; 
     border: 2px solid #9333ea !important; /* Purple border - always visible */

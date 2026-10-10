@@ -1,7 +1,7 @@
 // Per-panel page maps for the Submittal Generator.
 // Lookup is by Panel ID. Zones keep the measured fontFamily and fontSize.
-// Geometry stays text-tight; a 2px inset is applied only when a resize handle
-// would otherwise cover the glyphs on a box large enough to spare it.
+// Geometry stays text-tight and is placed exactly as measured; the resize
+// handle is drawn outside the box in editor mode.
 (function (root, factory) {
     const api = factory();
     if (typeof module === 'object' && module.exports) module.exports = api;
@@ -72,19 +72,12 @@
         return CONTENT_MAPS.has(map) ? map : 'custom';
     }
 
-    // Text-tight box from the map. Inset the handle corner only when both sides
-    // are more than three handle-widths, so a 12px grip does not cover the glyphs.
-    // Smaller boxes stay exact; the handle is drawn just outside them.
+    // Text-tight box from the map, used exactly as measured. The old 2px trim came off
+    // the right and bottom only, which pulled every larger box up and left of its text.
+    // The resize handle now sits outside the box (style.css lets editor boxes overflow),
+    // so no trim is needed. Zones marked exact:true (baked or saved) are never adjusted.
     function overlayBox(zone, metrics) {
-        const box = { x: zone.x, y: zone.y, w: zone.w, h: zone.h };
-        if (!metrics || !(metrics.width > 0) || !(metrics.height > 0)) return box;
-        const wPx = box.w * metrics.width;
-        const hPx = box.h * metrics.height;
-        if (!(wPx > HANDLE_PX * 3 && hPx > HANDLE_PX * 3)) return box;
-        const nextW = box.w - (2 / metrics.width);
-        const nextH = box.h - (2 / metrics.height);
-        if (!(nextW > 0) || !(nextH > 0)) return box;
-        return { x: box.x, y: box.y, w: nextW, h: nextH };
+        return { x: zone.x, y: zone.y, w: zone.w, h: zone.h };
     }
 
     function clampBox(box) {
@@ -101,7 +94,7 @@
 
     function presentZone(zone, metrics, adjusted) {
         const map = adjusted && CONTENT_MAPS.has(zone.map) ? zone.map : alignMap(zone);
-        const geom = clampBox(adjusted ? zone : overlayBox(zone, metrics));
+        const geom = clampBox(adjusted || zone.exact === true ? zone : overlayBox(zone, metrics));
         if (!geom) return null;
         const fontFamily = typeof zone.fontFamily === 'string' && zone.fontFamily
             ? zone.fontFamily

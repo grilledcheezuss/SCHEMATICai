@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai release v2.5.117 — Worker implementation v2.5.113 (unchanged)
+// 🧠 SCHEMATICA ai release v2.5.118 — Worker implementation v2.5.113 (unchanged)
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
