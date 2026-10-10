@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="app-version" content="v2.5.118">
-    <title>Cox Research | SCHEMATICA ai (v2.5.118)</title>
+    <meta name="app-version" content="v2.5.119">
+    <meta name="submittal-blank-base" content="">
+    <title>Cox Research | SCHEMATICA ai (v2.5.119)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -34,7 +35,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="style.css?v=2.5.118">
+    <link rel="stylesheet" href="style.css?v=2.5.119">
 </head>
 <body>
 
@@ -119,7 +120,7 @@
             <div class="menu-version" id="menu-version">VERSION</div>
             <div class="menu-section" id="admin-tools-section">
                 <button id="menu-demo" class="menu-item" onclick="DemoManager.toggleGenerator(); UI.toggleMenu()">
-                    <span class="menu-icon">📄</span> Submittal Generator <span id="gen-status" style="margin-left:auto; display:none;">●</span>
+                    <span class="menu-icon"></span> Submittal Generator <span id="gen-status" style="margin-left:auto; display:none;">●</span>
                 </button>
             </div>
             <div class="menu-section">
@@ -193,44 +194,7 @@
             </div>
         </div>
 
-        <div id="left-generator-context" style="display:none;">
-            <div id="demo-context-panel">
-                <div class="context-header" style="background:var(--glass-bg); border:1px solid var(--glass-border); padding:8px; margin-bottom:10px; border-radius:4px; cursor:pointer;" onclick="DemoManager.toggleContext()">
-                    <span style="font-size:11px; font-weight:600; color:var(--glass-text);">📄 CUSTOM PDF INFO</span>
-                    <button id="context-preview-btn" onclick="PdfExporter.preview()">Preview</button>
-                    <span id="context-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
-                </div>
-
-                <div id="demo-context-content">
-                    <div class="input-wrapper" data-field="cust"><span class="demo-label">Company Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Company..." oninput="RedactionManager.refreshContent()"></div>
-                    <div class="input-wrapper" data-field="job"><span class="demo-label">Job Name</span><input type="text" id="demo-job-name" class="demo-input" placeholder="Enter Job Name..." oninput="RedactionManager.refreshContent()"></div>
-                    <div class="input-wrapper" data-field="type"><span class="demo-label">System Type</span><input type="text" id="demo-system-type" class="demo-input" placeholder="e.g. Duplex Pump..." oninput="RedactionManager.refreshContent()"></div>
-                    <div class="input-wrapper" data-field="cpid"><span class="demo-label">Panel ID</span><input type="text" id="demo-panel-id" class="demo-input" placeholder="CP-####" oninput="RedactionManager.refreshContent()"></div>
-                    
-                    <div class="date-stage-row" style="display:flex; gap:5px;">
-                        <div class="input-wrapper" data-field="date" style="flex:1;"><span class="demo-label">Date</span><input type="date" id="demo-date" class="demo-input" oninput="RedactionManager.refreshContent()"></div>
-                        <div class="input-wrapper" data-field="stage" style="flex:1;">
-                            <span class="demo-label">Stage</span>
-                            <select id="demo-stage" class="demo-input" onchange="RedactionManager.refreshContent()">
-                                <option selected>SUBMITTAL</option>
-                                <option>DESIGN</option>
-                                <option>AS-BUILT</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="input-wrapper" data-field="po"><span class="demo-label">PO Number</span><input type="text" id="demo-po" class="demo-input" placeholder="PO-####" oninput="RedactionManager.refreshContent()"></div>
-                    <div class="input-wrapper" data-field="serial"><span class="demo-label">Serial Number</span><input type="text" id="demo-serial" class="demo-input" placeholder="Serial #..." oninput="RedactionManager.refreshContent()"></div>
-                    <div class="input-wrapper" data-field="company"><span class="demo-label">Company Name</span><input type="text" id="demo-company" class="demo-input" placeholder="Your Company..." oninput="RedactionManager.refreshContent()"></div>
-                    <div class="input-wrapper" data-field="address"><span class="demo-label">Company Address</span><input type="text" id="demo-address" class="demo-input" placeholder="123 Main St..." oninput="RedactionManager.refreshContent()"></div>
-                    
-                    <div style="display:flex; gap:5px;">
-                        <div class="input-wrapper" data-field="phone" style="flex:1;"><span class="demo-label">Phone</span><input type="text" id="demo-phone" class="demo-input" placeholder="(123) 456-7890" oninput="RedactionManager.refreshContent()"></div>
-                        <div class="input-wrapper" data-field="fax" style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(123) 456-7891" oninput="RedactionManager.refreshContent()"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <div id="left-generator-context" style="display:none;"></div>
         
         <div id="pagination-footer">
             <button id="page-prev" class="page-btn" onclick="SearchEngine.prevPage()">‹ Prev</button>
@@ -293,48 +257,39 @@
         </div>
         
         <div id="redaction-editor-content">
-                <!-- Page Selection -->
-                <div style="padding:8px; border-bottom:1px solid var(--border-color); margin-bottom:10px;">
-                    <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">📄 Page Selection</div>
-                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-                        <label style="font-size:10px; color:var(--text-secondary);">Editing Page:</label>
-                        <select id="page-selector" onchange="PageContext.setActivePage(parseInt(this.value))" style="font-size:10px; padding:4px 6px; border-radius:3px; border:1px solid var(--border-color); background:var(--bg-controls); color:var(--text-primary); flex:1;">
-                            <option value="1">Page 1</option>
-                        </select>
+                <div id="customer-info-box" style="padding:8px; border-bottom:1px solid var(--border-color); margin-bottom:10px;">
+                    <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">Customer info</div>
+                    <div class="input-wrapper" data-field="cust"><span class="demo-label">Company Name</span><input type="text" id="demo-cust-name" class="demo-input" placeholder="Enter Company..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="job"><span class="demo-label">Job Name</span><input type="text" id="demo-job-name" class="demo-input" placeholder="Enter Job Name..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="type"><span class="demo-label">System Type</span><input type="text" id="demo-system-type" class="demo-input" placeholder="e.g. Duplex Pump..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="cpid"><span class="demo-label">Panel ID</span><input type="text" id="demo-panel-id" class="demo-input" placeholder="CP-####" oninput="RedactionManager.refreshContent()"></div>
+                    <div class="date-stage-row" style="display:flex; gap:5px;">
+                        <div class="input-wrapper" data-field="date" style="flex:1;"><span class="demo-label">Date</span><input type="date" id="demo-date" class="demo-input" oninput="RedactionManager.refreshContent()"></div>
+                        <div class="input-wrapper" data-field="stage" style="flex:1;">
+                            <span class="demo-label">Stage</span>
+                            <select id="demo-stage" class="demo-input" onchange="RedactionManager.refreshContent()">
+                                <option selected>SUBMITTAL</option>
+                                <option>DESIGN</option>
+                                <option>AS-BUILT</option>
+                            </select>
+                        </div>
                     </div>
-                    <div style="font-size:9px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
-                        <span>Document profile:</span>
-                        <span class="profile-badge" id="active-profile-badge" style="font-size:9px; background:var(--app-primary); color:white; padding:3px 8px; border-radius:3px; flex:1; text-align:center;">Panel profile</span>
-                    </div>
-                    <p id="panel-profile-status" style="font-size:9px; color:var(--text-secondary); margin:6px 0 0;">Each panel has a predefined page map. Choose a page of this PDF to edit its boxes.</p>
-                </div>
-                
-                <div style="padding:0 8px; margin-bottom:15px;">
-                    <button id="save-panel-profile" class="search-btn" type="button" style="width:100%; font-size:10px; padding:8px;" onclick="PanelProfiles.saveActivePage()">Save adjustments</button>
-                </div>
-                
-                <!-- Profile Management -->
-                <div class="editor-section" style="border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:10px;">
-                    <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">💾 Profile Management</div>
-                    <div style="display:flex; gap:5px; margin-bottom:5px;">
-                        <input type="text" id="new-profile-name" class="demo-input" placeholder="New Profile Name..." style="flex:1;">
-                        <button class="search-btn" style="width:auto; padding:0 10px;" onclick="ProfileManager.saveCurrentPageAsProfile()">💾</button>
-                    </div>
-                    <div style="margin-bottom:8px;">
-                        <button class="search-btn" style="background:#8b5cf6 !important; width:100%; font-size:10px; padding:6px;" onclick="ProfileUploader.openUploadDialog()">📤 Upload Layout for New Profile</button>
-                    </div>
-                    <div>
-                        <button class="search-btn" style="background:#475569 !important; width:100%; font-size:10px; padding:6px;" onclick="ConfigExporter.export()">📋 Export Config</button>
+                    <div class="input-wrapper" data-field="po"><span class="demo-label">PO Number</span><input type="text" id="demo-po" class="demo-input" placeholder="PO-####" oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="serial"><span class="demo-label">Serial Number</span><input type="text" id="demo-serial" class="demo-input" placeholder="Serial #..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="company"><span class="demo-label">Company Name</span><input type="text" id="demo-company" class="demo-input" placeholder="Your Company..." oninput="RedactionManager.refreshContent()"></div>
+                    <div class="input-wrapper" data-field="address"><span class="demo-label">Company Address</span><input type="text" id="demo-address" class="demo-input" placeholder="Street or P.O. Box..." oninput="RedactionManager.refreshContent()"></div>
+                    <div style="display:flex; gap:5px;">
+                        <div class="input-wrapper" data-field="phone" style="flex:1;"><span class="demo-label">Phone</span><input type="text" id="demo-phone" class="demo-input" placeholder="(225) 756-3271" oninput="RedactionManager.refreshContent()"></div>
+                        <div class="input-wrapper" data-field="fax" style="flex:1;"><span class="demo-label">Fax</span><input type="text" id="demo-fax" class="demo-input" placeholder="(225) 755-1030" oninput="RedactionManager.refreshContent()"></div>
                     </div>
                 </div>
-                
-                <!-- Zone Styling (collapsible, collapsed by default) -->
-                <div id="zone-styling-panel" class="collapsed-state" style="padding:10px; margin-bottom:15px; background:var(--demo-bg); border:2px dashed var(--demo-border); border-radius:8px;">
+
+                <div id="zone-styling-panel" style="padding:10px; margin-bottom:15px; background:var(--demo-bg); border:2px dashed var(--demo-border); border-radius:8px;">
                     <div class="zone-styling-header" onclick="DemoManager.toggleZoneStyling()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; background:var(--glass-bg); border:1px solid var(--glass-border); padding:8px; margin-bottom:0; border-radius:4px;">
-                        <span style="font-size:11px; font-weight:600; color:var(--glass-text);">🎨 ZONE STYLING</span>
+                        <span style="font-size:11px; font-weight:600; color:var(--glass-text);">Zone styling</span>
                         <span id="zone-styling-toggle-icon" style="font-size:20px; color:var(--glass-text); line-height:1; padding:0 4px;">&#9662;</span>
                     </div>
-                    <div id="zone-styling-content" style="display:none; margin-top:8px;">
+                    <div id="zone-styling-content" style="display:block; margin-top:8px;">
                     
                     <div class="editor-section">
                         <span class="editor-label">CAD FONT STYLE</span>
@@ -368,27 +323,15 @@
                     </div>
                 </div>
 
+                <div class="editor-section" style="border-bottom:1px solid var(--border-color); padding-bottom:10px; margin:0 8px 10px;">
+                    <div style="font-size:11px; font-weight:600; color:var(--text-primary); margin-bottom:8px;">Profile Management</div>
+                    <button id="save-panel-profile" class="search-btn" type="button" style="width:100%; font-size:10px; padding:8px;" onclick="PanelProfiles.saveActivePage()">Save adjustments</button>
+                    <p id="panel-profile-status" style="font-size:9px; color:var(--text-secondary); margin:6px 0 0;">Save writes this page's boxes over the panel page map on this browser.</p>
+                    <input type="text" id="new-profile-name" class="demo-input submittal-legacy-field" placeholder="New Profile Name..." aria-hidden="true" tabindex="-1">
+                </div>
+
                 <div id="editor-controls" class="disabled-overlay">
                     <div class="editor-section">
-                        <span class="editor-label">Mapped Data</span>
-                        <select id="zone-map-select" class="cox-input" onchange="RedactionManager.mapSelectedZone()">
-                            <option value="cust">Company Name</option>
-                            <option value="job">Job Name</option>
-                            <option value="job_block">Job + System Type Block (multiline)</option>
-                            <option value="type">System Type</option>
-                            <option value="cpid">Panel ID (CP-####)</option>
-                            <option value="date">Date</option>
-                            <option value="stage">Design Stage</option>
-                            <option value="po">PO Number</option>
-                            <option value="serial">Serial Number</option>
-                            <option value="company">Company Name</option>
-                            <option value="address">Company Address</option>
-                            <option value="phone">Phone Number</option>
-                            <option value="fax">Fax Number</option>
-                            <option value="custom">Custom Text...</option>
-                            <option value="logo">Branding/Logo (Block)</option>
-                        </select>
-                        
                         <div id="custom-text-wrapper" style="display:none; margin-top:5px;">
                             <textarea id="custom-zone-text" class="demo-input" placeholder="Type text here (use Enter for new lines)..." rows="3" style="resize:vertical; width:100%;" oninput="RedactionManager.updateCustomText(this.value)"></textarea>
                         </div>
@@ -411,12 +354,12 @@
     <div id="pdf-preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; flex-direction:column;">
         <div id="pdf-preview-header" style="display:flex; align-items:center; justify-content:space-between; background:var(--lsu-purple); padding:0 12px; height:42px; flex-shrink:0; position:relative;">
             <div style="position:relative; z-index:2; min-width:90px;">
-                <button class="search-btn" style="background:rgba(255,255,255,0.15) !important; border:1px solid rgba(255,255,255,0.3); font-size:11px; padding:5px 10px; white-space:nowrap;" onclick="PdfExporter.openPrintExportMenu()">🖨️ Export ▾</button>
+                <button class="search-btn" style="background:rgba(255,255,255,0.15) !important; border:1px solid rgba(255,255,255,0.3); font-size:11px; padding:5px 10px; white-space:nowrap;" onclick="PdfExporter.openPrintExportMenu()">Export</button>
                 <div id="print-export-menu" style="display:none; position:absolute; top:calc(100% + 6px); left:0; background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.3); min-width:220px; z-index:100; overflow:hidden;">
-                    <button class="menu-item" onclick="PdfExporter.printRedacted()"><span class="menu-icon">🖨️</span> Print Generated PDF (visual masking)</button>
-                    <button class="menu-item" onclick="PdfExporter.downloadRedacted()"><span class="menu-icon">💾</span> Download Generated PDF (visual masking)</button>
-                    <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon">📧</span> Email (coming soon)</button>
-                    <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon">💬</span> Text (coming soon)</button>
+                    <button class="menu-item" onclick="PdfExporter.printRedacted()"><span class="menu-icon"></span> Print Generated PDF (visual masking)</button>
+                    <button class="menu-item" onclick="PdfExporter.downloadRedacted()"><span class="menu-icon"></span> Download Generated PDF (visual masking)</button>
+                    <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon"></span> Email (coming soon)</button>
+                    <button class="menu-item" style="opacity:0.4; cursor:not-allowed !important;" disabled><span class="menu-icon"></span> Text (coming soon)</button>
                 </div>
             </div>
             <span style="position:absolute; left:0; right:0; text-align:center; color:white; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:1px; pointer-events:none;">Custom PDF Preview</span>
@@ -425,15 +368,16 @@
         <div id="pdf-preview-container" style="flex:1; background:#fff; overflow:auto;"></div>
     </div>
 
-    <button id="generator-restore-btn" onclick="DemoManager.restorePanel()" title="Open Control Panel">⚙️</button>
+    <button id="generator-restore-btn" onclick="DemoManager.restorePanel()" title="Open Control Panel">Edit</button>
 
-<script src="release-update.js?v=2.5.118"></script>
-<script src="pdf-render-helper.js?v=2.5.118"></script>
-<script src="pdf-ui-state.js?v=2.5.118"></script>
-<script src="info-table-parser.js?v=2.5.118"></script>
-<script src="generator-state.js?v=2.5.118"></script>
-<script src="measured-layouts.js?v=2.5.118"></script>
-<script src="panel-profiles.js?v=2.5.118"></script>
-<script src="app.js?v=2.5.118"></script>
+<script src="release-update.js?v=2.5.119"></script>
+<script src="pdf-render-helper.js?v=2.5.119"></script>
+<script src="pdf-ui-state.js?v=2.5.119"></script>
+<script src="info-table-parser.js?v=2.5.119"></script>
+<script src="generator-state.js?v=2.5.119"></script>
+<script src="measured-layouts.js?v=2.5.119"></script>
+<script src="submittal-format.js?v=2.5.119"></script>
+<script src="panel-profiles.js?v=2.5.119"></script>
+<script src="app.js?v=2.5.119"></script>
 </body>
 </html>

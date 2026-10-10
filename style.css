@@ -835,6 +835,8 @@ body.generator-transition #pdf-main-view { opacity: 0.6; }
     flex-shrink: 0;
 }
 body.demo-mode .page-toolbar { display: flex; }
+body.demo-mode .page-toolbar,
+body.demo-mode .generator-resolution { display: none !important; }
 
 .rescan-page-btn {
     background: transparent;
@@ -949,6 +951,41 @@ body.editor-active .redaction-box.selected {
     background: rgba(236, 72, 153, 0.2) !important;
     box-shadow: 0 0 10px rgba(236, 72, 153, 0.5) !important;
     z-index: 100 !important; 
+}
+
+/* Submittal overlays always white out the source ink under the edit box. */
+body.demo-mode .redaction-box { background: #fff !important; }
+body.demo-mode .redaction-box[data-baked="1"] { display: none !important; }
+body.demo-mode .redaction-box.redaction-logo {
+    background: #0a0a12 url('assets/cox-research-logo.svg') center / contain no-repeat !important;
+}
+.zone-field-tag { display: none; }
+body.editor-active .zone-field-tag {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    padding: 0 2px;
+    background: #fff;
+    color: #334155;
+    font-family: Inter, sans-serif;
+    font-size: 8px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0;
+    pointer-events: none;
+}
+.submittal-legacy-field {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    border: 0 !important;
+    white-space: nowrap !important;
 }
 
 .redaction-resize-handle { display: none; } 
@@ -1534,6 +1571,10 @@ input[type="date"].demo-input { text-align: left; }
         min-width: 0;
         border: none;
         overflow: hidden;
+    }
+    #generator-panel.gen-collapsed #customer-info-box,
+    #generator-panel.minimized #customer-info-box {
+        display: none !important;
     }
     /* Restore btn not used on tablet */
     #generator-restore-btn { display: none !important; }

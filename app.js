@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.118 ---
-const APP_VERSION = "v2.5.118";
+// --- SCHEMATICA ai v2.5.119 ---
+const APP_VERSION = "v2.5.119";
 const VERSION_HISTORY = {
+    "v2.5.119": "Submittal Generator uses a blank panel PDF as the base when one is available (Cox logo, Cox address, and PROJECT SUBMITTAL already printed), and falls back to the mapped customer PDF when the blank is missing. Live overlays are job name, system type, and date; serial is whited out with no replacement text. Cover lines are centered serif, stage defaults to Submittal, and the info-page address is the P.O. Box block. The Submittal tab leads with customer info, then zone styling, and keeps Profile Management plus Save adjustments. 604 hide-list panels stay hidden while Submittal is on. Optional Worker BLANK_PDF proxy; existing routes and SPEC_TRANSFORM_VERSION stay v2.5.113.",
     "v2.5.118": "Submittal Generator panel page map rebuilt (5858 mapped panels, CP-3000 through CP-8378) with finer per-page placement, glyph-ink growth and page snapping, so whiteouts sit on the plotted text instead of drifting up or left; cover PROJECT SUBMITTAL / AS-BUILT headings map as the stage field. Mapped zones are now placed exactly as measured (the old 2px right/bottom trim is gone) and the editor resize handle sits outside the box. 57 Panel IDs stay unmapped and are hidden while Submittal is on. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.117": "Submittal Generator looks up each Panel ID in the measured page map (5865 panels, CP-3000 through CP-8378) and places that panel's text-tight zones, keeping every zone's fontFamily and fontSize. The catalog loads from PDFmapping at runtime. Mapped panels do not use Auto-Detect. Resize the boxes and save to overwrite that panel's profile. A 2px inset is applied only when a resize handle would cover the text. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.116": "Submittal Generator whiteouts sit about 2px inside the ruled cell for each field on cover, info, and schematic profiles. Address, phone, and fax each keep their own slice of a shared contact cell instead of one tall box. Auto-Scan joins fragmented title-block rules so info and schematic pages can match a measured profile. Cover Template Panel ID is back on the template drawing-number row. Frontend only — Worker executable remains v2.5.113.",
@@ -367,11 +368,11 @@ const LAYOUT_RULES = {
         { map: "logo", x: 0.3, y: 0.1, w: 0.4, h: 0.2, fontSize: 14, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' }
     ],
     COVER_TEMPLATE: [
-        { map: "cust", x: 0.15, y: 0.40, w: 0.7, h: 0.06, fontSize: 24, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', serif", textAlign: 'center' },
-        { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+        { map: "cust", x: 0.15, y: 0.40, w: 0.7, h: 0.06, fontSize: 24, transparent: false, fontWeight: 'bold', fontFamily: "'Times New Roman', Times, serif", textAlign: 'center' },
+        { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Times New Roman', Times, serif", textAlign: 'center' },
+        { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Times New Roman', Times, serif", textAlign: 'center' },
+        { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Times New Roman', Times, serif", textAlign: 'center' },
+        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Times New Roman', Times, serif", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -1811,13 +1812,19 @@ class DemoManager {
             if(indicator) indicator.style.display = 'inline-block';
             if(btn) btn.style.color = 'var(--app-primary)';
             if(!document.getElementById('demo-date').value) document.getElementById('demo-date').valueAsDate = new Date(); 
-            if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
+            if (PdfViewer.doc && typeof PdfViewer.adoptGeneratorBase === 'function') {
+                Promise.resolve(PdfViewer.adoptGeneratorBase()).catch(() => document.body.classList.remove('generator-transition'));
+            } else if (PdfViewer.doc) PdfViewer.renderStack();
+            else document.body.classList.remove('generator-transition');
         } else { 
             // Hides panel, rail, restore button and left-sidebar context block
             this.syncLayoutForViewport();
             if(indicator) indicator.style.display = 'none';
             if(btn) btn.style.color = ''; 
-            if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
+            if (PdfViewer.doc && typeof PdfViewer.adoptGeneratorBase === 'function') {
+                Promise.resolve(PdfViewer.adoptGeneratorBase()).catch(() => document.body.classList.remove('generator-transition'));
+            } else if (PdfViewer.doc) PdfViewer.renderStack();
+            else document.body.classList.remove('generator-transition');
         }
         if (typeof SearchEngine !== 'undefined' && SearchEngine.currentResults && SearchEngine.currentResults.length) {
             SearchEngine.renderCurrentPage();
@@ -1892,7 +1899,8 @@ class DemoManager {
             return;
         }
 
-        if (leftCtx) leftCtx.style.display = 'block';
+        // Customer fields live in the control panel. The old left rail stays mounted for layout CSS.
+        if (leftCtx) leftCtx.style.display = 'none';
         if (UI.isTablet()) {
             // Docked 3-column layout: rail toggles the sidebar, floating restore button unused
             if (rail) rail.style.display = 'flex';
@@ -1922,6 +1930,7 @@ class DemoManager {
     static toggleContext() {
         const panel = document.getElementById('demo-context-panel');
         const content = document.getElementById('demo-context-content');
+        if (!panel || !content) return;
         
         if (content.classList.contains('collapsed')) {
             content.classList.remove('collapsed');
@@ -1951,13 +1960,13 @@ class DemoManager {
             type: document.getElementById('demo-system-type').value || "SYSTEM TYPE", 
             cpid: document.getElementById('demo-panel-id').value || "CP-####", 
             date: document.getElementById('demo-date').value || "YYYY-MM-DD", 
-            stage: document.getElementById('demo-stage').value || "STAGE",
+            stage: document.getElementById('demo-stage').value || "SUBMITTAL",
             po: document.getElementById('demo-po')?.value || "PO-####",
-            serial: document.getElementById('demo-serial')?.value || "SERIAL-####",
-            company: document.getElementById('demo-company')?.value || "YOUR COMPANY",
-            address: document.getElementById('demo-address')?.value || "123 MAIN STREET",
-            phone: document.getElementById('demo-phone')?.value || "(555) 123-4567",
-            fax: document.getElementById('demo-fax')?.value || "(555) 123-4568"
+            serial: document.getElementById('demo-serial')?.value || "",
+            company: document.getElementById('demo-company')?.value || "",
+            address: document.getElementById('demo-address')?.value || "",
+            phone: document.getElementById('demo-phone')?.value || "",
+            fax: document.getElementById('demo-fax')?.value || ""
         };
     }
 }
@@ -2363,22 +2372,16 @@ class RedactionManager {
         const explicitFont = typeof fontFamily === 'string' && fontFamily.length > 0;
         let styleFont = explicitFont ? fontFamily : null;
         if (!styleFont) {
-             const pageNum = parseInt(wrapper.dataset.pageNumber, 10);
-             const isCoverCust = (mapKey === 'cust' && pageNum === 1);
-             styleFont = isCoverCust ? "'Times New Roman', serif" : "'Courier New', monospace";
-        }
-        // Built-in cover template: only the customer zone uses Times. A panel-map
-        // zone that already names its fontFamily keeps that family and size.
-        const panelFont = wrapper.dataset.panelMap === '1' && explicitFont;
-        const _pageNum = parseInt(wrapper.dataset.pageNumber, 10);
-        if (!panelFont && _pageNum === 1 && mapKey !== 'cust' && styleFont && styleFont.toLowerCase().includes('times')) {
-            styleFont = "'Courier New', monospace";
+            const pageNum = parseInt(wrapper.dataset.pageNumber, 10);
+            const coverSerif = pageNum === 1 && ['cust', 'job', 'job_block', 'type', 'stage', 'date', 'address', 'company', 'phone', 'fax'].includes(mapKey);
+            styleFont = coverSerif ? "'Times New Roman', Times, serif" : "'Courier New', monospace";
         }
         
         box.style.fontFamily = styleFont;
         box.style.fontSize = fontSize + 'px'; 
         box.style.fontWeight = fontWeight;
         box.style.textAlign = textAlign; 
+        if (mapKey === 'logo') box.classList.add('redaction-logo');
         
         if (rotation) {
             box.dataset.rotation = rotation;
@@ -2392,6 +2395,10 @@ class RedactionManager {
         textSpan.style.fontSize = 'inherit';
         textSpan.style.fontWeight = fontWeight;
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
+        const tag = document.createElement('span');
+        tag.className = 'zone-field-tag';
+        tag.textContent = (typeof SubmittalFormat !== 'undefined' ? SubmittalFormat.labelFor(mapKey, null) : (mapKey || 'Zone'));
+        box.appendChild(tag);
         handle.onmousedown = (e) => this.startResize(e, box);
         box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box);
         
@@ -2483,34 +2490,51 @@ class RedactionManager {
         if(this.activeBox) this.activeBox.classList.remove('selected'); 
         this.activeBox = box; 
         box.classList.add('selected'); 
-        document.getElementById('editor-controls').classList.remove('disabled-overlay'); 
+        const controls = document.getElementById('editor-controls');
+        if (controls) controls.classList.remove('disabled-overlay');
+        const pageNum = Number(box.closest('.pdf-page-wrapper')?.dataset.pageNumber);
+        if (pageNum && typeof PageContext !== 'undefined') PageContext.setActivePage(pageNum);
         
-        document.getElementById('zone-map-select').value = box.dataset.map; 
+        const mapSelect = document.getElementById('zone-map-select');
+        if (mapSelect && Array.from(mapSelect.options).some(option => option.value === box.dataset.map)) mapSelect.value = box.dataset.map;
         
         const customInputWrapper = document.getElementById('custom-text-wrapper');
         const customInput = document.getElementById('custom-zone-text');
         
-        if (box.dataset.map === 'custom') {
-            customInputWrapper.style.display = 'block';
-            customInput.value = box.dataset.customText || '';
-        } else {
-            customInputWrapper.style.display = 'none';
+        if (customInputWrapper) {
+            if (box.dataset.map === 'custom') {
+                customInputWrapper.style.display = 'block';
+                if (customInput) customInput.value = box.dataset.customText || '';
+            } else {
+                customInputWrapper.style.display = 'none';
+            }
         }
 
         const fs = parseInt(box.style.fontSize) || 14;
-        document.getElementById('redact-size').value = fs; 
-        document.getElementById('font-size-val').innerText = fs; 
+        const sizeInput = document.getElementById('redact-size');
+        const sizeLabel = document.getElementById('font-size-val');
+        if (sizeInput) sizeInput.value = fs;
+        if (sizeLabel) sizeLabel.innerText = fs;
         
-        const ff = box.style.fontFamily.replace(/"/g, "'");
+        const ff = (box.style.fontFamily || '').replace(/"/g, "'");
         const fontSelect = document.getElementById('redact-font');
-        if (/arial|helvetica|verdana/i.test(ff)) fontSelect.value = "Arial, Helvetica, sans-serif";
-        else if (/times/i.test(ff)) fontSelect.value = "'Times New Roman', serif";
-        else if (/courier/i.test(ff)) fontSelect.value = "'Courier New', monospace";
+        if (fontSelect) {
+            if (/arial|helvetica|verdana/i.test(ff)) fontSelect.value = "Arial, Helvetica, sans-serif";
+            else if (/times/i.test(ff)) fontSelect.value = "'Times New Roman', serif";
+            else if (/courier/i.test(ff)) fontSelect.value = "'Courier New', monospace";
+        }
 
-        document.getElementById('zone-bg-toggle').checked = (box.dataset.transparent === "false");
+        const bgToggle = document.getElementById('zone-bg-toggle');
+        if (bgToggle) bgToggle.checked = (box.dataset.transparent === "false");
     }
 
-    static deselect() { if(this.activeBox) this.activeBox.classList.remove('selected'); this.activeBox = null; document.getElementById('editor-controls').classList.add('disabled-overlay'); document.getElementById('custom-text-wrapper').style.display = 'none'; }
+    static deselect() {
+        if(this.activeBox) this.activeBox.classList.remove('selected');
+        this.activeBox = null;
+        document.getElementById('editor-controls')?.classList.add('disabled-overlay');
+        const custom = document.getElementById('custom-text-wrapper');
+        if (custom) custom.style.display = 'none';
+    }
     
     static updateActiveStyle() { 
         const fs = document.getElementById('redact-size').value;
@@ -2533,7 +2557,9 @@ class RedactionManager {
 
     static mapSelectedZone() { 
         if(!this.activeBox) return; 
-        const val = document.getElementById('zone-map-select').value;
+        const mapSelect = document.getElementById('zone-map-select');
+        if (!mapSelect) return;
+        const val = mapSelect.value;
         this.activeBox.dataset.map = val;
         
         if (val === 'custom') {
@@ -2572,11 +2598,19 @@ class RedactionManager {
         }
 
         const boxes = wrapper ? wrapper.querySelectorAll('.redaction-box') : this.zones;
+        const pageClass = wrapper?.dataset.pageClass || (Number(wrapper?.dataset.pageNumber) === 1 ? 'COVER' : 'SHEET');
         boxes.forEach(box => { 
             const map = box.dataset.map; 
             let text = ""; 
+            const formatted = (typeof SubmittalFormat !== 'undefined')
+                ? SubmittalFormat.overlayText({ map, field: box.dataset.field || '' }, ctx, pageClass)
+                : null;
             
-            if(box.dataset.customText !== undefined) {
+            if (map === 'serial' || map === 'logo' || box.dataset.baked === '1') {
+                text = '';
+            } else if (formatted !== null) {
+                text = formatted;
+            } else if(box.dataset.customText !== undefined) {
                 text = box.dataset.customText;
             } else if(map === 'cust') {
                 text = ctx.cust;
@@ -2606,11 +2640,11 @@ class RedactionManager {
             } else if(map === 'date') {
                 text = displayDate;
             } else if(map === 'stage') {
-                text = ctx.stage;
+                text = formatted !== null ? formatted : (ctx.stage || 'SUBMITTAL');
             } else if(map === 'po') {
                 text = ctx.po;
             } else if(map === 'serial') {
-                text = ctx.serial;
+                text = '';
             } else if(map === 'company') {
                 text = ctx.company;
             } else if(map === 'address') {
@@ -3427,10 +3461,7 @@ class LayoutScanner {
         const selects = document.querySelectorAll('.page-profile-select');
         console.log(`[refreshProfileOptions] Found ${selects.length} profile dropdowns`);
         
-        if (selects.length === 0) {
-            console.warn('[refreshProfileOptions] No .page-profile-select elements found in DOM');
-            return;
-        }
+        if (selects.length === 0) return;
         
         const customProfiles = ProfileManager.getCustomProfiles();
         
@@ -3445,9 +3476,9 @@ class LayoutScanner {
             }
             select.appendChild(builtins);
             if (Object.keys(customProfiles).length > 0) {
-                const group = document.createElement('optgroup'); group.label = '⭐ Custom Profiles';
+                const group = document.createElement('optgroup'); group.label = 'Custom Profiles';
                 for (const name of Object.keys(customProfiles)) {
-                    const option = document.createElement('option'); option.value = `CUSTOM:${name}`; option.textContent = `⭐ ${name}`; group.appendChild(option);
+                    const option = document.createElement('option'); option.value = `CUSTOM:${name}`; option.textContent = name; group.appendChild(option);
                 }
                 select.appendChild(group);
             }
@@ -3519,9 +3550,19 @@ class LayoutScanner {
         // Scale LAYOUT_RULES font sizes (defined at scale=1.0) proportionally to current zoom
         const scale = wrapper._generatorGeometry ? height / wrapper._generatorGeometry.height :
             ((typeof PdfViewer !== 'undefined' && PdfViewer.currentScale > 0) ? PdfViewer.currentScale : 1);
+        const pageClass = wrapper.dataset.pageClass || (Number(wrapper.dataset.pageNumber) === 1 ? 'COVER' : 'SHEET');
+        const usingBlank = wrapper.dataset.blankBase === '1';
         
         ruleSet.forEach(zone => { 
-            RedactionManager.createZoneOnWrapper(wrapper, zone.x * width, zone.y * height, zone.w * width, zone.h * height, zone.map, (zone.fontSize === undefined ? 14 : zone.fontSize) * scale, zone.text, zone.decoration || null, zone.type || null, zone.fontWeight || 'bold', zone.transparent || false, zone.rotation || 0, zone.fontFamily, zone.textAlign || 'center');
+            const styled = (typeof SubmittalFormat !== 'undefined') ? SubmittalFormat.coverStyle(zone, pageClass) : zone;
+            const box = RedactionManager.createZoneOnWrapper(wrapper, styled.x * width, styled.y * height, styled.w * width, styled.h * height, styled.map, (styled.fontSize === undefined ? 14 : styled.fontSize) * scale, styled.text, styled.decoration || null, zone.type || null, styled.fontWeight || 'bold', styled.transparent || false, styled.rotation || 0, styled.fontFamily, styled.textAlign || 'center');
+            if (!box) return;
+            if (styled.field) {
+                box.dataset.field = styled.field;
+                const tag = box.querySelector?.('.zone-field-tag');
+                if (tag && typeof SubmittalFormat !== 'undefined') tag.textContent = SubmittalFormat.labelFor(styled.map, styled.field);
+            }
+            if (usingBlank && typeof SubmittalFormat !== 'undefined' && SubmittalFormat.skipWhenBlank(styled)) box.dataset.baked = '1';
         });
         RedactionManager.rescaleZones(wrapper);
     }
@@ -4547,6 +4588,7 @@ class Generator {
             })();
         } else this.capture();
         if (typeof PanelProfiles !== 'undefined' && PanelProfiles.hasId(PdfViewer._activePanelId)) this.forceSourceCover = true;
+        if (PdfViewer.usingBlank) this.forceSourceCover = true;
         this.state.renderCommitted = false;
         this.invalidate();
     }
@@ -4589,7 +4631,8 @@ class Generator {
                 fontFamily: box.style.fontFamily, textAlign: box.style.textAlign,
                 type: box.dataset.type || null, decoration: box.dataset.decoration || null,
                 fontWeight: box.style.fontWeight, transparent: box.dataset.transparent === 'true',
-                rotation: Number(box.dataset.rotation || 0)
+                rotation: Number(box.dataset.rotation || 0),
+                field: box.dataset.field || undefined
             }));
             // CSS rounding can occur at any zoom; compare normalized semantics, not raw defaults.
             const comparable = value => JSON.stringify(GeneratorState.zones(value, page).map(z => Object.fromEntries(Object.entries(z).map(([k, v]) =>
@@ -4623,7 +4666,7 @@ class Generator {
             }
             let badge = wrapper.querySelector('.generator-resolution');
             if (!badge) { badge = document.createElement('span'); badge.className = 'generator-resolution'; wrapper.querySelector('.page-toolbar').appendChild(badge); }
-            badge.textContent = entry.status === 'resolved' ? `${entry.provenance}: ${entry.profileId}` : `⚠ Unresolved: ${entry.reason}. Choose a profile or import an exact mapping.`;
+            badge.textContent = entry.status === 'resolved' ? `${entry.provenance}: ${entry.profileId}` : `Unresolved: ${entry.reason}. Choose a profile or import an exact mapping.`;
             badge.title = 'Visual masking only — underlying PDF content is not removed.';
             RedactionManager.refreshContentForWrapper(wrapper);
         } finally { this.applying = false; }
@@ -4806,8 +4849,15 @@ class Generator {
                 this.paint(page);
                 continue;
             }
+            const selected = PanelProfiles.selectPage(id, page);
+            if (selected && selected.class) wrapper.dataset.pageClass = selected.class;
+            else if (!wrapper.dataset.pageClass) wrapper.dataset.pageClass = page === 1 ? 'COVER' : 'SHEET';
             try {
-                const sized = PanelProfiles.zonesFor(id, page, g);
+                let sized = PanelProfiles.zonesFor(id, page, g);
+                if (typeof SubmittalFormat !== 'undefined') {
+                    const pageClass = wrapper.dataset.pageClass || (page === 1 ? 'COVER' : 'SHEET');
+                    sized = sized.map(zone => SubmittalFormat.coverStyle(zone, pageClass));
+                }
                 if (sized.length) {
                     this.state.setPage(page, profileId, 'manual', sized, g, 'source');
                     wrapper.dataset.panelMapped = '1';
@@ -4932,50 +4982,8 @@ class Generator {
         } catch (error) { return false; }
     }
     static installControls() {
-        const host = document.getElementById('generator-panel');
-        if (!host || document.getElementById('generator-mapping-import')) return;
-        const controls = document.createElement('div'); controls.style.padding = '8px';
-        const input = document.createElement('input'); input.type = 'file'; input.accept = 'application/json,.json'; input.id = 'generator-mapping-import';
-        input.setAttribute('aria-label', 'Import exact generator mapping');
-        const status = document.createElement('div'); status.id = 'generator-mapping-status'; status.setAttribute('role', 'status');
-        if (this.state.error) status.textContent = 'Generator disabled: ' + this.state.error + '. Original PDF actions remain available.';
-        input.addEventListener('change', async () => {
-            try {
-                const file = input.files[0]; if (!file) return;
-                if (file.size > GeneratorState.LIMITS.MAX_JSON_BYTES) throw new Error('JSON exceeds 4 MiB import/export limit');
-                const generation = this.state.generation, revision = this.state.revision;
-                const text = await file.text();
-                if (generation !== this.state.generation || revision !== this.state.revision) throw new Error('Import superseded');
-                const data = GeneratorState.parseJson(text);
-                if (data.schema === 'schematicai-profiles/1') {
-                    this.importProfiles(data); status.textContent = 'Profiles imported.';
-                } else {
-                    this.importMapping(data); status.textContent = 'Exact mapping imported.';
-                }
-            } catch (e) { status.textContent = e.message; }
-            input.value = '';
-        });
-        const button = document.createElement('button'); button.textContent = 'Export mapping';
-        button.onclick = () => { try { this.downloadJson(this.exportMapping(), 'generator-mapping.json'); } catch (e) { status.textContent = e.message; } };
-        const profiles = document.createElement('button'); profiles.textContent = 'Export profiles';
-        profiles.onclick = () => this.downloadJson(this.exportProfiles(), 'generator-profiles.json');
-        const profileInput = document.createElement('input'); profileInput.type = 'file'; profileInput.accept = 'application/json,.json'; profileInput.id = 'generator-profiles-import';
-        profileInput.setAttribute('aria-label', 'Import custom generator profiles');
-        profileInput.addEventListener('change', async () => {
-            try {
-                const file = profileInput.files[0]; if (!file) return;
-                if (file.size > GeneratorState.LIMITS.MAX_JSON_BYTES) throw new Error('JSON exceeds 4 MiB import/export limit');
-                const token = this.state.token(), text = await file.text();
-                if (!this.state.current(token)) throw new Error('Import superseded');
-                this.importProfiles(text); status.textContent = 'Profiles imported.';
-            } catch (error) { status.textContent = error.message; }
-            profileInput.value = '';
-        });
-        const warning = document.createElement('div'); warning.textContent = 'Visual masking only; underlying PDF content is not removed.';
-        const mappingLabel = document.createElement('label'); mappingLabel.textContent = 'Import mapping JSON'; mappingLabel.appendChild(input);
-        const profilesLabel = document.createElement('label'); profilesLabel.textContent = 'Import profiles JSON'; profilesLabel.appendChild(profileInput);
-        mappingLabel.style.display = 'block'; profilesLabel.style.display = 'block';
-        controls.append(mappingLabel, button, profilesLabel, profiles, status, warning); host.appendChild(controls);
+        // Profile import/export buttons are not part of the Submittal panel.
+        // importMapping, exportMapping, importProfiles, and exportProfiles stay callable.
     }
     static downloadJson(value, name) {
         const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
@@ -4987,7 +4995,12 @@ class Generator {
         try { const link = document.createElement('a'); link.href = url; link.download = name; link.click(); }
         finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
     }
-    static text(zone, context) {
+    static text(zone, context, pageClass) {
+        if (zone.map === 'serial' || zone.map === 'logo') return '';
+        const formatted = (typeof SubmittalFormat !== 'undefined')
+            ? SubmittalFormat.overlayText(zone, context, pageClass || (zone.map === 'job_block' ? 'COVER' : 'SHEET'))
+            : null;
+        if (formatted !== null) return formatted;
         if (zone.text !== null) return zone.text;
         if (zone.map === 'job_block') {
             const words = (context.job || '').split(' '), lines = []; let line = '';
@@ -5021,11 +5034,28 @@ class Generator {
             timesBold: await output.embedFont(PDFLib.StandardFonts.TimesRomanBold),
             helveticaBold: await output.embedFont(PDFLib.StandardFonts.HelveticaBold)
         };
+        const usingBlank = typeof PdfViewer !== 'undefined' && PdfViewer.usingBlank;
+        const needsLogo = !usingBlank && snapshot.pages.some(entry => (entry.zones || []).some(zone => zone.map === 'logo'));
+        let logoImage = null;
+        if (needsLogo && typeof fetch === 'function') {
+            try {
+                const logoResponse = await fetch('assets/cox-research-logo.jpg');
+                if (logoResponse.ok) logoImage = await output.embedJpg(new Uint8Array(await logoResponse.arrayBuffer()));
+            } catch (error) { /* whiteout still covers the old mark */ }
+        }
         for (const entry of snapshot.pages) {
             const page = output.getPage(entry.page - 1), g = entry.geometry;
+            const pageClass = entry.page === 1 ? 'COVER' : 'SHEET';
             for (const zone of entry.zones.slice().sort((a,b) => Number(a.transparent) - Number(b.transparent))) {
-                if (!zone.transparent) page.drawRectangle({ ...GeneratorState.toPdfRect(g, zone), color: PDFLib.rgb(1,1,1), borderWidth: 0 });
-                const text = this.text(zone, snapshot.context); if (!text) continue;
+                if (usingBlank && typeof SubmittalFormat !== 'undefined' && SubmittalFormat.skipWhenBlank(zone)) continue;
+                const rect = GeneratorState.toPdfRect(g, zone);
+                if (zone.map === 'logo') {
+                    page.drawRectangle({ ...rect, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+                    if (logoImage) page.drawImage(logoImage, rect);
+                    continue;
+                }
+                if (zone.map === 'serial' || !zone.transparent) page.drawRectangle({ ...rect, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
+                const text = this.text(zone, snapshot.context, pageClass); if (!text) continue;
                 const bold = zone.fontWeight === 'bold' || Number.parseInt(zone.fontWeight,10) >= 600;
                 const family = String(zone.fontFamily || '');
                 const font = /times/i.test(family) ? (bold ? fonts.timesBold : fonts.times)
@@ -5100,7 +5130,7 @@ class PdfExporter {
         previewButtons.forEach((previewBtn) => {
             previewBtn.disabled = true;
         });
-        if (btn) btn.innerText = "⏳ GENERATING...";
+        if (btn) btn.innerText = "GENERATING...";
         
         try {
             const pdfBytes = await this.generateRedactedPdf();
@@ -5559,6 +5589,7 @@ class MobileScrollCoordinator {
 
 class PdfViewer {
     static doc = null; static currentScale = 1.0; static url = ""; static currentBlobUrl = ""; static currentPdfBlob = null;
+    static _sourcePdfBuffer = null; static usingBlank = false; static _blankProbeToken = 0;
     static _pendingBlobUrl = ""; static _pendingPdfBlob = null; static _pendingPanelId = ''; static _pendingUrl = ''; static _pendingDocumentIdentity = '';
     static _hasEverCommittedDocument = false;
     static _maintainPositionBetweenResults = false;
@@ -6067,6 +6098,11 @@ class PdfViewer {
     }
 
     static _beginDocumentLoad() {
+        if (typeof PageContext !== 'undefined') PageContext.currentPage = 1;
+        if (typeof document !== 'undefined' && document.body) document.body.classList.remove('panel-profile-active');
+        if (typeof RedactionManager !== 'undefined') {
+            try { RedactionManager.deselect(); } catch (error) { /* controls not mounted */ }
+        }
         if (typeof Generator !== 'undefined') {
             Generator.scanSequence++;
             Generator.state.renderCommitted = false;
@@ -6750,6 +6786,66 @@ class PdfViewer {
         }
     }
 
+    static async _prepareViewerBytes(panelId, sourceBuffer, fetchId) {
+        const source = sourceBuffer instanceof ArrayBuffer ? sourceBuffer : (sourceBuffer && sourceBuffer.buffer);
+        const sourceCopy = source ? source.slice(0) : new ArrayBuffer(0);
+        if (fetchId != null && this.currentFetchId !== fetchId) return sourceCopy;
+        this._sourcePdfBuffer = sourceCopy.slice(0);
+        this.usingBlank = false;
+        if (!DemoManager.isGeneratorActive || typeof SubmittalFormat === 'undefined') return sourceCopy;
+        const id = String(panelId || this._activePanelId || '').trim();
+        if (!id) return sourceCopy;
+        let blank = null;
+        try {
+            blank = await SubmittalFormat.fetchPdf(id, {
+                workerUrl: buildWorkerUrl('BLANK_PDF', { id }),
+                headers: (typeof AuthService !== 'undefined' && AuthService.headers) ? AuthService.headers() : {}
+            });
+        } catch (error) {
+            blank = null;
+        }
+        if (fetchId != null && this.currentFetchId !== fetchId) return sourceCopy;
+        if (!blank) return sourceCopy;
+        this.usingBlank = true;
+        return blank.slice(0);
+    }
+
+    static async adoptGeneratorBase() {
+        if (!this.doc) {
+            document.body.classList.remove('generator-transition');
+            return false;
+        }
+        if (!this._sourcePdfBuffer) return this.renderStack();
+        const probe = ++this._blankProbeToken;
+        const loadToken = this._documentLoadToken;
+        let bytes = this._sourcePdfBuffer.slice(0);
+        let blank = false;
+        if (DemoManager.isGeneratorActive && typeof SubmittalFormat !== 'undefined' && this._activePanelId) {
+            const fetched = await SubmittalFormat.fetchPdf(this._activePanelId, {
+                workerUrl: buildWorkerUrl('BLANK_PDF', { id: this._activePanelId }),
+                headers: (typeof AuthService !== 'undefined' && AuthService.headers) ? AuthService.headers() : {}
+            });
+            if (probe !== this._blankProbeToken || loadToken !== this._documentLoadToken) return false;
+            if (fetched) { bytes = fetched.slice(0); blank = true; }
+        }
+        if (probe !== this._blankProbeToken || loadToken !== this._documentLoadToken) return false;
+        if (blank === this.usingBlank) return this.renderStack();
+        this.usingBlank = blank;
+        if (this.loadingTask) {
+            await this.loadingTask.destroy().catch(() => {});
+            this.loadingTask = null;
+        }
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(bytes) });
+        this.doc = await this.loadingTask.promise;
+        if (this.currentBlobUrl) {
+            try { URL.revokeObjectURL(this.currentBlobUrl); } catch (error) { /* already revoked */ }
+        }
+        this.currentPdfBlob = blob;
+        this.currentBlobUrl = URL.createObjectURL(blob);
+        return this.renderStack();
+    }
+
     static async loadById(panelId, fallbackUrl) {
         // Cancel any active OCR tasks when loading a new PDF
         SmartScanner.cancelAllOcrTasks();
@@ -6785,16 +6881,19 @@ class PdfViewer {
                     const fallbackResult = await attemptPdfFallbackFetch(fallbackUrl, panelId, AuthService.headers);
                     if (fallbackResult) {
                         // === FALLBACK SUCCESS: LOAD AND RENDER ===
+                        const viewBuffer = await this._prepareViewerBytes(panelId, fallbackResult.arrayBuffer, fetchId);
+                        if (this.currentFetchId !== fetchId) return;
+                        const viewBlob = this.usingBlank ? new Blob([viewBuffer], { type: 'application/pdf' }) : fallbackResult.blob;
                         this._stagePendingDocumentResources({
-                            blob: fallbackResult.blob,
-                            blobUrl: URL.createObjectURL(fallbackResult.blob),
+                            blob: viewBlob,
+                            blobUrl: URL.createObjectURL(viewBlob),
                             panelId: this._activePanelId,
                             url: this.url
                         });
                         
                         try {
                             const docInitStartMs = getNowMs();
-                            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(fallbackResult.arrayBuffer) });
+                            this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(viewBuffer) });
                             this.doc = await this.loadingTask.promise;
                             logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-fallback' });
                         } catch (pdfError) {
@@ -6860,7 +6959,9 @@ class PdfViewer {
                 return;
             }
 
-            const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+            const viewBuffer = await this._prepareViewerBytes(panelId, arrayBuffer, fetchId);
+            if (this.currentFetchId !== fetchId) return;
+            const blob = new Blob([viewBuffer], { type: "application/pdf" });
             this._stagePendingDocumentResources({
                 blob,
                 blobUrl: URL.createObjectURL(blob),
@@ -6870,7 +6971,7 @@ class PdfViewer {
             
             try {
                 const docInitStartMs = getNowMs();
-                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(viewBuffer) });
                 this.doc = await this.loadingTask.promise;
                 logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-by-id' });
             } catch (pdfError) {
@@ -6974,16 +7075,19 @@ class PdfViewer {
             }
 
             // === LOAD FROM CACHE ===
+            const viewBuffer = await this._prepareViewerBytes(panelId, cached.arrayBuffer, fetchId);
+            if (this.currentFetchId !== fetchId) return;
+            const viewBlob = this.usingBlank ? new Blob([viewBuffer], { type: 'application/pdf' }) : cached.blob;
             this._stagePendingDocumentResources({
-                blob: cached.blob,
-                blobUrl: URL.createObjectURL(cached.blob),
+                blob: viewBlob,
+                blobUrl: URL.createObjectURL(viewBlob),
                 panelId: this._activePanelId,
                 url: this.url
             });
             
             try {
                 const docInitStartMs = getNowMs();
-                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(cached.arrayBuffer) });
+                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(viewBuffer) });
                 this.doc = await this.loadingTask.promise;
                 logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'cache-hit' });
             } catch (pdfError) {
@@ -7065,7 +7169,9 @@ class PdfViewer {
             }
 
             // === LOAD PDF ===
-            const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+            const viewBuffer = await this._prepareViewerBytes(this._activePanelId, arrayBuffer, fetchId);
+            if (this.currentFetchId !== fetchId) return;
+            const blob = new Blob([viewBuffer], { type: "application/pdf" });
             this._stagePendingDocumentResources({
                 blob,
                 blobUrl: URL.createObjectURL(blob),
@@ -7075,7 +7181,7 @@ class PdfViewer {
             
             try {
                 const docInitStartMs = getNowMs();
-                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+                this.loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(viewBuffer) });
                 this.doc = await this.loadingTask.promise;
                 logPdfTiming('document_init', getNowMs() - docInitStartMs, { source: 'network-url' });
             } catch (pdfError) {
@@ -7544,26 +7650,28 @@ class PdfViewer {
             wrapper.dataset.renderToken = String(renderToken);
             wrapper.style.width = renderMetrics.cssWidth + "px"; 
             wrapper.dataset.pageNumber = i;
+            wrapper.dataset.blankBase = this.usingBlank ? '1' : '';
+            wrapper.dataset.pageClass = i === 1 ? 'COVER' : 'SHEET';
             
             const toolbar = document.createElement('div');
             toolbar.className = 'page-toolbar';
             toolbar.innerHTML = `
                 <span style="font-weight:600;">PAGE ${i}</span>
                 <select class="page-profile-select" onchange="LayoutScanner.updatePageProfile(${i}, this.value)">
-                    <option value="COVER_TEMPLATE">📋 Cover Template</option>
-                    <optgroup label="📁 Info &amp; Notes">
-                        <option value="INFO">📝 Info / Notes (Standard)</option>
-                        <option value="INFO_BORDERLESS">🖼️ Info (Borderless)</option>
+                    <option value="COVER_TEMPLATE">Cover Template</option>
+                    <optgroup label="Info &amp; Notes">
+                        <option value="INFO">Info / Notes (Standard)</option>
+                        <option value="INFO_BORDERLESS">Info (Borderless)</option>
                     </optgroup>
-                    <optgroup label="📁 Schematics">
-                        <option value="SCHEMATIC_PORTRAIT">📄 Schematic (Portrait)</option>
-                        <option value="SCHEMATIC_PORTRAIT_BORDERLESS">🖼️ Schematic (Portrait Borderless)</option>
-                        <option value="SCHEMATIC_LANDSCAPE">🔄 Schematic (Landscape)</option>
-                        <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">🖼️ Schematic (Landscape Borderless)</option>
+                    <optgroup label="Schematics">
+                        <option value="SCHEMATIC_PORTRAIT">Schematic (Portrait)</option>
+                        <option value="SCHEMATIC_PORTRAIT_BORDERLESS">Schematic (Portrait Borderless)</option>
+                        <option value="SCHEMATIC_LANDSCAPE">Schematic (Landscape)</option>
+                        <option value="SCHEMATIC_LANDSCAPE_BORDERLESS">Schematic (Landscape Borderless)</option>
                     </optgroup>
-                    <optgroup label="📁 Special">
-                        <option value="DOOR_DRAWING">🚪 Door Drawing</option>
-                        <option value="GENERAL">📐 General</option>
+                    <optgroup label="Special">
+                        <option value="DOOR_DRAWING">Door Drawing</option>
+                        <option value="GENERAL">General</option>
                     </optgroup>
                 </select>
             `;
@@ -7693,12 +7801,7 @@ class PdfViewer {
         this._clampViewerScroll(container);
         requestAnimationFrame(() => this._clampViewerScroll(container));
         logPdfTiming('full_render_complete', getNowMs() - renderStartMs, { source: timingSource, pages: this.doc?.numPages || 0 });
-        // Populate ALL profile dropdowns ONCE after all pages are rendered
-        // This ensures all <select> elements exist in the DOM before population
-        console.log('[renderStack] All pages rendered, calling refreshProfileOptions()');
-        setTimeout(() => {
-            LayoutScanner.refreshProfileOptions();
-        }, 100); // 100ms delay to ensure DOM has fully updated
+        LayoutScanner.refreshProfileOptions();
         if(DemoManager.isGeneratorActive) {
             // Populate page selector
             const pageSelector = document.getElementById('page-selector');
@@ -8692,7 +8795,7 @@ for (const method of ['addZoneToCurrentView', 'deleteSelected', 'handleDrag', 'e
     };
 }
 document.addEventListener('input', event => {
-    if (event.target.closest?.('#left-generator-context')) {
+    if (event.target.closest?.('#left-generator-context, #customer-info-box')) {
         Generator.state.touch();
         RedactionManager.refreshContent();
     }

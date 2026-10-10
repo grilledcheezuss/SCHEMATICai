@@ -216,7 +216,7 @@ function generatorStateInPage() {
         rail: vis('toggle-right'),
         restore: vis('generator-restore-btn'),
         minimize: vis('generator-minimize-btn'),
-        context: vis('left-generator-context'),
+        context: vis('customer-info-box'),
         demoMode: document.body.classList.contains('demo-mode'),
         editorActive: document.body.classList.contains('editor-active'),
         genMinimized: document.body.classList.contains('gen-minimized'),
@@ -257,7 +257,7 @@ async function testGeneratorMatrix(browser) {
         }
         const docked = w >= 768;
         check(s1.active && s1.demoMode && s1.genMinimized && !s1.editorActive, `${label}: activated minimized`);
-        check(s1.context, `${label}: context block visible`);
+        check(!s1.context, `${label}: customer info stays inside the minimized panel`);
         check(s1.rail === docked, `${label}: rail ${docked ? 'shown' : 'hidden'}`);
         check(s1.restore === !docked, `${label}: restore button ${docked ? 'hidden' : 'shown'}`);
         check(!s1.panel, `${label}: panel minimized initially`);

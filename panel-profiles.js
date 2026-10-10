@@ -16,6 +16,7 @@
     let panels = Object.create(null);
     let ids = new Set();
     let unmapped = new Set();
+    let hide = new Set();
     let index = null;
     let complete = false;
     let indexLoaded = false;
@@ -101,7 +102,7 @@
             : "'Courier New', monospace";
         const fontSize = Number.isFinite(zone.fontSize) && zone.fontSize > 0 ? zone.fontSize : 14;
         const content = map !== 'custom' && map !== 'logo';
-        return {
+        const presented = {
             x: geom.x, y: geom.y, w: geom.w, h: geom.h, map,
             text: content ? null : (typeof zone.text === 'string' ? zone.text : ''),
             fontSize, fontFamily,
@@ -110,6 +111,9 @@
             fontWeight: zone.fontWeight || 'normal',
             rotation: Number.isFinite(zone.rotation) ? zone.rotation : 0
         };
+        if (typeof zone.field === 'string' && zone.field) presented.field = zone.field;
+        if (zone.decoration === 'underline') presented.decoration = 'underline';
+        return presented;
     }
 
     function pageRecord(record, pageNumber) {
@@ -136,6 +140,7 @@
             }
         }
         if (extras && Array.isArray(extras.unmapped)) extras.unmapped.forEach(id => unmapped.add(canonical(id)));
+        if (extras && Array.isArray(extras.hide)) extras.hide.forEach(id => hide.add(canonical(id)));
         if (catalog && Array.isArray(catalog.unmapped)) catalog.unmapped.forEach(id => unmapped.add(canonical(id)));
         if (catalog && catalog.complete === true) complete = true;
         shardsLoaded = true;
@@ -146,6 +151,7 @@
         panels = Object.create(null);
         ids = new Set();
         unmapped = new Set();
+        hide = new Set();
         index = null;
         complete = false;
         indexLoaded = false;
@@ -171,8 +177,12 @@
         if (!indexPromise) indexPromise = (async () => {
             try {
                 if (typeof fetch !== 'function') return index;
-                const response = await fetch('PDFmapping/panel-index.json?v=' + encodeURIComponent(versionToken()), { credentials: 'same-origin' });
+                const [response, hideResponse] = await Promise.all([
+                    fetch('PDFmapping/panel-index.json?v=' + encodeURIComponent(versionToken()), { credentials: 'same-origin' }),
+                    fetch('PDFmapping/submittal-hide.json?v=' + encodeURIComponent(versionToken()), { credentials: 'same-origin' })
+                ]);
                 if (response.ok) adoptIndex(await response.json());
+                if (hideResponse.ok) noteHide(await hideResponse.json());
             } catch (error) {
                 console.warn('Panel profile index unavailable', error);
             } finally {
@@ -296,10 +306,16 @@
         return (panels[key].pages || []).some(page => Array.isArray(page.zones) && page.zones.length > 0);
     }
 
+    function noteHide(list) {
+        const values = Array.isArray(list) ? list : (list && Array.isArray(list.ids) ? list.ids : []);
+        values.forEach(id => hide.add(canonical(id)));
+    }
+
     function hiddenWhenSubmittal(id) {
         const key = canonical(id);
         if (!key) return false;
-        if (unmapped.has(key)) return true;
+        // Hide list, unmapped pages, and panels with neither a blank nor a page map.
+        if (hide.has(key) || unmapped.has(key)) return true;
         if (panels[key] && !isMapped(key)) return true;
         if (complete && indexLoaded && !ids.has(key) && !panels[key]) return true;
         return false;
@@ -315,9 +331,13 @@
     }
 
     function fieldsFor(id, pageNumber) {
-        const maps = new Set(zonesFor(id, pageNumber, null).map(zone => zone.map));
+        const zones = zonesFor(id, pageNumber, null);
+        const maps = new Set(zones.map(zone => zone.map));
+        const named = new Set(zones.map(zone => zone.field).filter(Boolean));
         const fields = [];
-        if (maps.has('job_block')) fields.push('job', 'type');
+        if (maps.has('job_block') || named.has('project_info')) fields.push('job', 'type');
+        if (named.has('customer_job')) fields.push('job');
+        if (maps.has('type') || named.has('project_title')) fields.push('type');
         for (const field of ['cust', 'job', 'type', 'cpid', 'date', 'stage', 'po', 'serial', 'company', 'address', 'phone', 'fax']) {
             if (maps.has(field)) fields.push(field);
         }
@@ -357,6 +377,6 @@
     return {
         SCHEMA, HANDLE_PX, canonical, alignMap, overlayBox, presentZone, install, reset,
         loadIndex, loadShards, shardFor, peek, hasId, lookup, lookupAsync, zonesFor, selectPage,
-        firstContentPage, isMapped, hiddenWhenSubmittal, labelFor, fieldsFor, saveOverride, saveActivePage
+        firstContentPage, isMapped, noteHide, hiddenWhenSubmittal, labelFor, fieldsFor, saveOverride, saveActivePage
     };
 });

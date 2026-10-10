@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="2400" height="1350">
+  <rect width="1200" height="675" fill="#0a0a12"/>
+  <g fill="#ffffff" text-anchor="middle" font-family="Arial Black, Helvetica Neue, Arial, sans-serif">
+    <text x="600" y="340" font-size="220" font-weight="900" letter-spacing="8">COX</text>
+    <text x="818" y="210" font-size="36" font-weight="700">®</text>
+    <text x="600" y="430" font-size="52" font-weight="700" letter-spacing="28">RESEARCH</text>
+  </g>
+</svg>

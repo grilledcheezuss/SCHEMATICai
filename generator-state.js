@@ -71,7 +71,8 @@
             check(z.transparent === undefined || typeof z.transparent === 'boolean', 'Invalid zone transparency');
             const map = z.map || 'custom';
             check(typeof map === 'string' && ['custom', 'cust', 'job', 'job_block', 'type', 'cpid', 'date', 'stage', 'po', 'serial', 'company', 'address', 'phone', 'fax', 'logo'].includes(map), 'Invalid zone field');
-            const fontFamily = z.fontFamily || (page === 1 && map === 'cust' ? "'Times New Roman', serif" : "'Courier New', monospace");
+            const coverSerif = page === 1 && ['cust', 'job', 'job_block', 'type', 'stage', 'date', 'address', 'company', 'phone', 'fax'].includes(map);
+            const fontFamily = z.fontFamily || (coverSerif ? "'Times New Roman', Times, serif" : "'Courier New', monospace");
             const textAlign = z.textAlign || 'center';
             check(['left', 'center', 'right'].includes(textAlign), 'Invalid alignment');
             check(typeof fontFamily === 'string' && (z.text == null || typeof z.text === 'string'), 'Invalid zone text/font');
@@ -80,9 +81,11 @@
             check(z.type == null || typeof z.type === 'string', 'Invalid zone type');
             check(z.decoration == null || ['none', 'underline'].includes(z.decoration), 'Invalid zone decoration');
             check(z.fontWeight == null || typeof z.fontWeight === 'string', 'Invalid zone font weight');
-            return { x: z.x, y: z.y, w: z.w, h: z.h, map, text: z.text == null ? null : z.text,
+            const out = { x: z.x, y: z.y, w: z.w, h: z.h, map, text: z.text == null ? null : z.text,
                 fontSize, fontFamily, textAlign, rotation, transparent: z.transparent === true,
                 type: z.type || null, decoration: z.decoration || null, fontWeight: z.fontWeight || 'bold' };
+            if (typeof z.field === 'string' && z.field) out.field = z.field;
+            return out;
         });
     }
     function equalZones(a, b, page) { return JSON.stringify(zones(a, page)) === JSON.stringify(zones(b, page)); }
