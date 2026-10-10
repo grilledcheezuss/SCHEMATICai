@@ -280,6 +280,13 @@ async function loaded(count = 2) {
         const rules = vm.runInNewContext(source.slice(start, end) + '; LAYOUT_RULES');
         for (const [key, input] of Object.entries(rules)) G.zones(input, key === 'COVER_TEMPLATE' ? 1 : 0);
         assert(source.includes("zone.type || null"));
+        const sheet = rules.SCHEMATIC_PORTRAIT.find(z => z.map === 'cpid');
+        const info = rules.INFO.find(z => z.map === 'cpid');
+        const cover = rules.COVER_TEMPLATE.find(z => z.map === 'cpid');
+        // CP-8377 screenshots: built-in Panel ID sat outside the drawing-number cell, down and right.
+        assert(sheet.x <= 0.78 && sheet.y <= 0.91 && sheet.x + sheet.w >= 0.90, 'schematic cpid covers the title-block drawing number');
+        assert(info.x === sheet.x && info.y === sheet.y, 'info cpid uses the same drawing-number cell');
+        assert(cover.y <= 0.925 && cover.y + cover.h <= 0.96, 'cover cpid sits inside the template border');
     });
     const appSource = fs.readFileSync(require.resolve('../app.js'), 'utf8');
     const generatorStart = appSource.indexOf('class Generator {');

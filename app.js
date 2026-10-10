@@ -1,7 +1,7 @@
 // --- SCHEMATICA ai v2.5.115 ---
 const APP_VERSION = "v2.5.115";
 const VERSION_HISTORY = {
-    "v2.5.115": "Submittal Generator page detection: the 81 core measured Cox profiles ship in the page dropdown (no fetch race), and Auto-Scan selects info, schematic, and cover profiles from title-block geometry, including a small placement shift. Page 1 can take a measured cover and then shows that source sheet; an unmatched first page still uses Cover Template. Legacy built-in zones are unchanged. Frontend only — Worker executable remains v2.5.113.",
+    "v2.5.115": "Submittal Generator page detection: the 81 core measured Cox profiles ship in the page dropdown (no fetch race), and Auto-Scan selects info, schematic, and cover profiles from title-block geometry, including a small placement shift. Page 1 can take a measured cover and then shows that source sheet; an unmatched first page still uses Cover Template. Built-in Cover Template, Info, and Schematic Portrait Panel ID zones are shifted onto the cells shown on CP-8377 (drawing number up and left of the old box; cover number raised inside the border). Frontend only — Worker executable remains v2.5.113.",
     "v2.5.114": "Focused Submittal Generator integration: owned source-content SHA-256 identity, canonical displayed CropBox page state and stable profile IDs, 186 measured layouts with conservative exact geometric matching, atomic versioned source-bound mapping import/export, preserved manual edits across zoom/rerender, rotation-aware canonical PDF snapshots, stale async operation guards, and shared generated preview/print/download bytes with cleanup. Unresolved pages block generation without affecting original PDFs. Visual masking only; underlying PDF content is not removed. Worker, auth, parser and search logic unchanged.",
     "v2.5.113": "Sheets authority made observable end to end: the Worker reports a secret-free MAIN sheetStatus (active/unavailable/pending/unconfigured, classified reason, row/match/spec counts) plus X-SCHEMATICA-SHEETS-STATUS, tolerates CP/revision ID spellings, object or trailing-blank rows, omitted rowCount and Workspace Apps Script URLs, and a new transform key invalidates pre-fix MAIN pages. Successful syncs store the per-page sheet status; read-only SheetAuthorityAudit (report/text/inspect) reports recordsWithSheetSpecs/metadata/uncertainty and a verdict without network. This release refreshes browser snapshots; fallback, descriptions, DERIVED_REV 12 and snapshot schema 1 unchanged.",
     "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; Worker-parity bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
@@ -305,9 +305,9 @@ const LAYOUT_RULES = {
     INFO: [
         { map: "cust", x: 0.119, y: 0.085, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
         { map: "job", x: 0.058, y: 0.108, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
-        { map: "date", x: 0.064, y: 0.858, w: 0.08, h: 0.02, fontSize: 8, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "type", x: 0.149, y: 0.889, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.909, y: 0.94, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+        { map: "date", x: 0.0755, y: 0.8618, w: 0.0573, h: 0.016, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.1368, y: 0.8861, w: 0.2672, h: 0.0523, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid", x: 0.768, y: 0.902, w: 0.1556, h: 0.018, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     INFO_BORDERLESS: [
         { map: "cust", x: 0.01, y: 0.02, w: 0.3, h: 0.025, fontSize: 10, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
@@ -317,9 +317,9 @@ const LAYOUT_RULES = {
         { map: "cpid", x: 0.88, y: 0.97, w: 0.11, h: 0.02, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     SCHEMATIC_PORTRAIT: [
-        { map: "date", x: 0.064, y: 0.858, w: 0.08, h: 0.02, fontSize: 8, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "type", x: 0.144, y: 0.89, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.92, y: 0.945, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+        { map: "date", x: 0.0755, y: 0.8618, w: 0.0573, h: 0.016, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.1368, y: 0.8861, w: 0.2672, h: 0.0523, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid", x: 0.768, y: 0.902, w: 0.1556, h: 0.018, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     SCHEMATIC_PORTRAIT_BORDERLESS: [
         { map: "date", x: 0.01, y: 0.95, w: 0.08, h: 0.02, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
@@ -368,7 +368,7 @@ const LAYOUT_RULES = {
         { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+        { map: "cpid", x: 0.835, y: 0.920, w: 0.15, h: 0.028, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
