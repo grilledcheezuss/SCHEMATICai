@@ -1,6 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.116 (frontend release; Worker implementation v2.5.113)
+## Version: v2.5.117 (frontend release; Worker implementation v2.5.113)
+
+_Release note: v2.5.117 changes only the frontend PDF Submittal Generator. Mapped Panel IDs load per-page zones from `PDFmapping/panel-index.json` and the gzip shards under `PDFmapping/panels/`, including each zone's fontFamily and fontSize. Mapped panels do not use Auto-Detect. Deploy frontend assets, including `panel-profiles.js`, `generator-state.js`, `measured-layouts.js`, and the `PDFmapping` assets, as one release. The Worker banner aligns the release label; executable Worker code, API/auth/Sheets behavior, SPEC_TRANSFORM_VERSION v2.5.113, DERIVED_REV 12, encrypted snapshot schema 1 and compatibility_date are unchanged. No Worker redeployment is required. Generated output is visual masking/title-block replacement, not irreversible content redaction; see [REDACTION_SCHEMA.md](../REDACTION_SCHEMA.md)._
 
 _Release note: v2.5.116 changes only the frontend PDF Submittal Generator (field whiteouts inset about 2px inside their cells, and title-block detection that joins fragmented rules). Deploy frontend assets, including `generator-state.js`, `measured-layouts.js`, and the `PDFmapping` JSON assets, as one release. The Worker banner aligns the release label; executable Worker code, API/auth/Sheets behavior, SPEC_TRANSFORM_VERSION v2.5.113, DERIVED_REV 12, encrypted snapshot schema 1 and compatibility_date are unchanged. No Worker redeployment is required. Generated output is visual masking/title-block replacement, not irreversible content redaction; see [REDACTION_SCHEMA.md](../REDACTION_SCHEMA.md)._
 
@@ -34,6 +36,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.117**: Frontend-only panel-ID page maps. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.116**: Frontend-only cell-inset whiteouts and fragmented title-block matching. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.115**: Frontend-only generator page detection. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.114**: Frontend-only generator integration. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
@@ -460,6 +463,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.117**: Frontend-only panel-ID page maps with per-zone fontFamily and fontSize; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.116**: Frontend-only cell-inset whiteouts and fragmented title-block matching; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.115**: Frontend-only measured-profile detection; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.114**: Frontend-only generator integration; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.

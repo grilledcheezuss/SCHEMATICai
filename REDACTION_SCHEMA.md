@@ -1,6 +1,6 @@
 # SCHEMATICA ai Redaction Profile Schema
 
-## Release: v2.5.116
+## Release: v2.5.117
 
 ## Overview
 

@@ -1,0 +1,130 @@
+// Panel-map lookup, font retention, handle sizing, save-overwrite, and page select.
+// Run: node tests/panel-profiles.test.js
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const zlib = require('node:zlib');
+const PanelProfiles = require('../panel-profiles');
+
+const root = path.join(__dirname, '..');
+const sample = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/panel-page-sample.json'), 'utf8'));
+let assertions = 0;
+function test(name, fn) {
+    fn();
+    assertions++;
+    console.log('✓ ' + name);
+}
+
+PanelProfiles.reset();
+PanelProfiles.install(sample, { unmapped: ['CP-3053', 'cp-3016r1'] });
+
+test('lookup is case-insensitive and returns per-page zones', () => {
+    const record = PanelProfiles.lookup('cp-3000');
+    assert.ok(record && record.pages.length > 1);
+    const cover = PanelProfiles.zonesFor('CP-3000', 1, null);
+    const sheet = PanelProfiles.selectPage('cp-3000', 6);
+    assert.ok(cover.length > 0);
+    assert.equal(sheet.page, 6);
+    assert.equal(sheet.class, 'SHEET');
+    assert.notDeepEqual(cover.map(z => [z.x, z.y, z.w, z.h]), sheet.zones.map(z => [z.x, z.y, z.w, z.h]));
+    assert.equal(PanelProfiles.lookup('CP-9999'), null);
+});
+
+test('Project Info becomes job + system type and keeps fontFamily and fontSize', () => {
+    const cover = PanelProfiles.zonesFor('CP-3000', 1, null);
+    const info = cover.find(zone => zone.map === 'job_block');
+    assert.ok(info, 'project_info zone');
+    assert.equal(info.text, null);
+    assert.ok(info.fontFamily.includes('Arial') || info.fontFamily.includes('Times') || info.fontFamily.includes('Courier'));
+    assert.ok(info.fontSize > 0 && info.fontSize < 80);
+    const raw = sample['CP-3000'].pages[0].zones.find(zone => zone.field === 'project_info');
+    assert.equal(info.fontFamily, raw.fontFamily);
+    assert.equal(info.fontSize, raw.fontSize);
+    assert.equal(PanelProfiles.alignMap(raw), 'job_block');
+    for (const zone of cover) {
+        assert.equal(typeof zone.fontFamily, 'string');
+        assert.ok(zone.fontFamily.length > 0);
+        assert.ok(zone.fontSize > 0);
+    }
+    const cpid = cover.find(zone => zone.map === 'cpid');
+    const company = cover.find(zone => zone.map === 'company');
+    assert.ok(cpid && company);
+    assert.equal(cpid.fontFamily, sample['CP-3000'].pages[0].zones.find(zone => zone.map === 'cpid').fontFamily);
+});
+
+test('page select returns that page only', () => {
+    const first = PanelProfiles.selectPage('CP-3000', 1);
+    const later = PanelProfiles.selectPage('CP-3000', 9);
+    assert.equal(first.page, 1);
+    assert.equal(first.class, 'COVER');
+    assert.equal(later.page, 9);
+    assert.equal(later.class, 'SHEET');
+    assert.ok(later.zones.length > 0);
+    assert.ok(later.zones.every(zone => zone.fontFamily && zone.fontSize > 0));
+    assert.notEqual(later.profileKey, first.profileKey);
+});
+
+test('text-tight boxes inset only when the handle needs room', () => {
+    const raw = sample['CP-3000'].pages[0].zones;
+    const tight = raw.find(zone => zone.h * 792 <= PanelProfiles.HANDLE_PX * 3);
+    const roomy = raw.find(zone => zone.w * 612 > PanelProfiles.HANDLE_PX * 3 && zone.h * 792 > PanelProfiles.HANDLE_PX * 3);
+    assert.ok(tight && roomy);
+    const metrics = { width: 612, height: 792 };
+    const tightBox = PanelProfiles.overlayBox(tight, metrics);
+    const roomyBox = PanelProfiles.overlayBox(roomy, metrics);
+    assert.equal(tightBox.w, tight.w);
+    assert.equal(tightBox.h, tight.h);
+    assert.ok(Math.abs(roomyBox.w - (roomy.w - 2 / 612)) < 1e-9);
+    assert.ok(Math.abs(roomyBox.h - (roomy.h - 2 / 792)) < 1e-9);
+    // The retired cell inset (2/792 on every side of every box) is not applied.
+    assert.notEqual(tightBox.x, tight.x + 2 / 792);
+    const presented = PanelProfiles.presentZone(roomy, metrics, false);
+    assert.equal(presented.fontFamily, roomy.fontFamily);
+    assert.equal(presented.fontSize, roomy.fontSize);
+});
+
+test('save overwrites the selected page and leaves the other page', () => {
+    const before = PanelProfiles.zonesFor('CP-3000', 1, null);
+    const other = PanelProfiles.zonesFor('CP-3000', 9, null);
+    const edited = before.map((zone, index) => index === 0 ? { ...zone, w: Math.min(0.9, zone.w + 0.02), h: zone.h } : zone);
+    const saved = PanelProfiles.saveOverride('CP-3000', 1, edited);
+    assert.equal(saved[0].w, edited[0].w);
+    assert.equal(saved[0].fontFamily, before[0].fontFamily);
+    assert.equal(saved[0].fontSize, before[0].fontSize);
+    const after = PanelProfiles.zonesFor('cp-3000', 1, { width: 612, height: 792 });
+    assert.equal(after[0].w, edited[0].w, 'saved geometry is not inset again');
+    assert.equal(after[0].fontFamily, before[0].fontFamily);
+    assert.deepEqual(PanelProfiles.zonesFor('CP-3000', 9, null), other);
+    PanelProfiles.install({ 'CP-3001': { pages: [{ page: 1, class: 'COVER', profile_key: 'COVER_TEST', zones: [
+        { map: 'cpid', field: 'cpid', x: 0.1, y: 0.1, w: 0.2, h: 0.02, fontSize: 9, fontFamily: 'Arial, Helvetica, sans-serif' }
+    ] }] } });
+    assert.equal(PanelProfiles.zonesFor('CP-3001', 1, null)[0].fontFamily, 'Arial, Helvetica, sans-serif');
+    assert.equal(PanelProfiles.zonesFor('CP-3000', 1, null)[0].w, edited[0].w);
+});
+
+test('known-unmapped panels are the ones hidden when Submittal is on', () => {
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-3053'), true);
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('cp-3016r1'), true);
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-3000'), false);
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-9000'), false);
+});
+
+test('shipped shards keep fonts and contain no stored text', () => {
+    const index = JSON.parse(fs.readFileSync(path.join(root, 'PDFmapping/panel-index.json'), 'utf8'));
+    assert.equal(index.schema, 'schematicai-panel-profiles/1');
+    assert.equal(index.complete, false);
+    assert.ok(index.ids.includes('CP-3000'));
+    assert.ok(index.unmapped.includes('CP-3053'));
+    assert.ok(index.ids.length > 1000);
+    const blob = JSON.stringify(index);
+    assert.equal(blob.includes('dwg_path'), false);
+    assert.equal(/\d{3}[-.)]\d{3}[-.]\d{4}/.test(blob), false);
+    const shard = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root, 'PDFmapping/panels/cp-3000.json.gz'))).toString());
+    const zone = shard['CP-3000'].pages[0].zones.find(entry => entry.field === 'project_info');
+    assert.ok(zone.fontFamily && zone.fontSize > 0);
+    const encoded = JSON.stringify(shard['CP-3000']);
+    assert.equal(encoded.includes('"text"'), false);
+    assert.equal(encoded.includes('dwg_path'), false);
+});
+
+console.log('PASS panel profiles: ' + assertions + ' assertions');

@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="app-version" content="v2.5.116">
-    <title>Cox Research | SCHEMATICA ai (v2.5.116)</title>
+    <meta name="app-version" content="v2.5.117">
+    <title>Cox Research | SCHEMATICA ai (v2.5.117)</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔒</text></svg>">
     
     <script src="assets/vendor/pdfjs/pdf.min.js"></script>
@@ -34,7 +34,7 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="style.css?v=2.5.115">
+    <link rel="stylesheet" href="style.css?v=2.5.117">
 </head>
 <body>
 
@@ -303,16 +303,14 @@
                         </select>
                     </div>
                     <div style="font-size:9px; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
-                        <span>Profile:</span>
-                        <span class="profile-badge" id="active-profile-badge" style="font-size:9px; background:var(--app-primary); color:white; padding:3px 8px; border-radius:3px; flex:1; text-align:center;">Auto-Detect</span>
+                        <span>Document profile:</span>
+                        <span class="profile-badge" id="active-profile-badge" style="font-size:9px; background:var(--app-primary); color:white; padding:3px 8px; border-radius:3px; flex:1; text-align:center;">Panel profile</span>
                     </div>
+                    <p id="panel-profile-status" style="font-size:9px; color:var(--text-secondary); margin:6px 0 0;">Each panel has a predefined page map. Choose a page of this PDF to edit its boxes.</p>
                 </div>
                 
-                <!-- Page Actions -->
                 <div style="padding:0 8px; margin-bottom:15px;">
-                    <button id="rescan-current-btn" class="search-btn" style="width:100%; background:var(--app-accent) !important; font-size:10px; padding:8px;">
-                        🔄 Re-scan Current Page
-                    </button>
+                    <button id="save-panel-profile" class="search-btn" type="button" style="width:100%; font-size:10px; padding:8px;" onclick="PanelProfiles.saveActivePage()">Save adjustments</button>
                 </div>
                 
                 <!-- Profile Management -->
@@ -343,6 +341,7 @@
                         <select id="redact-font" class="cox-input" onchange="RedactionManager.updateActiveStyle()">
                             <option value="'Courier New', monospace">Monospace (Courier)</option>
                             <option value="'Times New Roman', serif">Serif (Times)</option>
+                            <option value="Arial, Helvetica, sans-serif">Sans (Arial)</option>
                         </select>
                     </div>
 
@@ -428,12 +427,13 @@
 
     <button id="generator-restore-btn" onclick="DemoManager.restorePanel()" title="Open Control Panel">⚙️</button>
 
-<script src="release-update.js?v=2.5.115"></script>
-<script src="pdf-render-helper.js?v=2.5.115"></script>
-<script src="pdf-ui-state.js?v=2.5.115"></script>
-<script src="info-table-parser.js?v=2.5.115"></script>
-<script src="generator-state.js?v=2.5.116"></script>
-<script src="measured-layouts.js?v=2.5.116"></script>
-<script src="app.js?v=2.5.116"></script>
+<script src="release-update.js?v=2.5.117"></script>
+<script src="pdf-render-helper.js?v=2.5.117"></script>
+<script src="pdf-ui-state.js?v=2.5.117"></script>
+<script src="info-table-parser.js?v=2.5.117"></script>
+<script src="generator-state.js?v=2.5.117"></script>
+<script src="measured-layouts.js?v=2.5.117"></script>
+<script src="panel-profiles.js?v=2.5.117"></script>
+<script src="app.js?v=2.5.117"></script>
 </body>
 </html>
