@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.116 ---
-const APP_VERSION = "v2.5.116";
+// --- SCHEMATICA ai v2.5.117 ---
+const APP_VERSION = "v2.5.117";
 const VERSION_HISTORY = {
+    "v2.5.117": "Submittal Generator looks up each Panel ID in the measured page map (5865 panels, CP-3000 through CP-8378) and places that panel's text-tight zones, keeping every zone's fontFamily and fontSize. The catalog loads from PDFmapping at runtime. Mapped panels do not use Auto-Detect. Resize the boxes and save to overwrite that panel's profile. A 2px inset is applied only when a resize handle would cover the text. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.116": "Submittal Generator whiteouts sit about 2px inside the ruled cell for each field on cover, info, and schematic profiles. Address, phone, and fax each keep their own slice of a shared contact cell instead of one tall box. Auto-Scan joins fragmented title-block rules so info and schematic pages can match a measured profile. Cover Template Panel ID is back on the template drawing-number row. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.115": "Submittal Generator page detection: the 81 core measured Cox profiles ship in the page dropdown (no fetch race), and Auto-Scan selects info, schematic, and cover profiles from title-block geometry, including a small placement shift. Page 1 can take a measured cover and then shows that source sheet; an unmatched first page still uses Cover Template. Built-in Cover Template, Info, and Schematic Portrait Panel ID zones are shifted onto the cells shown on CP-8377 (drawing number up and left of the old box; cover number raised inside the border). Frontend only — Worker executable remains v2.5.113.",
     "v2.5.114": "Focused Submittal Generator integration: owned source-content SHA-256 identity, canonical displayed CropBox page state and stable profile IDs, 186 measured layouts with conservative exact geometric matching, atomic versioned source-bound mapping import/export, preserved manual edits across zoom/rerender, rotation-aware canonical PDF snapshots, stale async operation guards, and shared generated preview/print/download bytes with cleanup. Unresolved pages block generation without affecting original PDFs. Visual masking only; underlying PDF content is not removed. Worker, auth, parser and search logic unchanged.",
@@ -1817,6 +1818,9 @@ class DemoManager {
             if(btn) btn.style.color = ''; 
             if(PdfViewer.doc) PdfViewer.renderStack(); else document.body.classList.remove('generator-transition');
         }
+        if (typeof SearchEngine !== 'undefined' && SearchEngine.currentResults && SearchEngine.currentResults.length) {
+            SearchEngine.renderCurrentPage();
+        }
     }
 
     static minimizePanel() {
@@ -1995,16 +1999,23 @@ class PageContext {
         
         // Update profile badge
         const profileBadge = document.getElementById('active-profile-badge');
+        const panelLabel = (typeof PanelProfiles !== 'undefined' && document.body.classList.contains('panel-profile-active'))
+            ? PanelProfiles.labelFor(typeof PdfViewer !== 'undefined' ? PdfViewer._activePanelId : '', this.currentPage) : '';
         if (profileBadge) {
             const profile = this.getActiveProfile();
-            profileBadge.textContent = this.getProfileDisplayName(profile);
+            profileBadge.textContent = panelLabel || this.getProfileDisplayName(profile);
         }
         
         // Refresh control panel to show relevant fields
-        ControlPanelManager.refreshForProfile(this.getActiveProfile());
+        if (panelLabel && typeof PanelProfiles !== 'undefined') {
+            const fields = PanelProfiles.fieldsFor(PdfViewer._activePanelId, this.currentPage);
+            if (fields.length) ControlPanelManager.updateInputFields(fields);
+            else ControlPanelManager.refreshForProfile(this.getActiveProfile());
+        } else ControlPanelManager.refreshForProfile(this.getActiveProfile());
     }
     
     static getProfileDisplayName(profile) {
+        if (typeof profile === 'string' && profile.startsWith('MEASURED:PANEL:')) return profile.slice('MEASURED:PANEL:'.length);
         if (typeof profile === 'string' && profile.startsWith('MEASURED:')) {
             const key = profile.slice(9);
             const layoutId = (typeof Generator !== 'undefined' && Generator.fingerprints[key]?.layout_id) || key;
@@ -2012,7 +2023,7 @@ class PageContext {
         }
         profile = profile.replace(/^BUILTIN:/, '');
         const names = {
-            'AUTO': 'Auto-Detect',
+            'AUTO': 'Panel profile',
             'COVER_TEMPLATE': 'Cover Template',
             'TITLE': 'Title Sheet',
             'TITLE_ASBUILT': 'As-Built Title',
@@ -2348,15 +2359,18 @@ class RedactionManager {
         
         box.dataset.transparent = transparent.toString(); 
         
-        let styleFont = fontFamily;
+        const explicitFont = typeof fontFamily === 'string' && fontFamily.length > 0;
+        let styleFont = explicitFont ? fontFamily : null;
         if (!styleFont) {
              const pageNum = parseInt(wrapper.dataset.pageNumber, 10);
              const isCoverCust = (mapKey === 'cust' && pageNum === 1);
              styleFont = isCoverCust ? "'Times New Roman', serif" : "'Courier New', monospace";
         }
-        // Guardrail: on page 1 cover, only cust zone may use Times New Roman
+        // Built-in cover template: only the customer zone uses Times. A panel-map
+        // zone that already names its fontFamily keeps that family and size.
+        const panelFont = wrapper.dataset.panelMap === '1' && explicitFont;
         const _pageNum = parseInt(wrapper.dataset.pageNumber, 10);
-        if (_pageNum === 1 && mapKey !== 'cust' && styleFont && styleFont.toLowerCase().includes('times')) {
+        if (!panelFont && _pageNum === 1 && mapKey !== 'cust' && styleFont && styleFont.toLowerCase().includes('times')) {
             styleFont = "'Courier New', monospace";
         }
         
@@ -2373,7 +2387,11 @@ class RedactionManager {
         textSpan.style.position = 'absolute'; textSpan.style.inset = '0'; textSpan.style.display = 'flex';
         textSpan.style.alignItems = 'center'; textSpan.style.justifyContent = textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center';
         textSpan.style.transformOrigin = '50% 50%'; textSpan.style.transform = rotation ? `rotate(${rotation}deg)` : 'none';
+        textSpan.style.fontFamily = styleFont;
+        textSpan.style.fontSize = 'inherit';
+        textSpan.style.fontWeight = fontWeight;
         const handle = document.createElement('div'); handle.className = 'redaction-resize-handle'; box.appendChild(handle);
+        handle.onmousedown = (e) => this.startResize(e, box);
         box.onmousedown = (e) => this.startDrag(e, box); layer.appendChild(box); this.zones.push(box);
         
         console.log(`📦 Total zones: ${this.zones.length}, Layer children: ${layer.children.length}`);
@@ -2411,8 +2429,37 @@ class RedactionManager {
         }
     }
 
-    static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = parseFloat(box.style.left) || 0; this.startTop = parseFloat(box.style.top) || 0; box.style.cursor = 'grabbing'; }
-    static handleDrag(e) { if(!this.isDragging || !this.activeBox) return; e.preventDefault(); const deltaX = e.clientX - this.startX; const deltaY = e.clientY - this.startY; this.activeBox.style.left = (this.startLeft + deltaX) + 'px'; this.activeBox.style.top = (this.startTop + deltaY) + 'px'; }
+    static startDrag(e, box) { if(!document.body.classList.contains('editor-active')) return; e.stopPropagation(); this.isResizing = false; this.selectZone(box); this.isDragging = true; this.activeBox = box; this.startX = e.clientX; this.startY = e.clientY; this.startLeft = parseFloat(box.style.left) || 0; this.startTop = parseFloat(box.style.top) || 0; box.style.cursor = 'grabbing'; }
+    static startResize(e, box) {
+        if (!document.body.classList.contains('editor-active')) return;
+        e.stopPropagation();
+        e.preventDefault();
+        this.selectZone(box);
+        this.isDragging = false;
+        this.isResizing = true;
+        this.activeBox = box;
+        this.startX = e.clientX;
+        this.startY = e.clientY;
+        this.startW = parseFloat(box.style.width) || 0;
+        this.startH = parseFloat(box.style.height) || 0;
+    }
+    static handleDrag(e) {
+        if (!this.activeBox) return;
+        if (this.isResizing) {
+            e.preventDefault();
+            const width = Math.max(4, this.startW + (e.clientX - this.startX));
+            const height = Math.max(4, this.startH + (e.clientY - this.startY));
+            this.activeBox.style.width = width + 'px';
+            this.activeBox.style.height = height + 'px';
+            return;
+        }
+        if(!this.isDragging) return;
+        e.preventDefault();
+        const deltaX = e.clientX - this.startX;
+        const deltaY = e.clientY - this.startY;
+        this.activeBox.style.left = (this.startLeft + deltaX) + 'px';
+        this.activeBox.style.top = (this.startTop + deltaY) + 'px';
+    }
     static endDrag() {
         if(this.activeBox) {
             this.activeBox.style.cursor = 'grab';
@@ -2428,6 +2475,7 @@ class RedactionManager {
             }
         }
         this.isDragging = false;
+        this.isResizing = false;
     }
     
     static selectZone(box) { 
@@ -2454,8 +2502,9 @@ class RedactionManager {
         
         const ff = box.style.fontFamily.replace(/"/g, "'");
         const fontSelect = document.getElementById('redact-font');
-        if (ff.includes("Courier")) fontSelect.value = "'Courier New', monospace";
-        else fontSelect.value = "'Times New Roman', serif";
+        if (/arial|helvetica|verdana/i.test(ff)) fontSelect.value = "Arial, Helvetica, sans-serif";
+        else if (/times/i.test(ff)) fontSelect.value = "'Times New Roman', serif";
+        else if (/courier/i.test(ff)) fontSelect.value = "'Courier New', monospace";
 
         document.getElementById('zone-bg-toggle').checked = (box.dataset.transparent === "false");
     }
@@ -2576,6 +2625,12 @@ class RedactionManager {
             const span = box.querySelector('.redaction-text') || box.querySelector('span'); 
             if(span) span.innerText = text; 
             else { const s = document.createElement('span'); s.className = 'redaction-text'; s.innerText = text; box.insertBefore(s, box.firstChild); }
+            const textNode = box.querySelector('.redaction-text') || box.querySelector('span');
+            if (textNode && box.style.fontFamily) {
+                textNode.style.fontFamily = box.style.fontFamily;
+                textNode.style.fontSize = 'inherit';
+                textNode.style.fontWeight = box.style.fontWeight || '';
+            }
             
             if(box.dataset.decoration === 'underline') { 
                 box.style.textDecoration = 'underline'; 
@@ -3382,7 +3437,6 @@ class LayoutScanner {
             if (select.disabled) return; // Skip disabled dropdowns (e.g. page 1 cover template)
             const currentVal = select.value;
             select.replaceChildren();
-            const auto = document.createElement('option'); auto.value = 'AUTO'; auto.textContent = '✨ Auto (Detected)'; select.appendChild(auto);
             const builtins = document.createElement('optgroup'); builtins.label = 'Built-in Profiles';
             for (const key of Object.keys(LAYOUT_RULES)) {
                 const option = document.createElement('option'); option.value = 'BUILTIN:' + key;
@@ -3405,8 +3459,16 @@ class LayoutScanner {
                 }
                 select.appendChild(group);
             }
-            select.value = !currentVal || currentVal === 'AUTO' ? 'AUTO' :
+            if (typeof PanelProfiles !== 'undefined' && typeof PdfViewer !== 'undefined' && PanelProfiles.hasId(PdfViewer._activePanelId)) {
+                const panelId = PanelProfiles.canonical(PdfViewer._activePanelId);
+                const option = document.createElement('option');
+                option.value = 'MEASURED:PANEL:' + panelId;
+                option.textContent = panelId + ' document profile';
+                select.appendChild(option);
+            }
+            const preferred = !currentVal || currentVal === 'AUTO' ? '' :
                 (/^(BUILTIN|CUSTOM|MEASURED):/.test(currentVal) ? currentVal : 'BUILTIN:' + currentVal);
+            if (preferred && Array.from(select.options).some(option => option.value === preferred)) select.value = preferred;
             console.log(`[refreshProfileOptions] Populated dropdown ${index + 1} with ${select.options.length} options`);
         });
     }
@@ -4289,14 +4351,21 @@ class SearchEngine {
         }
     }
 
+    static displayResults() {
+        const results = this.currentResults || [];
+        if (typeof DemoManager === 'undefined' || !DemoManager.isGeneratorActive || typeof PanelProfiles === 'undefined') return results;
+        return results.filter(record => !PanelProfiles.hiddenWhenSubmittal(record.displayId) && !PanelProfiles.hiddenWhenSubmittal(record.id));
+    }
+
     static renderCurrentPage() {
+        const visible = this.displayResults();
         const start = (this.currentPage - 1) * this.pageSize;
         const end = start + this.pageSize;
-        const pageResults = this.currentResults.slice(start, end);
-        const totalPages = Math.ceil(this.currentResults.length / this.pageSize);
+        const pageResults = visible.slice(start, end);
+        const totalPages = Math.ceil(visible.length / this.pageSize);
         
         // === RENDER PAGE RESULTS ===
-        UI.render(pageResults, this.lastCriteria, this.currentResults.length);
+        UI.render(pageResults, this.lastCriteria, visible.length);
         
         // === UPDATE PAGINATION CONTROLS ===
         const pageInfo = DOM_CACHE.get('page-info');
@@ -4326,7 +4395,7 @@ class SearchEngine {
     }
 
     static nextPage() {
-        const totalPages = Math.ceil(this.currentResults.length / this.pageSize);
+        const totalPages = Math.ceil(this.displayResults().length / this.pageSize);
         if (this.currentPage < totalPages) {
             this.currentPage++;
             this.renderCurrentPage();
@@ -4429,6 +4498,17 @@ class Generator {
         for (const [key, value] of Object.entries(LAYOUT_RULES)) all['BUILTIN:' + key] = value;
         for (const [key, value] of Object.entries(ProfileManager.getCustomProfiles())) all['CUSTOM:' + key] = value;
         for (const [key, value] of Object.entries(this.measured)) all['MEASURED:' + key] = value;
+        if (typeof PanelProfiles !== 'undefined' && typeof PdfViewer !== 'undefined' && PanelProfiles.hasId(PdfViewer._activePanelId)) {
+            const panelId = PanelProfiles.canonical(PdfViewer._activePanelId);
+            const record = PanelProfiles.peek(panelId);
+            if (record) {
+                const seeded = PanelProfiles.zonesFor(panelId, PanelProfiles.firstContentPage(record), null);
+                all['MEASURED:PANEL:' + panelId] = seeded.length ? seeded : [{
+                    x: 0.02, y: 0.02, w: 0.05, h: 0.02, map: 'custom', text: '', fontSize: 8,
+                    fontFamily: "'Courier New', monospace", textAlign: 'left', transparent: true, fontWeight: 'normal'
+                }];
+            }
+        }
         const normalized = Object.fromEntries(Object.entries(all).map(([key, value]) => [key, GeneratorState.zones(value, key === 'BUILTIN:COVER_TEMPLATE' ? 1 : 0)]));
         // Revision includes semantics, not merely a profile count or display name.
         this.state.register(normalized, GeneratorState.profileRevision(normalized, this.assetRevision || 'builtin'));
@@ -4465,6 +4545,7 @@ class Generator {
                 }
             })();
         } else this.capture();
+        if (typeof PanelProfiles !== 'undefined' && PanelProfiles.hasId(PdfViewer._activePanelId)) this.forceSourceCover = true;
         this.state.renderCommitted = false;
         this.invalidate();
     }
@@ -4478,7 +4559,10 @@ class Generator {
         const task = this.templateTasks.get(token);
         if (task) { this.templateTasks.delete(token); Promise.resolve(task.destroy()).catch(() => {}); }
     }
-    static async ready() { await Promise.all([this.sourceReady, this.loadAssets()]); return this.getState(); }
+    static async ready() {
+        await Promise.all([this.sourceReady, this.loadAssets(), typeof PanelProfiles !== 'undefined' ? PanelProfiles.loadIndex() : null]);
+        return this.getState();
+    }
     static getState() {
         return { digest: this.state.digest, sourceDigest: this.state.digest, sourcePageCount: this.state.sourcePageCount,
             generation: this.state.generation, revision: this.state.revision, profileRevision: this.state.profileRevision,
@@ -4524,6 +4608,7 @@ class Generator {
             if (RedactionManager.activeBox && layer.contains(RedactionManager.activeBox)) RedactionManager.deselect();
             RedactionManager.zones = RedactionManager.zones.filter(z => !layer.contains(z) && z.isConnected);
             layer.innerHTML = '';
+            wrapper.dataset.panelMap = String(entry.profileId || '').startsWith('MEASURED:PANEL:') ? '1' : '';
             LayoutScanner.applyRuleToWrapper(wrapper, entry.zones);
             wrapper.dataset.generatorGeneration = String(this.state.generation);
             wrapper.dataset.generatorStatus = entry.status;
@@ -4690,8 +4775,62 @@ class Generator {
         }
         return GeneratorState.zones(zones);
     }
+    static async applyPanelMap(record, onlyPage = null) {
+        const id = PanelProfiles.canonical(PdfViewer._activePanelId);
+        if (!this.forceSourceCover && !this.rerendering) {
+            this.forceSourceCover = true;
+            this.rerendering = true;
+            try { await PdfViewer.renderStack(); }
+            finally { this.rerendering = false; }
+            return this.getState();
+        }
+        this.capture();
+        this.registerProfiles();
+        const profileId = 'MEASURED:PANEL:' + id;
+        if (typeof document !== 'undefined' && document.body) document.body.classList.add('panel-profile-active');
+        for (let page = 1; page <= this.state.sourcePageCount; page++) {
+            if (onlyPage && page !== onlyPage) continue;
+            const wrapper = this.wrapper(page);
+            if (!wrapper) continue;
+            const g = wrapper._generatorGeometry;
+            const prior = this.state.pages[page];
+            if (prior?.status === 'resolved' && prior.provenance === 'manual' && prior.profileId !== profileId) {
+                wrapper.dataset.panelMapped = '0';
+                wrapper.dataset.panelMap = '';
+                this.paint(page);
+                continue;
+            }
+            if (prior?.status === 'resolved' && prior.profileId === profileId) {
+                wrapper.dataset.panelMapped = prior.zones.length ? '1' : '0';
+                this.paint(page);
+                continue;
+            }
+            try {
+                const sized = PanelProfiles.zonesFor(id, page, g);
+                if (sized.length) {
+                    this.state.setPage(page, profileId, 'manual', sized, g, 'source');
+                    wrapper.dataset.panelMapped = '1';
+                } else {
+                    this.state.unresolved(page, 'No mapped zones for this page of ' + id, g);
+                    wrapper.dataset.panelMapped = '0';
+                    wrapper.dataset.panelMap = '';
+                }
+            } catch (error) {
+                this.state.unresolved(page, error.message, g);
+                wrapper.dataset.panelMapped = '0';
+                wrapper.dataset.panelMap = '';
+            }
+            this.paint(page);
+        }
+        if (typeof PageContext !== 'undefined') PageContext.updateUI();
+        if (typeof LayoutScanner !== 'undefined') LayoutScanner.refreshProfileOptions();
+        return this.getState();
+    }
     static async scan(onlyPage = null) {
         await this.ready();
+        const panelRecord = typeof PanelProfiles !== 'undefined' ? await PanelProfiles.lookupAsync(PdfViewer._activePanelId) : null;
+        if (panelRecord) return this.applyPanelMap(panelRecord, onlyPage);
+        if (typeof document !== 'undefined' && document.body) document.body.classList.remove('panel-profile-active');
         this.capture();
         const sequence = ++this.scanSequence, generation = this.state.generation, doc = this.sourceDoc, renderToken = PdfViewer.currentRenderToken;
         for (let page = 1; page <= this.state.sourcePageCount; page++) {
@@ -4876,8 +5015,10 @@ class Generator {
         const fonts = {
             courier: await output.embedFont(PDFLib.StandardFonts.Courier),
             times: await output.embedFont(PDFLib.StandardFonts.TimesRoman),
+            helvetica: await output.embedFont(PDFLib.StandardFonts.Helvetica),
             courierBold: await output.embedFont(PDFLib.StandardFonts.CourierBold),
-            timesBold: await output.embedFont(PDFLib.StandardFonts.TimesRomanBold)
+            timesBold: await output.embedFont(PDFLib.StandardFonts.TimesRomanBold),
+            helveticaBold: await output.embedFont(PDFLib.StandardFonts.HelveticaBold)
         };
         for (const entry of snapshot.pages) {
             const page = output.getPage(entry.page - 1), g = entry.geometry;
@@ -4885,7 +5026,11 @@ class Generator {
                 if (!zone.transparent) page.drawRectangle({ ...GeneratorState.toPdfRect(g, zone), color: PDFLib.rgb(1,1,1), borderWidth: 0 });
                 const text = this.text(zone, snapshot.context); if (!text) continue;
                 const bold = zone.fontWeight === 'bold' || Number.parseInt(zone.fontWeight,10) >= 600;
-                const font = /times/i.test(zone.fontFamily) ? (bold ? fonts.timesBold : fonts.times) : (bold ? fonts.courierBold : fonts.courier), size = zone.fontSize;
+                const family = String(zone.fontFamily || '');
+                const font = /times/i.test(family) ? (bold ? fonts.timesBold : fonts.times)
+                    : /arial|helvetica|verdana|sans-serif/i.test(family) ? (bold ? fonts.helveticaBold : fonts.helvetica)
+                    : (bold ? fonts.courierBold : fonts.courier);
+                const size = zone.fontSize;
                 const lines = text.split('\n'), lineHeight = size * 1.4;
                 for (let i = 0; i < lines.length; i++) {
                     if (!lines[i]) continue;
@@ -7404,7 +7549,6 @@ class PdfViewer {
             toolbar.innerHTML = `
                 <span style="font-weight:600;">PAGE ${i}</span>
                 <select class="page-profile-select" onchange="LayoutScanner.updatePageProfile(${i}, this.value)">
-                    <option value="AUTO">✨ Auto (Detected)</option>
                     <option value="COVER_TEMPLATE">📋 Cover Template</option>
                     <optgroup label="📁 Info &amp; Notes">
                         <option value="INFO">📝 Info / Notes (Standard)</option>
@@ -7421,12 +7565,7 @@ class PdfViewer {
                         <option value="GENERAL">📐 General</option>
                     </optgroup>
                 </select>
-                <button class="rescan-btn" onclick="SmartScanner.rescanPage(${i})" title="Re-scan this page">🔄</button>
             `;
-            if (i === 1) {
-                const sel = toolbar.querySelector('.page-profile-select');
-                if (sel) sel.value = 'AUTO';
-            }
             wrapper.appendChild(toolbar);
 
             const contentContainer = document.createElement('div');
@@ -8559,6 +8698,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        if (typeof PanelProfiles !== 'undefined') PanelProfiles.loadIndex();
         // Sync version in menu
         const versionEl = document.getElementById('menu-version');
         if (versionEl) {
