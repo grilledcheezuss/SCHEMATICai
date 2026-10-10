@@ -109,22 +109,42 @@ test('known-unmapped panels are the ones hidden when Submittal is on', () => {
     assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-9000'), false);
 });
 
-test('shipped shards keep fonts and contain no stored text', () => {
+test('shipped catalog is the full set and keeps fonts without stored text', () => {
     const index = JSON.parse(fs.readFileSync(path.join(root, 'PDFmapping/panel-index.json'), 'utf8'));
     assert.equal(index.schema, 'schematicai-panel-profiles/1');
-    assert.equal(index.complete, false);
+    assert.equal(index.complete, true);
+    assert.equal(index.count, 5865);
+    assert.equal(index.ids.length, 5865);
     assert.ok(index.ids.includes('CP-3000'));
+    assert.ok(index.ids.includes('CP-8378'));
     assert.ok(index.unmapped.includes('CP-3053'));
-    assert.ok(index.ids.length > 1000);
+    assert.ok(index.unmapped.includes('CP-3337'));
+    assert.equal(PanelProfiles.shardFor('CP-8378'), 'PDFmapping/panels/cp-8000.json.gz');
+    assert.equal(PanelProfiles.shardFor('cp-4062'), 'PDFmapping/panels/cp-4000.json.gz');
     const blob = JSON.stringify(index);
     assert.equal(blob.includes('dwg_path'), false);
     assert.equal(/\d{3}[-.)]\d{3}[-.]\d{4}/.test(blob), false);
-    const shard = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root, 'PDFmapping/panels/cp-3000.json.gz'))).toString());
-    const zone = shard['CP-3000'].pages[0].zones.find(entry => entry.field === 'project_info');
-    assert.ok(zone.fontFamily && zone.fontSize > 0);
-    const encoded = JSON.stringify(shard['CP-3000']);
-    assert.equal(encoded.includes('"text"'), false);
-    assert.equal(encoded.includes('dwg_path'), false);
+    let packed = 0;
+    for (const file of index.shards) {
+        const shard = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root, file))).toString());
+        packed += Object.keys(shard).length;
+        const encoded = JSON.stringify(shard);
+        assert.equal(encoded.includes('"text"'), false, file);
+        assert.equal(encoded.includes('dwg_path'), false, file);
+        const sampleId = Object.keys(shard)[0];
+        const zone = shard[sampleId].pages.flatMap(page => page.zones)[0];
+        if (zone) {
+            assert.equal(typeof zone.fontFamily, 'string');
+            assert.ok(zone.fontSize > 0);
+        }
+    }
+    assert.equal(packed, 5865);
+    const early = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root, 'PDFmapping/panels/cp-3000.json.gz'))).toString());
+    const info = early['CP-3000'].pages[0].zones.find(entry => entry.field === 'project_info');
+    assert.ok(info.fontFamily && info.fontSize > 0);
+    const late = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root, 'PDFmapping/panels/cp-8000.json.gz'))).toString());
+    const lateZone = late['CP-8378'].pages.flatMap(page => page.zones).find(entry => entry.fontFamily && entry.fontSize);
+    assert.ok(lateZone);
 });
 
 console.log('PASS panel profiles: ' + assertions + ' assertions');

@@ -22,6 +22,8 @@
     let shardsLoaded = false;
     let indexPromise = null;
     let shardsPromise = null;
+    const loadedShards = new Set();
+    const shardPromises = new Map();
 
     function canonical(value) {
         let text = String(value || '').trim().toUpperCase().replace(/\s+/g, '');
@@ -157,6 +159,8 @@
         shardsLoaded = false;
         indexPromise = null;
         shardsPromise = null;
+        loadedShards.clear();
+        shardPromises.clear();
         delete memory[OVERRIDE_KEY];
         if (typeof localStorage !== 'undefined') {
             try { localStorage.removeItem(OVERRIDE_KEY); } catch (error) { /* ignore */ }
@@ -186,26 +190,52 @@
         return indexPromise;
     }
 
+    function ingest(decoded) {
+        if (!decoded || typeof decoded !== 'object') return;
+        for (const [id, record] of Object.entries(decoded)) {
+            const key = canonical(id);
+            if (!key || !record || typeof record !== 'object') continue;
+            panels[key] = record;
+            ids.add(key);
+        }
+    }
+
+    // Shards are one gzip per thousand Panel IDs: CP-8378 lives in cp-8000.json.gz.
+    function shardFor(id) {
+        const key = canonical(id);
+        const match = /^CP-(\d+)/.exec(key);
+        if (!match) return null;
+        const bucket = Math.floor(Number(match[1]) / 1000) * 1000;
+        return 'PDFmapping/panels/cp-' + bucket + '.json.gz';
+    }
+
+    function fetchShard(file) {
+        if (!file || loadedShards.has(file)) return Promise.resolve();
+        if (shardPromises.has(file)) return shardPromises.get(file);
+        const pending = (async () => {
+            const listed = index && Array.isArray(index.shards) ? index.shards : null;
+            if (listed && !listed.includes(file)) return;
+            if (typeof fetch !== 'function') return;
+            try {
+                const response = await fetch(file + '?v=' + encodeURIComponent(versionToken()), { credentials: 'same-origin' });
+                if (!response.ok) return;
+                const bytes = new Uint8Array(await response.arrayBuffer());
+                ingest(JSON.parse(new TextDecoder().decode(await gunzip(bytes))));
+                loadedShards.add(file);
+            } catch (error) {
+                console.warn('Panel profile shard unavailable', file, error);
+            }
+        })();
+        shardPromises.set(file, pending);
+        return pending.finally(() => { shardPromises.delete(file); });
+    }
+
     function loadShards() {
         if (shardsLoaded) return Promise.resolve(panels);
         if (!shardsPromise) shardsPromise = (async () => {
             await loadIndex();
             const files = index && Array.isArray(index.shards) ? index.shards : [];
-            for (const file of files) {
-                try {
-                    const response = await fetch(file + '?v=' + encodeURIComponent(versionToken()), { credentials: 'same-origin' });
-                    if (!response.ok) continue;
-                    const bytes = new Uint8Array(await response.arrayBuffer());
-                    const decoded = JSON.parse(new TextDecoder().decode(await gunzip(bytes)));
-                    for (const [id, record] of Object.entries(decoded)) {
-                        const key = canonical(id);
-                        panels[key] = record;
-                        ids.add(key);
-                    }
-                } catch (error) {
-                    console.warn('Panel profile shard unavailable', file, error);
-                }
-            }
+            for (const file of files) await fetchShard(file);
             shardsLoaded = true;
             return panels;
         })();
@@ -228,7 +258,7 @@
         if (!key) return null;
         if (panels[key]) return panels[key];
         if (!ids.has(key)) return null;
-        await loadShards();
+        await fetchShard(shardFor(key));
         return panels[key] || null;
     }
 
@@ -333,7 +363,7 @@
 
     return {
         SCHEMA, HANDLE_PX, canonical, alignMap, overlayBox, presentZone, install, reset,
-        loadIndex, loadShards, peek, hasId, lookup, lookupAsync, zonesFor, selectPage,
+        loadIndex, loadShards, shardFor, peek, hasId, lookup, lookupAsync, zonesFor, selectPage,
         firstContentPage, isMapped, hiddenWhenSubmittal, labelFor, fieldsFor, saveOverride, saveActivePage
     };
 });

@@ -1,7 +1,7 @@
 // --- SCHEMATICA ai v2.5.117 ---
 const APP_VERSION = "v2.5.117";
 const VERSION_HISTORY = {
-    "v2.5.117": "Submittal Generator looks up each Panel ID in the measured page map and places that panel's text-tight zones, keeping every zone's fontFamily and fontSize. Mapped panels do not use Auto-Detect. Resize the boxes and save to overwrite that panel's profile. A 2px inset is applied only when a resize handle would cover the text. Frontend only — Worker executable remains v2.5.113.",
+    "v2.5.117": "Submittal Generator looks up each Panel ID in the measured page map (5865 panels, CP-3000 through CP-8378) and places that panel's text-tight zones, keeping every zone's fontFamily and fontSize. The catalog loads from PDFmapping at runtime. Mapped panels do not use Auto-Detect. Resize the boxes and save to overwrite that panel's profile. A 2px inset is applied only when a resize handle would cover the text. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.116": "Submittal Generator whiteouts sit about 2px inside the ruled cell for each field on cover, info, and schematic profiles. Address, phone, and fax each keep their own slice of a shared contact cell instead of one tall box. Auto-Scan joins fragmented title-block rules so info and schematic pages can match a measured profile. Cover Template Panel ID is back on the template drawing-number row. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.115": "Submittal Generator page detection: the 81 core measured Cox profiles ship in the page dropdown (no fetch race), and Auto-Scan selects info, schematic, and cover profiles from title-block geometry, including a small placement shift. Page 1 can take a measured cover and then shows that source sheet; an unmatched first page still uses Cover Template. Built-in Cover Template, Info, and Schematic Portrait Panel ID zones are shifted onto the cells shown on CP-8377 (drawing number up and left of the old box; cover number raised inside the border). Frontend only — Worker executable remains v2.5.113.",
     "v2.5.114": "Focused Submittal Generator integration: owned source-content SHA-256 identity, canonical displayed CropBox page state and stable profile IDs, 186 measured layouts with conservative exact geometric matching, atomic versioned source-bound mapping import/export, preserved manual edits across zoom/rerender, rotation-aware canonical PDF snapshots, stale async operation guards, and shared generated preview/print/download bytes with cleanup. Unresolved pages block generation without affecting original PDFs. Visual masking only; underlying PDF content is not removed. Worker, auth, parser and search logic unchanged.",
@@ -8698,6 +8698,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        if (typeof PanelProfiles !== 'undefined') PanelProfiles.loadIndex();
         // Sync version in menu
         const versionEl = document.getElementById('menu-version');
         if (versionEl) {
