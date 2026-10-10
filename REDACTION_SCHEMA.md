@@ -1,6 +1,6 @@
 # SCHEMATICA ai Redaction Profile Schema
 
-## Release: v2.5.115
+## Release: v2.5.116
 
 ## Overview
 
@@ -440,6 +440,7 @@ This ensures proper layering: whiteouts cover content, then text appears on top.
 
 ## Version History
 
+- **v2.5.116**: Whiteout boxes inset about 2px inside each field cell on cover, info, and schematic profiles. Fragmented title-block rules still match. Cover Template Panel ID restored to the template row. Worker executable unchanged.
 - **v2.5.115**: Bundled measured Cox profiles, automatic info/schematic/cover selection, and small title-block placement shift. Worker executable unchanged.
 - **v2.5.114**: Revision-bound per-page generator state and mapping integration; visual masking semantics clarified.
 - **v2.5.3**: Added preview, improved export, rotation underline fix
@@ -479,7 +480,7 @@ of privacy.
 ## Release and acceptance
 
 Publish `index.html`, all versioned frontend scripts/styles (including
-`measured-layouts.js`), and the mapping JSON assets together. The v2.5.115 Worker
+`measured-layouts.js`), and the mapping JSON assets together. The v2.5.116 Worker
 banner is a release label only: executable Worker code and its v2.5.113 transform
 revision are unchanged. No Worker, Apps Script, parser revision, encrypted
 snapshot schema, or compatibility-date deployment change is required.

@@ -140,6 +140,234 @@
         const n = a.H.length + a.V.length + b.H.length + b.V.length;
         return n ? 2 * (lineMatches(a.H, b.H, .03, .03) + lineMatches(a.V, b.V, .006, .08)) / n : 0;
     }
+    // Join collinear CAD fragments (a rule drawn as many short, slightly skewed segments)
+    // so the title-block score sees the same long borders the fingerprint stored.
+    function mergeLines(lines, axisTol = 0.002, gapTol = 0.012) {
+        const sorted = (lines || [])
+            .map(l => [l[0], Math.min(l[1], l[2]), Math.max(l[1], l[2])])
+            .filter(l => Number.isFinite(l[0]) && l[2] - l[1] > 0.0015)
+            .sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+        const groups = [];
+        for (const line of sorted) {
+            let group = null;
+            for (let i = groups.length - 1; i >= 0 && groups[i].pos >= line[0] - axisTol; i--) {
+                if (Math.abs(groups[i].pos - line[0]) <= axisTol) { group = groups[i]; break; }
+            }
+            if (!group) groups.push(group = { pos: line[0], n: 1, segs: [] });
+            else group.pos = (group.pos * group.n + line[0]) / ++group.n;
+            group.segs.push([line[1], line[2]]);
+        }
+        const out = [];
+        for (const group of groups) {
+            const segs = group.segs.sort((a, b) => a[0] - b[0]);
+            let a = segs[0][0], b = segs[0][1];
+            for (let i = 1; i < segs.length; i++) {
+                if (segs[i][0] <= b + gapTol) b = Math.max(b, segs[i][1]);
+                else { out.push([group.pos, a, b]); a = segs[i][0]; b = segs[i][1]; }
+            }
+            out.push([group.pos, a, b]);
+        }
+        return out;
+    }
+    // ~2px on a letter page displayed near 792px tall. The same fraction is used on both axes.
+    const CELL_INSET = 2 / 792;
+    function clampRect(r) {
+        if (!r || ![r.x, r.y, r.w, r.h].every(Number.isFinite)) return null;
+        const x = Math.min(Math.max(0, r.x), 0.996), y = Math.min(Math.max(0, r.y), 0.996);
+        const w = Math.min(Math.max(0.004, r.w), 1 - x), h = Math.min(Math.max(0.004, r.h), 1 - y);
+        return w > 0 && h > 0 ? { x, y, w, h } : null;
+    }
+    function insetRect(r) {
+        const box = clampRect(r);
+        if (!box) return null;
+        const pad = Math.min(CELL_INSET, (box.w - 0.005) / 2, (box.h - 0.005) / 2);
+        if (!(pad > 0.0004)) return box;
+        return clampRect({ x: box.x + pad, y: box.y + pad, w: box.w - 2 * pad, h: box.h - 2 * pad });
+    }
+    function crossing(lines, at, slop) {
+        return lines.filter(l => l[1] - slop <= at && l[2] + slop >= at);
+    }
+    // Smallest ruled rectangle whose borders actually cross this point.
+    // Missing outer frame edges are taken from the rule endpoints, never from the page border.
+    function cellAround(H, V, cx, cy) {
+        const hCross = crossing(H, cx, 0.003).sort((a, b) => a[0] - b[0]);
+        const vCross = crossing(V, cy, 0.003).sort((a, b) => a[0] - b[0]);
+        const above = [...hCross].reverse().find(l => l[0] <= cy - 0.0015);
+        const below = hCross.find(l => l[0] >= cy + 0.0015);
+        const leftLine = [...vCross].reverse().find(l => l[0] <= cx - 0.0015);
+        const rightLine = vCross.find(l => l[0] >= cx + 0.0015);
+        let top = above ? above[0] : null, bot = below ? below[0] : null;
+        let L = leftLine ? leftLine[0] : null, R = rightLine ? rightLine[0] : null;
+        const collect = (edge, side) => {
+            const ends = [];
+            for (const line of [above, below]) {
+                if (!line) continue;
+                const end = side < 0 ? line[1] : line[2];
+                if (side < 0 ? end < cx - 0.004 : end > cx + 0.004) ends.push(end);
+            }
+            for (const line of H) {
+                if (top == null || bot == null || line[0] < top - 0.004 || line[0] > bot + 0.004) continue;
+                if (side < 0 && line[1] < cx - 0.004 && line[2] >= cx - 0.012) ends.push(line[1]);
+                if (side > 0 && line[2] > cx + 0.004 && line[1] <= cx + 0.012) ends.push(line[2]);
+            }
+            if (!ends.length) return edge;
+            const chosen = side < 0 ? Math.max(...ends) : Math.min(...ends);
+            if (Math.abs(chosen - cx) > 0.18) return edge;
+            return chosen;
+        };
+        if (L == null) L = collect(L, -1);
+        if (R == null) R = collect(R, 1);
+        if ([top, bot, L, R].some(v => v == null)) return null;
+        const w = R - L, h = bot - top;
+        if (!(w >= 0.015) || !(h >= 0.007) || w > 0.55 || h > 0.12) return null;
+        const reaches = (line, a, b) => line && line[1] <= a + 0.014 && line[2] >= b - 0.014;
+        if (!reaches(above, L, R) || !reaches(below, L, R)) return null;
+        return { x: L, y: top, w, h };
+    }
+    function intersectionArea(a, b) {
+        const w = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+        const h = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+        return w * h;
+    }
+    // A center that sits on a rule belongs to the adjacent cell that actually holds the text.
+    function bestCell(H, V, zone) {
+        const cx = zone.x + zone.w / 2, cy = zone.y + zone.h / 2, probes = [[cx, cy]];
+        for (const line of H) {
+            if (Math.abs(line[0] - cy) <= 0.004 && line[1] - 0.003 <= cx && line[2] + 0.003 >= cx) {
+                probes.push([cx, line[0] - 0.0035], [cx, line[0] + 0.0035]);
+            }
+        }
+        let best = null, bestScore = 0;
+        const seen = new Set();
+        for (const [x, y] of probes) {
+            const cell = cellAround(H, V, x, y);
+            if (!cell) continue;
+            const key = [cell.x, cell.y, cell.w, cell.h].map(n => Math.round(n * 1000)).join('|');
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const frac = intersectionArea(cell, zone) / Math.max(zone.w * zone.h, 1e-6);
+            if (frac < 0.35) continue;
+            const score = frac - cell.w * cell.h * 0.02;
+            if (score > bestScore) { best = cell; bestScore = score; }
+        }
+        return best;
+    }
+    function overlapFrac(a, b) {
+        const w = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+        const h = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+        const smaller = Math.min(a.w * a.h, b.w * b.h);
+        return smaller > 0 ? (w * h) / smaller : 0;
+    }
+    // Pull every zone inside the ruled entry that contains it, ~1–2px off each border.
+    // Fields that share one cell (address / phone / fax) each get their own slice of that cell.
+    function fitZonesToCells(input, H, V) {
+        const zones = (input || []).map(z => ({ ...z }));
+        const hLines = mergeLines(H, 0.002, 0.012), vLines = mergeLines(V, 0.002, 0.012);
+        const placed = zones.map(z => ({ z, cx: z.x + z.w / 2, cy: z.y + z.h / 2, cell: bestCell(hLines, vLines, z) }));
+        const groups = new Map();
+        placed.forEach((p, i) => {
+            if (!p.cell) return;
+            const key = [p.cell.x, p.cell.y, p.cell.w, p.cell.h].map(n => Math.round(n * 10000)).join('|');
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(i);
+        });
+        const rectOf = new Array(zones.length).fill(null);
+        const usable = (zone, rect) => !!rect && (rect.h >= 0.01 || rect.h >= zone.h * 0.7) && (rect.w >= 0.012 || rect.w >= zone.w * 0.7);
+        for (const indexes of groups.values()) {
+            const members = indexes.map(i => placed[i]), cell = members[0].cell;
+            const sameField = new Set(members.map(p => p.z.map || 'custom')).size === 1;
+            let duplicate = sameField;
+            if (duplicate && members.length > 1) {
+                for (let a = 0; a < members.length && duplicate; a++) for (let b = a + 1; b < members.length; b++) {
+                    if (overlapFrac(members[a].z, members[b].z) < 0.45) duplicate = false;
+                }
+            }
+            if (members.length === 1 || duplicate) {
+                const rect = insetRect(cell);
+                indexes.forEach(i => { if (usable(placed[i].z, rect)) rectOf[i] = rect; });
+                continue;
+            }
+            const byY = members.slice().sort((a, b) => a.cy - b.cy);
+            const byX = members.slice().sort((a, b) => a.cx - b.cx);
+            const vertical = (byY[byY.length - 1].cy - byY[0].cy) >= (byX[byX.length - 1].cx - byX[0].cx);
+            const stack = vertical ? byY : byX;
+            stack.forEach((cur, i) => {
+                const prev = stack[i - 1], next = stack[i + 1];
+                const rect = vertical
+                    ? { x: cell.x, y: prev ? (prev.cy + cur.cy) / 2 : cell.y, w: cell.w, h: 0 }
+                    : { x: prev ? (prev.cx + cur.cx) / 2 : cell.x, y: cell.y, w: 0, h: cell.h };
+                if (vertical) rect.h = Math.max(0.006, (next ? (cur.cy + next.cy) / 2 : cell.y + cell.h) - rect.y);
+                else rect.w = Math.max(0.008, (next ? (cur.cx + next.cx) / 2 : cell.x + cell.w) - rect.x);
+                const fittedRect = insetRect(rect);
+                const at = placed.indexOf(cur);
+                if (usable(cur.z, fittedRect)) rectOf[at] = fittedRect;
+            });
+        }
+        const free = placed.map((p, i) => ({ i, z: rectOf[i] ? { ...p.z, ...rectOf[i] } : { ...p.z }, fitted: !!rectOf[i], cut: false }));
+        const cutZone = (zone, keepStart, vertical, mid) => {
+            if (vertical) {
+                if (keepStart) {
+                    const y2 = Math.min(zone.y + zone.h, mid);
+                    return y2 - zone.y >= 0.008 ? { ...zone, h: y2 - zone.y } : zone;
+                }
+                const y = Math.max(zone.y, mid);
+                return zone.y + zone.h - y >= 0.008 ? { ...zone, y, h: zone.y + zone.h - y } : zone;
+            }
+            if (keepStart) {
+                const x2 = Math.min(zone.x + zone.w, mid);
+                return x2 - zone.x >= 0.008 ? { ...zone, w: x2 - zone.x } : zone;
+            }
+            const x = Math.max(zone.x, mid);
+            return zone.x + zone.w - x >= 0.008 ? { ...zone, x, w: zone.x + zone.w - x } : zone;
+        };
+        for (let pass = 0; pass < 4; pass++) {
+            let changed = false;
+            for (let a = 0; a < free.length; a++) for (let b = a + 1; b < free.length; b++) {
+                if (free[a].fitted || free[b].fitted) continue;
+                const A = free[a].z, B = free[b].z;
+                if (overlapFrac(A, B) < 0.35) continue;
+                const vertical = Math.abs((A.y + A.h / 2) - (B.y + B.h / 2)) >= Math.abs((A.x + A.w / 2) - (B.x + B.w / 2));
+                const mid = vertical ? ((A.y + A.h / 2) + (B.y + B.h / 2)) / 2 : ((A.x + A.w / 2) + (B.x + B.w / 2)) / 2;
+                const aStart = vertical ? (A.y + A.h / 2) <= (B.y + B.h / 2) : (A.x + A.w / 2) <= (B.x + B.w / 2);
+                const nextA = cutZone(A, aStart, vertical, mid), nextB = cutZone(B, !aStart, vertical, mid);
+                if (nextA !== A || nextB !== B) { free[a].z = nextA; free[b].z = nextB; free[a].cut = free[b].cut = true; changed = true; }
+            }
+            if (!changed) break;
+        }
+        // A wide envelope must not sit on top of the field that owns the cell.
+        const rank = map => ({ cpid: 1, date: 2, type: 3, po: 4, serial: 5, cust: 6, job: 7, job_block: 8, stage: 9, address: 10, phone: 11, fax: 12, logo: 13, company: 14, custom: 20 }[map] || 15);
+        const carve = (host, block) => {
+            const overlapW = Math.max(0, Math.min(host.x + host.w, block.x + block.w) - Math.max(host.x, block.x));
+            const overlapH = Math.max(0, Math.min(host.y + host.h, block.y + block.h) - Math.max(host.y, block.y));
+            if (overlapW * overlapH <= 0) return host;
+            const pieces = [
+                block.y - host.y >= 0.008 ? { ...host, h: block.y - host.y } : null,
+                host.y + host.h - (block.y + block.h) >= 0.008 ? { ...host, y: block.y + block.h, h: host.y + host.h - (block.y + block.h) } : null,
+                block.x - host.x >= 0.008 ? { ...host, w: block.x - host.x } : null,
+                host.x + host.w - (block.x + block.w) >= 0.008 ? { ...host, x: block.x + block.w, w: host.x + host.w - (block.x + block.w) } : null
+            ].filter(Boolean).sort((a, b) => b.w * b.h - a.w * a.h);
+            return pieces[0] || null;
+        };
+        for (let pass = 0; pass < 3; pass++) {
+            let changed = false;
+            for (let a = 0; a < free.length; a++) for (let b = a + 1; b < free.length; b++) {
+                const A = free[a].z, B = free[b].z;
+                if ((A.map || 'custom') === (B.map || 'custom')) continue;
+                if (overlapFrac(A, B) < 0.2) continue;
+                const loser = rank(A.map) >= rank(B.map) ? free[a] : free[b];
+                const winner = loser === free[a] ? free[b] : free[a];
+                const next = carve(loser.z, winner.z);
+                if (!next) { loser.z = { ...loser.z, transparent: true }; continue; }
+                if (next !== loser.z) { loser.z = next; loser.cut = true; changed = true; }
+            }
+            if (!changed) break;
+        }
+        return free.map(item => {
+            const source = item.cut ? (insetRect(item.z) || item.z) : item.z;
+            const box = clampRect(source) || source;
+            return { ...zones[item.i], ...source, x: box.x, y: box.y, w: box.w, h: box.h };
+        });
+    }
     function relLines(H, V, bbox) {
         const [x0, y0, x1, y1] = bbox, bw = x1 - x0, bh = y1 - y0;
         if (!(bw > 0) || !(bh > 0)) return null;
@@ -153,11 +381,13 @@
     function titleBand(H, V) {
         // Include rules that sit just past the page edge so a small downward print shift
         // still reconstructs the same grid instead of losing the bottom border.
-        const wide = H.filter(l => l[2] - l[1] >= 0.35 && l[0] >= 0.62 && l[0] <= 1.02);
-        const pool = wide.length >= 2 ? wide : H.filter(l => l[0] >= 0.62 && l[0] <= 1.02);
+        // A full-page frame sits on y=0 or y=1 and spans edge to edge. It is not a title-block rule.
+        const content = H.filter(l => !((l[2] - l[1]) >= 0.97 && (l[0] <= 0.02 || l[0] >= 0.985)));
+        const wide = content.filter(l => l[2] - l[1] >= 0.35 && l[0] >= 0.62 && l[0] <= 1.02);
+        const pool = wide.length >= 2 ? wide : content.filter(l => l[0] >= 0.62 && l[0] <= 1.02);
         if (pool.length < 2) return null;
         const top = Math.min(...pool.map(l => l[0])), bottom = Math.max(...pool.map(l => l[0]));
-        const Hs = H.filter(l => l[0] >= top - 0.02 && l[0] <= bottom + 0.02 && l[2] - l[1] >= 0.004);
+        const Hs = content.filter(l => l[0] >= top - 0.02 && l[0] <= bottom + 0.02 && l[2] - l[1] >= 0.004);
         const Vs = V.filter(l => l[1] >= top - 0.03 && l[2] <= bottom + 0.03 && l[2] - l[1] >= 0.004);
         if (Hs.length < 2 || !Vs.length) return null;
         const bbox = [
@@ -193,9 +423,11 @@
             if (!meta || meta.low_confidence || !Array.isArray(zones)) continue;
             const zone = zones.find(z => z.map === 'cpid');
             if (!zone) continue;
+            const textCenter = cpid.x + (cpid.w || 0) / 2;
             const dy = Math.abs(zone.y - cpid.y);
-            const dx = Math.abs((zone.x + zone.w / 2) - (cpid.x + (cpid.w || 0) / 2));
-            if (dy <= 0.03 && dx <= 0.08) hits.push({ key, score: 1 - dy / 0.03 - dx / 0.2 });
+            const dx = Math.abs((zone.x + zone.w / 2) - textCenter);
+            const inside = textCenter >= zone.x - 0.02 && textCenter <= zone.x + zone.w + 0.02;
+            if (dy <= 0.02 && dx <= 0.05 && inside) hits.push({ key, score: 1 - dy / 0.02 - dx / 0.15 });
         }
         hits.sort((a, b) => b.score - a.score);
         if (!hits.length) return null;
@@ -206,17 +438,25 @@
     // same grid is printed a little high/low or left/right. Identical competing templates stay unresolved.
     function matchMeasured(evidence, profiles, fingerprints, metadata) {
         if (!evidence || !evidence.H || !evidence.V) return { status: 'unresolved', reason: 'No geometric evidence' };
+        evidence = { ...evidence, H: mergeLines(evidence.H), V: mergeLines(evidence.V) };
+        const fitted = result => {
+            if (!result || result.status !== 'resolved') return result;
+            const key = String(result.profileId || '').replace(/^(MEASURED|BUILTIN|CUSTOM):/, '');
+            const source = result.zones || (profiles && profiles[key]);
+            if (!Array.isArray(source)) return result;
+            return { ...result, zones: fitZonesToCells(source, evidence.H, evidence.V) };
+        };
         if (evidence.preferCover) {
             const cover = matchCover(evidence, profiles, fingerprints, metadata);
-            return cover || { status: 'unresolved', reason: 'Unknown title-block geometry' };
+            return fitted(cover || { status: 'unresolved', reason: 'Unknown title-block geometry' });
         }
         const band = evidence.H.length && evidence.V.length ? titleBand(evidence.H, evidence.V) : null;
         if (!band) {
             if (evidence.class === 'COVER' || evidence.page === 1) {
                 const cover = matchCover(evidence, profiles, fingerprints, metadata);
-                if (cover) return cover;
+                if (cover) return fitted(cover);
             }
-            return { status: 'unresolved', reason: 'Unknown title-block geometry' };
+            return fitted({ status: 'unresolved', reason: 'Unknown title-block geometry' });
         }
         const observedRel = relLines(band.H, band.V, band.bbox);
         const groups = new Map();
@@ -237,9 +477,9 @@
         if (!ranked.length) {
             if (evidence.class === 'COVER' || evidence.page === 1) {
                 const cover = matchCover(evidence, profiles, fingerprints, metadata);
-                if (cover) return cover;
+                if (cover) return fitted(cover);
             }
-            return { status: 'unresolved', reason: 'Unknown title-block geometry' };
+            return fitted({ status: 'unresolved', reason: 'Unknown title-block geometry' });
         }
         const leader = ranked[0];
         leader.keys.sort((a, b) => a.dist - b.dist || ((metadata[b.key]?.n_pages || 0) - (metadata[a.key]?.n_pages || 0)));
@@ -251,11 +491,11 @@
         if (second && Math.abs(second.dist - best.dist) <= 0.004 && best.dist <= 0.012) {
             return { status: 'unresolved', reason: 'Ambiguous measured layouts', candidates: [best, second] };
         }
-        if (best.dist <= 0.012) return { status: 'resolved', profileId: 'MEASURED:' + best.key, confidence: leader.score, placement: 'exact' };
+        if (best.dist <= 0.012) return fitted({ status: 'resolved', profileId: 'MEASURED:' + best.key, confidence: leader.score, placement: 'exact' });
         if (best.dist <= 0.05) {
             const zones = placeZones(profiles[best.key], best.bbox, band.bbox);
             if (!zones) return { status: 'unresolved', reason: 'Unknown title-block geometry' };
-            return { status: 'resolved', profileId: 'MEASURED:' + best.key, confidence: leader.score, placement: 'affine', zones };
+            return fitted({ status: 'resolved', profileId: 'MEASURED:' + best.key, confidence: leader.score, placement: 'affine', zones });
         }
         return { status: 'unresolved', reason: 'Unknown title-block geometry' };
     }
@@ -366,5 +606,5 @@
                 pages: clone(pages), context: clone(context) });
         }
     }
-    return { State, SCHEMA, COORDINATES, LIMITS, boundedJson, parseJson, profileRevision, sha256, freezeSemantic, zones, equalZones, id, migrateProfiles, geometry, toPdfPoint, toPdfRect, rscore, matchMeasured };
+    return { State, SCHEMA, COORDINATES, LIMITS, boundedJson, parseJson, profileRevision, sha256, freezeSemantic, zones, equalZones, id, migrateProfiles, geometry, toPdfPoint, toPdfRect, rscore, mergeLines, fitZonesToCells, matchMeasured };
 });
