@@ -64,23 +64,31 @@ test('page select returns that page only', () => {
     assert.notEqual(later.profileKey, first.profileKey);
 });
 
-test('text-tight boxes inset only when the handle needs room', () => {
+test('text-tight boxes are placed exactly as measured (no trim, exact zones untouched)', () => {
     const raw = sample['CP-3000'].pages[0].zones;
     const tight = raw.find(zone => zone.h * 792 <= PanelProfiles.HANDLE_PX * 3);
     const roomy = raw.find(zone => zone.w * 612 > PanelProfiles.HANDLE_PX * 3 && zone.h * 792 > PanelProfiles.HANDLE_PX * 3);
     assert.ok(tight && roomy);
     const metrics = { width: 612, height: 792 };
-    const tightBox = PanelProfiles.overlayBox(tight, metrics);
-    const roomyBox = PanelProfiles.overlayBox(roomy, metrics);
-    assert.equal(tightBox.w, tight.w);
-    assert.equal(tightBox.h, tight.h);
-    assert.ok(Math.abs(roomyBox.w - (roomy.w - 2 / 612)) < 1e-9);
-    assert.ok(Math.abs(roomyBox.h - (roomy.h - 2 / 792)) < 1e-9);
-    // The retired cell inset (2/792 on every side of every box) is not applied.
-    assert.notEqual(tightBox.x, tight.x + 2 / 792);
+    for (const zone of [tight, roomy]) {
+        const box = PanelProfiles.overlayBox(zone, metrics);
+        assert.deepEqual([box.x, box.y, box.w, box.h], [zone.x, zone.y, zone.w, zone.h]);
+    }
+    const exact = PanelProfiles.presentZone({ ...roomy, exact: true }, metrics, false);
+    assert.deepEqual([exact.x, exact.y, exact.w, exact.h], [roomy.x, roomy.y, roomy.w, roomy.h]);
     const presented = PanelProfiles.presentZone(roomy, metrics, false);
+    assert.deepEqual([presented.x, presented.y, presented.w, presented.h], [roomy.x, roomy.y, roomy.w, roomy.h]);
     assert.equal(presented.fontFamily, roomy.fontFamily);
     assert.equal(presented.fontSize, roomy.fontSize);
+});
+
+test('stage zones (PROJECT SUBMITTAL / AS-BUILT heading) present as the stage field', () => {
+    const zone = { map: 'stage', field: 'stage', x: 0.33, y: 0.69, w: 0.31, h: 0.03, fontSize: 22, fontFamily: "'Times New Roman', Times, serif" };
+    const presented = PanelProfiles.presentZone(zone, { width: 612, height: 792 }, false);
+    assert.equal(presented.map, 'stage');
+    assert.equal(presented.text, null);
+    assert.equal(presented.fontSize, 22);
+    assert.equal(PanelProfiles.alignMap(zone), 'stage');
 });
 
 test('save overwrites the selected page and leaves the other page', () => {
@@ -113,12 +121,13 @@ test('shipped catalog is the full set and keeps fonts without stored text', () =
     const index = JSON.parse(fs.readFileSync(path.join(root, 'PDFmapping/panel-index.json'), 'utf8'));
     assert.equal(index.schema, 'schematicai-panel-profiles/1');
     assert.equal(index.complete, true);
-    assert.equal(index.count, 5865);
-    assert.equal(index.ids.length, 5865);
+    assert.equal(index.count, 5858);
+    assert.equal(index.ids.length, 5858);
     assert.ok(index.ids.includes('CP-3000'));
     assert.ok(index.ids.includes('CP-8378'));
     assert.ok(index.unmapped.includes('CP-3053'));
     assert.ok(index.unmapped.includes('CP-3337'));
+    assert.ok(index.unmapped.includes('CP-3777')); // rebuild timeout: unmapped, hidden in Submittal
     assert.equal(PanelProfiles.shardFor('CP-8378'), 'PDFmapping/panels/cp-8000.json.gz');
     assert.equal(PanelProfiles.shardFor('cp-4062'), 'PDFmapping/panels/cp-4000.json.gz');
     const blob = JSON.stringify(index);
@@ -138,7 +147,7 @@ test('shipped catalog is the full set and keeps fonts without stored text', () =
             assert.ok(zone.fontSize > 0);
         }
     }
-    assert.equal(packed, 5865);
+    assert.equal(packed, 5858);
     const early = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(root, 'PDFmapping/panels/cp-3000.json.gz'))).toString());
     const info = early['CP-3000'].pages[0].zones.find(entry => entry.field === 'project_info');
     assert.ok(info.fontFamily && info.fontSize > 0);
