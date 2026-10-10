@@ -241,5 +241,24 @@ function createFetchHarness(options = {}) {
         assert(payload.status === 403, 'PDF_BY_ID 403 should preserve upstream status');
     }
 
+    {
+        const calls = [];
+        const worker = loadWorker(async (input) => {
+            calls.push(typeof input === 'string' ? input : input.url);
+            return new Response('%PDF-1.4 blank', { status: 200, headers: { 'Content-Type': 'application/pdf' } });
+        });
+        const missing = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8204'), makeEnv(), { waitUntil: () => {} });
+        assert(missing.status === 404, 'unset blank base is not configured');
+        assert(await missing.text() === 'Blank base not configured', 'unset blank base message does not look like a missing file');
+        assert(calls.length === 0, 'unset blank base does not fetch');
+        const insecure = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8204'), makeEnv({ SUBMITTAL_BLANK_BASE: 'http://files.example/blanks' }), { waitUntil: () => {} });
+        assert(insecure.status === 404 && await insecure.text() === 'Blank base not configured', 'blank base must be https');
+        const served = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8204'), makeEnv({ SUBMITTAL_BLANK_BASE: 'https://files.example/blanks' }), { waitUntil: () => {} });
+        assert(served.status === 200, 'configured blank is proxied');
+        assert(calls.length === 1 && calls[0] === 'https://files.example/blanks/CP8000-8999/CP8200-8299/CP-8204.pdf', 'blank path stays under the configured prefix');
+        const escaped = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=../secret'), makeEnv({ SUBMITTAL_BLANK_BASE: 'https://files.example/blanks' }), { waitUntil: () => {} });
+        assert(escaped.status === 404 && calls.length === 1, 'non panel ids are not fetched');
+    }
+
     console.log('✅ Airtable token/header routing regression tests passed');
 })();

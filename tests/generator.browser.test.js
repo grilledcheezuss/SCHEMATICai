@@ -231,8 +231,8 @@ async function testProfilesAndEditing(browser) {
         const pages = await __raster((await PdfExporter.generateRedactedPdf()).buffer);
         return { dom, text: pages[0].text };
     });
-    check(mapped.dom[0].font.includes('Times') && mapped.dom[1].font.includes('Courier'),
-        'Cover customer defaults to Times, other cover fields default to Courier');
+    check(mapped.dom[0].font.includes('Times') && mapped.dom[1].font.includes('Times'),
+        'Cover customer, job, and date default to Times');
     check(mapped.dom[0].text === 'SYNTHETIC CUSTOMER' && mapped.dom[1].text.includes('SYNTHETIC JOB')
         && mapped.dom[2].text === '07/08/26' && mapped.text.includes('SYNTHETIC CUSTOMER')
         && mapped.text.includes('SYNTHETIC JOB') && mapped.text.includes('07/08/26'),

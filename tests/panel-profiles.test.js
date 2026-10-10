@@ -156,4 +156,17 @@ test('shipped catalog is the full set and keeps fonts without stored text', () =
     assert.ok(lateZone);
 });
 
+test('hide list keeps listed panels out of Submittal even when mapped', () => {
+    const list = JSON.parse(fs.readFileSync(path.join(root, 'PDFmapping/submittal-hide.json'), 'utf8'));
+    assert.equal(Array.isArray(list), true);
+    assert.equal(list.includes('CP-8204'), false);
+    assert.equal(list.includes('CP-3000R1'), true);
+    assert.equal(list.includes('CP-3000'), false);
+    PanelProfiles.noteHide(list);
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-3000R1'), true);
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-3001'), true);
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-8204'), false);
+    assert.equal(PanelProfiles.hiddenWhenSubmittal('CP-3000'), false);
+});
+
 console.log('PASS panel profiles: ' + assertions + ' assertions');

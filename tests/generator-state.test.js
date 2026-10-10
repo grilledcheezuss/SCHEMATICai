@@ -360,7 +360,7 @@ async function loaded(count = 2) {
         assert.equal(select.options.filter(option => option.value.startsWith('BUILTIN:')).length, 14);
         assert.equal(select.options.filter(option => option.value.startsWith('MEASURED:')).length, 0);
         const imported = select.options.find(option => option.value === 'CUSTOM:'+name);
-        assert.equal(imported.textContent, '⭐ '+name); assert.equal(imported.tag, 'option');
+        assert.equal(imported.textContent, name); assert.equal(imported.tag, 'option');
         assert.equal(select.value, 'BUILTIN:TITLE_ASBUILT');
     });
     async function runtime(saveHook = async () => new Uint8Array([37,80,68,70])) {
@@ -467,7 +467,8 @@ async function loaded(count = 2) {
         assert.equal(Math.round(call[2].x), 57); assert.equal(Math.round(call[2].y), 250);
         assert.equal(call[2].rotate, -90);
         assert(appSource.includes("textSpan.style.transformOrigin = '50% 50%'"));
-        assert(appSource.includes("generator-profiles-import"));
+        assert(appSource.includes('static importProfiles(input)'));
+        assert(!appSource.includes('generator-profiles-import'));
         assert(appSource.includes("console.warn('Invalid custom profiles ignored.');"));
     });
     for (const [name, mutate] of [

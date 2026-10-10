@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai release v2.5.118 — Worker implementation v2.5.113 (unchanged)
+// 🧠 SCHEMATICA ai release v2.5.119 — optional BLANK_PDF proxy. SPEC_TRANSFORM_VERSION stays v2.5.113.
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -906,6 +906,56 @@ async function fetchPdfWithGuards(url) {
     }
 }
 
+// Blank submittal PDFs live behind SUBMITTAL_BLANK_BASE (HTTPS prefix only).
+// Relative layout: CP8000-8999/CP8200-8299/CP-8204.pdf
+function blankRelativePath(id) {
+    let text = String(id || '').trim().toUpperCase().replace(/\s+/g, '');
+    text = text.replace(/\.(PDF|DWG)$/i, '');
+    if (/^CP\d/.test(text)) text = 'CP-' + text.slice(2);
+    else if (/^\d/.test(text)) text = 'CP-' + text;
+    if (!/^CP-[0-9A-Z.-]+$/.test(text)) return null;
+    const match = /^CP-(\d+)/.exec(text);
+    if (!match) return null;
+    const n = Number(match[1]);
+    if (!Number.isFinite(n)) return null;
+    const thou = Math.floor(n / 1000) * 1000;
+    const hun = Math.floor(n / 100) * 100;
+    return 'CP' + thou + '-' + (thou + 999) + '/CP' + hun + '-' + (hun + 99) + '/' + text + '.pdf';
+}
+
+function blankPdfUrl(base, id) {
+    const trimmed = String(base || '').trim();
+    if (!trimmed) return null;
+    let baseUrl;
+    try { baseUrl = new URL(trimmed); } catch (error) { return null; }
+    if (baseUrl.protocol !== 'https:' || baseUrl.username || baseUrl.password) return null;
+    const rel = blankRelativePath(id);
+    if (!rel || rel.includes('..')) return null;
+    const prefix = baseUrl.href.endsWith('/') ? baseUrl.href : baseUrl.href + '/';
+    let url;
+    try { url = new URL(rel.split('/').map(encodeURIComponent).join('/'), prefix); } catch (error) { return null; }
+    if (url.origin !== baseUrl.origin || url.protocol !== 'https:') return null;
+    const basePath = baseUrl.pathname.endsWith('/') ? baseUrl.pathname : baseUrl.pathname + '/';
+    if (!url.pathname.startsWith(basePath)) return null;
+    return url.href;
+}
+
+async function fetchConfiguredBlank(url) {
+    const host = getPdfUrlHost(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), PDF_FETCH_TIMEOUT_MS);
+    try {
+        console.log('[BLANK_PDF] Fetching blank from host:', host);
+        const response = await fetch(url, { signal: controller.signal, redirect: 'error' });
+        if (!response.ok) throw new Error('status ' + response.status);
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > MAX_PDF_SIZE_BYTES) throw new Error('too large');
+        return response;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
 // Security helper: Validate and clamp pageSize parameter
 function validatePageSize(pageSizeParam) {
     const pageSize = parseInt(pageSizeParam) || 100;
@@ -1355,6 +1405,27 @@ export default {
                 } catch (e) {
                     console.error('[PDF_BY_ID] PDF fetch failed. Panel ID:', panelId, 'Host:', getPdfUrlHost(pdfUrl), 'Error:', e.message);
                     return new Response(`PDF fetch failed: ${e.message}`, { status: 400, headers: corsHeaders });
+                }
+            }
+
+            if (target === 'BLANK_PDF') {
+                const panelId = url.searchParams.get('id');
+                if (!panelId) return new Response('Missing panel id', { status: 400, headers: corsHeaders });
+                const base = typeof env.SUBMITTAL_BLANK_BASE === 'string' ? env.SUBMITTAL_BLANK_BASE.trim() : '';
+                const blankUrl = blankPdfUrl(base, panelId);
+                if (!blankUrl) {
+                    return new Response('Blank base not configured', { status: 404, headers: corsHeaders });
+                }
+                try {
+                    const pdfResponse = await fetchConfiguredBlank(blankUrl);
+                    const newHeaders = new Headers(pdfResponse.headers);
+                    newHeaders.set('Access-Control-Allow-Origin', '*');
+                    newHeaders.set('Content-Type', 'application/pdf');
+                    console.log('[BLANK_PDF] Served blank for panel:', panelId, 'Host:', getPdfUrlHost(blankUrl));
+                    return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+                } catch (error) {
+                    console.error('[BLANK_PDF] Blank PDF not found. Panel ID:', panelId, 'Host:', getPdfUrlHost(blankUrl));
+                    return new Response('Blank PDF not found', { status: 404, headers: corsHeaders });
                 }
             }
 
