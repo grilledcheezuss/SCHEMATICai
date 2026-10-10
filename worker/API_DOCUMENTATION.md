@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.115 (frontend release; Worker implementation v2.5.113)
+## Version: v2.5.116 (frontend release; Worker implementation v2.5.113)
 
-_Release note: v2.5.115 changes only the frontend PDF Submittal Generator (measured Cox profiles in the page dropdown and automatic title-block detection). Deploy frontend assets, including `generator-state.js`, `measured-layouts.js`, and the `PDFmapping` JSON assets, as one release. The Worker banner aligns the release label; executable Worker code, API/auth/Sheets behavior, SPEC_TRANSFORM_VERSION v2.5.113, DERIVED_REV 12, encrypted snapshot schema 1 and compatibility_date are unchanged. No Worker redeployment is required. Generated output is visual masking/title-block replacement, not irreversible content redaction; see [REDACTION_SCHEMA.md](../REDACTION_SCHEMA.md)._
+_Release note: v2.5.116 changes only the frontend PDF Submittal Generator (field whiteouts inset about 2px inside their cells, and title-block detection that joins fragmented rules). Deploy frontend assets, including `generator-state.js`, `measured-layouts.js`, and the `PDFmapping` JSON assets, as one release. The Worker banner aligns the release label; executable Worker code, API/auth/Sheets behavior, SPEC_TRANSFORM_VERSION v2.5.113, DERIVED_REV 12, encrypted snapshot schema 1 and compatibility_date are unchanged. No Worker redeployment is required. Generated output is visual masking/title-block replacement, not irreversible content redaction; see [REDACTION_SCHEMA.md](../REDACTION_SCHEMA.md)._
 
 _Release note: v2.5.113 makes Google Sheets authority observable and more robust end to end (Worker and frontend, deploy both). MAIN keeps `sheets` (revision/hash or null) and adds a secret-free `sheetStatus`: state active/unavailable/pending/unconfigured, a classified reason (endpoint, redirect, http-<status>, timeout, too-large, json, payload, columns, no-ids, cached-*), the indexed row count and per-page matchedRows/withSpecs/withMetadata/withUncertainty; every MAIN response carries the live X-SCHEMATICA-SHEETS-STATUS header. Panel IDs also match `CP 1234`, `CP1234`, en-dash prefixes and `1234-R1`; rows may be objects keyed by column or omit trailing blank cells, `rowCount` may be omitted, numeric hashes and Workspace `/a/macros/<domain>/s/<id>/exec` URLs are accepted, blank panelType is not metadata, and redirect bodies are released. SPEC_TRANSFORM_VERSION v2.5.113 invalidates pre-fix MAIN pages and the frontend release refreshes browser snapshots. Successful syncs store the per-page status (counts and public revision/hash only) and the read-only console helper `SheetAuthorityAudit.report()/text()/inspect(id)` reports recordsWithSheetSpecs/metadata/uncertainty, trusted/uncertain field counts and a verdict (sheet-backed, no-sync-evidence, worker-did-not-report, worker-unconfigured, worker-sheet-unavailable, stale-snapshot, no-matching-rows) without network access. Fallback, full descriptions, lazy sheet compilation/caching, DERIVED_REV 12 and snapshot schema 1 are unchanged. Live sheet contents/endpoint were not available to this change; synthetic tests only._
 
@@ -34,6 +34,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
+- **v2.5.116**: Frontend-only cell-inset whiteouts and fragmented title-block matching. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.115**: Frontend-only generator page detection. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.114**: Frontend-only generator integration. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.113**: Observable Sheets authority: MAIN `sheetStatus` + `X-SCHEMATICA-SHEETS-STATUS`, classified unavailable reasons, tolerant panel ID spellings and compatible payload shapes, transform-key MAIN invalidation, stored per-sync status and read-only `SheetAuthorityAudit`. Deploy Worker and frontend.
@@ -459,6 +460,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
+- **v2.5.116**: Frontend-only cell-inset whiteouts and fragmented title-block matching; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.115**: Frontend-only measured-profile detection; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.114**: Frontend-only generator integration; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.113**: Sheets authority status in MAIN responses and headers, tolerant ID/payload matching, SPEC_TRANSFORM_VERSION v2.5.113. Deploy the API Worker and frontend v2.5.113.

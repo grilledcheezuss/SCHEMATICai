@@ -240,7 +240,8 @@ async function loaded(count = 2) {
         assert.equal(moved.placement, 'affine');
         const sourceZone = profiles[key].find(z => z.map === 'cpid') || profiles[key][0];
         const placed = moved.zones.find(z => z.map === sourceZone.map);
-        assert(Math.abs((placed.y - sourceZone.y) - 0.02) < 0.015, 'affine slide follows the printed title block');
+        const shiftedCenter = sourceZone.y + sourceZone.h / 2 + 0.02;
+        assert(Math.abs((placed.y + placed.h / 2) - shiftedCenter) < 0.025, 'affine slide follows the printed title block');
     });
     test('competing geometries visibly unresolved, never affine placement', () => {
         const result = G.matchMeasured(evidence, { ...onlyProfiles, twin: profiles[key] }, { ...onlyFp, twin: entry }, { ...onlyMeta, twin: metadata[key] });
@@ -274,6 +275,52 @@ async function loaded(count = 2) {
         const infoLines = G.matchMeasured({ ...reconstruct(sheetKey), class: 'INFO' }, profiles, fingerprints, metadata);
         assert.equal(infoLines.profileId, 'MEASURED:' + infoKey);
     });
+    test('fragmented, slightly skewed title-block rules still resolve the same layout', () => {
+        const name = 'SCHEMATIC_PORTRAIT_TB01A';
+        const fp = fingerprints[name].fingerprint, box = fp.title_block_bbox, lines = fp.template_lines_rel;
+        const absolute = {
+            H: lines.H.map(l => [box[1] + l[0] * (box[3] - box[1]), box[0] + l[1] * (box[2] - box[0]), box[0] + l[2] * (box[2] - box[0])]),
+            V: lines.V.map(l => [box[0] + l[0] * (box[2] - box[0]), box[1] + l[1] * (box[3] - box[1]), box[1] + l[2] * (box[3] - box[1])])
+        };
+        const split = list => list.flatMap(line => {
+            const span = line[2] - line[1], step = span / 3;
+            return [0, 1, 2].map(i => [line[0] + (i === 1 ? 0.0008 : -0.0004), line[1] + i * step, line[1] + (i + 1) * step - 0.0008]);
+        });
+        const result = G.matchMeasured({
+            edge: 'bottom', class: 'SHEET', H: split(absolute.H), V: split(absolute.V)
+        }, profiles, fingerprints, metadata);
+        assert.equal(result.status, 'resolved');
+        assert.equal(result.profileId, 'MEASURED:' + name);
+        assert.equal(result.placement, 'exact');
+    });
+    test('whiteout boxes sit about 2px inside their own entry cells', () => {
+        const name = 'SCHEMATIC_PORTRAIT_TB02A';
+        const fp = fingerprints[name].fingerprint, box = fp.title_block_bbox, lines = fp.template_lines_rel;
+        const H = lines.H.map(l => [box[1] + l[0] * (box[3] - box[1]), box[0] + l[1] * (box[2] - box[0]), box[0] + l[2] * (box[2] - box[0])]);
+        const V = lines.V.map(l => [box[0] + l[0] * (box[2] - box[0]), box[1] + l[1] * (box[3] - box[1]), box[1] + l[2] * (box[3] - box[1])]);
+        const fitted = G.fitZonesToCells(profiles[name], H, V);
+        const byMap = map => fitted.filter(z => z.map === map);
+        const type = byMap('type')[0], rawType = profiles[name].find(z => z.map === 'type');
+        const inset = 2 / 792;
+        assert(type.h > rawType.h + 0.005, 'project-title box grows from the glyphs to the cell');
+        assert(Math.abs((type.y - 0.8736) - inset) < 0.004, 'top edge is inset from the cell rule');
+        assert(type.x > 0.13 && type.x + type.w < 0.41, 'project title stays inside its column');
+        for (const map of ['cpid', 'date', 'po']) assert(byMap(map).length === 1, map + ' keeps its own box');
+        const cpid = byMap('cpid')[0], date = byMap('date')[0];
+        assert(cpid.x > 0.76 && cpid.x + cpid.w < 0.93 && cpid.h > 0.012, 'panel id fills the drawing-number cell');
+        assert(date.x < 0.09 && date.x + date.w < 0.15 && date.h > 0.012, 'date fills the date cell');
+        const contact = ['address', 'phone', 'fax'].map(map => byMap(map)[0]);
+        for (let i = 0; i < contact.length; i++) for (let j = i + 1; j < contact.length; j++) {
+            const a = contact[i], b = contact[j];
+            const overlap = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+            assert(overlap < 0.001, 'address, phone, and fax do not share one box');
+        }
+        const cover = G.fitZonesToCells(profiles.COVER_TEMPLATE_COV01, [], []);
+        const cust = cover.find(z => z.map === 'cust'), job = cover.find(z => z.map === 'job');
+        const yOverlap = Math.max(0, Math.min(cust.y + cust.h, job.y + job.h) - Math.max(cust.y, job.y));
+        assert(yOverlap < 0.002, 'cover company and job boxes occupy separate entry regions');
+        G.zones(fitted); G.zones(cover, 1);
+    });
     test('actual built-in semantics all validate, including missing fontSize and type', () => {
         const source = fs.readFileSync(require.resolve('../app.js'), 'utf8');
         const start = source.indexOf('const LAYOUT_RULES'), end = source.indexOf('\n};', start) + 3;
@@ -283,10 +330,10 @@ async function loaded(count = 2) {
         const sheet = rules.SCHEMATIC_PORTRAIT.find(z => z.map === 'cpid');
         const info = rules.INFO.find(z => z.map === 'cpid');
         const cover = rules.COVER_TEMPLATE.find(z => z.map === 'cpid');
-        // CP-8377 screenshots: built-in Panel ID sat outside the drawing-number cell, down and right.
+        // Info and schematic built-ins start on the TB02 drawing-number cell; scan insets them to the page rules.
         assert(sheet.x <= 0.78 && sheet.y <= 0.91 && sheet.x + sheet.w >= 0.90, 'schematic cpid covers the title-block drawing number');
         assert(info.x === sheet.x && info.y === sheet.y, 'info cpid uses the same drawing-number cell');
-        assert(cover.y <= 0.925 && cover.y + cover.h <= 0.96, 'cover cpid sits inside the template border');
+        assert(cover.x === 0.835 && cover.y === 0.948 && cover.h === 0.03, 'cover cpid keeps the template drawing-number row');
     });
     const appSource = fs.readFileSync(require.resolve('../app.js'), 'utf8');
     const generatorStart = appSource.indexOf('class Generator {');

@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.115 ---
-const APP_VERSION = "v2.5.115";
+// --- SCHEMATICA ai v2.5.116 ---
+const APP_VERSION = "v2.5.116";
 const VERSION_HISTORY = {
+    "v2.5.116": "Submittal Generator whiteouts sit about 2px inside the ruled cell for each field on cover, info, and schematic profiles. Address, phone, and fax each keep their own slice of a shared contact cell instead of one tall box. Auto-Scan joins fragmented title-block rules so info and schematic pages can match a measured profile. Cover Template Panel ID is back on the template drawing-number row. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.115": "Submittal Generator page detection: the 81 core measured Cox profiles ship in the page dropdown (no fetch race), and Auto-Scan selects info, schematic, and cover profiles from title-block geometry, including a small placement shift. Page 1 can take a measured cover and then shows that source sheet; an unmatched first page still uses Cover Template. Built-in Cover Template, Info, and Schematic Portrait Panel ID zones are shifted onto the cells shown on CP-8377 (drawing number up and left of the old box; cover number raised inside the border). Frontend only — Worker executable remains v2.5.113.",
     "v2.5.114": "Focused Submittal Generator integration: owned source-content SHA-256 identity, canonical displayed CropBox page state and stable profile IDs, 186 measured layouts with conservative exact geometric matching, atomic versioned source-bound mapping import/export, preserved manual edits across zoom/rerender, rotation-aware canonical PDF snapshots, stale async operation guards, and shared generated preview/print/download bytes with cleanup. Unresolved pages block generation without affecting original PDFs. Visual masking only; underlying PDF content is not removed. Worker, auth, parser and search logic unchanged.",
     "v2.5.113": "Sheets authority made observable end to end: the Worker reports a secret-free MAIN sheetStatus (active/unavailable/pending/unconfigured, classified reason, row/match/spec counts) plus X-SCHEMATICA-SHEETS-STATUS, tolerates CP/revision ID spellings, object or trailing-blank rows, omitted rowCount and Workspace Apps Script URLs, and a new transform key invalidates pre-fix MAIN pages. Successful syncs store the per-page sheet status; read-only SheetAuthorityAudit (report/text/inspect) reports recordsWithSheetSpecs/metadata/uncertainty and a verdict without network. This release refreshes browser snapshots; fallback, descriptions, DERIVED_REV 12 and snapshot schema 1 unchanged.",
@@ -368,7 +369,7 @@ const LAYOUT_RULES = {
         { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.835, y: 0.920, w: 0.15, h: 0.028, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -4360,6 +4361,7 @@ class Generator {
     static exportSequence = 0;
     static forceSourceCover = false;
     static rerendering = false;
+    static lineCache = Object.create(null);
 
     static invalidate() {
         this.exportSequence++;
@@ -4443,6 +4445,7 @@ class Generator {
         if (this.sourceDoc !== PdfViewer.doc) {
             this.sourceDoc = PdfViewer.doc;
             this.forceSourceCover = false;
+            this.lineCache = Object.create(null);
             const doc = this.sourceDoc, loadToken = PdfViewer._documentLoadToken;
             const blob = PdfViewer._pendingPdfBlob || PdfViewer.currentPdfBlob;
             const generation = ++this.state.generation;
@@ -4539,6 +4542,14 @@ class Generator {
             RedactionManager.refreshContentForWrapper(wrapper);
         } finally { this.applying = false; }
     }
+    static fittedProfile(profileId, page) {
+        const lines = this.lineCache[page];
+        const key = /^(BUILTIN|CUSTOM|MEASURED):/.test(String(profileId)) ? profileId : 'BUILTIN:' + profileId;
+        const raw = this.state.profiles[key];
+        const templateCover = page === 1 && /^BUILTIN:(COVER_TEMPLATE|COX_COVER|DELTA_COVER|THIRD_PARTY_COVER)$/.test(key);
+        if (!raw || !lines || (templateCover && this.wrapper(page)?.dataset.contentSource === 'replacement')) return undefined;
+        return GeneratorState.fitZonesToCells(raw, lines.H, lines.V);
+    }
     static async setPageProfile(page, profileId) {
         this.capture();
         const wrapper = this.wrapper(page);
@@ -4550,7 +4561,7 @@ class Generator {
         const templateCover = page === 1 && /^(BUILTIN:)?(COVER_TEMPLATE|COX_COVER|DELTA_COVER|THIRD_PARTY_COVER)$/.test(String(profileId));
         if (measuredCover && wrapper?.dataset.contentSource === 'replacement') {
             this.forceSourceCover = true;
-            this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, 'source');
+            this.state.setPage(page, profileId, 'manual', this.fittedProfile(profileId, page), wrapper?._generatorGeometry, 'source');
             this.paint(page);
             await PdfViewer.renderStack();
             PageContext.setActivePage(page);
@@ -4558,14 +4569,14 @@ class Generator {
         }
         if (templateCover && this.forceSourceCover) {
             this.forceSourceCover = false;
-            this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, 'replacement');
+            this.state.setPage(page, profileId, 'manual', this.fittedProfile(profileId, page), wrapper?._generatorGeometry, 'replacement');
             this.paint(page);
             await PdfViewer.renderStack();
             PageContext.setActivePage(page);
             return this.getState();
         }
         const source = measuredCover ? 'source' : wrapper?.dataset.contentSource;
-        this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, source);
+        this.state.setPage(page, profileId, 'manual', this.fittedProfile(profileId, page), wrapper?._generatorGeometry, source);
         this.paint(page); PageContext.setActivePage(page);
         return this.getState();
     }
@@ -4585,8 +4596,10 @@ class Generator {
             return [(m[0]*x+m[2]*y+m[4])/g.width, (m[1]*x+m[3]*y+m[5])/g.height];
         };
         const line = (a, b) => {
-            if (Math.abs(a[1]-b[1]) < .0002 && Math.abs(a[0]-b[0]) > .004) H.push([a[1], Math.min(a[0], b[0]), Math.max(a[0], b[0])]);
-            if (Math.abs(a[0]-b[0]) < .0002 && Math.abs(a[1]-b[1]) > .004) V.push([a[0], Math.min(a[1], b[1]), Math.max(a[1], b[1])]);
+            const dx = Math.abs(a[0] - b[0]), dy = Math.abs(a[1] - b[1]);
+            // CAD rules are often a fraction of a degree off axis. Keep them; mergeLines joins the fragments.
+            if (dy < 0.0018 && dx > 0.004) H.push([(a[1] + b[1]) / 2, Math.min(a[0], b[0]), Math.max(a[0], b[0])]);
+            if (dx < 0.0018 && dy > 0.004) V.push([(a[0] + b[0]) / 2, Math.min(a[1], b[1]), Math.max(a[1], b[1])]);
         };
         for (let i = 0; i < operators.fnArray.length; i++) {
             const op = operators.fnArray[i], args = operators.argsArray[i];
@@ -4594,19 +4607,22 @@ class Generator {
             else if (op === OPS.restore) matrix = stack.pop() || [1,0,0,1,0,0];
             else if (op === OPS.transform) matrix = multiply(matrix, args);
             else if (op === OPS.constructPath) {
-                let j = 0;
+                let j = 0, subStart = null;
                 for (const pathOp of args[0]) {
-                    if (pathOp === OPS.moveTo) cursor = point(args[1][j++], args[1][j++]);
+                    if (pathOp === OPS.moveTo) { cursor = point(args[1][j++], args[1][j++]); subStart = cursor; }
                     else if (pathOp === OPS.lineTo) { const next = point(args[1][j++], args[1][j++]); if (cursor) line(cursor, next); cursor = next; }
+                    else if (pathOp === OPS.closePath) { if (cursor && subStart) line(cursor, subStart); cursor = subStart; }
                     else if (pathOp === OPS.rectangle) {
                         const x=args[1][j++], y=args[1][j++], w=args[1][j++], h=args[1][j++];
                         const p = [point(x,y),point(x+w,y),point(x+w,y+h),point(x,y+h)];
-                        p.forEach((v,k) => line(v,p[(k+1)%4])); cursor = null;
+                        p.forEach((v,k) => line(v,p[(k+1)%4])); cursor = null; subStart = null;
                     } else if (pathOp === OPS.curveTo) { j += 6; cursor = null; }
                     else if (pathOp === OPS.curveTo2 || pathOp === OPS.curveTo3) { j += 4; cursor = null; }
                 }
             }
         }
+        const merged = { H: GeneratorState.mergeLines(H), V: GeneratorState.mergeLines(V) };
+        H.length = 0; V.length = 0; H.push(...merged.H); V.push(...merged.V);
         const textContent = await page.getTextContent();
         const text = textContent.items.map(i => i.str).join(' ').toUpperCase();
         const infoStrong = /\b(TABLE OF CONTENTS|SPECIFICATION|PANEL TYPE|INDEX OF DRAWINGS|BILL OF MATERIALS|VOLTAGE|PHASE)\b/.test(text);
@@ -4699,6 +4715,7 @@ class Generator {
                     : g;
                 const evidence = await this.evidence(sourcePage, gMatch);
                 evidence.page = page;
+                this.lineCache[page] = { H: evidence.H.slice(), V: evidence.V.slice() };
                 if (page === 1) evidence.preferCover = true;
                 if (sequence !== this.scanSequence || generation !== this.state.generation || doc !== this.sourceDoc || renderToken !== PdfViewer.currentRenderToken || !this.state.current(token)) return;
                 const result = GeneratorState.matchMeasured(evidence, this.measured, this.fingerprints, this.metadata);
@@ -4716,7 +4733,8 @@ class Generator {
                     const contentSource = page === 1 && result.profileId.startsWith('MEASURED:') ? 'source' : source;
                     this.state.setPage(page, result.profileId, 'auto', result.zones, g, contentSource);
                 } else if (page === 1 && result.reason !== 'Ambiguous measured layouts') {
-                    this.state.setPage(1, 'BUILTIN:COVER_TEMPLATE', 'auto', undefined, g, source);
+                    const coverZones = source === 'replacement' ? undefined : this.fittedProfile('BUILTIN:COVER_TEMPLATE', 1);
+                    this.state.setPage(1, 'BUILTIN:COVER_TEMPLATE', 'auto', coverZones, g, source);
                 } else {
                     const noTitleBlockEvidence = evidence.H.length === 0 || evidence.V.length === 0;
                     const fallback = page !== 1 && noTitleBlockEvidence && result.reason !== 'Ambiguous measured layouts' ? this.confirmedTextZones(evidence,g) : null;
