@@ -4,7 +4,7 @@
 
 This directory contains tests for the SCHEMATICA ai application.
 
-## Generator integration (v2.5.114)
+## Generator integration (v2.5.115)
 
 ```bash
 node tests/generator-state.test.js

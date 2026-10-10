@@ -1,6 +1,7 @@
-// --- SCHEMATICA ai v2.5.114 ---
-const APP_VERSION = "v2.5.114";
+// --- SCHEMATICA ai v2.5.115 ---
+const APP_VERSION = "v2.5.115";
 const VERSION_HISTORY = {
+    "v2.5.115": "Submittal Generator page detection: the 81 core measured Cox profiles ship in the page dropdown (no fetch race), and Auto-Scan selects info, schematic, and cover profiles from title-block geometry, including a small placement shift. Page 1 can take a measured cover and then shows that source sheet; an unmatched first page still uses Cover Template. Built-in Cover Template, Info, and Schematic Portrait Panel ID zones are shifted onto the cells shown on CP-8377 (drawing number up and left of the old box; cover number raised inside the border). Frontend only — Worker executable remains v2.5.113.",
     "v2.5.114": "Focused Submittal Generator integration: owned source-content SHA-256 identity, canonical displayed CropBox page state and stable profile IDs, 186 measured layouts with conservative exact geometric matching, atomic versioned source-bound mapping import/export, preserved manual edits across zoom/rerender, rotation-aware canonical PDF snapshots, stale async operation guards, and shared generated preview/print/download bytes with cleanup. Unresolved pages block generation without affecting original PDFs. Visual masking only; underlying PDF content is not removed. Worker, auth, parser and search logic unchanged.",
     "v2.5.113": "Sheets authority made observable end to end: the Worker reports a secret-free MAIN sheetStatus (active/unavailable/pending/unconfigured, classified reason, row/match/spec counts) plus X-SCHEMATICA-SHEETS-STATUS, tolerates CP/revision ID spellings, object or trailing-blank rows, omitted rowCount and Workspace Apps Script URLs, and a new transform key invalidates pre-fix MAIN pages. Successful syncs store the per-page sheet status; read-only SheetAuthorityAudit (report/text/inspect) reports recordsWithSheetSpecs/metadata/uncertainty and a verdict without network. This release refreshes browser snapshots; fallback, descriptions, DERIVED_REV 12 and snapshot schema 1 unchanged.",
     "v2.5.111": "Strict per-field Google Sheets authority: selective Worker extraction and browser derivation skip trusted fields; Worker-parity bounded normalized sheet values match exclusively without legacy fallback. Sheet-first badges, sorting and manufacturer ranking override stale values. DERIVED_REV 12 and release/cache refresh preserve encrypted snapshot schema 1.",
@@ -304,9 +305,9 @@ const LAYOUT_RULES = {
     INFO: [
         { map: "cust", x: 0.119, y: 0.085, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
         { map: "job", x: 0.058, y: 0.108, w: 0.25, h: 0.025, fontSize: 10, transparent: true, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
-        { map: "date", x: 0.064, y: 0.858, w: 0.08, h: 0.02, fontSize: 8, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "type", x: 0.149, y: 0.889, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.909, y: 0.94, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+        { map: "date", x: 0.0755, y: 0.8618, w: 0.0573, h: 0.016, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.1368, y: 0.8861, w: 0.2672, h: 0.0523, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid", x: 0.768, y: 0.902, w: 0.1556, h: 0.018, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     INFO_BORDERLESS: [
         { map: "cust", x: 0.01, y: 0.02, w: 0.3, h: 0.025, fontSize: 10, transparent: false, fontFamily: "'Times New Roman', serif", textAlign: 'left' },
@@ -316,9 +317,9 @@ const LAYOUT_RULES = {
         { map: "cpid", x: 0.88, y: 0.97, w: 0.11, h: 0.02, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     SCHEMATIC_PORTRAIT: [
-        { map: "date", x: 0.064, y: 0.858, w: 0.08, h: 0.02, fontSize: 8, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "type", x: 0.144, y: 0.89, w: 0.25, h: 0.04, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.92, y: 0.945, w: 0.07, h: 0.02, fontSize: 10, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
+        { map: "date", x: 0.0755, y: 0.8618, w: 0.0573, h: 0.016, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "type", x: 0.1368, y: 0.8861, w: 0.2672, h: 0.0523, fontSize: 15, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
+        { map: "cpid", x: 0.768, y: 0.902, w: 0.1556, h: 0.018, fontSize: 10, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     SCHEMATIC_PORTRAIT_BORDERLESS: [
         { map: "date", x: 0.01, y: 0.95, w: 0.08, h: 0.02, fontSize: 8, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'left' },
@@ -367,7 +368,7 @@ const LAYOUT_RULES = {
         { map: "job_block", x: 0.15, y: 0.50, w: 0.7, h: 0.12, fontSize: 20, transparent: false, decoration: 'underline', fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "stage", x: 0.15, y: 0.68, w: 0.7, h: 0.045, fontSize: 18, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
         { map: "date", x: 0.25, y: 0.74, w: 0.499, h: 0.04, fontSize: 16, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'center' },
-        { map: "cpid", x: 0.835, y: 0.948, w: 0.15, h: 0.03, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
+        { map: "cpid", x: 0.835, y: 0.920, w: 0.15, h: 0.028, fontSize: 12, transparent: false, fontFamily: "'Courier New', monospace", textAlign: 'right' }
     ],
     GENERAL: [
         { map: "custom", text: "GENERAL LAYOUT PLACEHOLDER", x: 0.499, y: 0.499, w: 0.3, h: 0.051, fontSize: 14, transparent: true, fontFamily: "'Courier New', monospace", textAlign: 'center' }
@@ -2003,6 +2004,11 @@ class PageContext {
     }
     
     static getProfileDisplayName(profile) {
+        if (typeof profile === 'string' && profile.startsWith('MEASURED:')) {
+            const key = profile.slice(9);
+            const layoutId = (typeof Generator !== 'undefined' && Generator.fingerprints[key]?.layout_id) || key;
+            return 'Measured ' + layoutId;
+        }
         profile = profile.replace(/^BUILTIN:/, '');
         const names = {
             'AUTO': 'Auto-Detect',
@@ -3389,6 +3395,15 @@ class LayoutScanner {
                 }
                 select.appendChild(group);
             }
+            if (typeof Generator !== 'undefined' && Generator.measured && Object.keys(Generator.measured).length) {
+                const group = document.createElement('optgroup'); group.label = 'Measured Cox layouts';
+                for (const key of Object.keys(Generator.measured).sort()) {
+                    const option = document.createElement('option'); option.value = 'MEASURED:' + key;
+                    option.textContent = 'Measured ' + (Generator.fingerprints[key]?.layout_id || key);
+                    group.appendChild(option);
+                }
+                select.appendChild(group);
+            }
             select.value = !currentVal || currentVal === 'AUTO' ? 'AUTO' :
                 (/^(BUILTIN|CUSTOM|MEASURED):/.test(currentVal) ? currentVal : 'BUILTIN:' + currentVal);
             console.log(`[refreshProfileOptions] Populated dropdown ${index + 1} with ${select.options.length} options`);
@@ -4343,6 +4358,8 @@ class Generator {
     static generatedDocumentLoadToken = null;
     static generatedTemplateRevision = 0;
     static exportSequence = 0;
+    static forceSourceCover = false;
+    static rerendering = false;
 
     static invalidate() {
         this.exportSequence++;
@@ -4364,8 +4381,23 @@ class Generator {
         const container = document.getElementById('pdf-preview-container');
         if (container) container.innerHTML = '';
     }
+    static adoptPacked(packed) {
+        if (!packed?.profiles) return false;
+        const validated = {};
+        for (const [key, value] of Object.entries(packed.profiles)) {
+            try { validated[key] = GeneratorState.zones(value); }
+            catch (e) { console.warn('Skipping measured profile', key, e.message); }
+        }
+        if (!Object.keys(validated).length) return false;
+        this.measured = { ...validated, ...this.measured };
+        this.fingerprints = { ...(packed.fingerprints || {}), ...this.fingerprints };
+        this.metadata = { ...(packed.metadata || {}), ...this.metadata };
+        if (!this.assetRevision) this.assetRevision = 'packed:' + Object.keys(this.measured).length;
+        return true;
+    }
     static async loadAssets() {
         if (!this.assetsReady) this.assetsReady = (async () => {
+            this.adoptPacked(typeof globalThis !== 'undefined' ? globalThis.MEASURED_LAYOUTS : null);
             try {
                 const [profiles, fingerprints, metadata] = await Promise.all([
                     'PDFmapping/layouts_overlay.json', 'PDFmapping/LAYOUT_FINGERPRINTS.json', 'PDFmapping/layouts_overlay.meta.json'
@@ -4376,15 +4408,17 @@ class Generator {
                 }));
                 const validated = {};
                 for (const [key, value] of Object.entries(profiles)) validated[key] = GeneratorState.zones(value);
-                this.measured = validated;
-                this.fingerprints = fingerprints.by_profile_key;
-                this.metadata = metadata.profiles;
-                this.assetRevision = metadata.generated + ':' + Object.keys(validated).length;
+                this.measured = { ...this.measured, ...validated };
+                this.fingerprints = { ...this.fingerprints, ...(fingerprints.by_profile_key || {}) };
+                this.metadata = { ...this.metadata, ...(metadata.profiles || {}) };
+                this.assetRevision = metadata.generated + ':' + Object.keys(this.measured).length;
+                this.assetError = null;
             } catch (e) {
-                this.assetError = e.message;
+                if (!Object.keys(this.measured).length) this.assetError = e.message;
                 console.warn(e);
             }
             this.registerProfiles();
+            if (typeof LayoutScanner !== 'undefined') LayoutScanner.refreshProfileOptions();
         })();
         return this.assetsReady;
     }
@@ -4408,6 +4442,7 @@ class Generator {
         }
         if (this.sourceDoc !== PdfViewer.doc) {
             this.sourceDoc = PdfViewer.doc;
+            this.forceSourceCover = false;
             const doc = this.sourceDoc, loadToken = PdfViewer._documentLoadToken;
             const blob = PdfViewer._pendingPdfBlob || PdfViewer.currentPdfBlob;
             const generation = ++this.state.generation;
@@ -4504,14 +4539,33 @@ class Generator {
             RedactionManager.refreshContentForWrapper(wrapper);
         } finally { this.applying = false; }
     }
-    static setPageProfile(page, profileId) {
+    static async setPageProfile(page, profileId) {
         this.capture();
         const wrapper = this.wrapper(page);
-        if (profileId === 'AUTO' && page !== 1) {
+        if (profileId === 'AUTO') {
             delete this.state.pages[page]; this.state.touch();
             return this.scan(page);
         }
-        this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, wrapper?.dataset.contentSource);
+        const measuredCover = page === 1 && String(profileId).startsWith('MEASURED:');
+        const templateCover = page === 1 && /^(BUILTIN:)?(COVER_TEMPLATE|COX_COVER|DELTA_COVER|THIRD_PARTY_COVER)$/.test(String(profileId));
+        if (measuredCover && wrapper?.dataset.contentSource === 'replacement') {
+            this.forceSourceCover = true;
+            this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, 'source');
+            this.paint(page);
+            await PdfViewer.renderStack();
+            PageContext.setActivePage(page);
+            return this.getState();
+        }
+        if (templateCover && this.forceSourceCover) {
+            this.forceSourceCover = false;
+            this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, 'replacement');
+            this.paint(page);
+            await PdfViewer.renderStack();
+            PageContext.setActivePage(page);
+            return this.getState();
+        }
+        const source = measuredCover ? 'source' : wrapper?.dataset.contentSource;
+        this.state.setPage(page, profileId, 'manual', undefined, wrapper?._generatorGeometry, source);
         this.paint(page); PageContext.setActivePage(page);
         return this.getState();
     }
@@ -4555,7 +4609,35 @@ class Generator {
         }
         const textContent = await page.getTextContent();
         const text = textContent.items.map(i => i.str).join(' ').toUpperCase();
-        return { H, V, edge: 'bottom', class: /\b(NOTES|SPECIFICATION|TABLE OF CONTENTS|INDEX)\b/.test(text) ? 'INFO' : 'SHEET', textContent };
+        const infoStrong = /\b(TABLE OF CONTENTS|SPECIFICATION|PANEL TYPE|INDEX OF DRAWINGS|BILL OF MATERIALS|VOLTAGE|PHASE)\b/.test(text);
+        const sheetStrong = /\b(SCHEMATIC|WIRING|ELEMENTARY|LADDER|POWER DIAGRAM|CONTROL DIAGRAM|ONE[\s-]?LINE|SINGLE[\s-]?LINE)\b/.test(text);
+        const notes = /\bNOTES\b/.test(text);
+        const headerBands = H.filter(l => l[0] > 0.01 && l[0] < 0.22 && (l[2] - l[1]) >= 0.45).length;
+        let klass = 'SHEET';
+        if (headerBands >= 2 || (infoStrong && !sheetStrong) || (notes && !sheetStrong)) klass = 'INFO';
+        else if (sheetStrong) klass = 'SHEET';
+        const bottomMass = H.filter(l => l[0] >= 0.62 && l[2] - l[1] >= 0.3).length;
+        const rightMass = V.filter(l => l[0] >= 0.72 && l[2] - l[1] >= 0.15).length;
+        const leftMass = V.filter(l => l[0] <= 0.28 && l[2] - l[1] >= 0.15).length;
+        let edge = 'bottom';
+        if (rightMass > bottomMass && rightMass >= leftMass) edge = 'right';
+        else if (leftMass > bottomMass && leftMass > rightMass) edge = 'left';
+        const textItems = [];
+        const [a, b, c, d, e, f] = g.transform;
+        const scale = Math.hypot(a, b);
+        for (const item of textContent.items || []) {
+            if (!item.str || !item.transform || !Number.isFinite(item.width)) continue;
+            const t = item.transform, horizontal = a * t[0] + c * t[1], vertical = b * t[0] + d * t[1];
+            if (horizontal <= 0 || Math.abs(vertical) > .001 || Math.abs(a * t[2] + c * t[3]) > .001) continue;
+            const fontSize = Math.abs(b * t[2] + d * t[3]);
+            const x = (a * t[4] + c * t[5] + e) / g.width;
+            const y = (b * t[4] + d * t[5] + f - fontSize) / g.height;
+            const w = item.width * scale / g.width, h = fontSize / g.height;
+            if (!Number.isFinite(fontSize) || fontSize <= 0 || w <= 0 || h <= 0) continue;
+            if (x < -0.05 || y < -0.05 || x > 1.05 || y > 1.05) continue;
+            textItems.push({ text: item.str.trim(), x, y, w, h });
+        }
+        return { H, V, edge, class: klass, textContent, textItems };
     }
     static confirmedTextZones(evidence, g) {
         const items = [];
@@ -4608,22 +4690,36 @@ class Generator {
                 }
                 this.paint(page); continue;
             }
-            if (page === 1) { this.state.setPage(1, 'BUILTIN:COVER_TEMPLATE', 'auto', undefined, g, source); this.paint(1); continue; }
             const token = this.state.token();
             try {
-                const evidence = await this.evidence(await doc.getPage(page), g);
+                const sourcePage = await doc.getPage(page);
+                // Page 1 may be showing the cover template. Match the source sheet's own page, then swap.
+                const gMatch = page === 1 && source === 'replacement'
+                    ? GeneratorState.geometry(sourcePage.getViewport({ scale: 1 }), sourcePage.view, sourcePage.rotate || 0)
+                    : g;
+                const evidence = await this.evidence(sourcePage, gMatch);
+                evidence.page = page;
+                if (page === 1) evidence.preferCover = true;
                 if (sequence !== this.scanSequence || generation !== this.state.generation || doc !== this.sourceDoc || renderToken !== PdfViewer.currentRenderToken || !this.state.current(token)) return;
                 const result = GeneratorState.matchMeasured(evidence, this.measured, this.fingerprints, this.metadata);
-                if (result.status === 'resolved') {
-                    const key = result.profileId.slice(9);
-                    if (this.metadata[key].cox_check_fields?.length) {
-                        result.status = 'unresolved'; result.reason = 'Mixed company branding requires exact mapping or manual review';
-                    }
+                if (result.status === 'resolved' && page === 1 && result.profileId.startsWith('MEASURED:') && source === 'replacement' && !this.rerendering) {
+                    this.rerendering = true;
+                    this.forceSourceCover = true;
+                    try {
+                        this.state.setPage(page, result.profileId, 'auto', result.zones, gMatch, 'source');
+                        this.paint(page);
+                        await PdfViewer.renderStack();
+                    } finally { this.rerendering = false; }
+                    return this.getState();
                 }
-                if (result.status === 'resolved') this.state.setPage(page, result.profileId, 'auto', undefined, g, source);
-                else {
+                if (result.status === 'resolved') {
+                    const contentSource = page === 1 && result.profileId.startsWith('MEASURED:') ? 'source' : source;
+                    this.state.setPage(page, result.profileId, 'auto', result.zones, g, contentSource);
+                } else if (page === 1 && result.reason !== 'Ambiguous measured layouts') {
+                    this.state.setPage(1, 'BUILTIN:COVER_TEMPLATE', 'auto', undefined, g, source);
+                } else {
                     const noTitleBlockEvidence = evidence.H.length === 0 || evidence.V.length === 0;
-                    const fallback = noTitleBlockEvidence && result.reason !== 'Ambiguous measured layouts' ? this.confirmedTextZones(evidence,g) : null;
+                    const fallback = page !== 1 && noTitleBlockEvidence && result.reason !== 'Ambiguous measured layouts' ? this.confirmedTextZones(evidence,g) : null;
                     if (fallback) {
                         const profile = PageClassifier.classify(evidence.textContent,g.width/g.height,page);
                         this.state.setPage(page, 'BUILTIN:'+profile, 'auto', fallback, g, source);
@@ -4635,6 +4731,7 @@ class Generator {
             }
             this.paint(page);
         }
+        if (typeof LayoutScanner !== 'undefined') LayoutScanner.refreshProfileOptions();
         return this.getState();
     }
     static importMapping(input) { this.capture(); this.state.importMapping(input); Object.keys(this.state.pages).forEach(p => this.paint(Number(p))); return this.getState(); }
@@ -7242,7 +7339,7 @@ class PdfViewer {
             
             // Wrap getPage in try/catch
             try {
-                if (i === 1 && renderTemplateUsable) {
+                if (i === 1 && renderTemplateUsable && !(typeof Generator !== 'undefined' && Generator.forceSourceCover)) {
                     page = await coverDoc.getPage(1);
                     isTemplate = true;
                 } else {
@@ -7310,7 +7407,7 @@ class PdfViewer {
             `;
             if (i === 1) {
                 const sel = toolbar.querySelector('.page-profile-select');
-                if (sel) { sel.value = 'COVER_TEMPLATE'; sel.disabled = true; }
+                if (sel) sel.value = 'AUTO';
             }
             wrapper.appendChild(toolbar);
 
@@ -8420,16 +8517,14 @@ LayoutScanner.refreshProfileOptions = () => {
     refreshGeneratorProfileOptions();
     document.querySelectorAll('.page-profile-select').forEach(select => {
         const wrapper = select.closest('.pdf-page-wrapper');
-        for (const key of Object.keys(Generator.measured)) {
-            const option = document.createElement('option'); option.value = 'MEASURED:' + key; option.textContent = 'Measured: ' + key; select.appendChild(option);
-        }
-        const entry = Generator.state.pages[Number(wrapper.dataset.pageNumber)];
-        if (entry?.profileId) {
-            const legacy = entry.profileId.replace(/^BUILTIN:/, '');
-            select.value = Array.from(select.options).some(o => o.value === entry.profileId) ? entry.profileId : legacy;
-        }
+        const entry = wrapper && Generator.state.pages[Number(wrapper.dataset.pageNumber)];
+        if (entry?.profileId && Array.from(select.options).some(o => o.value === entry.profileId)) select.value = entry.profileId;
     });
 };
+if (typeof globalThis !== 'undefined' && globalThis.MEASURED_LAYOUTS) {
+    Generator.adoptPacked(globalThis.MEASURED_LAYOUTS);
+    Generator.registerProfiles();
+}
 for (const method of ['addZoneToCurrentView', 'deleteSelected', 'handleDrag', 'endDrag', 'updateActiveStyle', 'updateActiveAlignment', 'mapSelectedZone', 'updateCustomText', 'toggleBoxBackground', 'clearAll']) {
     const original = RedactionManager[method].bind(RedactionManager);
     RedactionManager[method] = (...args) => {
@@ -8475,6 +8570,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(err => console.warn('⚠️ Cover sheet template not loaded (app continues without it):', err));
         
+        Generator.loadAssets();
         UI.init(); 
         if (typeof MobileScrollCoordinator !== 'undefined') {
             MobileScrollCoordinator.init();

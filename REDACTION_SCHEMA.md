@@ -1,6 +1,6 @@
 # SCHEMATICA ai Redaction Profile Schema
 
-## Release: v2.5.114
+## Release: v2.5.115
 
 ## Overview
 
@@ -440,6 +440,7 @@ This ensures proper layering: whiteouts cover content, then text appears on top.
 
 ## Version History
 
+- **v2.5.115**: Bundled measured Cox profiles, automatic info/schematic/cover selection, and small title-block placement shift. Worker executable unchanged.
 - **v2.5.114**: Revision-bound per-page generator state and mapping integration; visual masking semantics clarified.
 - **v2.5.3**: Added preview, improved export, rotation underline fix
 - **v2.5.2**: Fixed overlay visibility, CSS improvements
@@ -466,19 +467,22 @@ pending; synthetic test fixtures are not user mapping data.
 
 The Python reference `match_layout.py` requires `layouts.json`, `extract`,
 `analyze`, and `fields`, which are absent here. It is evidence of matcher intent,
-not a standalone runnable browser dependency. The browser integration is
-conservative: eligible exact placements only, with ambiguity requiring operator
-review. It does not claim parity with the reference's OCR-based conditional Cox
-branding release or affine re-placement. Review measured masks for over-blanking
-and missed content before sharing; a matching profile is not proof of privacy.
+not a standalone runnable browser dependency. The browser matcher groups identical
+title-block templates, accepts the closest core placement, and slides that
+profile's zones when the same grid is printed up to about 5% of the page away.
+Competing templates stay unresolved for operator review. It does not claim parity
+with the reference's OCR-based conditional Cox branding release: a matched profile
+is applied, including profiles flagged `cox_check`. Review measured masks for
+over-blanking and missed content before sharing; a matching profile is not proof
+of privacy.
 
 ## Release and acceptance
 
-Publish `index.html`, all versioned frontend scripts/styles, and the mapping JSON
-assets together. The v2.5.114 Worker banner is a release label only: executable
-Worker code and its v2.5.113 transform revision are unchanged. No Worker, Apps
-Script, parser revision, encrypted snapshot schema, or compatibility-date
-deployment change is required.
+Publish `index.html`, all versioned frontend scripts/styles (including
+`measured-layouts.js`), and the mapping JSON assets together. The v2.5.115 Worker
+banner is a release label only: executable Worker code and its v2.5.113 transform
+revision are unchanged. No Worker, Apps Script, parser revision, encrypted
+snapshot schema, or compatibility-date deployment change is required.
 
 Pending manual acceptance: representative real documents (including rare and
 no-title-block layouts), mapped text/logo placement, responsive editing and
