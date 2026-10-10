@@ -104,7 +104,9 @@
         try {
             const response = await fetch(url, { headers, credentials: 'same-origin' });
             if (!response.ok) {
-                if (!direct && response.status === 404) {
+                if (!direct && (response.status === 401 || response.status === 403)) {
+                    workerBlank = 'off';
+                } else if (!direct && response.status === 404) {
                     const note = await response.clone().text().catch(() => '');
                     if (/not configured/i.test(note)) workerBlank = 'off';
                 }
@@ -113,6 +115,10 @@
             }
             const bytes = await response.arrayBuffer();
             if (!isPdfBytes(bytes)) {
+                if (!direct) {
+                    const head = new Uint8Array(bytes.slice(0, 1));
+                    if (head[0] === 0x7B || head[0] === 0x5B) workerBlank = 'off';
+                }
                 misses.add(key);
                 return null;
             }
@@ -206,9 +212,13 @@
         workerBlank = 'unknown';
     }
 
+    function workerState() {
+        return workerBlank;
+    }
+
     return {
         STAGE_DEFAULT, COVER_COMPANY, COVER_LINES, INFO_LINES,
         canonical, relativePath, configuredBase, directUrl, isPdfBytes, fetchPdf,
-        labelFor, isLive, skipWhenBlank, overlayText, coverStyle, resetCache
+        labelFor, isLive, skipWhenBlank, overlayText, coverStyle, resetCache, workerState
     };
 });
