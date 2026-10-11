@@ -1,5 +1,5 @@
 // ==========================================
-// 🧠 SCHEMATICA ai release v2.5.119 — optional BLANK_PDF proxy. SPEC_TRANSFORM_VERSION stays v2.5.113.
+// 🧠 SCHEMATICA ai release v2.5.119 — BLANK_PDF from Dropbox or SUBMITTAL_BLANK_BASE. SPEC_TRANSFORM_VERSION stays v2.5.113.
 // Pure parsing helpers mirrored in worker/lib/extract.js for unit testing.
 // ==========================================
 
@@ -906,8 +906,11 @@ async function fetchPdfWithGuards(url) {
     }
 }
 
-// Blank submittal PDFs live behind SUBMITTAL_BLANK_BASE (HTTPS prefix only).
+// Blank submittal PDFs: HTTPS SUBMITTAL_BLANK_BASE if set, otherwise Dropbox
+// /CP DOCS/CP-SUBMITTAL-BLANK via DROPBOX_ACCESS_TOKEN (or a refresh grant).
 // Relative layout: CP8000-8999/CP8200-8299/CP-8204.pdf
+const DROPBOX_BLANK_ROOT = '/CP DOCS/CP-SUBMITTAL-BLANK';
+let dropboxTokenCache = { token: '', expiresAt: 0 };
 function blankRelativePath(id) {
     let text = String(id || '').trim().toUpperCase().replace(/\s+/g, '');
     text = text.replace(/\.(PDF|DWG)$/i, '');
@@ -947,6 +950,73 @@ async function fetchConfiguredBlank(url) {
     try {
         console.log('[BLANK_PDF] Fetching blank from host:', host);
         const response = await fetch(url, { signal: controller.signal, redirect: 'error' });
+        if (!response.ok) throw new Error('status ' + response.status);
+        const contentLength = response.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > MAX_PDF_SIZE_BYTES) throw new Error('too large');
+        return response;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+function blankPdfResponse(pdfResponse, panelId, host) {
+    const newHeaders = new Headers(pdfResponse.headers);
+    newHeaders.set('Access-Control-Allow-Origin', '*');
+    newHeaders.set('Content-Type', 'application/pdf');
+    newHeaders.delete('Dropbox-API-Result');
+    newHeaders.delete('set-cookie');
+    console.log('[BLANK_PDF] Served blank for panel:', panelId, 'Host:', host);
+    return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+}
+
+async function dropboxAccessToken(env) {
+    const direct = typeof env.DROPBOX_ACCESS_TOKEN === 'string' ? env.DROPBOX_ACCESS_TOKEN.trim() : '';
+    if (direct) return direct;
+    const refresh = typeof env.DROPBOX_REFRESH_TOKEN === 'string' ? env.DROPBOX_REFRESH_TOKEN.trim() : '';
+    const key = typeof env.DROPBOX_APP_KEY === 'string' ? env.DROPBOX_APP_KEY.trim() : '';
+    const secret = typeof env.DROPBOX_APP_SECRET === 'string' ? env.DROPBOX_APP_SECRET.trim() : '';
+    if (!refresh || !key || !secret) return '';
+    if (dropboxTokenCache.token && dropboxTokenCache.expiresAt > Date.now() + 60000) return dropboxTokenCache.token;
+    const body = new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refresh,
+        client_id: key,
+        client_secret: secret
+    });
+    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+        redirect: 'error'
+    });
+    if (!response.ok) return '';
+    const payload = await response.json();
+    if (!payload || typeof payload.access_token !== 'string' || !payload.access_token) return '';
+    const expiresIn = Number(payload.expires_in) || 14400;
+    dropboxTokenCache = { token: payload.access_token, expiresAt: Date.now() + expiresIn * 1000 };
+    return payload.access_token;
+}
+
+async function fetchDropboxBlank(token, relativePath) {
+    const dropboxPath = DROPBOX_BLANK_ROOT + '/' + relativePath;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), PDF_FETCH_TIMEOUT_MS);
+    try {
+        console.log('[BLANK_PDF] Fetching Dropbox blank. Path suffix:', relativePath);
+        const response = await fetch('https://content.dropboxapi.com/2/files/download', {
+            method: 'POST',
+            headers: {
+                Authorization: 'Bearer ' + token,
+                'Dropbox-API-Arg': JSON.stringify({ path: dropboxPath })
+            },
+            signal: controller.signal,
+            redirect: 'error'
+        });
+        if (response.status === 401 || response.status === 403) {
+            const error = new Error('dropbox auth');
+            error.notConfigured = true;
+            throw error;
+        }
         if (!response.ok) throw new Error('status ' + response.status);
         const contentLength = response.headers.get('content-length');
         if (contentLength && parseInt(contentLength, 10) > MAX_PDF_SIZE_BYTES) throw new Error('too large');
@@ -1412,19 +1482,33 @@ export default {
                 const panelId = url.searchParams.get('id');
                 if (!panelId) return new Response('Missing panel id', { status: 400, headers: corsHeaders });
                 const base = typeof env.SUBMITTAL_BLANK_BASE === 'string' ? env.SUBMITTAL_BLANK_BASE.trim() : '';
-                const blankUrl = blankPdfUrl(base, panelId);
-                if (!blankUrl) {
-                    return new Response('Blank base not configured', { status: 404, headers: corsHeaders });
+                if (base) {
+                    const blankUrl = blankPdfUrl(base, panelId);
+                    if (!blankUrl) {
+                        return new Response('Blank base not configured', { status: 404, headers: corsHeaders });
+                    }
+                    try {
+                        const pdfResponse = await fetchConfiguredBlank(blankUrl);
+                        return blankPdfResponse(pdfResponse, panelId, getPdfUrlHost(blankUrl));
+                    } catch (error) {
+                        console.error('[BLANK_PDF] Blank PDF not found. Panel ID:', panelId, 'Host:', getPdfUrlHost(blankUrl));
+                        return new Response('Blank PDF not found', { status: 404, headers: corsHeaders });
+                    }
                 }
+                const relative = blankRelativePath(panelId);
+                if (!relative) return new Response('Blank PDF not found', { status: 404, headers: corsHeaders });
+                let token = '';
+                try { token = await dropboxAccessToken(env); } catch (error) { token = ''; }
+                if (!token) return new Response('Blank base not configured', { status: 404, headers: corsHeaders });
                 try {
-                    const pdfResponse = await fetchConfiguredBlank(blankUrl);
-                    const newHeaders = new Headers(pdfResponse.headers);
-                    newHeaders.set('Access-Control-Allow-Origin', '*');
-                    newHeaders.set('Content-Type', 'application/pdf');
-                    console.log('[BLANK_PDF] Served blank for panel:', panelId, 'Host:', getPdfUrlHost(blankUrl));
-                    return new Response(pdfResponse.body, { status: pdfResponse.status, headers: newHeaders });
+                    const pdfResponse = await fetchDropboxBlank(token, relative);
+                    return blankPdfResponse(pdfResponse, panelId, 'content.dropboxapi.com');
                 } catch (error) {
-                    console.error('[BLANK_PDF] Blank PDF not found. Panel ID:', panelId, 'Host:', getPdfUrlHost(blankUrl));
+                    if (error && error.notConfigured) {
+                        console.error('[BLANK_PDF] Dropbox token rejected. Panel ID:', panelId);
+                        return new Response('Blank base not configured', { status: 404, headers: corsHeaders });
+                    }
+                    console.error('[BLANK_PDF] Blank PDF not found. Panel ID:', panelId, 'Host: content.dropboxapi.com');
                     return new Response('Blank PDF not found', { status: 404, headers: corsHeaders });
                 }
             }

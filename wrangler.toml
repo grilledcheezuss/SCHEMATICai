@@ -1,3 +1,12 @@
+# Submittal blanks: BLANK_PDF reads Dropbox /CP DOCS/CP-SUBMITTAL-BLANK.
+# Turn blanks on from the repo root (after npx wrangler login):
+#   npx wrangler secret put DROPBOX_ACCESS_TOKEN
+#   npx wrangler deploy
+# The token needs files.content.read. Do not commit it.
+# Optional HTTPS override (not a public Dropbox share link):
+#   npx wrangler secret put SUBMITTAL_BLANK_BASE
+# Optional refresh grant instead of a short-lived access token:
+#   DROPBOX_REFRESH_TOKEN, DROPBOX_APP_KEY, DROPBOX_APP_SECRET
 name = "cox-proxy"
 main = "worker/worker.js"
 compatibility_date = "2024-01-01"

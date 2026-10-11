@@ -1,8 +1,8 @@
 # SCHEMATICA ai Worker API Documentation
 
-## Version: v2.5.119 (frontend release; Worker adds optional BLANK_PDF; SPEC_TRANSFORM_VERSION v2.5.113)
+## Version: v2.5.119 (frontend release; Worker BLANK_PDF reads Dropbox; SPEC_TRANSFORM_VERSION v2.5.113)
 
-_Release note: v2.5.119 is a frontend Submittal Generator release plus one optional Worker route. When Submittal is on, the viewer uses a blank panel PDF (Cox logo, Cox address, and PROJECT SUBMITTAL already printed) if `BLANK_PDF` can fetch it, and otherwise keeps the mapped customer PDF. Live overlays are job name, system type, and date; serial is whited out with no replacement text. Set `SUBMITTAL_BLANK_BASE` to an HTTPS prefix that serves `CP8000-8999/CP8200-8299/CP-8204.pdf` (the Dropbox folder layout under that prefix). Do not point it at a public Dropbox share link. If the variable is unset, `BLANK_PDF` returns 404 `Blank base not configured` and the frontend falls back. Existing PDF, MAIN, auth, and Sheets routes are unchanged. SPEC_TRANSFORM_VERSION stays v2.5.113. Redeploy the Worker only when blanks should be served._
+_Release note: v2.5.119 is a frontend Submittal Generator release plus the `BLANK_PDF` route. When Submittal is on, the viewer uses a blank panel PDF (Cox logo, Cox address, and PROJECT SUBMITTAL already printed) if `BLANK_PDF` can fetch it, and otherwise keeps the mapped customer PDF. Live overlays are job name, system type, and date in black; serial is whited out with no replacement text. Logo overlays use the approved Cox letterforms, contained in the zone: black on white pages and title-block cells, white-on-dark only for tall cover plates. Turn blanks on from the repo root after `npx wrangler login`: `npx wrangler secret put DROPBOX_ACCESS_TOKEN` (Dropbox scope `files.content.read`), then `npx wrangler deploy`. The Worker downloads `/CP DOCS/CP-SUBMITTAL-BLANK/CP8000-8999/CP8200-8299/CP-8204.pdf` with that token. Do not commit the token and do not use a public Dropbox share link. Optional override: `SUBMITTAL_BLANK_BASE` as an HTTPS prefix for the same relative layout. Optional refresh grant: `DROPBOX_REFRESH_TOKEN`, `DROPBOX_APP_KEY`, and `DROPBOX_APP_SECRET`. If none of those are set, `BLANK_PDF` returns 404 `Blank base not configured` and the frontend falls back. A missing file returns 404 `Blank PDF not found` and other panels are still tried. Existing PDF, MAIN, auth, and Sheets routes are unchanged. SPEC_TRANSFORM_VERSION stays v2.5.113. Redeploy this Worker or blanks stay on the mapped customer PDF._
 
 _Release note: v2.5.118 changes only the frontend PDF Submittal Generator. The panel page map in `PDFmapping/panel-index.json` and `PDFmapping/panels/cp-*.json.gz` is rebuilt (5858 mapped panels; 57 unmapped Panel IDs hidden while Submittal is on) with tighter placement, and mapped zones are drawn exactly as measured (no 2px trim; editor resize handle outside the box). Same shard schema as v2.5.117. Deploy `panel-profiles.js`, `style.css`, and the `PDFmapping` assets with the frontend as one release. Executable Worker code, API/auth/Sheets behavior, SPEC_TRANSFORM_VERSION v2.5.113, DERIVED_REV 12, encrypted snapshot schema 1 and compatibility_date are unchanged. No Worker redeployment is required._
 
@@ -40,7 +40,7 @@ The SCHEMATICA ai Worker is a Cloudflare Worker that provides a secure, edge-com
 
 ## Version History
 
-- **v2.5.119**: Submittal blanks, cover defaults, and Submittal panel cleanup. Optional unauthenticated `BLANK_PDF` route reads `SUBMITTAL_BLANK_BASE` (HTTPS prefix only, same-origin path join, no redirect follow). SPEC_TRANSFORM_VERSION stays v2.5.113. Redeploy the Worker only to serve blanks.
+- **v2.5.119**: Submittal blanks, approved Cox letterforms, black overlay text, and Submittal panel cleanup. Unauthenticated `BLANK_PDF` downloads `/CP DOCS/CP-SUBMITTAL-BLANK/...` when `DROPBOX_ACCESS_TOKEN` is set, or uses HTTPS `SUBMITTAL_BLANK_BASE`. Turn on with `npx wrangler secret put DROPBOX_ACCESS_TOKEN` then `npx wrangler deploy`. SPEC_TRANSFORM_VERSION stays v2.5.113.
 - **v2.5.118**: Frontend-only rebuilt panel page map and exact (untrimmed) zone placement. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.117**: Frontend-only panel-ID page maps. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
 - **v2.5.116**: Frontend-only cell-inset whiteouts and fragmented title-block matching. Release banner aligned; Worker executable implementation remains v2.5.113. Deploy frontend only.
@@ -140,7 +140,7 @@ API keys are now read from Worker environment secrets instead of hardcoded value
 
 ## API Targets
 
-The Worker supports four primary targets, specified via the `?target=` query parameter:
+The Worker supports five primary targets, specified via the `?target=` query parameter:
 
 ### 1. PDF (Unauthenticated)
 
@@ -205,6 +205,37 @@ The worker automatically tries multiple variations:
 GET /?target=PDF_BY_ID&id=1234
 GET /?target=PDF_BY_ID&id=CP-1234.dwg
 ```
+
+---
+
+### 2b. BLANK_PDF (Unauthenticated)
+
+**Purpose**: Serve the blank Submittal PDF for a panel when Submittal is on.
+
+**Endpoint**: `/?target=BLANK_PDF&id=<panel_id>`
+
+**Method**: `GET`
+
+**Query Parameters**:
+- `id` (required): Control Panel ID (e.g., `CP-8204`)
+
+**Lookup order**:
+1. If `SUBMITTAL_BLANK_BASE` is a non-empty HTTPS prefix, fetch `{base}/CP8000-8999/CP8200-8299/CP-8204.pdf` (same-origin path join, no redirect follow). HTTP bases are rejected.
+2. Otherwise, if `DROPBOX_ACCESS_TOKEN` is set, `POST https://content.dropboxapi.com/2/files/download` with `Dropbox-API-Arg` path `/CP DOCS/CP-SUBMITTAL-BLANK/CP8000-8999/CP8200-8299/CP-8204.pdf`.
+3. Otherwise, if `DROPBOX_REFRESH_TOKEN`, `DROPBOX_APP_KEY`, and `DROPBOX_APP_SECRET` are all set, refresh an access token and download the same Dropbox path.
+
+**Turn on** (repo root, after `npx wrangler login`):
+```
+npx wrangler secret put DROPBOX_ACCESS_TOKEN
+npx wrangler deploy
+```
+The token needs Dropbox scope `files.content.read`. Do not commit the token. Do not point `SUBMITTAL_BLANK_BASE` at a public Dropbox share link.
+
+**Response**:
+- Success (200): PDF bytes, `Content-Type: application/pdf`, CORS `*`
+- Error (400): Missing panel id
+- Error (404) `Blank base not configured`: no HTTPS base and no usable Dropbox token (frontend stops probing)
+- Error (404) `Blank PDF not found`: this panel's blank is missing (frontend still tries other panels)
 
 ---
 
@@ -469,7 +500,7 @@ Configure these secrets in your Cloudflare Worker dashboard:
 
 ## Version History
 
-- **v2.5.119**: Optional `BLANK_PDF` proxy. Unset `SUBMITTAL_BLANK_BASE` keeps the 404 fallback. SPEC_TRANSFORM_VERSION v2.5.113. Existing routes unchanged.
+- **v2.5.119**: `BLANK_PDF` serves Dropbox `/CP DOCS/CP-SUBMITTAL-BLANK/...` when `DROPBOX_ACCESS_TOKEN` is set (`npx wrangler secret put DROPBOX_ACCESS_TOKEN` then `npx wrangler deploy`). HTTPS `SUBMITTAL_BLANK_BASE` still overrides. Unset config keeps 404 `Blank base not configured`. SPEC_TRANSFORM_VERSION v2.5.113. Existing routes unchanged.
 - **v2.5.118**: Frontend-only rebuilt panel page map and exact zone placement; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.117**: Frontend-only panel-ID page maps with per-zone fontFamily and fontSize; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.
 - **v2.5.116**: Frontend-only cell-inset whiteouts and fragmented title-block matching; no API/auth/Sheets or Worker executable changes and no Worker redeployment required.

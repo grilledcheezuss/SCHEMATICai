@@ -42,4 +42,59 @@ assert.equal(styled.textAlign, 'center');
 assert.equal(styled.decoration, 'underline');
 assert.equal(SubmittalFormat.labelFor('cust', 'customer_job'), 'Job');
 
-console.log('PASS submittal format');
+(async () => {
+    const originalFetch = global.fetch;
+    try {
+        let calls = 0;
+        global.fetch = async () => {
+            calls += 1;
+            return new Response('Blank base not configured', { status: 404 });
+        };
+        SubmittalFormat.resetCache();
+        assert.equal(await SubmittalFormat.fetchPdf('CP-8204', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8204' }), null);
+        assert.equal(await SubmittalFormat.fetchPdf('CP-8205', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8205' }), null);
+        assert.equal(calls, 1, 'not configured disables the worker probe');
+        assert.equal(SubmittalFormat.workerState(), 'off');
+
+        calls = 0;
+        global.fetch = async () => {
+            calls += 1;
+            return new Response('unauthorized', { status: 401 });
+        };
+        SubmittalFormat.resetCache();
+        assert.equal(await SubmittalFormat.fetchPdf('CP-8204', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8204' }), null);
+        assert.equal(await SubmittalFormat.fetchPdf('CP-8300', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8300' }), null);
+        assert.equal(calls, 1, '401 disables the worker probe');
+
+        calls = 0;
+        global.fetch = async (url) => {
+            calls += 1;
+            if (String(url).includes('CP-8204')) return new Response('Blank PDF not found', { status: 404 });
+            return new Response(Buffer.from('%PDF-1.4\n'), { status: 200 });
+        };
+        SubmittalFormat.resetCache();
+        assert.equal(await SubmittalFormat.fetchPdf('CP-8204', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8204' }), null);
+        const hit = await SubmittalFormat.fetchPdf('CP-8205', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8205' });
+        assert.ok(hit && hit.byteLength > 5, 'a missing blank does not disable other panels');
+        assert.equal(calls, 2);
+        assert.equal(SubmittalFormat.workerState(), 'on');
+
+        calls = 0;
+        global.fetch = async () => {
+            calls += 1;
+            return new Response(JSON.stringify({ error: 'unknown target' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        };
+        SubmittalFormat.resetCache();
+        assert.equal(await SubmittalFormat.fetchPdf('CP-8204', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8204' }), null);
+        assert.equal(await SubmittalFormat.fetchPdf('CP-8205', { workerUrl: 'https://worker.example/?target=BLANK_PDF&id=CP-8205' }), null);
+        assert.equal(calls, 1, 'json from an old worker disables the probe');
+        assert.equal(SubmittalFormat.workerState(), 'off');
+    } finally {
+        global.fetch = originalFetch;
+        SubmittalFormat.resetCache();
+    }
+    console.log('PASS submittal format');
+})().catch((error) => {
+    console.error(error);
+    process.exit(1);
+});

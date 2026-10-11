@@ -953,11 +953,26 @@ body.editor-active .redaction-box.selected {
     z-index: 100 !important; 
 }
 
-/* Submittal overlays always white out the source ink under the edit box. */
+/* Submittal overlays always white out the source ink under the edit box.
+   Overlay text stays black on the whiteout, including dark mode. */
 body.demo-mode .redaction-box { background: #fff !important; }
+body.demo-mode .redaction-box,
+body.demo-mode .redaction-text {
+    color: #000 !important;
+    text-shadow: none !important;
+}
 body.demo-mode .redaction-box[data-baked="1"] { display: none !important; }
 body.demo-mode .redaction-box.redaction-logo {
-    background: #0a0a12 url('assets/cox-research-logo.svg') center / contain no-repeat !important;
+    color: transparent !important;
+    background-color: #fff !important;
+    background-image: url('assets/cox-research-logo.svg?v=2.5.119') !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: contain !important;
+}
+body.demo-mode .redaction-box.redaction-logo .redaction-text { color: transparent !important; }
+body.demo-mode .redaction-box.redaction-logo[data-logo-ground="dark"] {
+    background-image: url('assets/cox-research-logo-on-dark.svg?v=2.5.119') !important;
 }
 .zone-field-tag { display: none; }
 body.editor-active .zone-field-tag {

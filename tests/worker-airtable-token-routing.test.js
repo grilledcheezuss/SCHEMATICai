@@ -260,5 +260,68 @@ function createFetchHarness(options = {}) {
         assert(escaped.status === 404 && calls.length === 1, 'non panel ids are not fetched');
     }
 
+    {
+        const calls = [];
+        const worker = loadWorker(async (input, init = {}) => {
+            const url = typeof input === 'string' ? input : input.url;
+            const headers = new Headers(init.headers || {});
+            const arg = headers.get('Dropbox-API-Arg');
+            calls.push({ url, method: (init.method || 'GET').toUpperCase(), arg, authorization: headers.get('Authorization') });
+            if (arg && arg.includes('CP-8204.pdf')) {
+                return new Response('%PDF-1.4 blank', { status: 200, headers: { 'Content-Type': 'application/octet-stream' } });
+            }
+            if (url.startsWith('https://files.example/')) return new Response('%PDF-1.4 blank', { status: 200 });
+            return new Response('missing', { status: 409 });
+        });
+        const served = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8204'), makeEnv({ DROPBOX_ACCESS_TOKEN: 'dbx-read-token' }), { waitUntil: () => {} });
+        assert(served.status === 200, 'dropbox blank is proxied');
+        assert(calls.length === 1, 'dropbox blank fetches once');
+        assert(calls[0].url === 'https://content.dropboxapi.com/2/files/download', 'dropbox download host');
+        assert(calls[0].method === 'POST', 'dropbox download is POST');
+        assert(calls[0].authorization === 'Bearer dbx-read-token', 'dropbox bearer token');
+        assert(calls[0].arg === JSON.stringify({ path: '/CP DOCS/CP-SUBMITTAL-BLANK/CP8000-8999/CP8200-8299/CP-8204.pdf' }), 'dropbox path is the blank folder');
+        const preferBase = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8204'), makeEnv({ DROPBOX_ACCESS_TOKEN: 'dbx-read-token', SUBMITTAL_BLANK_BASE: 'https://files.example/blanks' }), { waitUntil: () => {} });
+        assert(preferBase.status === 200 && calls[1].url === 'https://files.example/blanks/CP8000-8999/CP8200-8299/CP-8204.pdf', 'https base overrides dropbox');
+        const missingFile = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8205'), makeEnv({ DROPBOX_ACCESS_TOKEN: 'dbx-read-token' }), { waitUntil: () => {} });
+        assert(missingFile.status === 404 && await missingFile.text() === 'Blank PDF not found', 'missing dropbox file is not a config error');
+        const escaped = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=../secret'), makeEnv({ DROPBOX_ACCESS_TOKEN: 'dbx-read-token' }), { waitUntil: () => {} });
+        assert(escaped.status === 404 && calls.length === 3, 'bad ids are not sent to dropbox');
+    }
+
+    {
+        const calls = [];
+        const worker = loadWorker(async (input, init = {}) => {
+            const url = typeof input === 'string' ? input : input.url;
+            calls.push(url);
+            return new Response('expired', { status: 401 });
+        });
+        const rejected = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8204'), makeEnv({ DROPBOX_ACCESS_TOKEN: 'expired-token' }), { waitUntil: () => {} });
+        assert(rejected.status === 404 && await rejected.text() === 'Blank base not configured', 'dropbox 401 stops the client probe');
+        assert(calls.length === 1 && calls[0] === 'https://content.dropboxapi.com/2/files/download', 'rejected token still targets dropbox download');
+    }
+
+    {
+        const calls = [];
+        const worker = loadWorker(async (input, init = {}) => {
+            const url = typeof input === 'string' ? input : input.url;
+            calls.push({ url, body: init.body || '' });
+            if (url === 'https://api.dropboxapi.com/oauth2/token') {
+                return new Response(JSON.stringify({ access_token: 'minted-token', expires_in: 14400 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            }
+            const headers = new Headers(init.headers || {});
+            assert(headers.get('Authorization') === 'Bearer minted-token', 'refresh grant is exchanged before download');
+            return new Response('%PDF-1.4 blank', { status: 200 });
+        });
+        const served = await worker.fetch(new Request('https://worker.example/?target=BLANK_PDF&id=CP-8204'), makeEnv({
+            DROPBOX_REFRESH_TOKEN: 'refresh',
+            DROPBOX_APP_KEY: 'app-key',
+            DROPBOX_APP_SECRET: 'app-secret'
+        }), { waitUntil: () => {} });
+        assert(served.status === 200, 'refresh token serves a blank');
+        assert(calls[0].url === 'https://api.dropboxapi.com/oauth2/token', 'refresh hits the oauth token endpoint');
+        assert(String(calls[0].body).includes('grant_type=refresh_token'), 'refresh grant type');
+        assert(calls[1].url === 'https://content.dropboxapi.com/2/files/download', 'refresh is followed by download');
+    }
+
     console.log('✅ Airtable token/header routing regression tests passed');
 })();

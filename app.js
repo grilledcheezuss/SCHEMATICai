@@ -1,7 +1,7 @@
 // --- SCHEMATICA ai v2.5.119 ---
 const APP_VERSION = "v2.5.119";
 const VERSION_HISTORY = {
-    "v2.5.119": "Submittal Generator uses a blank panel PDF as the base when one is available (Cox logo, Cox address, and PROJECT SUBMITTAL already printed), and falls back to the mapped customer PDF when the blank is missing. Live overlays are job name, system type, and date; serial is whited out with no replacement text. Cover lines are centered serif, stage defaults to Submittal, and the info-page address is the P.O. Box block. The Submittal tab leads with customer info, then zone styling, and keeps Profile Management plus Save adjustments. 604 hide-list panels stay hidden while Submittal is on. Optional Worker BLANK_PDF proxy; existing routes and SPEC_TRANSFORM_VERSION stay v2.5.113.",
+    "v2.5.119": "Submittal Generator uses a blank panel PDF as the base when one is available (Cox logo, Cox address, and PROJECT SUBMITTAL already printed), and falls back to the mapped customer PDF when the blank is missing. Live overlays are job name, system type, and date in black; serial is whited out with no replacement text. The Cox mark uses the approved letterforms: black on white pages and title-block cells, white on a dark plate only inside tall cover logo zones. Cover lines are centered serif, stage defaults to Submittal, and the info-page address is the P.O. Box block. The Submittal tab leads with customer info, then zone styling, and keeps Profile Management plus Save adjustments. 604 hide-list panels stay hidden while Submittal is on. Worker BLANK_PDF reads Dropbox /CP DOCS/CP-SUBMITTAL-BLANK when DROPBOX_ACCESS_TOKEN is set (npx wrangler secret put DROPBOX_ACCESS_TOKEN, then npx wrangler deploy), or an HTTPS SUBMITTAL_BLANK_BASE. SPEC_TRANSFORM_VERSION stays v2.5.113.",
     "v2.5.118": "Submittal Generator panel page map rebuilt (5858 mapped panels, CP-3000 through CP-8378) with finer per-page placement, glyph-ink growth and page snapping, so whiteouts sit on the plotted text instead of drifting up or left; cover PROJECT SUBMITTAL / AS-BUILT headings map as the stage field. Mapped zones are now placed exactly as measured (the old 2px right/bottom trim is gone) and the editor resize handle sits outside the box. 57 Panel IDs stay unmapped and are hidden while Submittal is on. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.117": "Submittal Generator looks up each Panel ID in the measured page map (5865 panels, CP-3000 through CP-8378) and places that panel's text-tight zones, keeping every zone's fontFamily and fontSize. The catalog loads from PDFmapping at runtime. Mapped panels do not use Auto-Detect. Resize the boxes and save to overwrite that panel's profile. A 2px inset is applied only when a resize handle would cover the text. Frontend only — Worker executable remains v2.5.113.",
     "v2.5.116": "Submittal Generator whiteouts sit about 2px inside the ruled cell for each field on cover, info, and schematic profiles. Address, phone, and fax each keep their own slice of a shared contact cell instead of one tall box. Auto-Scan joins fragmented title-block rules so info and schematic pages can match a measured profile. Cover Template Panel ID is back on the template drawing-number row. Frontend only — Worker executable remains v2.5.113.",
@@ -2381,7 +2381,13 @@ class RedactionManager {
         box.style.fontSize = fontSize + 'px'; 
         box.style.fontWeight = fontWeight;
         box.style.textAlign = textAlign; 
-        if (mapKey === 'logo') box.classList.add('redaction-logo');
+        if (mapKey === 'logo') {
+            box.classList.add('redaction-logo');
+            const logoPage = parseInt(wrapper.dataset.pageNumber, 10);
+            if (logoPage === 1 && ch > 0 && (h / ch) >= 0.2) box.dataset.logoGround = 'dark';
+        }
+        box.style.color = mapKey === 'logo' ? 'transparent' : '#000';
+        box.style.textShadow = 'none';
         
         if (rotation) {
             box.dataset.rotation = rotation;
@@ -2665,6 +2671,17 @@ class RedactionManager {
                 textNode.style.fontFamily = box.style.fontFamily;
                 textNode.style.fontSize = 'inherit';
                 textNode.style.fontWeight = box.style.fontWeight || '';
+            }
+            if (textNode) {
+                textNode.style.color = map === 'logo' ? 'transparent' : '#000';
+                textNode.style.textShadow = 'none';
+            }
+            box.style.color = map === 'logo' ? 'transparent' : '#000';
+            box.style.textShadow = 'none';
+            if (map === 'logo' && wrapper) {
+                const relH = parseFloat(box.dataset.relH);
+                if (pageClass === 'COVER' && relH >= 0.2) box.dataset.logoGround = 'dark';
+                else delete box.dataset.logoGround;
             }
             
             if(box.dataset.decoration === 'underline') { 
@@ -5036,13 +5053,28 @@ class Generator {
         };
         const usingBlank = typeof PdfViewer !== 'undefined' && PdfViewer.usingBlank;
         const needsLogo = !usingBlank && snapshot.pages.some(entry => (entry.zones || []).some(zone => zone.map === 'logo'));
-        let logoImage = null;
+        let logoBlack = null;
+        let logoOnDark = null;
         if (needsLogo && typeof fetch === 'function') {
-            try {
-                const logoResponse = await fetch('assets/cox-research-logo.jpg');
-                if (logoResponse.ok) logoImage = await output.embedJpg(new Uint8Array(await logoResponse.arrayBuffer()));
-            } catch (error) { /* whiteout still covers the old mark */ }
+            const embedLogo = async (path) => {
+                try {
+                    const logoResponse = await fetch(path);
+                    if (!logoResponse.ok) return null;
+                    return await output.embedPng(new Uint8Array(await logoResponse.arrayBuffer()));
+                } catch (error) { return null; }
+            };
+            logoBlack = await embedLogo('assets/cox-research-logo.png?v=2.5.119');
+            logoOnDark = await embedLogo('assets/cox-research-logo-on-dark.png?v=2.5.119');
         }
+        const containedLogo = (rect, image) => {
+            const aspect = image.width / image.height;
+            const pad = 0.08;
+            let width = rect.width * (1 - pad * 2);
+            let height = width / aspect;
+            const limit = rect.height * (1 - pad * 2);
+            if (height > limit) { height = limit; width = height * aspect; }
+            return { x: rect.x + (rect.width - width) / 2, y: rect.y + (rect.height - height) / 2, width, height };
+        };
         for (const entry of snapshot.pages) {
             const page = output.getPage(entry.page - 1), g = entry.geometry;
             const pageClass = entry.page === 1 ? 'COVER' : 'SHEET';
@@ -5051,7 +5083,9 @@ class Generator {
                 const rect = GeneratorState.toPdfRect(g, zone);
                 if (zone.map === 'logo') {
                     page.drawRectangle({ ...rect, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
-                    if (logoImage) page.drawImage(logoImage, rect);
+                    const darkPlate = pageClass === 'COVER' && zone.h >= 0.2;
+                    const logoImage = darkPlate ? (logoOnDark || logoBlack) : logoBlack;
+                    if (logoImage) page.drawImage(logoImage, containedLogo(rect, logoImage));
                     continue;
                 }
                 if (zone.map === 'serial' || !zone.transparent) page.drawRectangle({ ...rect, color: PDFLib.rgb(1,1,1), borderWidth: 0 });
@@ -6805,6 +6839,7 @@ class PdfViewer {
             blank = null;
         }
         if (fetchId != null && this.currentFetchId !== fetchId) return sourceCopy;
+        this.syncBlankNotice();
         if (!blank) return sourceCopy;
         this.usingBlank = true;
         return blank.slice(0);
@@ -6829,6 +6864,7 @@ class PdfViewer {
             if (fetched) { bytes = fetched.slice(0); blank = true; }
         }
         if (probe !== this._blankProbeToken || loadToken !== this._documentLoadToken) return false;
+        this.syncBlankNotice();
         if (blank === this.usingBlank) return this.renderStack();
         this.usingBlank = blank;
         if (this.loadingTask) {
@@ -6844,6 +6880,12 @@ class PdfViewer {
         this.currentPdfBlob = blob;
         this.currentBlobUrl = URL.createObjectURL(blob);
         return this.renderStack();
+    }
+
+    static syncBlankNotice() {
+        const note = document.getElementById('submittal-blank-notice');
+        if (!note || typeof SubmittalFormat === 'undefined') return;
+        note.hidden = SubmittalFormat.workerState() !== 'off';
     }
 
     static async loadById(panelId, fallbackUrl) {
